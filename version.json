@@ -1,27 +1,27 @@
 {
-  "version": "2.4.6",
-  "versionCode": 17,
+  "version": "2.4.7",
+  "versionCode": 18,
   "releaseDate": "2026-08-17",
   "phone": {
-    "version": "2.4.6",
-    "versionCode": 17,
-    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.4.6/AJO_PHONE.apk",
+    "version": "2.4.7",
+    "versionCode": 18,
+    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.4.7/AJO_PHONE.apk",
     "changelog": [
-      "⚡ Netflix-Style Smart Adaptive Streaming (ABR): Automatically detects bandwidth & device resolution for instant crisp 1080p/4K",
-      "🎯 Fixed Channel Mappings: Aaj Tak, ABP News, India TV, NDTV, Zee News, News18, Republic play 100% verified authentic broadcasts",
-      "🖼️ Fixed Channel Thumbnails & Logos: Correct high-definition brand logos for every channel",
-      "🚀 Ultra-smooth 60fps buffer-free playback with zero latency"
+      "🎬 Fixed Documentaries & Originals Streaming: Attached verified 1080p direct HLS streams to all titles",
+      "🖼️ Fixed All Posters & Images: Replaced broken external image links with 100% verified status 200 CDN posters",
+      "🛡️ Bulletproof Fallback Cards: Elegant glassmorphic fallbacks if any image fails to load",
+      "⚡ Ultra-smooth 60fps buffer-free adaptive streaming"
     ],
     "size_mb": "4.6 MB"
   },
   "tv": {
-    "version": "2.4.6",
-    "versionCode": 17,
-    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.4.6/AJO_TV.apk",
+    "version": "2.4.7",
+    "versionCode": 18,
+    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.4.7/AJO_TV.apk",
     "changelog": [
-      "⚡ Netflix-Style Smart Adaptive Streaming (ABR): Automatically detects bandwidth & device resolution for instant crisp 1080p/4K",
-      "🎯 Fixed Channel Mappings: Aaj Tak, ABP News, India TV, NDTV, Zee News, News18, Republic play 100% verified authentic broadcasts",
-      "🖼️ Fixed Channel Thumbnails & Logos: Correct high-definition brand logos for every channel",
+      "🎬 Fixed Documentaries & Originals Streaming: Attached verified 1080p direct HLS streams to all titles",
+      "🖼️ Fixed All Posters & Images: Replaced broken external image links with 100% verified status 200 CDN posters",
+      "🛡️ Bulletproof Fallback Cards: Elegant glassmorphic fallbacks if any image fails to load",
       "🚀 Hardware-accelerated GPU 60fps rendering optimization"
     ],
     "size_mb": "4.6 MB"
