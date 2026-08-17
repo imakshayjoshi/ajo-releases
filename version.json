@@ -1,27 +1,27 @@
 {
-  "version": "2.4.5",
-  "versionCode": 16,
+  "version": "2.4.6",
+  "versionCode": 17,
   "releaseDate": "2026-08-17",
   "phone": {
-    "version": "2.4.5",
-    "versionCode": 16,
-    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.4.5/AJO_PHONE.apk",
+    "version": "2.4.6",
+    "versionCode": 17,
+    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.4.6/AJO_PHONE.apk",
     "changelog": [
-      "🔥 Integrated Multi-Provider Dynamic Engines (PlayTorrio & OnStream & Famelack)",
-      "⚔️ Full AllAnime 1080p GraphQL Anime Vault with English sub/dub & direct streams",
-      "📺 Merged 1,200+ Live TV Channels (Star, Sony, Sports, Cinema, Regional, Global)",
-      "🚀 Ultra-smooth 60fps hardware accelerated streaming engine"
+      "⚡ Netflix-Style Smart Adaptive Streaming (ABR): Automatically detects bandwidth & device resolution for instant crisp 1080p/4K",
+      "🎯 Fixed Channel Mappings: Aaj Tak, ABP News, India TV, NDTV, Zee News, News18, Republic play 100% verified authentic broadcasts",
+      "🖼️ Fixed Channel Thumbnails & Logos: Correct high-definition brand logos for every channel",
+      "🚀 Ultra-smooth 60fps buffer-free playback with zero latency"
     ],
     "size_mb": "4.6 MB"
   },
   "tv": {
-    "version": "2.4.5",
-    "versionCode": 16,
-    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.4.5/AJO_TV.apk",
+    "version": "2.4.6",
+    "versionCode": 17,
+    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.4.6/AJO_TV.apk",
     "changelog": [
-      "🔥 Integrated Multi-Provider Dynamic Engines (PlayTorrio & OnStream & Famelack)",
-      "⚔️ Full AllAnime 1080p GraphQL Anime Vault with English sub/dub & direct streams",
-      "📺 Merged 1,200+ Live TV Channels with instant D-Pad Channel Zapping",
+      "⚡ Netflix-Style Smart Adaptive Streaming (ABR): Automatically detects bandwidth & device resolution for instant crisp 1080p/4K",
+      "🎯 Fixed Channel Mappings: Aaj Tak, ABP News, India TV, NDTV, Zee News, News18, Republic play 100% verified authentic broadcasts",
+      "🖼️ Fixed Channel Thumbnails & Logos: Correct high-definition brand logos for every channel",
       "🚀 Hardware-accelerated GPU 60fps rendering optimization"
     ],
     "size_mb": "4.6 MB"
