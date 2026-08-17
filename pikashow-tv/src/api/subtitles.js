@@ -1,55 +1,17 @@
-/**
- * Subtitles Engine for AJO TV
- * Supports OpenSubtitles / Wyzie / Auto-generated WebVTT multi-language subtitles (English, Hindi, Spanish, French, German, Russian, etc.)
- */
+const REQUEST_TIMEOUT_MS = 4000;
 
 export async function fetchSubtitlesForMedia(item) {
   if (!item || item.is_live) return [];
-
-  const tmdbId = item.id || item.tmdb_id || item.imdb_id;
-  const imdbId = item.imdb_id;
-  const title = encodeURIComponent(item.title_en || item.title || '');
-  const year = item.year || '';
-
-  const subtitleTracks = [];
-
-  // Default English / Hindi / Multi-language fallback tracks
-  const defaultLanguages = [
-    { lang: 'en', label: 'English (SDH)', default: true },
-    { lang: 'hi', label: 'Hindi (हिंदी)', default: false },
-    { lang: 'es', label: 'Spanish (Español)', default: false },
-    { lang: 'fr', label: 'French (Français)', default: false },
-    { lang: 'ar', label: 'Arabic (العربية)', default: false }
-  ];
-
+  const tmdbId = item.tmdb_id || item.id;
+  if (!tmdbId) return [];
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
-    // 1. Try VidLink Subtitle API
-    if (tmdbId) {
-      const vidlinkUrl = `https://api.vidlink.pro/subtitles?id=${tmdbId}&type=${item.type === 'series' ? 'tv' : 'movie'}`;
-      const res = await fetch(vidlinkUrl, { signal: AbortSignal.timeout(3500) });
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
-          return data.map(sub => ({
-            id: sub.id || sub.lang,
-            lang: sub.lang || 'en',
-            label: sub.label || sub.language || 'Subtitles',
-            url: sub.url,
-            default: sub.lang === 'en'
-          }));
-        }
-      }
-    }
-  } catch (err) {
-    // Fallback gracefully
-  }
-
-  // 2. Return universal tracks
-  return defaultLanguages.map(l => ({
-    id: l.lang,
-    lang: l.lang,
-    label: l.label,
-    default: l.default,
-    url: ''
-  }));
+    const type = ['series', 'serial', 'serials', 'tv'].includes(item.type) ? 'tv' : 'movie';
+    const response = await fetch(`https://api.vidlink.pro/subtitles?id=${encodeURIComponent(tmdbId)}&type=${type}`, { signal: controller.signal });
+    if (!response.ok) return [];
+    const data = await response.json();
+    if (!Array.isArray(data)) return [];
+    return data.flatMap((track, index) => !track?.url || !/^https?:\/\//i.test(track.url) ? [] : [{ id: track.id || `${track.lang || 'und'}-${index}`, lang: track.lang || 'und', label: track.label || track.language || track.lang || 'Subtitles', url: track.url, default: Boolean(track.default || track.lang === 'en') }]);
+  } catch { return []; } finally { clearTimeout(timer); }
 }

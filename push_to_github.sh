@@ -1,24 +1,13 @@
 #!/bin/bash
-# AJO GitHub Uploader Script
-# Usage: ./push_to_github.sh [GITHUB_TOKEN] [REPO_NAME]
+set -euo pipefail
+REPO="${1:-imakshayjoshi/ajo-releases}"
 
-TOKEN="$1"
-REPO="${2:-imakshayjoshi/ajo-releases}"
-
-if [ -z "$TOKEN" ]; then
-  echo "❌ Please provide a GitHub Personal Access Token (with 'repo' scope):"
-  echo "   ./push_to_github.sh <YOUR_GITHUB_TOKEN> [owner/repo]"
-  echo ""
-  echo "Or if you are already authenticated with gh CLI, simply run:"
-  echo "   git push https://github.com/${REPO}.git main"
+if ! command -v gh >/dev/null 2>&1; then
+  echo "GitHub CLI is required. Install it, then run: gh auth login"
   exit 1
 fi
 
-echo "🚀 Setting up remote for https://github.com/${REPO}.git ..."
+gh auth status >/dev/null
 git remote remove origin 2>/dev/null || true
-git remote add origin "https://${TOKEN}@github.com/${REPO}.git"
-
-echo "📤 Pushing all source files to GitHub main branch..."
-git push -u origin main --force
-
-echo "✅ Successfully uploaded all source files to https://github.com/${REPO}!"
+git remote add origin "https://github.com/${REPO}.git"
+git push -u origin main
