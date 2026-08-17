@@ -1,27 +1,27 @@
 {
-  "version": "2.4.1",
-  "versionCode": 12,
+  "version": "2.4.2",
+  "versionCode": 13,
   "releaseDate": "2026-08-17",
   "phone": {
-    "version": "2.4.1",
-    "versionCode": 12,
-    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.4.1/AJO_PHONE.apk",
+    "version": "2.4.2",
+    "versionCode": 13,
+    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.4.2/AJO_PHONE.apk",
     "changelog": [
-      "🔧 Fixed isIframe ReferenceError in TV Player component",
-      "📺 Full 740+ Live TV Channels with instant streaming",
-      "🎬 All Movies & Web Series with Expanded Catalogs & Infinite Scrolling",
-      "⚡ 100% Native Video Engine (Zero iframes, Zero ads, Zero sandbox)"
+      "⚡ Instant OTA Updates: Dual-channel parallel update checks with zero-delay cache bypass",
+      "🚀 Background Auto-Check: Update info is pre-loaded the instant you open Settings",
+      "📺 Full 740+ Live Channels with instant playback & multi-audio",
+      "📱 100% Native Video Engine with hardware-accelerated 60fps controls"
     ],
     "size_mb": "4.6 MB"
   },
   "tv": {
-    "version": "2.4.1",
-    "versionCode": 12,
-    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.4.1/AJO_TV.apk",
+    "version": "2.4.2",
+    "versionCode": 13,
+    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.4.2/AJO_TV.apk",
     "changelog": [
-      "🔧 Fixed isIframe ReferenceError in TV Player component",
-      "📺 Full 740+ Live TV Channels with instant D-Pad Channel Zapping",
-      "🎬 All Movies & Web Series with Expanded Catalogs & Infinite Scrolling",
+      "⚡ Instant OTA Updates: Dual-channel parallel update checks with zero-delay cache bypass",
+      "🚀 Background Auto-Check: Update info is pre-loaded the instant you open Settings",
+      "📺 Full 740+ Live Channels with instant D-Pad Channel Zapping",
       "🚀 Hardware-accelerated GPU 60fps rendering optimization"
     ],
     "size_mb": "4.6 MB"
