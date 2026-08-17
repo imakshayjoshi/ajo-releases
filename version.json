@@ -1,28 +1,28 @@
 {
-  "version": "2.1.0",
-  "versionCode": 4,
+  "version": "2.2.0",
+  "versionCode": 5,
   "releaseDate": "2026-08-17",
   "phone": {
-    "version": "2.1.0",
-    "versionCode": 4,
-    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/latest/download/AJO_PHONE.apk",
+    "version": "2.2.0",
+    "versionCode": 5,
+    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.2.0/AJO_PHONE.apk",
     "changelog": [
-      "⚡ Edge-to-Edge immersive fullscreen mode (no status bar, no black bars)",
-      "📱 Touch scrolling fix with smooth momentum scrolling & navigation bar",
-      "📺 Fire TV Stick cast reliability and sanitized compact payload sync",
-      "🚀 On-device 1-tap OTA software updates"
+      "🚀 Ultra-Smooth 120Hz & 60fps momentum touch scrolling optimization",
+      "⚡ GPU hardware layer compositing for vertical and horizontal rails",
+      "📱 Fixed scroll dampening and improved swipe response across all devices",
+      "📺 Fire TV Stick cast reliability and sanitized compact payload sync"
     ],
     "size_mb": "4.6 MB"
   },
   "tv": {
-    "version": "2.1.0",
-    "versionCode": 4,
-    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/latest/download/AJO_TV.apk",
+    "version": "2.2.0",
+    "versionCode": 5,
+    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.2.0/AJO_TV.apk",
     "changelog": [
+      "🚀 Hardware-accelerated GPU 60fps rendering optimization",
       "📺 Google TV & Fire TV D-Pad navigation enhancement",
       "⚡ Real-time cloud & local casting sync from phone",
-      "🛡️ Enhanced ad-shield popup suppressor",
-      "🚀 On-device 1-tap OTA software updates"
+      "🛡️ Enhanced ad-shield popup suppressor"
     ],
     "size_mb": "4.6 MB"
   }
