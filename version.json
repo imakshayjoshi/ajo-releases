@@ -1,27 +1,27 @@
 {
-  "version": "2.2.3",
-  "versionCode": 8,
+  "version": "2.2.4",
+  "versionCode": 9,
   "releaseDate": "2026-08-17",
   "phone": {
-    "version": "2.2.3",
-    "versionCode": 8,
-    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.2.3/AJO_PHONE.apk",
+    "version": "2.2.4",
+    "versionCode": 9,
+    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.2.4/AJO_PHONE.apk",
     "changelog": [
-      "🛡️ 100% Ad-Shield Protection: Native & Web interceptors block all new tabs and popup ads",
-      "⚡ Automatic Server Failover: Instantly switches to mirror server if stream buffers > 5s",
-      "🔘 High-Visibility Server Switcher: Direct on-screen 1-tap mirror server selector pills",
-      "📱 Fixed stuck touch scrolling: Fluid dual-axis swipe on cards and media rails"
+      "🛡️ Complete Sandbox Warning Suppression & Zero-Ad Experience",
+      "⚡ Automatic Server Failover with prominent on-screen mirror pills",
+      "📱 Silky Smooth 120Hz scrolling across all rails and cards",
+      "🔍 Pinch-to-Zoom, Aspect Ratio toggle (Fit / Zoom / Stretch), and Double-Tap Zoom"
     ],
     "size_mb": "4.6 MB"
   },
   "tv": {
-    "version": "2.2.3",
-    "versionCode": 8,
-    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.2.3/AJO_TV.apk",
+    "version": "2.2.4",
+    "versionCode": 9,
+    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.2.4/AJO_TV.apk",
     "changelog": [
-      "🛡️ 100% Ad-Shield Protection: Neutralizes all popups and external redirects natively",
-      "⚡ Automatic Server Failover: Smooth multi-CDN mirror switching",
-      "🔘 High-Visibility Server Switcher: D-Pad selectable server bar",
+      "🛡️ Complete Sandbox Warning Suppression & Zero-Ad Experience",
+      "⚡ Automatic Server Failover with D-Pad mirror selector",
+      "🔲 1-Tap Aspect Ratio toggle: Fit (16:9), Zoom (Fill), Stretch (100%), 4:3",
       "🚀 Hardware-accelerated GPU 60fps rendering optimization"
     ],
     "size_mb": "4.6 MB"
