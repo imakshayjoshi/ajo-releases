@@ -1,27 +1,27 @@
 {
-  "version": "2.4.2",
-  "versionCode": 13,
+  "version": "2.4.3",
+  "versionCode": 14,
   "releaseDate": "2026-08-17",
   "phone": {
-    "version": "2.4.2",
-    "versionCode": 13,
-    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.4.2/AJO_PHONE.apk",
+    "version": "2.4.3",
+    "versionCode": 14,
+    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.4.3/AJO_PHONE.apk",
     "changelog": [
-      "⚡ Instant OTA Updates: Dual-channel parallel update checks with zero-delay cache bypass",
-      "🚀 Background Auto-Check: Update info is pre-loaded the instant you open Settings",
-      "📺 Full 740+ Live Channels with instant playback & multi-audio",
-      "📱 100% Native Video Engine with hardware-accelerated 60fps controls"
+      "🚀 Sleek Floating Startup Update Notice: Informs you immediately with 1-tap install",
+      "⚡ Ultra-Fast OTA checking with zero-delay cache bypass",
+      "📺 Full 740+ Live TV Channels with instant streaming & HD quality",
+      "🎬 All Movies & Web Series with continuous infinite scrolling"
     ],
     "size_mb": "4.6 MB"
   },
   "tv": {
-    "version": "2.4.2",
-    "versionCode": 13,
-    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.4.2/AJO_TV.apk",
+    "version": "2.4.3",
+    "versionCode": 14,
+    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.4.3/AJO_TV.apk",
     "changelog": [
-      "⚡ Instant OTA Updates: Dual-channel parallel update checks with zero-delay cache bypass",
-      "🚀 Background Auto-Check: Update info is pre-loaded the instant you open Settings",
-      "📺 Full 740+ Live Channels with instant D-Pad Channel Zapping",
+      "🚀 Sleek Floating Startup Update Notice: Informs you immediately with 1-tap install",
+      "⚡ Ultra-Fast OTA checking with zero-delay cache bypass",
+      "📺 Full 740+ Live TV Channels with instant D-Pad Channel Zapping",
       "🚀 Hardware-accelerated GPU 60fps rendering optimization"
     ],
     "size_mb": "4.6 MB"
