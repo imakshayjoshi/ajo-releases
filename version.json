@@ -1,26 +1,26 @@
 {
-  "version": "2.4.3",
-  "versionCode": 14,
+  "version": "2.4.4",
+  "versionCode": 15,
   "releaseDate": "2026-08-17",
   "phone": {
-    "version": "2.4.3",
-    "versionCode": 14,
-    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.4.3/AJO_PHONE.apk",
+    "version": "2.4.4",
+    "versionCode": 15,
+    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.4.4/AJO_PHONE.apk",
     "changelog": [
-      "🚀 Sleek Floating Startup Update Notice: Informs you immediately with 1-tap install",
-      "⚡ Ultra-Fast OTA checking with zero-delay cache bypass",
-      "📺 Full 740+ Live TV Channels with instant streaming & HD quality",
-      "🎬 All Movies & Web Series with continuous infinite scrolling"
+      "🎬 100% Authentic Content Streams: Connected official PikaShow movie & series streaming engines",
+      "🚫 Removed all dummy/test streams: Every title plays its genuine content in Full HD / 4K",
+      "⚡ Dual-audio & Multi-server support (Hindi, English, Tamil, Telugu)",
+      "📺 Full 740+ Live TV Channels with instant streaming & HD quality"
     ],
     "size_mb": "4.6 MB"
   },
   "tv": {
-    "version": "2.4.3",
-    "versionCode": 14,
-    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.4.3/AJO_TV.apk",
+    "version": "2.4.4",
+    "versionCode": 15,
+    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.4.4/AJO_TV.apk",
     "changelog": [
-      "🚀 Sleek Floating Startup Update Notice: Informs you immediately with 1-tap install",
-      "⚡ Ultra-Fast OTA checking with zero-delay cache bypass",
+      "🎬 100% Authentic Content Streams: Connected official PikaShow movie & series streaming engines",
+      "🚫 Removed all dummy/test streams: Every title plays its genuine content in Full HD / 4K",
       "📺 Full 740+ Live TV Channels with instant D-Pad Channel Zapping",
       "🚀 Hardware-accelerated GPU 60fps rendering optimization"
     ],
