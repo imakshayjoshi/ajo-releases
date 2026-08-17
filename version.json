@@ -1,45 +1,41 @@
 {
   "schemaVersion": 2,
-  "version": "2.4.8",
-  "versionCode": 19,
+  "version": "2.4.9",
+  "versionCode": 20,
   "releaseDate": "2026-08-17",
   "phone": {
-    "version": "2.4.8",
-    "versionCode": 19,
+    "version": "2.4.9",
+    "versionCode": 20,
     "packageId": "com.ajo.phone",
-    "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.4.8/AJO_PHONE.apk",
-    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.4.8/AJO_PHONE.apk",
-    "sha256": "abaac0b0009238b92f1883e7868f88775e73f17fc8b46617e089d595c2c6b9b5",
+    "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.4.9/AJO_PHONE.apk",
+    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.4.9/AJO_PHONE.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "⚡ Ultra-Fast Fire TV & Android TV Performance: Hardware 60fps rendering, zero GPU lag",
-      "🎮 3-Way Instant Phone-to-TV Pairing & Tactile D-Pad Remote Control",
-      "📺 1-Tap Instant TV Channel Cast with 680+ live channels & instant streaming",
+      "📺 Fixed TV Home Rails: Dense 8-9 cards per row with perfect spacing",
+      "🔥 ShortTV Mini-Drama Series Hub on TV: 6-column gallery & episode selector",
+      "⚡ WebSocket MQTT Ultra-Fast Casting: Zero rate limits & instant channel playback",
       "🎬 Auto-Dismissing Video Player Controls (3-second smooth inactivity timer)",
-      "📱 ShortTV & Drama Shorts Binge Mode: TikTok/MovieBox-style vertical player",
-      "🔥 Worldwide Content Multi-Filter: Region, Audio Language, Genre, Year & Sort",
-      "🛡️ 100% Zero-Ad Clean VIP Experience: Direct master HLS streams"
+      "🛡️ Multi-Mirror Smart Stream Auto-Failover to VIP 1080p CDNs",
+      "🎮 Tactile D-Pad Remote Control & Shorthand Room Code Auto-Expansion"
     ],
     "size_mb": "4.3 MB"
   },
   "tv": {
-    "version": "2.4.8",
-    "versionCode": 19,
+    "version": "2.4.9",
+    "versionCode": 20,
     "packageId": "com.ajo.tv",
-    "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.4.8/AJO_TV.apk",
-    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.4.8/AJO_TV.apk",
-    "sha256": "b52e3ad7e5b721a7cc5188ea105430e6cfac9addab377a79da635b48147cdf22",
+    "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.4.9/AJO_TV.apk",
+    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.4.9/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "⚡ Ultra-Fast Fire TV & Android TV Performance: Hardware 60fps rendering, zero GPU lag",
-      "🎮 Seamless Fire TV Remote Navigation with Hardware Key Deduplication & 2D Focus Grid",
-      "📺 High-Performance Cast Receiver for 1-Tap Instant Phone Casting",
+      "📺 Fixed TV Home Rails: Dense 8-9 cards per row with perfect spacing",
+      "🔥 ShortTV Mini-Drama Series Hub on TV: 6-column gallery & episode selector",
+      "⚡ High-Performance Cast Receiver for Instant 1-Tap Phone-to-TV Streaming",
       "🎬 Auto-Dismissing Video Player Controls (3-second smooth inactivity timer)",
-      "📱 ShortTV & Drama Shorts Binge Mode: Full-screen mini-series with episode drawer",
-      "🔥 Worldwide Content Multi-Filter: Region, Audio Language, Genre, Year & Sort",
-      "🛡️ 100% Zero-Ad Clean VIP Experience: Direct master HLS streams"
+      "🛡️ Multi-Mirror Smart Stream Auto-Failover to VIP 1080p CDNs",
+      "🎮 Seamless Fire TV & Android TV Remote Focus Navigation"
     ],
     "size_mb": "4.3 MB"
   }
