@@ -1,27 +1,27 @@
 {
-  "version": "2.4.4",
-  "versionCode": 15,
+  "version": "2.4.5",
+  "versionCode": 16,
   "releaseDate": "2026-08-17",
   "phone": {
-    "version": "2.4.4",
-    "versionCode": 15,
-    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.4.4/AJO_PHONE.apk",
+    "version": "2.4.5",
+    "versionCode": 16,
+    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.4.5/AJO_PHONE.apk",
     "changelog": [
-      "🎬 100% Authentic Content Streams: Connected official PikaShow movie & series streaming engines",
-      "🚫 Removed all dummy/test streams: Every title plays its genuine content in Full HD / 4K",
-      "⚡ Dual-audio & Multi-server support (Hindi, English, Tamil, Telugu)",
-      "📺 Full 740+ Live TV Channels with instant streaming & HD quality"
+      "🔥 Integrated Multi-Provider Dynamic Engines (PlayTorrio & OnStream & Famelack)",
+      "⚔️ Full AllAnime 1080p GraphQL Anime Vault with English sub/dub & direct streams",
+      "📺 Merged 1,200+ Live TV Channels (Star, Sony, Sports, Cinema, Regional, Global)",
+      "🚀 Ultra-smooth 60fps hardware accelerated streaming engine"
     ],
     "size_mb": "4.6 MB"
   },
   "tv": {
-    "version": "2.4.4",
-    "versionCode": 15,
-    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.4.4/AJO_TV.apk",
+    "version": "2.4.5",
+    "versionCode": 16,
+    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.4.5/AJO_TV.apk",
     "changelog": [
-      "🎬 100% Authentic Content Streams: Connected official PikaShow movie & series streaming engines",
-      "🚫 Removed all dummy/test streams: Every title plays its genuine content in Full HD / 4K",
-      "📺 Full 740+ Live TV Channels with instant D-Pad Channel Zapping",
+      "🔥 Integrated Multi-Provider Dynamic Engines (PlayTorrio & OnStream & Famelack)",
+      "⚔️ Full AllAnime 1080p GraphQL Anime Vault with English sub/dub & direct streams",
+      "📺 Merged 1,200+ Live TV Channels with instant D-Pad Channel Zapping",
       "🚀 Hardware-accelerated GPU 60fps rendering optimization"
     ],
     "size_mb": "4.6 MB"
