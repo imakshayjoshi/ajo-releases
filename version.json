@@ -1,28 +1,28 @@
 {
-  "version": "2.2.1",
-  "versionCode": 6,
+  "version": "2.2.2",
+  "versionCode": 7,
   "releaseDate": "2026-08-17",
   "phone": {
-    "version": "2.2.1",
-    "versionCode": 6,
-    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.2.1/AJO_PHONE.apk",
+    "version": "2.2.2",
+    "versionCode": 7,
+    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.2.2/AJO_PHONE.apk",
     "changelog": [
-      "🎬 Fixed Media Details Bottom Sheet Modal & Play Button on card tap",
-      "🚀 Silky-Smooth 120Hz & 60fps momentum touch scrolling optimization",
-      "⚡ GPU hardware layer compositing for vertical and horizontal rails",
-      "📺 Fire TV Stick cast reliability and 1-tap OTA updates"
+      "🔍 Pinch-to-Zoom & Double-Tap Screen Fit / Zoom to eliminate black bars",
+      "🔲 1-Tap Aspect Ratio toggle: Fit (16:9), Zoom (Fill), Stretch (100%), 4:3",
+      "🛡️ Disabled sandbox restrictions and eliminated iframe sandbox warnings",
+      "🎬 Fixed Media Details Bottom Sheet Modal with Play Now button on card tap"
     ],
     "size_mb": "4.6 MB"
   },
   "tv": {
-    "version": "2.2.1",
-    "versionCode": 6,
-    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.2.1/AJO_TV.apk",
+    "version": "2.2.2",
+    "versionCode": 7,
+    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.2.2/AJO_TV.apk",
     "changelog": [
+      "🔲 1-Tap Aspect Ratio toggle: Fit (16:9), Zoom (Fill), Stretch (100%), 4:3",
+      "🛡️ Disabled sandbox restrictions and eliminated iframe sandbox warnings",
       "🚀 Hardware-accelerated GPU 60fps rendering optimization",
-      "📺 Google TV & Fire TV D-Pad navigation enhancement",
-      "⚡ Real-time cloud & local casting sync from phone",
-      "🛡️ Enhanced ad-shield popup suppressor"
+      "📺 Google TV & Fire TV D-Pad navigation enhancement"
     ],
     "size_mb": "4.6 MB"
   }
