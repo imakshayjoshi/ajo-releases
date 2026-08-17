@@ -1,41 +1,43 @@
 {
   "schemaVersion": 2,
-  "version": "2.4.9",
-  "versionCode": 20,
+  "version": "2.5.0",
+  "versionCode": 21,
   "releaseDate": "2026-08-17",
   "phone": {
-    "version": "2.4.9",
-    "versionCode": 20,
+    "version": "2.5.0",
+    "versionCode": 21,
     "packageId": "com.ajo.phone",
-    "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.4.9/AJO_PHONE.apk",
-    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.4.9/AJO_PHONE.apk",
+    "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.5.0/AJO_PHONE.apk",
+    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.5.0/AJO_PHONE.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "📺 Fixed TV Home Rails: Dense 8-9 cards per row with perfect spacing",
+      "🎮 Seamless 2D Spatial Navigation & Smooth TV Scrolling for all D-Pad remotes",
+      "📺 Fixed TV Home Rails & 7-Column Content Grid: 8-9 cards per row with perfect spacing",
       "🔥 ShortTV Mini-Drama Series Hub on TV: 6-column gallery & episode selector",
       "⚡ WebSocket MQTT Ultra-Fast Casting: Zero rate limits & instant channel playback",
       "🎬 Auto-Dismissing Video Player Controls (3-second smooth inactivity timer)",
-      "🛡️ Multi-Mirror Smart Stream Auto-Failover to VIP 1080p CDNs",
-      "🎮 Tactile D-Pad Remote Control & Shorthand Room Code Auto-Expansion"
+      "🛡️ Smart Stream Auto-Failover to VIP 1080p CDNs",
+      "✨ Fixed update notification false-triggers on latest installed version"
     ],
     "size_mb": "4.3 MB"
   },
   "tv": {
-    "version": "2.4.9",
-    "versionCode": 20,
+    "version": "2.5.0",
+    "versionCode": 21,
     "packageId": "com.ajo.tv",
-    "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.4.9/AJO_TV.apk",
-    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.4.9/AJO_TV.apk",
+    "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.5.0/AJO_TV.apk",
+    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.5.0/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "📺 Fixed TV Home Rails: Dense 8-9 cards per row with perfect spacing",
+      "🎮 Seamless 2D Spatial Navigation & Smooth TV Scrolling for all D-Pad remotes",
+      "📺 Fixed TV Home Rails & 7-Column Content Grid: 8-9 cards per row with perfect spacing",
       "🔥 ShortTV Mini-Drama Series Hub on TV: 6-column gallery & episode selector",
       "⚡ High-Performance Cast Receiver for Instant 1-Tap Phone-to-TV Streaming",
       "🎬 Auto-Dismissing Video Player Controls (3-second smooth inactivity timer)",
-      "🛡️ Multi-Mirror Smart Stream Auto-Failover to VIP 1080p CDNs",
-      "🎮 Seamless Fire TV & Android TV Remote Focus Navigation"
+      "🛡️ Smart Stream Auto-Failover to VIP 1080p CDNs",
+      "✨ Fixed update notification false-triggers on latest installed version"
     ],
     "size_mb": "4.3 MB"
   }
