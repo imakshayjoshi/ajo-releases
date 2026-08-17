@@ -1,27 +1,27 @@
 {
-  "version": "2.3.0",
-  "versionCode": 10,
+  "version": "2.4.0",
+  "versionCode": 11,
   "releaseDate": "2026-08-17",
   "phone": {
-    "version": "2.3.0",
-    "versionCode": 10,
-    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.3.0/AJO_PHONE.apk",
+    "version": "2.4.0",
+    "versionCode": 11,
+    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.4.0/AJO_PHONE.apk",
     "changelog": [
-      "🚫 Completely Removed 1Flex & Third-Party Embeds (Zero Sandbox & Zero Popups)",
-      "⚡ 100% Direct Native HLS 4K/1080p Playback Engine with Hls.js",
-      "📺 700+ Verified Live Channels (Sports, Star, Sony, Zee, Colors, News, Regional)",
-      "📱 Full-Featured Native Bottom Controls Bar, Seek & Pinch-to-Zoom"
+      "📺 Full 740+ Live TV Channels Unlocked (Sports, Entertainment, Cinema, News, Regional & International)",
+      "🎬 All Movies & Web Series with Expanded Catalogs & Infinite Scrolling",
+      "⚡ 100% Native HLS Video Playback (Zero iframes, Zero ads, Zero sandbox)",
+      "🔍 Advanced Genre & Language Filters (Hindi, Marathi, Punjabi, Tamil, Telugu, Bangla)"
     ],
     "size_mb": "4.6 MB"
   },
   "tv": {
-    "version": "2.3.0",
-    "versionCode": 10,
-    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.3.0/AJO_TV.apk",
+    "version": "2.4.0",
+    "versionCode": 11,
+    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.4.0/AJO_TV.apk",
     "changelog": [
-      "🚫 Completely Removed 1Flex & Third-Party Embeds (Zero Sandbox & Zero Popups)",
-      "⚡ 100% Direct Native HLS 4K/1080p Playback Engine with Hls.js",
-      "📺 700+ Verified Live Channels with instant D-Pad Channel Zapping",
+      "📺 Full 740+ Live TV Channels with instant D-Pad Channel Zapping",
+      "🎬 All Movies & Web Series with Expanded Catalogs & Infinite Scrolling",
+      "⚡ 100% Native HLS Video Playback (Zero iframes, Zero ads, Zero sandbox)",
       "🚀 Hardware-accelerated GPU 60fps rendering optimization"
     ],
     "size_mb": "4.6 MB"
