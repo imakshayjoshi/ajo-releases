@@ -1,29 +1,46 @@
 {
+  "schemaVersion": 2,
   "version": "2.4.8",
   "versionCode": 19,
   "releaseDate": "2026-08-17",
   "phone": {
     "version": "2.4.8",
     "versionCode": 19,
+    "packageId": "com.ajo.phone",
+    "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.4.8/AJO_PHONE.apk",
     "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.4.8/AJO_PHONE.apk",
+    "sha256": "abaac0b0009238b92f1883e7868f88775e73f17fc8b46617e089d595c2c6b9b5",
+    "mandatory": false,
+    "minimumVersionCode": 1,
     "changelog": [
-      "🔥 Worldwide Content Multi-Filter: Filter all titles by Region (India, Hollywood, Korea, Japan, UK, Nollywood, Europe), Audio Language, Genre, Year & Sort",
-      "📱 ShortTV & Drama Shorts Binge Mode: TikTok/MovieBox-style vertical short drama player with fast swipe, multi-episode drawer & zero ads",
-      "⚡ 100% Zero-Ad Clean VIP Experience: Direct master HLS streams & instant HD startup",
-      "🚀 Ultra-smooth 60fps hardware accelerated playback"
+      "⚡ Ultra-Fast Fire TV & Android TV Performance: Hardware 60fps rendering, zero GPU lag",
+      "🎮 3-Way Instant Phone-to-TV Pairing & Tactile D-Pad Remote Control",
+      "📺 1-Tap Instant TV Channel Cast with 680+ live channels & instant streaming",
+      "🎬 Auto-Dismissing Video Player Controls (3-second smooth inactivity timer)",
+      "📱 ShortTV & Drama Shorts Binge Mode: TikTok/MovieBox-style vertical player",
+      "🔥 Worldwide Content Multi-Filter: Region, Audio Language, Genre, Year & Sort",
+      "🛡️ 100% Zero-Ad Clean VIP Experience: Direct master HLS streams"
     ],
-    "size_mb": "4.6 MB"
+    "size_mb": "4.3 MB"
   },
   "tv": {
     "version": "2.4.8",
     "versionCode": 19,
+    "packageId": "com.ajo.tv",
+    "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.4.8/AJO_TV.apk",
     "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.4.8/AJO_TV.apk",
+    "sha256": "b52e3ad7e5b721a7cc5188ea105430e6cfac9addab377a79da635b48147cdf22",
+    "mandatory": false,
+    "minimumVersionCode": 1,
     "changelog": [
-      "🔥 Worldwide Content Multi-Filter: Filter all titles by Region (India, Hollywood, Korea, Japan, UK, Nollywood, Europe), Audio Language, Genre, Year & Sort",
-      "📱 ShortTV & Drama Shorts Binge Mode: Full-screen drama shorts & mini-series streaming with episode drawer",
-      "⚡ 100% Zero-Ad Clean VIP Experience: Direct master HLS streams & instant HD startup",
-      "🚀 Ultra-smooth 60fps hardware accelerated playback"
+      "⚡ Ultra-Fast Fire TV & Android TV Performance: Hardware 60fps rendering, zero GPU lag",
+      "🎮 Seamless Fire TV Remote Navigation with Hardware Key Deduplication & 2D Focus Grid",
+      "📺 High-Performance Cast Receiver for 1-Tap Instant Phone Casting",
+      "🎬 Auto-Dismissing Video Player Controls (3-second smooth inactivity timer)",
+      "📱 ShortTV & Drama Shorts Binge Mode: Full-screen mini-series with episode drawer",
+      "🔥 Worldwide Content Multi-Filter: Region, Audio Language, Genre, Year & Sort",
+      "🛡️ 100% Zero-Ad Clean VIP Experience: Direct master HLS streams"
     ],
-    "size_mb": "4.6 MB"
+    "size_mb": "4.3 MB"
   }
 }
