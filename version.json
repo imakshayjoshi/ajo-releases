@@ -1,27 +1,27 @@
 {
-  "version": "2.2.4",
-  "versionCode": 9,
+  "version": "2.3.0",
+  "versionCode": 10,
   "releaseDate": "2026-08-17",
   "phone": {
-    "version": "2.2.4",
-    "versionCode": 9,
-    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.2.4/AJO_PHONE.apk",
+    "version": "2.3.0",
+    "versionCode": 10,
+    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.3.0/AJO_PHONE.apk",
     "changelog": [
-      "🛡️ Complete Sandbox Warning Suppression & Zero-Ad Experience",
-      "⚡ Automatic Server Failover with prominent on-screen mirror pills",
-      "📱 Silky Smooth 120Hz scrolling across all rails and cards",
-      "🔍 Pinch-to-Zoom, Aspect Ratio toggle (Fit / Zoom / Stretch), and Double-Tap Zoom"
+      "🚫 Completely Removed 1Flex & Third-Party Embeds (Zero Sandbox & Zero Popups)",
+      "⚡ 100% Direct Native HLS 4K/1080p Playback Engine with Hls.js",
+      "📺 700+ Verified Live Channels (Sports, Star, Sony, Zee, Colors, News, Regional)",
+      "📱 Full-Featured Native Bottom Controls Bar, Seek & Pinch-to-Zoom"
     ],
     "size_mb": "4.6 MB"
   },
   "tv": {
-    "version": "2.2.4",
-    "versionCode": 9,
-    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.2.4/AJO_TV.apk",
+    "version": "2.3.0",
+    "versionCode": 10,
+    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.3.0/AJO_TV.apk",
     "changelog": [
-      "🛡️ Complete Sandbox Warning Suppression & Zero-Ad Experience",
-      "⚡ Automatic Server Failover with D-Pad mirror selector",
-      "🔲 1-Tap Aspect Ratio toggle: Fit (16:9), Zoom (Fill), Stretch (100%), 4:3",
+      "🚫 Completely Removed 1Flex & Third-Party Embeds (Zero Sandbox & Zero Popups)",
+      "⚡ 100% Direct Native HLS 4K/1080p Playback Engine with Hls.js",
+      "📺 700+ Verified Live Channels with instant D-Pad Channel Zapping",
       "🚀 Hardware-accelerated GPU 60fps rendering optimization"
     ],
     "size_mb": "4.6 MB"
