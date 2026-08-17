@@ -1,0 +1,29 @@
+{
+  "version": "2.1.0",
+  "versionCode": 4,
+  "releaseDate": "2026-08-17",
+  "phone": {
+    "version": "2.1.0",
+    "versionCode": 4,
+    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/latest/download/AJO_PHONE.apk",
+    "changelog": [
+      "⚡ Edge-to-Edge immersive fullscreen mode (no status bar, no black bars)",
+      "📱 Touch scrolling fix with smooth momentum scrolling & navigation bar",
+      "📺 Fire TV Stick cast reliability and sanitized compact payload sync",
+      "🚀 On-device 1-tap OTA software updates"
+    ],
+    "size_mb": "4.6 MB"
+  },
+  "tv": {
+    "version": "2.1.0",
+    "versionCode": 4,
+    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/latest/download/AJO_TV.apk",
+    "changelog": [
+      "📺 Google TV & Fire TV D-Pad navigation enhancement",
+      "⚡ Real-time cloud & local casting sync from phone",
+      "🛡️ Enhanced ad-shield popup suppressor",
+      "🚀 On-device 1-tap OTA software updates"
+    ],
+    "size_mb": "4.6 MB"
+  }
+}
