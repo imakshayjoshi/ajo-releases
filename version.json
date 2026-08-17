@@ -1,0 +1,29 @@
+{
+  "version": "2.4.8",
+  "versionCode": 19,
+  "releaseDate": "2026-08-17",
+  "phone": {
+    "version": "2.4.8",
+    "versionCode": 19,
+    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.4.8/AJO_PHONE.apk",
+    "changelog": [
+      "🔥 Worldwide Content Multi-Filter: Filter all titles by Region (India, Hollywood, Korea, Japan, UK, Nollywood, Europe), Audio Language, Genre, Year & Sort",
+      "📱 ShortTV & Drama Shorts Binge Mode: TikTok/MovieBox-style vertical short drama player with fast swipe, multi-episode drawer & zero ads",
+      "⚡ 100% Zero-Ad Clean VIP Experience: Direct master HLS streams & instant HD startup",
+      "🚀 Ultra-smooth 60fps hardware accelerated playback"
+    ],
+    "size_mb": "4.6 MB"
+  },
+  "tv": {
+    "version": "2.4.8",
+    "versionCode": 19,
+    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.4.8/AJO_TV.apk",
+    "changelog": [
+      "🔥 Worldwide Content Multi-Filter: Filter all titles by Region (India, Hollywood, Korea, Japan, UK, Nollywood, Europe), Audio Language, Genre, Year & Sort",
+      "📱 ShortTV & Drama Shorts Binge Mode: Full-screen drama shorts & mini-series streaming with episode drawer",
+      "⚡ 100% Zero-Ad Clean VIP Experience: Direct master HLS streams & instant HD startup",
+      "🚀 Ultra-smooth 60fps hardware accelerated playback"
+    ],
+    "size_mb": "4.6 MB"
+  }
+}

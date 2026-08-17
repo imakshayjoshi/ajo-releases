@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>AJO TV — Universal Entertainment & 24/7 Live Broadcasts</title>
+    <!-- Google Fonts for rich TV typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/src/index.css" />
+    <!-- Global Anti-Ad & Sandbox Warning Suppressor -->
+    <script>
+      (function() {
+        // 1. Suppress all sandbox notices and third-party iframe console noise
+        const shouldFilter = function(args) {
+          try {
+            return args.some(function(a) {
+              if (!a) return false;
+              const str = (typeof a === 'string' ? a : (a.message || a.toString() || '')).toLowerCase();
+              return str.includes('sandbox') || 
+                     str.includes('blocked script') || 
+                     str.includes('allow-popups') || 
+                     str.includes('frame without user gesture') ||
+                     str.includes('unsafe attempt to initiate navigation');
+            });
+          } catch(e) { return false; }
+        };
+
+        const origError = console.error;
+        console.error = function() {
+          if (shouldFilter(Array.from(arguments))) return;
+          origError.apply(console, arguments);
+        };
+
+        const origWarn = console.warn;
+        console.warn = function() {
+          if (shouldFilter(Array.from(arguments))) return;
+          origWarn.apply(console, arguments);
+        };
+
+        // 2. Intercept window.open
+        window.open = function(url, target, features) {
+          return null;
+        };
+
+        // 3. Intercept window.showModalDialog
+        if (window.showModalDialog) {
+          window.showModalDialog = function() { return null; };
+        }
+
+        // 4. Intercept programmatic anchor clicks
+        const origClick = HTMLAnchorElement.prototype.click;
+        HTMLAnchorElement.prototype.click = function() {
+          const href = this.href || '';
+          const target = this.target || '';
+          if (target === '_blank' || (href.startsWith('http') && !href.includes(window.location.host))) {
+            return;
+          }
+          return origClick.apply(this, arguments);
+        };
+
+        // 5. Intercept capture-phase window click events for rogue external URLs
+        window.addEventListener('click', function(e) {
+          let node = e.target;
+          while (node && node.tagName !== 'A') {
+            node = node.parentElement;
+          }
+          if (node && node.tagName === 'A') {
+            const href = node.getAttribute('href') || '';
+            const target = node.getAttribute('target') || '';
+            if (target === '_blank' && !href.includes(window.location.host) && !href.startsWith('#') && !href.startsWith('/')) {
+              e.preventDefault();
+              e.stopPropagation();
+            }
+          }
+        }, true);
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

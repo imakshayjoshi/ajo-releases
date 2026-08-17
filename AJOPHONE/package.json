@@ -1,0 +1,26 @@
+{
+  "name": "pikashow-tv",
+  "version": "1.0.0",
+  "description": "Premium 10-Foot Android TV & Fire TV Streaming Client",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@capacitor/core": "^8.5.0",
+    "clsx": "^2.1.1",
+    "hls.js": "^1.6.15",
+    "lucide-react": "^1.16.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "tailwind-merge": "^3.4.0"
+  },
+  "devDependencies": {
+    "@capacitor/android": "^8.5.0",
+    "@capacitor/cli": "^8.5.0",
+    "@vitejs/plugin-react": "^5.1.4",
+    "vite": "^7.3.1"
+  }
+}
