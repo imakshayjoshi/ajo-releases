@@ -2,7 +2,8 @@ name: Quality checks
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, "fix/**"]
+  workflow_dispatch:
 jobs:
   web:
     runs-on: ubuntu-latest
