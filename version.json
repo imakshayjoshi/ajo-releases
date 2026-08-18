@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "version": "2.5.4",
-  "versionCode": 25,
+  "version": "2.5.5",
+  "versionCode": 26,
   "releaseDate": "2026-08-18",
   "phone": {
     "version": "2.5.4",
@@ -12,34 +12,26 @@
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "✨ Streamlined Clean TV & Phone UI: Removed oversized single-item hero banner for instant access to content rows",
-      "⚡ Instant TV Navigation: Immediate D-Pad transitions from top navigation tabs directly to content rails",
+      "✨ Streamlined Clean Phone UI: Instant access to content rows",
       "🔥 Fixed Black Screen & CORS Video Rendering: Restored full hardware decoding on Live TV and VOD streams",
-      "⚡ Ultra-Reliable EMQX WebSocket Casting: Multi-broker failover cluster with 1-tap Phone-to-TV instant channel casting",
-      "⚡ APIPlayer.ru Integration: Ultra-Fast Video Embed API with 40+ OpenSubtitles & Multi-Audio",
-      "📺 Fixed TV Home Rails & 7-Column Content Grid: 8-9 cards per row with perfect spacing",
-      "🔥 ShortTV Mini-Drama Series Hub: 6-column gallery & episode selector",
-      "🎬 Auto-Dismissing Video Player Controls (3-second smooth inactivity timer)"
+      "⚡ Ultra-Reliable EMQX WebSocket Casting: Multi-broker failover cluster with 1-tap Phone-to-TV instant channel casting"
     ],
     "size_mb": "4.3 MB"
   },
   "tv": {
-    "version": "2.5.4",
-    "versionCode": 25,
+    "version": "2.5.5",
+    "versionCode": 26,
     "packageId": "com.ajo.tv",
-    "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.5.4/AJO_TV.apk",
-    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.5.4/AJO_TV.apk",
+    "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.5.5/AJO_TV.apk",
+    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.5.5/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "✨ Streamlined Clean TV UI: Removed oversized single-item hero banner for instant access to content rows",
-      "⚡ Instant TV Navigation: Immediate D-Pad transitions from top navigation tabs directly to content rails",
-      "🔥 Fixed Black Screen & CORS Video Rendering: Restored full hardware decoding on Live TV and VOD streams",
-      "⚡ Ultra-Reliable EMQX WebSocket Cast Receiver: Multi-broker failover cluster with 1-tap Phone-to-TV instant channel casting",
-      "⚡ APIPlayer.ru Integration: Ultra-Fast Video Embed API with 40+ OpenSubtitles & Multi-Audio",
-      "📺 Fixed TV Home Rails & 7-Column Content Grid: 8-9 cards per row with perfect spacing",
-      "🔥 ShortTV Mini-Drama Series Hub: 6-column gallery & episode selector",
-      "🎬 Auto-Dismissing Video Player Controls (3-second smooth inactivity timer)"
+      "⚡ Fire TV Remote Navigation Fix: Deterministic directional D-Pad navigation (Right goes Right, Left goes Left, Up goes Up, Down goes Down)",
+      "🎯 Fixed Settings & Check for Updates Focus: Direct keyboard navigation into Check for Updates button and all TV settings cards",
+      "🚀 Zero Layout-Thrashing & Zero Lag: Replaced DOM-wide reflow searches with instant container-aware tree navigation (0ms latency)",
+      "✨ Streamlined Clean TV UI: Immediate access to content rails without oversized hero banner",
+      "🔥 Fixed Black Screen & CORS Video Rendering: Restored full hardware decoding on Live TV and VOD streams"
     ],
     "size_mb": "4.3 MB"
   }
