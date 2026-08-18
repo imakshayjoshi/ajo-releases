@@ -1,43 +1,43 @@
 {
   "schemaVersion": 2,
-  "version": "2.5.1",
-  "versionCode": 22,
+  "version": "2.5.2",
+  "versionCode": 23,
   "releaseDate": "2026-08-18",
   "phone": {
-    "version": "2.5.1",
-    "versionCode": 22,
+    "version": "2.5.2",
+    "versionCode": 23,
     "packageId": "com.ajo.phone",
-    "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.5.1/AJO_PHONE.apk",
-    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.5.1/AJO_PHONE.apk",
+    "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.5.2/AJO_PHONE.apk",
+    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.5.2/AJO_PHONE.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
+      "🔥 Fire TV OS Video Decoder Fix: Resolved white screen on Live TV channels with pure black surface compositing & Leanback fallback",
+      "⚡ Ultra-Fast 60fps Spatial Navigation: 0ms D-Pad latency, instant hardware remote response, and smooth grid scrolling",
       "⚡ APIPlayer.ru Integration: Ultra-Fast Video Embed API with 40+ OpenSubtitles & Multi-Audio",
-      "🎮 Seamless 2D Spatial Navigation & Smooth TV Scrolling for all D-Pad remotes",
       "📺 Fixed TV Home Rails & 7-Column Content Grid: 8-9 cards per row with perfect spacing",
       "🔥 ShortTV Mini-Drama Series Hub on TV: 6-column gallery & episode selector",
       "⚡ WebSocket MQTT Ultra-Fast Casting: Zero rate limits & instant channel playback",
-      "🎬 Auto-Dismissing Video Player Controls (3-second smooth inactivity timer)",
-      "🛡️ Smart Stream Auto-Failover to VIP 1080p CDNs"
+      "🎬 Auto-Dismissing Video Player Controls (3-second smooth inactivity timer)"
     ],
     "size_mb": "4.3 MB"
   },
   "tv": {
-    "version": "2.5.1",
-    "versionCode": 22,
+    "version": "2.5.2",
+    "versionCode": 23,
     "packageId": "com.ajo.tv",
-    "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.5.1/AJO_TV.apk",
-    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.5.1/AJO_TV.apk",
+    "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.5.2/AJO_TV.apk",
+    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.5.2/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
+      "🔥 Fire TV OS Video Decoder Fix: Resolved white screen on Live TV channels with pure black surface compositing & Leanback fallback",
+      "⚡ Ultra-Fast 60fps Spatial Navigation: 0ms D-Pad latency, instant hardware remote response, and smooth grid scrolling",
       "⚡ APIPlayer.ru Integration: Ultra-Fast Video Embed API with 40+ OpenSubtitles & Multi-Audio",
-      "🎮 Seamless 2D Spatial Navigation & Smooth TV Scrolling for all D-Pad remotes",
       "📺 Fixed TV Home Rails & 7-Column Content Grid: 8-9 cards per row with perfect spacing",
       "🔥 ShortTV Mini-Drama Series Hub on TV: 6-column gallery & episode selector",
       "⚡ High-Performance Cast Receiver for Instant 1-Tap Phone-to-TV Streaming",
-      "🎬 Auto-Dismissing Video Player Controls (3-second smooth inactivity timer)",
-      "🛡️ Smart Stream Auto-Failover to VIP 1080p CDNs"
+      "🎬 Auto-Dismissing Video Player Controls (3-second smooth inactivity timer)"
     ],
     "size_mb": "4.3 MB"
   }
