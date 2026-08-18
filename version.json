@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "version": "2.5.6",
-  "versionCode": 27,
+  "version": "2.5.7",
+  "versionCode": 28,
   "releaseDate": "2026-08-18",
   "phone": {
     "version": "2.5.4",
@@ -19,20 +19,20 @@
     "size_mb": "4.3 MB"
   },
   "tv": {
-    "version": "2.5.6",
-    "versionCode": 27,
+    "version": "2.5.7",
+    "versionCode": 28,
     "packageId": "com.ajo.tv",
-    "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.5.6/AJO_TV.apk",
-    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.5.6/AJO_TV.apk",
+    "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.5.7/AJO_TV.apk",
+    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.5.7/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "🔥 Fixed Fire TV Live Stream Hardware Video Decoder: Resolved black screen with audio by allowing native hardware video overlay composite",
-      "🌐 Enabled Cleartext HTTP & Mixed Content Mode: Allowed all HTTP/HTTPS IPTV broadcast streams and MPEG-TS chunk loading across Fire OS",
-      "⚡ Deterministic Fire TV D-Pad Navigation: Enforced true directional movement (Right moves Right, Left moves Left, Up moves Up, Down moves Down)",
-      "🎯 Fixed Settings & Check for Updates Focus: Direct keyboard navigation into Check for Updates button and all TV settings cards",
-      "🚀 Zero Layout-Thrashing & Zero Lag: Replaced DOM-wide reflow searches with instant container-aware tree navigation (0ms latency)"
+      "📺 Legacy 2014-2016 Smart TV & Panasonic TV Support: Built-in ES5/ES6 legacy runtime bundle with polyfills (Chrome 49+, Android 5.0+)",
+      "🔒 Expired Root SSL Certificate Bypass: Added native SSL error bypass in BridgeWebViewClient so older TVs load HTTPS streams & CDNs seamlessly",
+      "🔥 Fixed Fire TV & Smart TV Live Stream Hardware Video Decoder: Restored full 1080p/4K 60fps hardware decoded video playback",
+      "🌐 Cleartext HTTP & Mixed Content Mode: Allowed all HTTP/HTTPS IPTV broadcast streams across all TV models",
+      "⚡ Deterministic D-Pad Remote Navigation: Fast 0ms remote response across all TV brands"
     ],
-    "size_mb": "4.3 MB"
+    "size_mb": "4.6 MB"
   }
 }
