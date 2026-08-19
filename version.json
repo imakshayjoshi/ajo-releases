@@ -22,14 +22,14 @@
     "version": "2.6.0",
     "versionCode": 31,
     "packageId": "com.ajo.tv",
-    "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.6.0/AJO_TV.apk",
-    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.6.0/AJO_TV.apk",
+    "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
+    "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
       "🔥 Fixed Live Stream Black Screen: Restored MSE Hls.js demuxer for flawless 1080p video rendering on Fire TV and Panasonic Smart TVs",
       "⚡ Fixed Remote Navigation to Top Movies: Added D-Pad focusability and 2D spatial navigation to Top 10 Indian movies row",
-      "🔒 Fixed In-App Updater: Built-in legacy SSL bypass and multi-redirect handling for smooth OTA updating",
+      "🔒 Fixed In-App Updater: Direct zero-redirect download stream for smooth OTA updating",
       "✨ UI Cleanup: Removed 'Shorts TV' and extraneous cast icons"
     ],
     "size_mb": "4.6 MB"
