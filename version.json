@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "version": "3.0.2",
-  "versionCode": 39,
+  "version": "3.0.3",
+  "versionCode": 40,
   "releaseDate": "2026-08-19",
   "phone": {
     "version": "2.5.5",
@@ -19,14 +19,15 @@
     "size_mb": "4.3 MB"
   },
   "tv": {
-    "version": "3.0.2",
-    "versionCode": 39,
+    "version": "3.0.3",
+    "versionCode": 40,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
+      "⚡ Fixed OTA Package Manager Versioning: Synchronized binary Android build.gradle versionCode (40) and versionName (3.0.3) so installed updates persist permanently",
       "🔥 Self-Healing Video Engine: Automatic black-screen watchdog that detects missing video frames on legacy Fire TV models and auto-switches to the Native TV Player Engine in 3 seconds!",
       "⚡ Dual Video Engines: 1-Click remote switcher between HLS.js and Native Android Hardware Player",
       "🚀 Hardware Acceleration: Restored FLAG_HARDWARE_ACCELERATED on Window with transparent video compositing",
