@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "version": "3.0.1",
-  "versionCode": 38,
+  "version": "3.0.2",
+  "versionCode": 39,
   "releaseDate": "2026-08-19",
   "phone": {
     "version": "2.5.5",
@@ -19,18 +19,18 @@
     "size_mb": "4.3 MB"
   },
   "tv": {
-    "version": "3.0.1",
-    "versionCode": 38,
+    "version": "3.0.2",
+    "versionCode": 39,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "🛡️ Fixed Minified React Error: Complete type safety and sanitization on all movie/channel titles, ratings, and descriptions",
-      "🌟 Complete Clean Rebuild: Simple, lightning-fast 60 FPS TV interface with zero black screens",
-      "🎮 Bulletproof Remote Control: Deterministic D-Pad navigation that never gets stuck",
-      "🍿 Direct Multi-Audio HLS: High-speed Hindi, English, Tamil, Telugu streams for all movies & series"
+      "🔥 Self-Healing Video Engine: Automatic black-screen watchdog that detects missing video frames on legacy Fire TV models and auto-switches to the Native TV Player Engine in 3 seconds!",
+      "⚡ Dual Video Engines: 1-Click remote switcher between HLS.js and Native Android Hardware Player",
+      "🚀 Hardware Acceleration: Restored FLAG_HARDWARE_ACCELERATED on Window with transparent video compositing",
+      "🎮 Bulletproof Remote Control: Deterministic D-Pad navigation with zero-trap focus recovery"
     ],
     "size_mb": "4.5 MB"
   }
