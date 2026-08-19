@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "version": "2.6.5",
-  "versionCode": 36,
+  "version": "3.0.0",
+  "versionCode": 37,
   "releaseDate": "2026-08-19",
   "phone": {
     "version": "2.5.5",
@@ -19,18 +19,20 @@
     "size_mb": "4.3 MB"
   },
   "tv": {
-    "version": "2.6.5",
-    "versionCode": 36,
+    "version": "3.0.0",
+    "versionCode": 37,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "🔥 The Holy Grail Fix: Finally eliminated the Fire TV Black Screen with Audio bug by making WebView backgrounds transparent so the OS hardware video layer shows through!",
-      "⚡ Anti-Hang Async Cleanup: Eliminated synchronous codec lockup on exit so returning to app is instant",
-      "🎬 Multi-Audio Direct HLS: High-speed Hindi, English, Tamil, Telugu streams for all movies & series"
+      "🌟 COMPLETE REBUILD FROM SCRATCH: 100% simple, lightning-fast, and rock-solid architecture for Fire TV OS!",
+      "📺 Zero Black Screens: Clean unified video pipeline for all Live Channels and Movies with pure hardware video acceleration",
+      "🎮 Bulletproof Remote Control: Deterministic D-Pad navigation that never gets stuck, with instant focus restoration when pressing Back",
+      "⚡ Ultra-Lightweight & Fluid 60 FPS: Eliminated all heavy background filters and memory bloat on 1GB RAM Fire TV models",
+      "🍿 Direct Multi-Audio HLS: High-speed Hindi, English, Tamil, Telugu streams for all movies & series"
     ],
-    "size_mb": "4.6 MB"
+    "size_mb": "4.5 MB"
   }
 }
