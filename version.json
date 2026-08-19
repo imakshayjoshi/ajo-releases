@@ -1,8 +1,8 @@
 {
   "schemaVersion": 2,
-  "version": "2.5.8",
-  "versionCode": 29,
-  "releaseDate": "2026-08-18",
+  "version": "2.5.9",
+  "versionCode": 30,
+  "releaseDate": "2026-08-19",
   "phone": {
     "version": "2.5.4",
     "versionCode": 25,
@@ -19,19 +19,19 @@
     "size_mb": "4.3 MB"
   },
   "tv": {
-    "version": "2.5.8",
-    "versionCode": 29,
+    "version": "2.5.9",
+    "versionCode": 30,
     "packageId": "com.ajo.tv",
-    "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.5.8/AJO_TV.apk",
-    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.5.8/AJO_TV.apk",
+    "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.5.9/AJO_TV.apk",
+    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v2.5.9/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "⚡ True 2D Grid & Rail Remote Navigation: Fixed sequential arrow jumping, down from Live Sports immediately enters channels, Up/Down moves vertically across cards",
-      "🔴 Instant 1-Click Live TV Guide Playback: Clicking any channel row immediately starts the live stream directly with simple favorite toggle",
-      "✨ Removed ShortTV & Cast Icons: Cleaned TV UI completely removing ShortTV and unnecessary cast icons from the TV interface",
-      "📺 Legacy 2014-2016 Smart TV & Panasonic TV Support: Built-in ES5/ES6 legacy runtime with polyfills and SSL bypass",
-      "🔥 Hardware Video Acceleration: Restored 1080p/4K 60fps hardware decoded video playback with cleartext HTTP mode"
+      "🔥 Fixed Fire TV Black Screen: Adjusted WebView layer types to prevent occlusion of native hardware video overlay",
+      "⚡ Improved Performance & Reduced Hangs: Removed smooth scrolling and complex inset transitions causing memory leaks on 1GB RAM Fire TV models",
+      "✨ UI Cleanup: Removed 'Shorts TV' and extraneous cast icons from the TV interface",
+      "🎮 Fixed D-Pad Remote Navigation: Restored direct 2D grid movement, preventing sequential drifting",
+      "📺 Supported Legacy Devices: Verified fixes for Panasonic 2014-2016 Smart TVs"
     ],
     "size_mb": "4.6 MB"
   }
