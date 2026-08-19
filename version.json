@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "version": "2.6.1",
-  "versionCode": 32,
+  "version": "2.6.2",
+  "versionCode": 33,
   "releaseDate": "2026-08-19",
   "phone": {
     "version": "2.5.5",
@@ -19,17 +19,17 @@
     "size_mb": "4.3 MB"
   },
   "tv": {
-    "version": "2.6.1",
-    "versionCode": 32,
+    "version": "2.6.2",
+    "versionCode": 33,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "🔥 Fixed Movie Streaming: Prioritized direct HLS multi-audio streams (Hindi, Tamil, Telugu, English) as Server 1",
-      "⚡ Removed Broken Iframes: Eliminated heavy ad-filled web embeds causing app freezes and server switching loops",
-      "📺 Smooth 1080p Hardware Video Decoders for Fire TV and Panasonic Smart TVs",
+      "🔥 Fixed Live Stream Black Screen: Enabled transparent WebView canvas hole-punching for native hardware video plane",
+      "⚡ Hardware GPU Accelerated Video: Enabled FLAG_HARDWARE_ACCELERATED and LAYER_TYPE_HARDWARE on Fire TV & Smart TVs",
+      "🎬 Fixed Movie Streaming: Prioritized direct HLS multi-audio streams (Hindi, Tamil, Telugu, English) as Server 1",
       "🎮 Instant D-Pad Control on Movies & Live Channels"
     ],
     "size_mb": "4.6 MB"
