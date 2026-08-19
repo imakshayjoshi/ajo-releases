@@ -3,387 +3,332 @@ import {
   getBollywoodCatalog, 
   getHollywoodCatalog, 
   getSerialsCatalog, 
-  getLiveBroadcasts,
-  normalizeMediaItem
+  getLiveBroadcasts 
 } from './api/pikashow';
 import { getWatchHistory, saveProgress } from './api/history';
-import { getDocumentariesCatalog, getAnimeCatalog, getNetworkOriginalsCatalog } from './api/hubCatalog';
-import { getShortTVSummaryList } from './api/shortTvCatalog';
-import { checkForAppUpdates, startAppUpdate } from './api/otaUpdate';
-import { useSpatialNavigation } from './hooks/useSpatialNavigation';
+import { checkForAppUpdates } from './api/otaUpdate';
 import { GoogleTVHeader } from './components/GoogleTVHeader';
-import { HeroBanner } from './components/HeroBanner';
 import { MediaRail } from './components/MediaRail';
-import { Top10Rail } from './components/Top10Rail';
-import { MediaDetailsModal } from './components/MediaDetailsModal';
-import { TVPlayer } from './components/TVPlayer';
-import { SearchView } from './components/SearchView';
-import { EPGGuideView } from './components/EPGGuideView';
-import { SettingsView } from './components/SettingsView';
 import { MediaGridView } from './components/MediaGridView';
-import { ShortTVView } from './components/ShortTVView';
-import { Film, Video, Tv, Trophy, Radio, Flame, Rocket, Sparkles } from 'lucide-react';
+import { MediaDetailsModal } from './components/MediaDetailsModal';
+import { SearchView } from './components/SearchView';
+import { SettingsView } from './components/SettingsView';
+import { TVPlayer } from './components/TVPlayer';
+import { useSpatialNavigation } from './hooks/useSpatialNavigation';
+import { shouldPreferNativePlayer, playInNativePlayer } from './utils/nativePlayer';
+import { Play, Sparkles } from 'lucide-react';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('home');
-  const [ambientPoster, setAmbientPoster] = useState('');
-  
-  // OTA Update Startup Notice State
-  const [otaNotice, setOtaNotice] = useState(null);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      checkForAppUpdates('tv', false).then(info => {
-        if (info && info.hasUpdate) {
-          setOtaNotice(info);
-        }
-      }).catch(() => {});
-    }, 1500);
-    return () => clearTimeout(timer);
-  }, []);
-
-  // Catalogs
-  const [continueWatching, setContinueWatching] = useState([]);
-  const [liveItems, setLiveItems] = useState([]);
-  const [sportsItems, setSportsItems] = useState([]);
-  const [entertainmentItems, setEntertainmentItems] = useState([]);
-  const [newsItems, setNewsItems] = useState([]);
-  const [musicItems, setMusicItems] = useState([]);
-  const [bollywoodItems, setBollywoodItems] = useState([]);
-  const [hollywoodItems, setHollywoodItems] = useState([]);
-  const [serialsItems, setSerialsItems] = useState([]);
-  const [docuItems, setDocuItems] = useState([]);
-  const [animeItems, setAnimeItems] = useState([]);
-  const [networkItems, setNetworkItems] = useState([]);
-  const [shortTvItems, setShortTvItems] = useState([]);
-  const [featuredItem, setFeaturedItem] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Player & Details Modal
+  // Catalogs
+  const [bollywoodItems, setBollywoodItems] = useState([]);
+  const [hollywoodItems, setHollywoodItems] = useState([]);
+  const [seriesItems, setSeriesItems] = useState([]);
+  const [liveItems, setLiveItems] = useState([]);
+  const [continueWatching, setContinueWatching] = useState([]);
+
+  // Active Modals / Player
   const [selectedItem, setSelectedItem] = useState(null);
-  const [activePlayback, setActivePlayback] = useState(null);
+  const [activePlayback, setActivePlayback] = useState(null); // { item, server, episodes, episodeIndex }
+  const [otaPrompt, setOtaPrompt] = useState(null);
 
-  // 2D Spatial Navigation with Android TV Back Stack
-  useSpatialNavigation({
-    enabled: true,
-    onBack: () => {
-      if (activePlayback) {
-        setActivePlayback(null);
-        setContinueWatching(getWatchHistory());
-      } else if (selectedItem) {
-        setSelectedItem(null);
-      } else if (activeTab !== 'home') {
-        setActiveTab('home');
-      }
-    }
-  });
-
-  const loadAllContent = useCallback(async () => {
+  // Load all catalogs on startup
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      setContinueWatching(getWatchHistory());
-
-      const [live, bolly, holly, serials] = await Promise.allSettled([
-        getLiveBroadcasts(),
+      const [bolly, holly, serials, live] = await Promise.allSettled([
         getBollywoodCatalog(),
         getHollywoodCatalog(),
-        getSerialsCatalog()
+        getSerialsCatalog(),
+        getLiveBroadcasts()
       ]);
 
-      const lList = live.status === 'fulfilled' && Array.isArray(live.value) ? live.value : [];
-      const bList = bolly.status === 'fulfilled' && Array.isArray(bolly.value) ? bolly.value : [];
-      const hList = holly.status === 'fulfilled' && Array.isArray(holly.value) ? holly.value : [];
-      const sList = serials.status === 'fulfilled' && Array.isArray(serials.value) ? serials.value : [];
-
-      setLiveItems(lList);
-      
-      // Categorize Live Channels
-      const sports = lList.filter(c => 
-        (c.category || '').toLowerCase().includes('sport') ||
-        (c.title || '').toLowerCase().includes('sport') || 
-        (c.title || '').toLowerCase().includes('cricket') || 
-        (c.title || '').toLowerCase().includes('fancode') ||
-        (c.title || '').toLowerCase().includes('ten') ||
-        (c.title || '').toLowerCase().includes('willow')
-      );
-
-      const entertainment = lList.filter(c => 
-        (c.category || '').toLowerCase().includes('entertainment') ||
-        (c.category || '').toLowerCase().includes('general') ||
-        (c.title || '').toLowerCase().includes('star') || 
-        (c.title || '').toLowerCase().includes('sony') || 
-        (c.title || '').toLowerCase().includes('zee') || 
-        (c.title || '').toLowerCase().includes('colors')
-      );
-
-      const news = lList.filter(c => 
-        (c.category || '').toLowerCase().includes('news') ||
-        (c.title || '').toLowerCase().includes('news') ||
-        (c.title || '').toLowerCase().includes('tak') ||
-        (c.title || '').toLowerCase().includes('bharat')
-      );
-
-      const music = lList.filter(c => 
-        (c.category || '').toLowerCase().includes('music') ||
-        (c.title || '').toLowerCase().includes('9x') ||
-        (c.title || '').toLowerCase().includes('mtv') ||
-        (c.title || '').toLowerCase().includes('zoom')
-      );
-
-      setSportsItems(sports.length > 0 ? sports : lList.slice(0, 15));
-      setEntertainmentItems(entertainment.length > 0 ? entertainment : lList.slice(0, 15));
-      setNewsItems(news.length > 0 ? news : lList.slice(0, 15));
-      setMusicItems(music.length > 0 ? music : lList.slice(0, 15));
-
-      setBollywoodItems(bList);
-      setHollywoodItems(hList);
-      setSerialsItems(sList);
-      setDocuItems(getDocumentariesCatalog());
-      setNetworkItems(getNetworkOriginalsCatalog());
-      setShortTvItems(getShortTVSummaryList());
-
-      const animeData = await getAnimeCatalog();
-      setAnimeItems(animeData);
-
-      // Featured Spotlight
-      const spotlight = bList[0] || lList[0] || null;
-      setFeaturedItem(spotlight);
-      if (spotlight?.poster_url || spotlight?.poster) {
-        setAmbientPoster(spotlight.poster_url || spotlight.poster);
-      }
+      if (bolly.status === 'fulfilled') setBollywoodItems(bolly.value || []);
+      if (holly.status === 'fulfilled') setHollywoodItems(holly.value || []);
+      if (serials.status === 'fulfilled') setSeriesItems(serials.value || []);
+      if (live.status === 'fulfilled') setLiveItems(live.value || []);
+      setContinueWatching(getWatchHistory() || []);
     } catch (err) {
-      console.error('Error loading content:', err);
+      console.error('Error loading catalogs:', err);
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    loadAllContent();
-  }, [loadAllContent]);
+    loadData();
+    // Check for updates in background
+    checkForAppUpdates('tv').then((res) => {
+      if (res && res.hasUpdate) {
+        setOtaPrompt(res);
+      }
+    }).catch(() => {});
+  }, [loadData]);
 
-  // Click on a movie/show/channel card
-  const handleCardClick = useCallback((item) => {
+  // Handle item click (Live TV plays directly, Movies open details)
+  const handleItemClick = useCallback((item) => {
     if (item.is_live || item.type === 'live' || item.year === 'LIVE') {
       const server = item.players?.[0] || item.player?.[0] || (item.url ? { url: item.url, source: 'm3u8' } : null);
+      const url = server?.url || item.url;
+
+      // Fire TV / legacy Android TV: go straight to the native ExoPlayer activity.
+      // Mounting TVPlayer first would start a WebView MSE pipeline that renders
+      // black and keeps decoding audio in the background behind the native player.
+      if (url && shouldPreferNativePlayer()) {
+        const title = item.title_en || item.title || item.name || 'Live Channel';
+        if (playInNativePlayer(url, title, true)) return;
+      }
+
       setActivePlayback({ item, server });
     } else {
       setSelectedItem(item);
     }
   }, []);
 
-  const handleStartPlayback = useCallback((item, server) => {
+  // Start playback from modal or details
+  const handleStartPlayback = useCallback((item, server = null, episodes = [], episodeIndex = 0) => {
     setSelectedItem(null);
-    setActivePlayback({ item, server });
+
+    const url = server?.url || item?.url;
+    const isLiveItem = Boolean(item?.is_live || item?.type === 'live' || item?.year === 'LIVE');
+    if (url && shouldPreferNativePlayer()) {
+      const title = item?.title_en || item?.title || item?.name || 'Video Stream';
+      if (playInNativePlayer(url, title, isLiveItem)) return;
+    }
+
+    setActivePlayback({ item, server, episodes, episodeIndex });
   }, []);
 
+  // Close player and save progress
   const handleClosePlayer = useCallback((lastTime, duration) => {
     if (activePlayback && lastTime > 10) {
       saveProgress(activePlayback.item, lastTime, duration);
-      setContinueWatching(getWatchHistory());
+      setContinueWatching(getWatchHistory() || []);
     }
     setActivePlayback(null);
+
+    // Re-focus active cards smoothly
+    setTimeout(() => {
+      const target = document.querySelector('.tv-card, .tv-nav-pill.active, .tv-hero');
+      if (target) {
+        try { target.focus(); } catch (_) {}
+      }
+    }, 60);
   }, [activePlayback]);
 
-  const handleFocusItem = useCallback((item) => {
-    const poster = item.backdrop_url || item.poster_url || item.poster || item.logo || '';
-    if (poster) {
-      setAmbientPoster(poster);
+  // Global Remote Back Handler
+  const handleBack = useCallback(() => {
+    if (activePlayback) {
+      handleClosePlayer(0, 0);
+      return;
     }
-  }, []);
+    if (selectedItem) {
+      setSelectedItem(null);
+      return;
+    }
+    if (activeTab !== 'home') {
+      setActiveTab('home');
+      return;
+    }
+  }, [activePlayback, selectedItem, activeTab, handleClosePlayer]);
+
+  // Spatial Navigation Hook
+  const { focusInitial } = useSpatialNavigation({
+    onBack: handleBack,
+    isModalOpen: Boolean(selectedItem || activePlayback),
+    modalSelector: selectedItem ? '.tv-modal-card' : activePlayback ? '.tv-player-fullscreen' : null,
+  });
+
+  // Focus initial element when changing tabs
+  useEffect(() => {
+    if (!selectedItem && !activePlayback) {
+      focusInitial('.tv-nav-pill.active, .tv-hero, .tv-card');
+    }
+  }, [activeTab, selectedItem, activePlayback, focusInitial]);
+
+  // Featured Spotlight Hero Item (e.g. from Bollywood or Hollywood)
+  const featuredItem = useMemo(() => {
+    return bollywoodItems[0] || hollywoodItems[0] || null;
+  }, [bollywoodItems, hollywoodItems]);
+
+  // All Movies combined
+  const allMovies = useMemo(() => {
+    return [...bollywoodItems, ...hollywoodItems];
+  }, [bollywoodItems, hollywoodItems]);
 
   return (
-    <div className="gtv-root-layout">
-      {/* Dynamic Ambient Background Wallpaper */}
-      <div 
-        className="tv-background-art"
-        style={{
-          backgroundImage: ambientPoster ? `url(${ambientPoster})` : 'none',
-          opacity: ambientPoster ? 0.35 : 0
-        }}
-      />
-      <div className="tv-background-overlay" />
+    <div className="tv-app">
+      {/* Top Google TV Style Navigation Bar */}
+      <GoogleTVHeader activeTab={activeTab} onSelectTab={setActiveTab} />
 
-      {/* Google TV Top Header Navigation */}
-      <GoogleTVHeader 
-        activeTab={activeTab} 
-        onTabChange={(tab) => setActiveTab(tab)}
-      />
+      {/* OTA Update Toast Banner */}
+      {otaPrompt && (
+        <div style={{
+          background: 'linear-gradient(90deg, #2563eb, #38bdf8)',
+          color: '#ffffff',
+          padding: '10px 48px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          fontWeight: 700,
+          fontSize: '0.95rem'
+        }}>
+          <span>🚀 New Update Available: v{otaPrompt.latestVersion} (Fire TV Edition)</span>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button
+              tabIndex={0}
+              className="tv-btn-primary"
+              style={{ padding: '6px 16px', fontSize: '0.85rem' }}
+              onClick={() => {
+                if (window.AndroidUpdater?.downloadAndInstall) {
+                  window.AndroidUpdater.downloadAndInstall(otaPrompt.apkUrl);
+                } else {
+                  window.open(otaPrompt.apkUrl, '_blank');
+                }
+              }}
+            >
+              Update Now
+            </button>
+            <button
+              tabIndex={0}
+              className="tv-btn-secondary"
+              style={{ padding: '6px 16px', fontSize: '0.85rem' }}
+              onClick={() => setOtaPrompt(null)}
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
 
-      {/* Main 10-Foot TV Content Area */}
-      <main className="mobile-main-scroll-container">
-        {activeTab === 'search' ? (
-          <SearchView 
-            onSelectItem={handleCardClick}
-            onFocusItem={handleFocusItem}
-          />
-        ) : activeTab === 'epg' ? (
-          <EPGGuideView 
-            channels={liveItems}
-            onSelectChannel={(ch) => handleStartPlayback(ch, ch.players?.[0] || ch.player?.[0])}
-            onFocusItem={handleFocusItem}
-          />
-        ) : activeTab === 'settings' ? (
-          <SettingsView 
-            onClearHistory={() => setContinueWatching([])}
-            onReloadApp={loadAllContent}
-          />
-        ) : activeTab === 'short_tv' ? (
-          <ShortTVView 
-            onPlayFullscreen={(item, server) => handleStartPlayback(item, server)}
-          />
-        ) : activeTab === 'movies' ? (
-          <MediaGridView
-            title="Movies & Documentaries (4K UHD)"
-            icon={Film}
-            type="movies"
-            items={[...bollywoodItems, ...hollywoodItems, ...docuItems.filter(d => d.type === 'movie')]}
-            onSelectItem={handleCardClick}
-            onFocusItem={handleFocusItem}
-          />
-        ) : activeTab === 'shows' ? (
-          <MediaGridView
-            title="Web Series, Documentaries & Anime"
-            icon={Tv}
-            type="shows"
-            items={[...serialsItems, ...docuItems, ...animeItems, ...networkItems, ...shortTvItems]}
-            onSelectItem={handleCardClick}
-            onFocusItem={handleFocusItem}
-          />
+      {/* Main Content Area */}
+      <main className="tv-main-content">
+        {loading ? (
+          <div className="tv-center-state">
+            <div className="tv-spinner" />
+            <p style={{ fontWeight: 700, marginTop: 16 }}>Loading Catalog & Live Channels...</p>
+          </div>
         ) : (
           <>
-            {/* FOR YOU / HOME TAB VIEW */}
-            {featuredItem && (
-              <HeroBanner
-                featuredItem={featuredItem}
-                onPlay={(item) => handleStartPlayback(item, item.players?.[0] || item.player?.[0])}
-                onSelectInfo={(item) => setSelectedItem(item)}
+            {/* 🏠 HOME TAB */}
+            {activeTab === 'home' && (
+              <>
+                {/* Spotlight Hero Banner */}
+                {featuredItem && (
+                  <div 
+                    tabIndex={0}
+                    className="tv-hero"
+                    style={{ backgroundImage: `url(${featuredItem.backdrop_url || featuredItem.poster_url})` }}
+                    onClick={() => setSelectedItem(featuredItem)}
+                  >
+                    <div className="tv-hero-overlay" />
+                    <div className="tv-hero-content">
+                      <div className="tv-hero-badge">
+                        <Sparkles size={12} />
+                        <span>Featured Premiere</span>
+                      </div>
+                      <h1 className="tv-hero-title">{typeof featuredItem.title === 'string' ? featuredItem.title : (featuredItem.title_en || 'Featured Premiere')}</h1>
+                      <p className="tv-hero-desc">{typeof featuredItem.description === 'string' ? featuredItem.description : ''}</p>
+                      <button className="tv-hero-btn" tabIndex={0} onClick={() => setSelectedItem(featuredItem)}>
+                        <Play size={16} fill="#07090e" />
+                        <span>Watch Now</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Continue Watching Rail */}
+                {continueWatching.length > 0 && (
+                  <MediaRail
+                    title="🕒 Continue Watching"
+                    items={continueWatching}
+                    onSelectItem={handleItemClick}
+                  />
+                )}
+
+                {/* Live Channels Rail */}
+                {liveItems.length > 0 && (
+                  <MediaRail
+                    title="🔴 Live TV & News Broadcasts"
+                    items={liveItems.slice(0, 20)}
+                    isLive={true}
+                    onSelectItem={handleItemClick}
+                  />
+                )}
+
+                {/* Bollywood Movies Rail */}
+                {bollywoodItems.length > 0 && (
+                  <MediaRail
+                    title="🎬 Bollywood Blockbusters"
+                    items={bollywoodItems}
+                    onSelectItem={handleItemClick}
+                  />
+                )}
+
+                {/* Hollywood Movies Rail */}
+                {hollywoodItems.length > 0 && (
+                  <MediaRail
+                    title="🍿 Hollywood Hits & 4K Cinema"
+                    items={hollywoodItems}
+                    onSelectItem={handleItemClick}
+                  />
+                )}
+
+                {/* Web Series Rail */}
+                {seriesItems.length > 0 && (
+                  <MediaRail
+                    title="📺 Binge-Worthy Web Series"
+                    items={seriesItems}
+                    onSelectItem={handleItemClick}
+                  />
+                )}
+              </>
+            )}
+
+            {/* 🎬 MOVIES TAB */}
+            {activeTab === 'movies' && (
+              <MediaGridView
+                title="🎬 All Movies (Bollywood & Hollywood)"
+                items={allMovies}
+                onSelectItem={handleItemClick}
               />
             )}
 
-            {/* CONTINUE WATCHING ROW */}
-            {continueWatching.length > 0 && (
-              <MediaRail 
-                title="▶️ Continue Watching" 
-                items={continueWatching}
-                landscape={true}
-                onSelectItem={handleCardClick}
-                onFocusItem={handleFocusItem}
+            {/* 📺 WEB SERIES TAB */}
+            {activeTab === 'series' && (
+              <MediaGridView
+                title="📺 Complete Web Series Vault"
+                items={seriesItems}
+                onSelectItem={handleItemClick}
               />
             )}
 
-            {/* TOP 10 IN INDIA TODAY */}
-            {bollywoodItems.length > 0 && (
-              <Top10Rail 
-                title="🔥 Top 10 in India Today" 
-                items={bollywoodItems.slice(0, 10)}
-                onSelectItem={handleCardClick}
-                onFocusItem={handleFocusItem}
+            {/* 🔴 LIVE TV TAB */}
+            {activeTab === 'live' && (
+              <MediaGridView
+                title="🔴 Live Television Channels"
+                items={liveItems}
+                isLive={true}
+                onSelectItem={handleItemClick}
               />
             )}
 
-            {/* 🔥 SHORT TV & DRAMA SHORTS */}
-            {shortTvItems.length > 0 && (
-              <MediaRail 
-                title="🔥 ShortTV & Drama Shorts (Reels Mode)" 
-                items={shortTvItems}
-                landscape={false}
-                onSelectItem={() => setActiveTab('short_tv')}
-                onFocusItem={handleFocusItem}
-              />
+            {/* 🔍 SEARCH TAB */}
+            {activeTab === 'search' && (
+              <SearchView onSelectItem={handleItemClick} />
             )}
 
-            {/* LIVE SPORTS & CRICKET */}
-            <MediaRail 
-              title="⚡ Live Sports & Cricket (Star Sports, Sony Sports, Willow)" 
-              items={sportsItems}
-              landscape={true}
-              onSelectItem={handleCardClick}
-              onFocusItem={handleFocusItem}
-            />
-
-            {/* LIVE TV CHANNELS */}
-            <MediaRail 
-              title="🔴 Live Star, Sony & Zee TV Channels" 
-              items={entertainmentItems}
-              landscape={true}
-              onSelectItem={handleCardClick}
-              onFocusItem={handleFocusItem}
-            />
-
-            {/* LIVE NEWS */}
-            <MediaRail 
-              title="📰 24/7 Live News Channels" 
-              items={newsItems}
-              landscape={true}
-              onSelectItem={handleCardClick}
-              onFocusItem={handleFocusItem}
-            />
-
-            {/* BOLLYWOOD BLOCKBUSTERS */}
-            <MediaRail 
-              title="🎬 Bollywood Blockbusters (4K UHD)" 
-              items={bollywoodItems}
-              landscape={false}
-              onSelectItem={handleCardClick}
-              onFocusItem={handleFocusItem}
-            />
-
-            {/* HOLLYWOOD MOVIES */}
-            <MediaRail 
-              title="🍿 Hollywood Blockbusters" 
-              items={hollywoodItems}
-              landscape={false}
-              onSelectItem={handleCardClick}
-              onFocusItem={handleFocusItem}
-            />
-
-            {/* TV SERIALS */}
-            <MediaRail 
-              title="📺 Web Serials & Premium Series" 
-              items={serialsItems}
-              landscape={false}
-              onSelectItem={handleCardClick}
-              onFocusItem={handleFocusItem}
-            />
-
-            {/* 👑 NETWORK ORIGINALS */}
-            {networkItems.length > 0 && (
-              <MediaRail 
-                title="👑 Premium Network Originals (HBO, Netflix, Prime)" 
-                items={networkItems}
-                landscape={false}
-                onSelectItem={handleCardClick}
-                onFocusItem={handleFocusItem}
-              />
-            )}
-
-            {/* 🌍 DOCUMENTARIES */}
-            {docuItems.length > 0 && (
-              <MediaRail 
-                title="🌍 Documentaries & True Crime" 
-                items={docuItems}
-                landscape={false}
-                onSelectItem={handleCardClick}
-                onFocusItem={handleFocusItem}
-              />
-            )}
-
-            {/* ⚔️ ANIME VAULT */}
-            {animeItems.length > 0 && (
-              <MediaRail 
-                title="⚔️ Anime Vault (4K Ultra HD)" 
-                items={animeItems}
-                landscape={false}
-                onSelectItem={handleCardClick}
-                onFocusItem={handleFocusItem}
-              />
+            {/* ⚙️ SETTINGS TAB */}
+            {activeTab === 'settings' && (
+              <SettingsView />
             )}
           </>
         )}
       </main>
 
-      {/* Details Modal */}
+      {/* Media Details Popup Modal */}
       {selectedItem && (
         <MediaDetailsModal
           item={selectedItem}
@@ -392,13 +337,16 @@ export default function App() {
         />
       )}
 
-      {/* Fullscreen TV Player with In-Player EPG Quick Switcher */}
+      {/* Fullscreen TV Player */}
       {activePlayback && (
         <TVPlayer
           item={activePlayback.item}
           server={activePlayback.server}
           channels={liveItems}
-          onSelectChannel={(ch) => handleStartPlayback(ch, ch.players?.[0] || ch.player?.[0])}
+          episodes={activePlayback.episodes}
+          currentEpisodeIndex={activePlayback.episodeIndex}
+          onSelectEpisode={(ep, idx) => handleStartPlayback(ep, null, activePlayback.episodes, idx)}
+          onSelectChannel={(ch) => handleItemClick(ch)}
           onClose={handleClosePlayer}
         />
       )}

@@ -1,8 +1,8 @@
 {
   "schemaVersion": 2,
-  "version": "3.0.5",
-  "versionCode": 42,
-  "releaseDate": "2026-08-19",
+  "version": "3.0.6",
+  "versionCode": 43,
+  "releaseDate": "2026-08-20",
   "phone": {
     "version": "2.5.5",
     "versionCode": 26,
@@ -19,19 +19,22 @@
     "size_mb": "4.3 MB"
   },
   "tv": {
-    "version": "3.0.5",
-    "versionCode": 42,
+    "version": "3.0.6",
+    "versionCode": 43,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "🔥 Dedicated Native Hardware Player: Integrated 100% native Android VideoView / MediaCodec engine (PlayerActivity) that bypasses WebView rendering completely to eliminate black screen issues permanently on all Fire TV OS and Android TV devices!",
-      "🎮 Built-in 10-Foot TV Remote Controls: Full D-Pad seek (◄/► 10s), Play/Pause (OK), OSD overlay, and buffer indicators",
-      "⚡ Auto-Failover Watchdog: Automatically rescues playback into native hardware player if WebView black screen is detected",
-      "🚀 Dual Mode: Instant 1-click 'Hardware Player' button in modal & player OSD"
+      "🎥 ExoPlayer / AndroidX Media3 Engine: video now decodes onto a real hardware SurfaceView, permanently fixing the black-screen-with-audio bug on Fire TV OS and legacy Android TV panels",
+      "⚡ Auto Native Handoff: Fire TV devices route Live TV and movies straight to the hardware player — no 3-second black screen wait",
+      "🔧 Software Decoder Fallback: if a Fire TV hardware codec refuses the stream, playback automatically re-initialises on software H.264/AAC",
+      "🔒 Legacy SSL Trust: OkHttp data source with permissive trust manager so HTTPS IPTV CDNs load on 2014-2016 panels with expired root CAs",
+      "📡 Permissive HLS Parsing: non-IDR keyframes and access-unit detection enabled for tokenized IPTV .m3u8 playlists",
+      "🎮 Clean Back Exit: player releases the decoder before finishing, returning D-Pad focus to the TV UI instantly"
     ],
-    "size_mb": "4.6 MB"
+    "size_mb": "8.8 MB",
+    "sha256": "88fd910d6f6b7c6d035322098c74d21c45ee012bc37bab48cdd00d971b013fd9"
   }
 }
