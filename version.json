@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "version": "3.0.4",
-  "versionCode": 41,
+  "version": "3.0.5",
+  "versionCode": 42,
   "releaseDate": "2026-08-19",
   "phone": {
     "version": "2.5.5",
@@ -19,18 +19,18 @@
     "size_mb": "4.3 MB"
   },
   "tv": {
-    "version": "3.0.4",
-    "versionCode": 41,
+    "version": "3.0.5",
+    "versionCode": 42,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "🔥 Full Legacy Transpilation: Modern and legacy JS polyfill bundling ensures 100% startup on Android 5.0 - 14 and Fire OS without black screens",
-      "🛡️ Visual Startup Diagnostic: Added error catcher to display any initialization notice on TV screen instead of silent black failure",
-      "⚡ Fixed OTA Package Manager: Synchronized versionCode 41 and versionName 3.0.4",
-      "📺 Self-Healing Dual Video Engine: Auto-switches to Native TV Player if Hls.js drops frames on older chipsets"
+      "🔥 Dedicated Native Hardware Player: Integrated 100% native Android VideoView / MediaCodec engine (PlayerActivity) that bypasses WebView rendering completely to eliminate black screen issues permanently on all Fire TV OS and Android TV devices!",
+      "🎮 Built-in 10-Foot TV Remote Controls: Full D-Pad seek (◄/► 10s), Play/Pause (OK), OSD overlay, and buffer indicators",
+      "⚡ Auto-Failover Watchdog: Automatically rescues playback into native hardware player if WebView black screen is detected",
+      "🚀 Dual Mode: Instant 1-click 'Hardware Player' button in modal & player OSD"
     ],
     "size_mb": "4.6 MB"
   }
