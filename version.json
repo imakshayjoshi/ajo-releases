@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "version": "2.6.3",
-  "versionCode": 34,
+  "version": "2.6.4",
+  "versionCode": 35,
   "releaseDate": "2026-08-19",
   "phone": {
     "version": "2.5.5",
@@ -19,18 +19,17 @@
     "size_mb": "4.3 MB"
   },
   "tv": {
-    "version": "2.6.3",
-    "versionCode": 34,
+    "version": "2.6.4",
+    "versionCode": 35,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "🔥 Restored Rock-Solid v2.4.8 Player Architecture: Unified HLS video & audio pipeline with zero black screens",
+      "🔥 Fixed Fire TV / Android TV Video Black Screen issue caused by hardware acceleration tearing",
       "⚡ Anti-Hang Async Cleanup: Eliminated synchronous codec lockup on exit so returning to app is instant",
-      "🎬 Multi-Audio Direct HLS: High-speed Hindi, English, Tamil, Telugu streams for all movies & series",
-      "🎮 In-Player EPG Quick Switcher & Native D-Pad Navigation"
+      "🎬 Multi-Audio Direct HLS: High-speed Hindi, English, Tamil, Telugu streams for all movies & series"
     ],
     "size_mb": "4.6 MB"
   }
