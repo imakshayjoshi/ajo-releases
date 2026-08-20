@@ -290,7 +290,7 @@ public class PlayerActivity extends AppCompatActivity {
             PlayerView view = new PlayerView(this);
             view.setUseController(false);           // we draw our own 10-foot OSD
             view.setKeepContentOnPlayerReset(true);
-            view.setShutterBackgroundColor(Color.BLACK);
+            view.setShutterBackgroundColor(Color.TRANSPARENT);
             view.setResizeMode(AspectRatioFrameLayout.RESIZE_MODE_FIT);
             view.setLayoutParams(fill);
             playerView = view;

@@ -27,12 +27,13 @@
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "📺 Self-Contained TVPlayer.css: Forced transparent OSD background, mix-blend-mode: normal, and opacity: 1 to ensure zero hole-punching failures on Fire TV.",
+      "📺 Unconditional Hardware ExoPlayer: Bypasses WebView player completely on all TV models regardless of manufacturer or Android OS version.",
+      "✨ Transparent Surface Shutter: Eliminated PlayerView black shutter overlay during stream loading.",
       "🛡️ Embed-Source Protection: Non-playable iframe embeds now sort last and hand off safely to real playable HLS m3u8 streams.",
       "⚡ Decoder Lifecycle Fix: Release WebView video decoder before native ExoPlayer handoff so both engines never fight over MediaCodec resources.",
       "🔙 Deterministic Back Button: Returns cleanly from PlayerActivity with focus restored to the active card."
     ],
     "size_mb": "8.8 MB",
-    "sha256": "dde6296e222c0d8c8c18efa6e9ae6e3cae0006adada7bf252b08e46ad273c6fb"
+    "sha256": "b18f5a53e20ea50d1abe06d07b1180cfb9447eb435d1a1ec2a0c6b5247b42a62"
   }
 }

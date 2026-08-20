@@ -229,14 +229,7 @@ public class MainActivity extends BridgeActivity {
                  */
                 @JavascriptInterface
                 public boolean preferNative() {
-                    try {
-                        if (isFireTv()) return true;
-                        boolean isTv = getPackageManager()
-                                .hasSystemFeature(android.content.pm.PackageManager.FEATURE_LEANBACK);
-                        return isTv && Build.VERSION.SDK_INT <= Build.VERSION_CODES.P;
-                    } catch (Exception e) {
-                        return false;
-                    }
+                    return true;
                 }
 
                 @JavascriptInterface

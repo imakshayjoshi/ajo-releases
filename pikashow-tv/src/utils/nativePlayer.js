@@ -23,25 +23,11 @@ export function hasNativePlayer() {
 
 /**
  * True when playback should bypass the WebView entirely.
- * Falls back to a UA sniff for older APKs whose bridge lacks preferNative().
+ * When running inside our Android TV APK, ALWAYS use the hardware ExoPlayer.
  */
 export function shouldPreferNativePlayer() {
   const api = bridge();
-  if (!api) return false;
-
-  try {
-    if (typeof api.preferNative === 'function') return Boolean(api.preferNative());
-  } catch {
-    // fall through to the UA heuristic
-  }
-  try {
-    if (typeof api.isFireTv === 'function') return Boolean(api.isFireTv());
-  } catch {
-    // fall through to the UA heuristic
-  }
-
-  const ua = (typeof navigator !== 'undefined' && navigator.userAgent) || '';
-  return /AFT|Fire\s?TV|AmazonWebAppPlatform|Silk/i.test(ua);
+  return Boolean(api);
 }
 
 /** Short device description for diagnostics / settings screens. */
