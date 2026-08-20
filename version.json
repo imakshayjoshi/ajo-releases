@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "version": "3.0.6",
-  "versionCode": 43,
+  "version": "3.0.9",
+  "versionCode": 46,
   "releaseDate": "2026-08-20",
   "phone": {
     "version": "2.5.5",
@@ -19,22 +19,19 @@
     "size_mb": "4.3 MB"
   },
   "tv": {
-    "version": "3.0.6",
-    "versionCode": 43,
+    "version": "3.0.9",
+    "versionCode": 46,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "🎥 ExoPlayer / AndroidX Media3 Engine: video now decodes onto a real hardware SurfaceView, permanently fixing the black-screen-with-audio bug on Fire TV OS and legacy Android TV panels",
-      "⚡ Auto Native Handoff: Fire TV devices route Live TV and movies straight to the hardware player — no 3-second black screen wait",
-      "🔧 Software Decoder Fallback: if a Fire TV hardware codec refuses the stream, playback automatically re-initialises on software H.264/AAC",
-      "🔒 Legacy SSL Trust: OkHttp data source with permissive trust manager so HTTPS IPTV CDNs load on 2014-2016 panels with expired root CAs",
-      "📡 Permissive HLS Parsing: non-IDR keyframes and access-unit detection enabled for tokenized IPTV .m3u8 playlists",
-      "🎮 Clean Back Exit: player releases the decoder before finishing, returning D-Pad focus to the TV UI instantly"
+      "🔙 Fixed Back button from PlayerActivity – launchMode changed from singleTop to standard so Back returns cleanly to MainActivity with focus restored.",
+      "📺 Leanback detection widened – preferNative() now returns true for any TV/Leanback device (no API cap), so Google Android TV images auto-route to native player.",
+      "⏱️ Web-player watchdog improved – keys off readyState >= 3 + zero frames/dimensions with a ~3s grace, works even when TV WebViews refuse autoplay (paused at time 0)."
     ],
-    "size_mb": "8.8 MB",
-    "sha256": "88fd910d6f6b7c6d035322098c74d21c45ee012bc37bab48cdd00d971b013fd9"
+    "size_mb": "8.5 MB",
+    "sha256": "9f9f0af2ec0634f19d5c70cf965fb28bddb5b0fe9542ca2edf6776d6ae5e3e39"
   }
 }
