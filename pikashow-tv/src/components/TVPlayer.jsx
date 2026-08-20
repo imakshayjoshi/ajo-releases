@@ -18,8 +18,10 @@ import { generateUniversalServers } from '../utils/streamingEngines';
 import {
   hasNativePlayer,
   shouldPreferNativePlayer,
+  isNativePlayableUrl,
   playInNativePlayer
 } from '../utils/nativePlayer';
+import './TVPlayer.css';
 
 export function TVPlayer({
   item,
@@ -75,6 +77,17 @@ export function TVPlayer({
     return generateUniversalServers(item);
   }, [item, server, isLive]);
 
+  // On a TV box, an iframe embed source can never render: the native player only
+  // accepts real stream URLs, and the legacy WebView cannot composite MSE video.
+  // So put directly playable sources first and leave the embeds at the bottom.
+  const orderedServers = useMemo(() => {
+    if (!shouldPreferNativePlayer() || allServers.length < 2) return allServers;
+    const playable = allServers.filter((srv) => isNativePlayableUrl(srv?.url));
+    if (playable.length === 0) return allServers;
+    const rest = allServers.filter((srv) => !isNativePlayableUrl(srv?.url));
+    return [...playable, ...rest];
+  }, [allServers]);
+
   const [currentServerIndex, setCurrentServerIndex] = useState(0);
   const [videoEngine, setVideoEngine] = useState('hls'); // 'hls' | 'native'
   const [isPlaying, setIsPlaying] = useState(true);
@@ -88,7 +101,7 @@ export function TVPlayer({
   const [errorMessage, setErrorMessage] = useState(null);
   const [nativeActive, setNativeActive] = useState(false);
 
-  const activeServer = allServers[currentServerIndex] || allServers[0] || server;
+  const activeServer = orderedServers[currentServerIndex] || orderedServers[0] || server;
   const streamUrl = activeServer?.url || item?.url;
 
   // Wake up OSD and reset auto-hide timer
@@ -112,9 +125,9 @@ export function TVPlayer({
 
   // Auto failover to next server if current server fails
   const handleFailover = useCallback((reason = 'Stream connection error') => {
-    if (allServers.length > 1 && currentServerIndex < allServers.length - 1) {
+    if (orderedServers.length > 1 && currentServerIndex < orderedServers.length - 1) {
       const nextIdx = currentServerIndex + 1;
-      const nextName = allServers[nextIdx]?.name || `Server ${nextIdx + 1}`;
+      const nextName = orderedServers[nextIdx]?.name || `Server ${nextIdx + 1}`;
       setErrorMessage(`⚡ ${reason}. Switching to ${nextName}...`);
       setCurrentServerIndex(nextIdx);
       setTimeout(() => setErrorMessage(null), 3000);
@@ -122,7 +135,7 @@ export function TVPlayer({
       setErrorMessage('Stream offline. Please select another server or channel.');
       setIsBuffering(false);
     }
-  }, [allServers, currentServerIndex]);
+  }, [orderedServers, currentServerIndex]);
 
   // Toggle Video Engine (HLS.js vs Native Android HTML5 Video)
   const toggleEngine = useCallback(() => {
@@ -171,6 +184,9 @@ export function TVPlayer({
   /** Single entry point for every handoff to the native hardware player. */
   const handOffToNative = useCallback((message) => {
     if (!streamUrl) return false;
+    // Iframe embeds and known player pages are not streams. Launching the native
+    // player with one guarantees a black screen, so refuse here.
+    if (!isNativePlayableUrl(streamUrl)) return false;
 
     // Release the decoder first, then launch. Order matters here.
     teardownWebPlayback();
@@ -188,8 +204,12 @@ export function TVPlayer({
 
   const launchNativeHardwarePlayer = useCallback(() => {
     if (handOffToNative('▶ Opening in hardware player...')) return true;
-    setErrorMessage('Native Player only available on Android / Fire TV');
-    setTimeout(() => setErrorMessage(null), 2500);
+    setErrorMessage(
+      hasNativePlayer()
+        ? 'This source cannot open in the hardware player. Try another server.'
+        : 'Native Player only available on Android / Fire TV'
+    );
+    setTimeout(() => setErrorMessage(null), 3000);
     return false;
   }, [handOffToNative]);
 
@@ -225,6 +245,8 @@ export function TVPlayer({
     if (!streamUrl) return;
     if (nativeHandoffDoneRef.current === streamUrl) return;
     if (!shouldPreferNativePlayer()) return;
+    // Not a real stream URL. The embed guard below deals with it.
+    if (!isNativePlayableUrl(streamUrl)) return;
 
     nativeHandoffDoneRef.current = streamUrl;
     handOffToNative('▶ Opening in hardware player...');
@@ -309,7 +331,8 @@ export function TVPlayer({
               // handOffToNative destroys this instance for us.
               if (!handOffToNative('Stream engine failed, switching to hardware player...')) {
                 hls.destroy();
-                setVideoEngine('native');
+                hlsRef.current = null;
+                handleFailover('Stream engine failed');
               }
               break;
           }
@@ -360,8 +383,10 @@ export function TVPlayer({
         console.warn('Black screen detected in WebView, handing off to native hardware player');
         const watchdog = blackScreenWatchdogRef.current;
         if (!handOffToNative('Black screen detected, switching to hardware player...')) {
+          // Cannot hand off (not a real stream URL, or not an Android build).
+          // Try the next source rather than staring at a black screen.
           nativeHandoffDoneRef.current = streamUrl;
-          setVideoEngine('native');
+          handleFailover('Video not rendering');
         }
         if (watchdog) clearInterval(watchdog);
         return;
@@ -387,6 +412,28 @@ export function TVPlayer({
       }
     };
   }, [streamUrl, isLive, videoEngine, nativeActive, handOffToNative, handleFailover]);
+
+  // Embed guard. Declared after the pipeline effect on purpose, so this message
+  // survives the setErrorMessage(null) that the pipeline does on start.
+  useEffect(() => {
+    if (!streamUrl) return;
+    if (!shouldPreferNativePlayer()) return;
+    if (isNativePlayableUrl(streamUrl)) return;
+
+    const nextPlayable = orderedServers.findIndex(
+      (srv, idx) => idx > currentServerIndex && isNativePlayableUrl(srv?.url)
+    );
+
+    if (nextPlayable !== -1) {
+      setErrorMessage('This source cannot play on TV. Switching server...');
+      setCurrentServerIndex(nextPlayable);
+      setTimeout(() => setErrorMessage(null), 3000);
+      return;
+    }
+
+    setIsBuffering(false);
+    setErrorMessage('This source is not supported on TV. Please pick another server or channel.');
+  }, [streamUrl, orderedServers, currentServerIndex]);
 
   // Video Time Update & Progress
   const handleTimeUpdate = useCallback(() => {
@@ -670,14 +717,14 @@ export function TVPlayer({
                   </>
                 )}
 
-                {allServers.length > 1 && (
+                {orderedServers.length > 1 && (
                   <button 
                     className="tv-player-btn" 
                     tabIndex={0}
                     onClick={() => setShowDrawer(showDrawer === 'servers' ? null : 'servers')}
                   >
                     <Server size={18} />
-                    <span>Servers ({currentServerIndex + 1}/{allServers.length})</span>
+                    <span>Servers ({currentServerIndex + 1}/{orderedServers.length})</span>
                   </button>
                 )}
 
@@ -779,21 +826,26 @@ export function TVPlayer({
           ))}
 
           {/* Servers List */}
-          {showDrawer === 'servers' && allServers.map((srv, idx) => (
-            <button
-              key={srv.id || idx}
-              tabIndex={0}
-              className={`tv-drawer-item ${idx === currentServerIndex ? 'active' : ''}`}
-              onClick={() => {
-                setCurrentServerIndex(idx);
-                setShowDrawer(null);
-                pingOsd();
-              }}
-            >
-              <span>{srv.name || `Server ${idx + 1}`}</span>
-              <span style={{ fontSize: '0.75rem', color: '#38bdf8' }}>{srv.source?.toUpperCase() || 'HLS'}</span>
-            </button>
-          ))}
+          {showDrawer === 'servers' && orderedServers.map((srv, idx) => {
+            const tvUnsupported = shouldPreferNativePlayer() && !isNativePlayableUrl(srv?.url);
+            return (
+              <button
+                key={srv.id || idx}
+                tabIndex={0}
+                className={`tv-drawer-item ${idx === currentServerIndex ? 'active' : ''}`}
+                onClick={() => {
+                  setCurrentServerIndex(idx);
+                  setShowDrawer(null);
+                  pingOsd();
+                }}
+              >
+                <span>{srv.name || `Server ${idx + 1}`}</span>
+                <span style={{ fontSize: '0.75rem', color: tvUnsupported ? '#f59e0b' : '#38bdf8' }}>
+                  {tvUnsupported ? 'Not supported on TV' : (srv.source?.toUpperCase() || 'HLS')}
+                </span>
+              </button>
+            );
+          })}
 
           {/* Audio Tracks List */}
           {showDrawer === 'audio' && audioTracks.map((trk) => (
