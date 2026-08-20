@@ -27,11 +27,12 @@
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "🔙 Fixed Back button from PlayerActivity – launchMode changed from singleTop to standard so Back returns cleanly to MainActivity with focus restored.",
-      "📺 Leanback detection widened – preferNative() now returns true for any TV/Leanback device (no API cap), so Google Android TV images auto-route to native player.",
-      "⏱️ Web-player watchdog improved – keys off readyState >= 3 + zero frames/dimensions with a ~3s grace, works even when TV WebViews refuse autoplay (paused at time 0)."
+      "📺 Self-Contained TVPlayer.css: Forced transparent OSD background, mix-blend-mode: normal, and opacity: 1 to ensure zero hole-punching failures on Fire TV.",
+      "🛡️ Embed-Source Protection: Non-playable iframe embeds now sort last and hand off safely to real playable HLS m3u8 streams.",
+      "⚡ Decoder Lifecycle Fix: Release WebView video decoder before native ExoPlayer handoff so both engines never fight over MediaCodec resources.",
+      "🔙 Deterministic Back Button: Returns cleanly from PlayerActivity with focus restored to the active card."
     ],
-    "size_mb": "8.5 MB",
-    "sha256": "9f9f0af2ec0634f19d5c70cf965fb28bddb5b0fe9542ca2edf6776d6ae5e3e39"
+    "size_mb": "8.8 MB",
+    "sha256": "dde6296e222c0d8c8c18efa6e9ae6e3cae0006adada7bf252b08e46ad273c6fb"
   }
 }
