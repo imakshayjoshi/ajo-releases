@@ -1,7 +1,9 @@
 package com.pikashow.tv;
 
+import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
@@ -95,6 +97,12 @@ public class PlayerActivity extends AppCompatActivity {
     private static final long SEEK_STEP_MS = 10000L;
     private static final long OSD_HIDE_DELAY_MS = 4000L;
 
+    /**
+     * How long to wait for a decoded frame to reach the surface before assuming the
+     * hardware decoder is handing us audio with a black picture.
+     */
+    private static final long FIRST_FRAME_TIMEOUT_MS = 9000L;
+
     @Nullable private ExoPlayer player;
     @Nullable private PlayerView playerView;
     @Nullable private SurfaceView fallbackSurfaceView;
@@ -114,6 +122,11 @@ public class PlayerActivity extends AppCompatActivity {
     private boolean softwareDecoderRetryDone = false;
     private long resumePositionMs = C.TIME_UNSET;
 
+    /** Tracks whether the current stream ever put a frame on the surface. */
+    private boolean firstFrameRendered = false;
+    /** Tracks whether the current stream actually carries video at all. */
+    private boolean hasVideoTrack = false;
+
     private final Handler uiHandler = new Handler(Looper.getMainLooper());
     private boolean isOsdVisible = true;
 
@@ -124,6 +137,39 @@ public class PlayerActivity extends AppCompatActivity {
         public void run() {
             updateProgressText();
             uiHandler.postDelayed(this, 1000L);
+        }
+    };
+
+    /**
+     * Audio is flowing but nothing was ever drawn. On Fire TV this is almost always
+     * a hardware decoder that accepted the stream and then failed to output to the
+     * surface, so retry the whole pipeline on software decoders once.
+     */
+    private final Runnable firstFrameWatchdog = new Runnable() {
+        @Override
+        public void run() {
+            if (firstFrameRendered || player == null) return;
+            // Audio-only streams (radio channels) legitimately never render.
+            if (!hasVideoTrack) return;
+
+            Log.w(TAG, "NO_FIRST_FRAME after " + FIRST_FRAME_TIMEOUT_MS
+                    + "ms with a video track present");
+
+            if (!softwareDecoderRetryDone) {
+                softwareDecoderRetryDone = true;
+                resumePositionMs = isLive ? C.TIME_UNSET : player.getCurrentPosition();
+                Toast.makeText(PlayerActivity.this,
+                        "Video not rendering, switching to software decoder...",
+                        Toast.LENGTH_SHORT).show();
+                showOsd();
+                initializePlayer();
+                return;
+            }
+
+            Toast.makeText(PlayerActivity.this,
+                    "This stream is playing audio only on this device.",
+                    Toast.LENGTH_LONG).show();
+            showOsd();
         }
     };
 
@@ -159,21 +205,62 @@ public class PlayerActivity extends AppCompatActivity {
         showOsd();
     }
 
+    /**
+     * PlayerActivity is declared singleTop, so tapping another channel while it is
+     * already open is delivered here instead of through onCreate. Without this the
+     * new URL was dropped on the floor and the old stream kept playing.
+     */
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        if (intent == null) return;
+        setIntent(intent);
+
+        String newUrl = intent.getStringExtra("url");
+        if (TextUtils.isEmpty(newUrl)) return;
+
+        streamUrl = newUrl;
+        isLive = intent.getBooleanExtra("isLive", false);
+        streamTitle = intent.getStringExtra("title");
+        if (TextUtils.isEmpty(streamTitle)) {
+            streamTitle = isLive ? "Live Channel" : "Video Stream";
+        }
+
+        // Fresh stream: allow a hardware decoder attempt again and drop the old
+        // resume position.
+        softwareDecoderRetryDone = false;
+        resumePositionMs = C.TIME_UNSET;
+
+        applyStreamMetadataToUi();
+        initializePlayer();
+        showOsd();
+    }
+
     @Override
     protected void onStop() {
         super.onStop();
-        // Fire TV can background the activity (Home button); release the decoder so
-        // the next app gets the hardware codec back on 1GB devices.
+        // Fire TV tears the surface down when the activity backgrounds (Home button,
+        // overlay app, screensaver). Keeping the player bound to that dead surface is
+        // exactly how you come back to audio with a black picture, so release it and
+        // rebuild in onStart.
         if (player != null) {
-            resumePositionMs = player.getCurrentPosition();
-            player.setPlayWhenReady(false);
+            resumePositionMs = isLive ? C.TIME_UNSET : player.getCurrentPosition();
         }
+        uiHandler.removeCallbacks(progressRunnable);
+        uiHandler.removeCallbacks(firstFrameWatchdog);
+        releasePlayer();
     }
 
     @Override
     protected void onStart() {
         super.onStart();
-        if (player != null && !player.isPlaying() && player.getPlaybackState() != Player.STATE_ENDED) {
+        // onCreate already built the player on a cold start; this only runs when we
+        // come back from the background after onStop released it.
+        if (player == null && !TextUtils.isEmpty(streamUrl)) {
+            initializePlayer();
+            showOsd();
+        } else if (player != null && !player.isPlaying()
+                && player.getPlaybackState() != Player.STATE_ENDED) {
             player.setPlayWhenReady(true);
         }
     }
@@ -227,29 +314,35 @@ public class PlayerActivity extends AppCompatActivity {
         osdOverlay = new RelativeLayout(this);
         osdOverlay.setLayoutParams(new RelativeLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-        osdOverlay.setBackgroundColor(Color.parseColor("#66000000"));
-        osdOverlay.setPadding(48, 36, 48, 36);
+        // Must stay fully transparent. A flat scrim here (this used to be #66000000)
+        // is a black film over the whole picture every time the OSD wakes up, which
+        // reads as "black screen over the video" on a 10-foot display.
+        osdOverlay.setBackgroundColor(Color.TRANSPARENT);
+        osdOverlay.setClickable(false);
+        osdOverlay.setFocusable(false);
 
         // --- top bar: LIVE/HD badge + title ---
         LinearLayout topBar = new LinearLayout(this);
         topBar.setOrientation(LinearLayout.HORIZONTAL);
         topBar.setGravity(Gravity.CENTER_VERTICAL);
+        topBar.setPadding(48, 36, 48, 48);
+        // Gradient only behind the text, so the picture stays untouched.
+        topBar.setBackground(new GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{Color.parseColor("#CC000000"), Color.TRANSPARENT}));
         RelativeLayout.LayoutParams topParams = new RelativeLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         topParams.addRule(RelativeLayout.ALIGN_PARENT_TOP);
         topBar.setLayoutParams(topParams);
 
         statusBadge = new TextView(this);
-        statusBadge.setText(isLive ? "\u25CF LIVE" : "HD");
         statusBadge.setTextColor(Color.BLACK);
         statusBadge.setTextSize(14);
         statusBadge.setTypeface(Typeface.DEFAULT_BOLD);
         statusBadge.setPadding(16, 6, 16, 6);
-        statusBadge.setBackgroundColor(isLive ? Color.parseColor("#ef4444") : Color.parseColor("#38bdf8"));
         topBar.addView(statusBadge);
 
         titleView = new TextView(this);
-        titleView.setText("  " + streamTitle);
         titleView.setTextColor(Color.WHITE);
         titleView.setTextSize(22);
         titleView.setTypeface(Typeface.DEFAULT_BOLD);
@@ -262,21 +355,21 @@ public class PlayerActivity extends AppCompatActivity {
         // --- bottom bar: elapsed/duration + remote hint ---
         LinearLayout bottomBar = new LinearLayout(this);
         bottomBar.setOrientation(LinearLayout.VERTICAL);
+        bottomBar.setPadding(48, 48, 48, 36);
+        bottomBar.setBackground(new GradientDrawable(
+                GradientDrawable.Orientation.BOTTOM_TOP,
+                new int[]{Color.parseColor("#CC000000"), Color.TRANSPARENT}));
         RelativeLayout.LayoutParams bottomParams = new RelativeLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         bottomParams.addRule(RelativeLayout.ALIGN_PARENT_BOTTOM);
         bottomBar.setLayoutParams(bottomParams);
 
         timeView = new TextView(this);
-        timeView.setText(isLive ? "Live broadcast" : "00:00 / 00:00");
         timeView.setTextColor(Color.parseColor("#cbd5e1"));
         timeView.setTextSize(16);
         bottomBar.addView(timeView);
 
         hintView = new TextView(this);
-        hintView.setText(isLive
-                ? "Remote: [OK] Play/Pause  \u2022  [\u25B2/\u25BC] Info  \u2022  [Back] Return to AJO TV"
-                : "Remote: [OK] Play/Pause  \u2022  [\u25C4/\u25BA] Seek 10s  \u2022  [Back] Return to AJO TV");
         hintView.setTextColor(Color.parseColor("#94a3b8"));
         hintView.setTextSize(14);
         hintView.setPadding(0, 12, 0, 0);
@@ -285,13 +378,38 @@ public class PlayerActivity extends AppCompatActivity {
         osdOverlay.addView(bottomBar);
         root.addView(osdOverlay);
 
+        applyStreamMetadataToUi();
+
         return root;
+    }
+
+    /** Fills the OSD text for the current stream. Safe to call on a channel switch. */
+    private void applyStreamMetadataToUi() {
+        if (statusBadge != null) {
+            statusBadge.setText(isLive ? "\u25CF LIVE" : "HD");
+            statusBadge.setBackgroundColor(
+                    isLive ? Color.parseColor("#ef4444") : Color.parseColor("#38bdf8"));
+        }
+        if (titleView != null) {
+            titleView.setText("  " + streamTitle);
+        }
+        if (timeView != null) {
+            timeView.setText(isLive ? "Live broadcast" : "00:00 / 00:00");
+        }
+        if (hintView != null) {
+            hintView.setText(isLive
+                    ? "Remote: [OK] Play/Pause  \u2022  [\u25B2/\u25BC] Info  \u2022  [Back] Return to AJO TV"
+                    : "Remote: [OK] Play/Pause  \u2022  [\u25C4/\u25BA] Seek 10s  \u2022  [Back] Return to AJO TV");
+        }
     }
 
     // -------------------------------------------------------------- the player
 
     private void initializePlayer() {
         releasePlayer();
+
+        firstFrameRendered = false;
+        hasVideoTrack = false;
 
         // Prefer bundled software extension decoders when a hardware decoder is
         // unavailable, and allow ExoPlayer to fall back through the decoder list
@@ -317,7 +435,7 @@ public class PlayerActivity extends AppCompatActivity {
 
         DefaultTrackSelector trackSelector = new DefaultTrackSelector(this);
         trackSelector.setParameters(trackSelector.buildUponParameters()
-                // 32" 720p/1080p panel on ~1GB RAM: don't let ABR climb into 4K and
+                // 32\" 720p/1080p panel on ~1GB RAM: don't let ABR climb into 4K and
                 // blow the decoder budget.
                 .setMaxVideoSize(1920, 1080)
                 .setMaxVideoBitrate(8_000_000)
@@ -354,7 +472,11 @@ public class PlayerActivity extends AppCompatActivity {
         exo.setPlayWhenReady(true);
 
         player = exo;
+
+        uiHandler.removeCallbacks(progressRunnable);
         uiHandler.post(progressRunnable);
+        uiHandler.removeCallbacks(firstFrameWatchdog);
+        uiHandler.postDelayed(firstFrameWatchdog, FIRST_FRAME_TIMEOUT_MS);
     }
 
     /**
@@ -519,7 +641,7 @@ public class PlayerActivity extends AppCompatActivity {
                 Toast.makeText(PlayerActivity.this,
                         "Switching to software decoder...", Toast.LENGTH_SHORT).show();
                 if (player != null) {
-                    resumePositionMs = player.getCurrentPosition();
+                    resumePositionMs = isLive ? C.TIME_UNSET : player.getCurrentPosition();
                 }
                 showOsd();
                 initializePlayer();
@@ -555,6 +677,8 @@ public class PlayerActivity extends AppCompatActivity {
         @Override
         public void onRenderedFirstFrame() {
             Log.i(TAG, "RENDERED_FIRST_FRAME: hardware surface is receiving decoded video");
+            firstFrameRendered = true;
+            uiHandler.removeCallbacks(firstFrameWatchdog);
             bufferSpinner.setVisibility(View.GONE);
         }
 
@@ -571,6 +695,7 @@ public class PlayerActivity extends AppCompatActivity {
                 if (group.getType() == C.TRACK_TYPE_VIDEO) videoTracks += group.length;
                 if (group.getType() == C.TRACK_TYPE_AUDIO) audioTracks += group.length;
             }
+            hasVideoTrack = videoTracks > 0;
             Log.i(TAG, "TRACKS: video=" + videoTracks + " audio=" + audioTracks);
         }
     }
