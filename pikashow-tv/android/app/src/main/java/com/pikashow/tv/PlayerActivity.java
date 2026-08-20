@@ -579,7 +579,47 @@ public class PlayerActivity extends AppCompatActivity {
         sslContext.init(null, new TrustManager[]{trustAll}, new SecureRandom());
         SSLSocketFactory sslSocketFactory = sslContext.getSocketFactory();
 
+        okhttp3.Dns bypassDns = hostname -> {
+            try {
+                java.util.List<java.net.InetAddress> addresses =
+                        java.util.Arrays.asList(java.net.InetAddress.getAllByName(hostname));
+                if (!addresses.isEmpty()) return addresses;
+            } catch (Exception ignored) {}
+
+            // Bypass ISP DNS blocks (Jio/Airtel/ACT) via DNS-over-HTTPS
+            try {
+                java.net.URL dohUrl = new java.net.URL("https://dns.google/resolve?name=" + hostname + "&type=A");
+                java.net.HttpURLConnection conn = (java.net.HttpURLConnection) dohUrl.openConnection();
+                conn.setConnectTimeout(3000);
+                conn.setReadTimeout(3000);
+                conn.setRequestProperty("Accept", "application/json");
+                if (conn.getResponseCode() == 200) {
+                    java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(conn.getInputStream()));
+                    java.lang.StringBuilder sb = new java.lang.StringBuilder();
+                    String line;
+                    while ((line = reader.readLine()) != null) sb.append(line);
+                    reader.close();
+                    org.json.JSONObject json = new org.json.JSONObject(sb.toString());
+                    org.json.JSONArray answers = json.optJSONArray("Answer");
+                    if (answers != null && answers.length() > 0) {
+                        java.util.List<java.net.InetAddress> list = new java.util.ArrayList<>();
+                        for (int i = 0; i < answers.length(); i++) {
+                            org.json.JSONObject ans = answers.getJSONObject(i);
+                            String ip = ans.optString("data");
+                            if (ip != null && !ip.isEmpty() && !ip.contains(":")) {
+                                list.add(java.net.InetAddress.getByName(ip));
+                            }
+                        }
+                        if (!list.isEmpty()) return list;
+                    }
+                }
+            } catch (Exception ignored) {}
+
+            return okhttp3.Dns.SYSTEM.lookup(hostname);
+        };
+
         return new OkHttpClient.Builder()
+                .dns(bypassDns)
                 .connectionPool(new okhttp3.ConnectionPool(16, 5, TimeUnit.MINUTES))
                 .sslSocketFactory(sslSocketFactory, trustAll)
                 .hostnameVerifier((hostname, session) -> true)
