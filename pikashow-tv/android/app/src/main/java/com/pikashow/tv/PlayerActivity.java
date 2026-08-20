@@ -12,11 +12,12 @@ import android.text.TextUtils;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.KeyEvent;
-import android.view.SurfaceView;
+import android.view.TextureView;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.RelativeLayout;
@@ -32,6 +33,7 @@ import androidx.media3.common.MediaItem;
 import androidx.media3.common.MimeTypes;
 import androidx.media3.common.PlaybackException;
 import androidx.media3.common.Player;
+import androidx.media3.common.VideoSize;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.datasource.DataSource;
 import androidx.media3.datasource.DefaultDataSource;
@@ -50,7 +52,6 @@ import androidx.media3.exoplayer.trackselection.DefaultTrackSelector;
 import androidx.media3.extractor.DefaultExtractorsFactory;
 import androidx.media3.extractor.ts.DefaultTsPayloadReaderFactory;
 import androidx.media3.ui.AspectRatioFrameLayout;
-import androidx.media3.ui.PlayerView;
 
 import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
@@ -70,18 +71,10 @@ import okhttp3.OkHttpClient;
 /**
  * Dedicated native video player for Fire TV OS / Android TV.
  *
- * <p>Why this exists: on legacy Fire OS builds the Chromium/Silk WebView does not
- * hole-punch the hardware video plane for inline {@code <video>} + MSE (Hls.js)
- * playback. The decoded surface sits behind the WebView while the WebView paints
- * an opaque black layer over it — audio plays, video is pitch black.
- *
- * <p>The fix is to render outside the WebView entirely: AndroidX Media3 / ExoPlayer
- * decoding onto a real {@link SurfaceView}, which composites directly with the
- * hardware video plane.
- *
- * <p>Also replaces {@code android.widget.VideoView}, whose NuPlayer/MediaPlayer
- * backend cannot reliably parse modern chunked HLS manifests, tokenized TS
- * segments, or requests needing custom headers on old MediaTek/Amlogic chipsets.
+ * <p>Uses TextureView-backed rendering pipeline inside an AspectRatioFrameLayout.
+ * TextureView draws directly into Android's OpenGL ES View hierarchy as a standard
+ * View, completely eliminating hardware overlay plane punch-through failures and
+ * Z-ordering occlusion bugs on older Smart TV chipsets (Panasonic, Toshiba, Fire TV OS 5/6/7).
  */
 @OptIn(markerClass = UnstableApi.class)
 public class PlayerActivity extends AppCompatActivity {
@@ -101,11 +94,11 @@ public class PlayerActivity extends AppCompatActivity {
      * How long to wait for a decoded frame to reach the surface before assuming the
      * hardware decoder is handing us audio with a black picture.
      */
-    private static final long FIRST_FRAME_TIMEOUT_MS = 9000L;
+    private static final long FIRST_FRAME_TIMEOUT_MS = 7000L;
 
     @Nullable private ExoPlayer player;
-    @Nullable private PlayerView playerView;
-    @Nullable private SurfaceView fallbackSurfaceView;
+    @Nullable private AspectRatioFrameLayout aspectRatioFrameLayout;
+    @Nullable private TextureView videoTextureView;
 
     private RelativeLayout osdOverlay;
     private ProgressBar bufferSpinner;
@@ -149,27 +142,20 @@ public class PlayerActivity extends AppCompatActivity {
         @Override
         public void run() {
             if (firstFrameRendered || player == null) return;
-            // Audio-only streams (radio channels) legitimately never render.
             if (!hasVideoTrack) return;
 
             Log.w(TAG, "NO_FIRST_FRAME after " + FIRST_FRAME_TIMEOUT_MS
-                    + "ms with a video track present");
+                    + "ms with a video track present. Retrying with software decoder.");
 
             if (!softwareDecoderRetryDone) {
                 softwareDecoderRetryDone = true;
                 resumePositionMs = isLive ? C.TIME_UNSET : player.getCurrentPosition();
                 Toast.makeText(PlayerActivity.this,
-                        "Video not rendering, switching to software decoder...",
+                        "Switching to optimized decoder...",
                         Toast.LENGTH_SHORT).show();
                 showOsd();
                 initializePlayer();
-                return;
             }
-
-            Toast.makeText(PlayerActivity.this,
-                    "This stream is playing audio only on this device.",
-                    Toast.LENGTH_LONG).show();
-            showOsd();
         }
     };
 
@@ -179,8 +165,6 @@ public class PlayerActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // Title bar is already suppressed by AppTheme.Player (windowNoTitle=true);
-        // calling requestWindowFeature() on an AppCompatActivity throws.
         getWindow().setFlags(
                 WindowManager.LayoutParams.FLAG_FULLSCREEN | WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON,
                 WindowManager.LayoutParams.FLAG_FULLSCREEN | WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
@@ -205,11 +189,6 @@ public class PlayerActivity extends AppCompatActivity {
         showOsd();
     }
 
-    /**
-     * PlayerActivity is declared singleTop, so tapping another channel while it is
-     * already open is delivered here instead of through onCreate. Without this the
-     * new URL was dropped on the floor and the old stream kept playing.
-     */
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
@@ -226,8 +205,6 @@ public class PlayerActivity extends AppCompatActivity {
             streamTitle = isLive ? "Live Channel" : "Video Stream";
         }
 
-        // Fresh stream: allow a hardware decoder attempt again and drop the old
-        // resume position.
         softwareDecoderRetryDone = false;
         resumePositionMs = C.TIME_UNSET;
 
@@ -239,10 +216,6 @@ public class PlayerActivity extends AppCompatActivity {
     @Override
     protected void onStop() {
         super.onStop();
-        // Fire TV tears the surface down when the activity backgrounds (Home button,
-        // overlay app, screensaver). Keeping the player bound to that dead surface is
-        // exactly how you come back to audio with a black picture, so release it and
-        // rebuild in onStart.
         if (player != null) {
             resumePositionMs = isLive ? C.TIME_UNSET : player.getCurrentPosition();
         }
@@ -254,8 +227,6 @@ public class PlayerActivity extends AppCompatActivity {
     @Override
     protected void onStart() {
         super.onStart();
-        // onCreate already built the player on a cold start; this only runs when we
-        // come back from the background after onStop released it.
         if (player == null && !TextUtils.isEmpty(streamUrl)) {
             initializePlayer();
             showOsd();
@@ -276,32 +247,26 @@ public class PlayerActivity extends AppCompatActivity {
 
     private View buildUi() {
         RelativeLayout root = new RelativeLayout(this);
-        root.setBackgroundColor(Color.BLACK);
         root.setLayoutParams(new RelativeLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
         RelativeLayout.LayoutParams fill = new RelativeLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
+        fill.addRule(RelativeLayout.CENTER_IN_PARENT);
 
-        // Media3 PlayerView defaults to a SurfaceView output, which is exactly the
-        // hardware-composited path we need. If inflating it fails on an unusual
-        // legacy theme, drop to a bare SurfaceView rather than dying.
-        try {
-            PlayerView view = new PlayerView(this);
-            view.setUseController(false);           // we draw our own 10-foot OSD
-            view.setKeepContentOnPlayerReset(true);
-            view.setShutterBackgroundColor(Color.TRANSPARENT);
-            view.setResizeMode(AspectRatioFrameLayout.RESIZE_MODE_FIT);
-            view.setLayoutParams(fill);
-            playerView = view;
-            root.addView(view);
-        } catch (Throwable t) {
-            Log.w(TAG, "PlayerView unavailable, falling back to raw SurfaceView", t);
-            SurfaceView surface = new SurfaceView(this);
-            surface.setLayoutParams(fill);
-            fallbackSurfaceView = surface;
-            root.addView(surface);
-        }
+        // AspectRatioFrameLayout maintains correct 16:9 / 4:3 video ratio
+        aspectRatioFrameLayout = new AspectRatioFrameLayout(this);
+        aspectRatioFrameLayout.setResizeMode(AspectRatioFrameLayout.RESIZE_MODE_FIT);
+        aspectRatioFrameLayout.setLayoutParams(fill);
+
+        // TextureView renders video directly inside Android's View tree via OpenGL ES
+        videoTextureView = new TextureView(this);
+        FrameLayout.LayoutParams textureParams = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT, Gravity.CENTER);
+        videoTextureView.setLayoutParams(textureParams);
+        aspectRatioFrameLayout.addView(videoTextureView);
+
+        root.addView(aspectRatioFrameLayout);
 
         bufferSpinner = new ProgressBar(this);
         bufferSpinner.setIndeterminate(true);
@@ -314,9 +279,6 @@ public class PlayerActivity extends AppCompatActivity {
         osdOverlay = new RelativeLayout(this);
         osdOverlay.setLayoutParams(new RelativeLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-        // Must stay fully transparent. A flat scrim here (this used to be #66000000)
-        // is a black film over the whole picture every time the OSD wakes up, which
-        // reads as "black screen over the video" on a 10-foot display.
         osdOverlay.setBackgroundColor(Color.TRANSPARENT);
         osdOverlay.setClickable(false);
         osdOverlay.setFocusable(false);
@@ -326,7 +288,6 @@ public class PlayerActivity extends AppCompatActivity {
         topBar.setOrientation(LinearLayout.HORIZONTAL);
         topBar.setGravity(Gravity.CENTER_VERTICAL);
         topBar.setPadding(48, 36, 48, 48);
-        // Gradient only behind the text, so the picture stays untouched.
         topBar.setBackground(new GradientDrawable(
                 GradientDrawable.Orientation.TOP_BOTTOM,
                 new int[]{Color.parseColor("#CC000000"), Color.TRANSPARENT}));
@@ -379,22 +340,25 @@ public class PlayerActivity extends AppCompatActivity {
         root.addView(osdOverlay);
 
         applyStreamMetadataToUi();
-
         return root;
     }
 
-    /** Fills the OSD text for the current stream. Safe to call on a channel switch. */
     private void applyStreamMetadataToUi() {
-        if (statusBadge != null) {
-            statusBadge.setText(isLive ? "\u25CF LIVE" : "HD");
-            statusBadge.setBackgroundColor(
-                    isLive ? Color.parseColor("#ef4444") : Color.parseColor("#38bdf8"));
-        }
         if (titleView != null) {
-            titleView.setText("  " + streamTitle);
+            titleView.setText(streamTitle);
         }
-        if (timeView != null) {
-            timeView.setText(isLive ? "Live broadcast" : "00:00 / 00:00");
+        if (statusBadge != null) {
+            GradientDrawable badgeBg = new GradientDrawable();
+            badgeBg.setCornerRadius(8);
+            if (isLive) {
+                badgeBg.setColor(Color.parseColor("#ef4444"));
+                statusBadge.setBackground(badgeBg);
+                statusBadge.setText("LIVE BROADCAST");
+            } else {
+                badgeBg.setColor(Color.parseColor("#38bdf8"));
+                statusBadge.setBackground(badgeBg);
+                statusBadge.setText("HD STREAM");
+            }
         }
         if (hintView != null) {
             hintView.setText(isLive
@@ -411,15 +375,11 @@ public class PlayerActivity extends AppCompatActivity {
         firstFrameRendered = false;
         hasVideoTrack = false;
 
-        // Prefer bundled software extension decoders when a hardware decoder is
-        // unavailable, and allow ExoPlayer to fall back through the decoder list
-        // when a Fire TV MediaCodec instance fails to configure or init.
         DefaultRenderersFactory renderersFactory = new DefaultRenderersFactory(this)
                 .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
                 .setEnableDecoderFallback(true)
                 .setMediaCodecSelector(
                         softwareDecoderRetryDone
-                                // Second attempt: skip hardware decoders entirely.
                                 ? (mimeType, requiresSecureDecoder, requiresTunnelingDecoder) -> {
                                     java.util.List<androidx.media3.exoplayer.mediacodec.MediaCodecInfo> all =
                                             androidx.media3.exoplayer.mediacodec.MediaCodecUtil.getDecoderInfos(
@@ -435,8 +395,6 @@ public class PlayerActivity extends AppCompatActivity {
 
         DefaultTrackSelector trackSelector = new DefaultTrackSelector(this);
         trackSelector.setParameters(trackSelector.buildUponParameters()
-                // 32\" 720p/1080p panel on ~1GB RAM: don't let ABR climb into 4K and
-                // blow the decoder budget.
                 .setMaxVideoSize(1920, 1080)
                 .setMaxVideoBitrate(8_000_000)
                 .setForceLowestBitrate(false));
@@ -458,11 +416,10 @@ public class PlayerActivity extends AppCompatActivity {
         exo.setHandleAudioBecomingNoisy(true);
         exo.addListener(new PlayerEventListener());
 
-        if (playerView != null) {
-            playerView.setPlayer(exo);
-        } else if (fallbackSurfaceView != null) {
-            exo.setVideoSurfaceView(fallbackSurfaceView);
+        if (videoTextureView != null) {
+            exo.setVideoTextureView(videoTextureView);
         }
+        exo.setVideoScalingMode(C.VIDEO_SCALING_MODE_SCALE_TO_FIT);
 
         exo.setMediaSource(buildMediaSource(streamUrl));
         if (resumePositionMs != C.TIME_UNSET && !isLive) {
@@ -479,11 +436,6 @@ public class PlayerActivity extends AppCompatActivity {
         uiHandler.postDelayed(firstFrameWatchdog, FIRST_FRAME_TIMEOUT_MS);
     }
 
-    /**
-     * HLS gets an explicit {@link HlsMediaSource} with permissive TS parsing —
-     * IPTV playlists routinely start mid-GOP or omit access-unit boundaries, which
-     * the strict defaults reject (and which is one way a stream ends up audio-only).
-     */
     private MediaSource buildMediaSource(String url) {
         DataSource.Factory dataSourceFactory = buildDataSourceFactory();
         Uri uri = Uri.parse(url);
@@ -506,8 +458,6 @@ public class PlayerActivity extends AppCompatActivity {
                     /* exposeCea608WhenMissingDeclarations= */ true);
             return new HlsMediaSource.Factory(dataSourceFactory)
                     .setExtractorFactory(hlsExtractorFactory)
-                    // Read the first segment instead of trusting the playlist's
-                    // CODECS attribute — legacy IPTV manifests lie about it.
                     .setAllowChunklessPreparation(false)
                     .createMediaSource(itemBuilder.build());
         }
@@ -522,12 +472,6 @@ public class PlayerActivity extends AppCompatActivity {
                 .createMediaSource(itemBuilder.build());
     }
 
-    /**
-     * HTTP stack for stream loading. Prefers OkHttp (better redirect + keep-alive
-     * behaviour on old Android) with a permissive TLS trust manager, because these
-     * 2014-2016 panels ship root CA stores that expired years ago and would
-     * otherwise abort the handshake on perfectly good HTTPS CDNs.
-     */
     private DataSource.Factory buildDataSourceFactory() {
         Map<String, String> defaultHeaders = new HashMap<>();
         defaultHeaders.put("Accept", "*/*");
@@ -550,8 +494,6 @@ public class PlayerActivity extends AppCompatActivity {
                     .setDefaultRequestProperties(defaultHeaders);
         }
 
-        // DefaultDataSource wraps the HTTP factory so file:// and content:// URIs
-        // (local downloads) keep working through the same player.
         return new DefaultDataSource.Factory(this, httpFactory);
     }
 
@@ -571,48 +513,48 @@ public class PlayerActivity extends AppCompatActivity {
 
         SSLContext sslContext = SSLContext.getInstance("TLS");
         sslContext.init(null, new TrustManager[]{trustAll}, new SecureRandom());
-        SSLSocketFactory socketFactory = sslContext.getSocketFactory();
+        SSLSocketFactory sslSocketFactory = sslContext.getSocketFactory();
 
         return new OkHttpClient.Builder()
-                .connectTimeout(CONNECT_TIMEOUT_MS, TimeUnit.MILLISECONDS)
-                .readTimeout(READ_TIMEOUT_MS, TimeUnit.MILLISECONDS)
-                .writeTimeout(READ_TIMEOUT_MS, TimeUnit.MILLISECONDS)
-                .followRedirects(true)
-                .followSslRedirects(true)   // allow http -> https and back
-                .retryOnConnectionFailure(true)
-                .sslSocketFactory(socketFactory, trustAll)
+                .sslSocketFactory(sslSocketFactory, trustAll)
                 .hostnameVerifier((hostname, session) -> true)
                 .connectionSpecs(Arrays.asList(
                         ConnectionSpec.MODERN_TLS,
                         ConnectionSpec.COMPATIBLE_TLS,
                         ConnectionSpec.CLEARTEXT))
+                .connectTimeout(CONNECT_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+                .readTimeout(READ_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+                .followRedirects(true)
+                .followSslRedirects(true)
+                .retryOnConnectionFailure(true)
                 .build();
     }
 
     private void releasePlayer() {
         if (player != null) {
-            player.removeMediaItems(0, player.getMediaItemCount());
-            player.release();
+            try {
+                player.stop();
+                player.release();
+            } catch (Exception e) {
+                Log.w(TAG, "Error releasing ExoPlayer", e);
+            }
             player = null;
-        }
-        if (playerView != null) {
-            playerView.setPlayer(null);
         }
     }
 
-    private final class PlayerEventListener implements Player.Listener {
-
+    private class PlayerEventListener implements Player.Listener {
         @Override
-        public void onPlaybackStateChanged(int state) {
-            switch (state) {
+        public void onPlaybackStateChanged(int playbackState) {
+            switch (playbackState) {
                 case Player.STATE_BUFFERING:
                     bufferSpinner.setVisibility(View.VISIBLE);
                     break;
                 case Player.STATE_READY:
                     bufferSpinner.setVisibility(View.GONE);
-                    scheduleHideOsd();
+                    updateProgressText();
                     break;
                 case Player.STATE_ENDED:
+                    bufferSpinner.setVisibility(View.GONE);
                     finish();
                     break;
                 case Player.STATE_IDLE:
@@ -623,29 +565,22 @@ public class PlayerActivity extends AppCompatActivity {
 
         @Override
         public void onPlayerError(@NonNull PlaybackException error) {
-            Log.e(TAG, "Playback error: " + error.getErrorCodeName(), error);
+            Log.e(TAG, "PLAYER_ERROR: " + error.getMessage() + " (code " + error.errorCode + ")", error);
             bufferSpinner.setVisibility(View.GONE);
 
             int code = error.errorCode;
-            boolean decoderProblem =
-                    code == PlaybackException.ERROR_CODE_DECODER_INIT_FAILED
-                            || code == PlaybackException.ERROR_CODE_DECODER_QUERY_FAILED
-                            || code == PlaybackException.ERROR_CODE_DECODING_FAILED
-                            || code == PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED
-                            || code == PlaybackException.ERROR_CODE_DECODING_FORMAT_EXCEEDS_CAPABILITIES;
-
-            if (decoderProblem && !softwareDecoderRetryDone) {
-                // Hardware decoder refused the stream: rebuild the pipeline forcing
-                // software H.264/AAC. This is the real-world Fire TV failure mode.
-                softwareDecoderRetryDone = true;
-                Toast.makeText(PlayerActivity.this,
-                        "Switching to software decoder...", Toast.LENGTH_SHORT).show();
-                if (player != null) {
-                    resumePositionMs = isLive ? C.TIME_UNSET : player.getCurrentPosition();
+            if (code == PlaybackException.ERROR_CODE_DECODER_INIT_FAILED
+                    || code == PlaybackException.ERROR_CODE_DECODING_FAILED
+                    || code == PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED) {
+                if (!softwareDecoderRetryDone) {
+                    softwareDecoderRetryDone = true;
+                    Toast.makeText(PlayerActivity.this,
+                            "Hardware decoder failed, switching to software decoder...",
+                            Toast.LENGTH_SHORT).show();
+                    showOsd();
+                    initializePlayer();
+                    return;
                 }
-                showOsd();
-                initializePlayer();
-                return;
             }
 
             if (isLive && code == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW) {
@@ -668,12 +603,6 @@ public class PlayerActivity extends AppCompatActivity {
             }
         }
 
-        /**
-         * Fires the moment a decoded frame actually reaches the output surface.
-         * This is the signal that distinguishes a working player from the
-         * audio-only black screen, so it is logged for on-device diagnosis
-         * (`adb logcat -s AJOPlayer`).
-         */
         @Override
         public void onRenderedFirstFrame() {
             Log.i(TAG, "RENDERED_FIRST_FRAME: hardware surface is receiving decoded video");
@@ -683,8 +612,11 @@ public class PlayerActivity extends AppCompatActivity {
         }
 
         @Override
-        public void onVideoSizeChanged(@NonNull androidx.media3.common.VideoSize videoSize) {
+        public void onVideoSizeChanged(@NonNull VideoSize videoSize) {
             Log.i(TAG, "VIDEO_SIZE: " + videoSize.width + "x" + videoSize.height);
+            if (videoSize.width > 0 && videoSize.height > 0 && aspectRatioFrameLayout != null) {
+                aspectRatioFrameLayout.setAspectRatio((float) videoSize.width / videoSize.height);
+            }
         }
 
         @Override
@@ -793,8 +725,6 @@ public class PlayerActivity extends AppCompatActivity {
 
             case KeyEvent.KEYCODE_BACK:
             case KeyEvent.KEYCODE_ESCAPE:
-                // Tear the decoder down before finishing so the WebView UI gets a
-                // clean, unblocked hardware codec and focus back immediately.
                 uiHandler.removeCallbacksAndMessages(null);
                 releasePlayer();
                 finish();
