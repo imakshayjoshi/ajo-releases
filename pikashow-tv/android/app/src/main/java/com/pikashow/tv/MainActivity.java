@@ -524,18 +524,55 @@ public class MainActivity extends BridgeActivity {
         if (event.getAction() == KeyEvent.ACTION_DOWN) {
             int keyCode = event.getKeyCode();
             if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_ESCAPE) {
-                // Forward back button event directly to web app so it handles closing
-                // player/modals
                 if (getBridge() != null && getBridge().getWebView() != null) {
                     getBridge().getWebView().evaluateJavascript(
                             "(function(){ window.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', code: 'Escape', keyCode: 27, which: 27, bubbles: true, cancelable: true})); })();",
                             null);
-                    return true; // Prevent Android OS from killing the app and exiting to TV launcher!
+                    return true;
                 }
             }
+
+            // Direct 0ms D-Pad & Selection keys for Fire TV Mobile Remote App & Physical Remotes
+            String jsKey = null;
+            int jsCode = 0;
+            switch (keyCode) {
+                case KeyEvent.KEYCODE_DPAD_UP:
+                    jsKey = "ArrowUp";
+                    jsCode = 38;
+                    break;
+                case KeyEvent.KEYCODE_DPAD_DOWN:
+                    jsKey = "ArrowDown";
+                    jsCode = 40;
+                    break;
+                case KeyEvent.KEYCODE_DPAD_LEFT:
+                    jsKey = "ArrowLeft";
+                    jsCode = 37;
+                    break;
+                case KeyEvent.KEYCODE_DPAD_RIGHT:
+                    jsKey = "ArrowRight";
+                    jsCode = 39;
+                    break;
+                case KeyEvent.KEYCODE_DPAD_CENTER:
+                case KeyEvent.KEYCODE_ENTER:
+                case KeyEvent.KEYCODE_NUMPAD_ENTER:
+                    jsKey = "Enter";
+                    jsCode = 13;
+                    break;
+            }
+
+            if (jsKey != null && getBridge() != null && getBridge().getWebView() != null) {
+                final String key = jsKey;
+                final int code = jsCode;
+                getBridge().getWebView().evaluateJavascript(
+                        "(function(){" +
+                        "var e = new KeyboardEvent('keydown', {key: '" + key + "', code: '" + key + "', keyCode: " + code + ", which: " + code + ", bubbles: true, cancelable: true});" +
+                        "window.dispatchEvent(e);" +
+                        "if(document.activeElement && '" + key + "' === 'Enter'){try{document.activeElement.click();}catch(err){}}" +
+                        "})();",
+                        null);
+                return true;
+            }
         }
-        // Let all D-Pad keys (UP, DOWN, LEFT, RIGHT, CENTER, ENTER) pass synchronously
-        // with 0ms latency!
         return super.dispatchKeyEvent(event);
     }
 }

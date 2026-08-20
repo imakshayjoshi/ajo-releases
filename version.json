@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "version": "3.1.0",
-  "versionCode": 47,
+  "version": "3.1.1",
+  "versionCode": 48,
   "releaseDate": "2026-08-20",
   "phone": {
     "version": "2.5.5",
@@ -19,21 +19,20 @@
     "size_mb": "4.3 MB"
   },
   "tv": {
-    "version": "3.1.0",
-    "versionCode": 47,
+    "version": "3.1.1",
+    "versionCode": 48,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "📺 TextureView Rendering Engine: Completely eliminates hardware overlay plane punch-through failures and Z-ordering bugs on older Smart TV chipsets (Panasonic, Toshiba, Fire TV OS 5/6/7).",
-      "✨ Clean Theme Transparency: Removed global background overrides in styles.xml that were painting solid black over video planes.",
-      "🛡️ Unconditional Hardware ExoPlayer: Bypasses WebView player completely on all TV models regardless of manufacturer or Android OS version.",
-      "⚡ Permissive SSL & Manifest Engine: Allows mid-GOP TS segments, tokenized playlists, and legacy root CA validation.",
-      "🔙 Deterministic Back Button: Returns cleanly from PlayerActivity with focus restored to the active card."
+      "📱 Fire TV Mobile Remote App Compatibility: Direct key injection ensures 100% responsiveness without touch-mode swallowing.",
+      "⚡ O(1) Zero-Reflow Spatial Navigation: Sibling traversal and instant scrolling eliminate UI thread freezing on low-RAM TV processors.",
+      "📺 TextureView GPU Compositing Engine: Guaranteed video rendering across all TV chipsets without black screens.",
+      "🚀 60 FPS Lean Stylesheet: Stripped heavy box-shadow rasterization for butter-smooth navigation."
     ],
     "size_mb": "8.5 MB",
-    "sha256": "320da2a95423dee9b5f7bfad5ba44e06e2139b7ddbb5120d2f09d91824a4f6f7"
+    "sha256": "2eab2b329c3b0a110fab64b25d124e6f6d52c7764f38da1290e88093ea8c3eee"
   }
 }
