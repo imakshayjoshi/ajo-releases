@@ -37,6 +37,9 @@ export function TVPlayer({
   const stallWatchdogRef = useRef(null);
   const blackScreenWatchdogRef = useRef(null);
   const nativeHandoffDoneRef = useRef(false);
+  // Read synchronously by the pipeline effect. State alone lands one commit too
+  // late, which is long enough for Hls.js to grab the decoder we just gave away.
+  const nativeActiveRef = useRef(false);
 
   const isLive = item?.is_live || 
                  item?.type === 'live' || 
@@ -83,6 +86,7 @@ export function TVPlayer({
   const [audioTracks, setAudioTracks] = useState([]);
   const [currentAudio, setCurrentAudio] = useState(0);
   const [errorMessage, setErrorMessage] = useState(null);
+  const [nativeActive, setNativeActive] = useState(false);
 
   const activeServer = allServers[currentServerIndex] || allServers[0] || server;
   const streamUrl = activeServer?.url || item?.url;
@@ -128,12 +132,90 @@ export function TVPlayer({
     setTimeout(() => setErrorMessage(null), 2500);
   }, [videoEngine]);
 
+  /**
+   * Fully stops WebView playback and frees the video decoder.
+   *
+   * Fire TV boxes have a tiny MediaCodec budget. Handing a stream to the native
+   * ExoPlayer activity while Hls.js still holds a decoder is how you end up with
+   * audio on top of a black picture, so nothing may launch before this runs.
+   */
+  const teardownWebPlayback = useCallback(() => {
+    if (stallWatchdogRef.current) {
+      clearInterval(stallWatchdogRef.current);
+      stallWatchdogRef.current = null;
+    }
+    if (blackScreenWatchdogRef.current) {
+      clearInterval(blackScreenWatchdogRef.current);
+      blackScreenWatchdogRef.current = null;
+    }
+    if (hlsRef.current) {
+      try {
+        hlsRef.current.destroy();
+      } catch (err) {
+        console.warn('Hls teardown notice:', err);
+      }
+      hlsRef.current = null;
+    }
+    const video = videoRef.current;
+    if (video) {
+      try {
+        video.pause();
+        video.removeAttribute('src');
+        video.load();
+      } catch (err) {
+        console.warn('Video teardown notice:', err);
+      }
+    }
+  }, []);
+
+  /** Single entry point for every handoff to the native hardware player. */
+  const handOffToNative = useCallback((message) => {
+    if (!streamUrl) return false;
+
+    // Release the decoder first, then launch. Order matters here.
+    teardownWebPlayback();
+
+    if (!playInNativePlayer(streamUrl, title, isLive)) return false;
+
+    nativeHandoffDoneRef.current = streamUrl;
+    nativeActiveRef.current = true;
+    setNativeActive(true);
+    setIsBuffering(false);
+    setErrorMessage(message || '▶ Opening in hardware player...');
+    setTimeout(() => setErrorMessage(null), 2500);
+    return true;
+  }, [streamUrl, title, isLive, teardownWebPlayback]);
+
   const launchNativeHardwarePlayer = useCallback(() => {
-    if (playInNativePlayer(streamUrl, title, isLive)) return true;
+    if (handOffToNative('▶ Opening in hardware player...')) return true;
     setErrorMessage('Native Player only available on Android / Fire TV');
     setTimeout(() => setErrorMessage(null), 2500);
     return false;
-  }, [streamUrl, title, isLive]);
+  }, [handOffToNative]);
+
+  // Let the Android layer stop web playback directly before it starts the native
+  // player, so the decoder is free even if the handoff came from the Java side.
+  useEffect(() => {
+    window.__ajoStopWebPlayback = () => teardownWebPlayback();
+    return () => {
+      if (window.__ajoStopWebPlayback) delete window.__ajoStopWebPlayback;
+    };
+  }, [teardownWebPlayback]);
+
+  // The native player finished or the user pressed Back inside it. Close this view
+  // instead of leaving a dead, black <video> element on screen.
+  useEffect(() => {
+    const handleNativeClosed = () => {
+      if (!nativeActiveRef.current) return;
+      teardownWebPlayback();
+      if (onClose) {
+        const video = videoRef.current;
+        onClose(video?.currentTime || 0, video?.duration || 0);
+      }
+    };
+    window.addEventListener('ajo-native-player-closed', handleNativeClosed);
+    return () => window.removeEventListener('ajo-native-player-closed', handleNativeClosed);
+  }, [onClose, teardownWebPlayback]);
 
   // On Fire TV / legacy Android TV WebViews, MSE video never composites over the
   // hardware plane — audio plays while the surface stays black. Hand the stream
@@ -145,18 +227,21 @@ export function TVPlayer({
     if (!shouldPreferNativePlayer()) return;
 
     nativeHandoffDoneRef.current = streamUrl;
-    if (playInNativePlayer(streamUrl, title, isLive)) {
-      setIsBuffering(false);
-      setErrorMessage('▶ Opening in hardware player...');
-      setTimeout(() => setErrorMessage(null), 2500);
-    }
-  }, [streamUrl, title, isLive]);
+    handOffToNative('▶ Opening in hardware player...');
+  }, [streamUrl, handOffToNative]);
 
   // Video & Hls.js Pipeline Setup
   useEffect(() => {
     if (!streamUrl) {
       setIsBuffering(false);
       setErrorMessage('No valid stream URL found.');
+      return;
+    }
+
+    // Playback belongs to the native player now. Building the WebView pipeline
+    // here would take a second decoder and black out the native surface.
+    if (nativeActiveRef.current) {
+      setIsBuffering(false);
       return;
     }
 
@@ -220,9 +305,10 @@ export function TVPlayer({
               if (video && video.paused) video.play().catch(() => {});
               break;
             default:
-              hls.destroy();
-              // Auto fallback to native player if HLS fatal crash occurs
-              if (!playInNativePlayer(streamUrl, title, isLive)) {
+              // Auto fallback to native player if HLS fatal crash occurs.
+              // handOffToNative destroys this instance for us.
+              if (!handOffToNative('Stream engine failed, switching to hardware player...')) {
+                hls.destroy();
                 setVideoEngine('native');
               }
               break;
@@ -258,7 +344,7 @@ export function TVPlayer({
     // the first segment can take longer than 3s to decode.
     let blackScreenChecks = 0;
     blackScreenWatchdogRef.current = setInterval(() => {
-      if (!video || nativeHandoffDoneRef.current === streamUrl) return;
+      if (!video || nativeActiveRef.current || nativeHandoffDoneRef.current === streamUrl) return;
       blackScreenChecks += 1;
 
       const advancing = !video.paused && video.currentTime > 1;
@@ -272,11 +358,12 @@ export function TVPlayer({
 
       if (advancing && (noVideoPlane || noFrames)) {
         console.warn('Black screen detected in WebView, handing off to native hardware player');
-        nativeHandoffDoneRef.current = streamUrl;
-        if (!playInNativePlayer(streamUrl, title, isLive)) {
+        const watchdog = blackScreenWatchdogRef.current;
+        if (!handOffToNative('Black screen detected, switching to hardware player...')) {
+          nativeHandoffDoneRef.current = streamUrl;
           setVideoEngine('native');
         }
-        clearInterval(blackScreenWatchdogRef.current);
+        if (watchdog) clearInterval(watchdog);
         return;
       }
 
@@ -295,10 +382,11 @@ export function TVPlayer({
       }
       if (video) {
         video.pause();
-        video.src = '';
+        video.removeAttribute('src');
+        video.load();
       }
     };
-  }, [streamUrl, isLive, videoEngine, handleFailover]);
+  }, [streamUrl, isLive, videoEngine, nativeActive, handOffToNative, handleFailover]);
 
   // Video Time Update & Progress
   const handleTimeUpdate = useCallback(() => {
@@ -359,6 +447,7 @@ export function TVPlayer({
         }
         if (onClose) {
           const video = videoRef.current;
+          teardownWebPlayback();
           onClose(video?.currentTime || 0, video?.duration || 0);
         }
         return;
@@ -390,7 +479,7 @@ export function TVPlayer({
 
     window.addEventListener('keydown', handleKeyDown, true);
     return () => window.removeEventListener('keydown', handleKeyDown, true);
-  }, [pingOsd, showDrawer, onClose, isLive, channels, togglePlayPause, handleSeek]);
+  }, [pingOsd, showDrawer, onClose, isLive, channels, togglePlayPause, handleSeek, teardownWebPlayback]);
 
   // Format MM:SS helper
   const formatTime = (seconds) => {
@@ -401,7 +490,22 @@ export function TVPlayer({
   };
 
   return (
-    <div className="tv-player-fullscreen" onClick={pingOsd}>
+    <div
+      className="tv-player-fullscreen"
+      onClick={pingOsd}
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        width: '100%',
+        height: '100%',
+        background: '#000',
+        overflow: 'hidden',
+        zIndex: 2000
+      }}
+    >
       <video
         ref={videoRef}
         className="tv-player-video"
@@ -409,6 +513,10 @@ export function TVPlayer({
         autoPlay
         controls={false}
         style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          display: 'block',
           width: '100%',
           height: '100%',
           objectFit: 'contain',
@@ -426,7 +534,18 @@ export function TVPlayer({
 
       {/* Buffering Spinner */}
       {isBuffering && (
-        <div className="tv-center-state" style={{ position: 'absolute', pointerEvents: 'none' }}>
+        <div
+          className="tv-center-state"
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            textAlign: 'center',
+            pointerEvents: 'none',
+            zIndex: 80
+          }}
+        >
           <div className="tv-spinner" />
           <p style={{ fontWeight: 700, color: '#38bdf8', marginTop: 12 }}>Buffering Stream...</p>
         </div>
@@ -455,20 +574,51 @@ export function TVPlayer({
         </div>
       )}
 
-      {/* On-Screen Display (OSD) Overlay */}
+      {/* On-Screen Display (OSD) Overlay.
+          Geometry is inline on purpose: this must never become a full-screen dark
+          layer over the picture, and it must not depend on a CSS class existing. */}
       {showOsd && (
-        <div className="tv-player-osd">
+        <div
+          className="tv-player-osd"
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            background: 'transparent',
+            pointerEvents: 'none',
+            zIndex: 60
+          }}
+        >
           {/* Top Bar */}
-          <div className="tv-player-osd-top">
+          <div
+            className="tv-player-osd-top"
+            style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              justifyContent: 'space-between',
+              gap: 24,
+              padding: '28px 40px 56px',
+              background: 'linear-gradient(180deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0) 100%)',
+              pointerEvents: 'auto'
+            }}
+          >
             <div className="tv-player-osd-title-box">
               <h1 className="tv-player-title">{title}</h1>
-              <p className="tv-player-subtitle">{subtitle} • {activeServer?.name || 'Server 1'} ({videoEngine === 'hls' ? 'HLS Engine' : 'Native Engine'})</p>
+              <p className="tv-player-subtitle">{subtitle} • {activeServer?.name || 'Server 1'} ({nativeActive ? 'Hardware Player' : videoEngine === 'hls' ? 'HLS Engine' : 'Native Engine'})</p>
             </div>
 
             <button 
               className="tv-player-btn"
               tabIndex={0}
-              onClick={() => onClose && onClose(videoRef.current?.currentTime || 0, videoRef.current?.duration || 0)}
+              onClick={() => {
+                teardownWebPlayback();
+                if (onClose) onClose(videoRef.current?.currentTime || 0, videoRef.current?.duration || 0);
+              }}
             >
               <ArrowLeft size={18} />
               <span>Back (Return)</span>
@@ -476,7 +626,14 @@ export function TVPlayer({
           </div>
 
           {/* Bottom Controls Bar */}
-          <div className="tv-player-osd-bottom">
+          <div
+            className="tv-player-osd-bottom"
+            style={{
+              padding: '56px 40px 28px',
+              background: 'linear-gradient(0deg, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0) 100%)',
+              pointerEvents: 'auto'
+            }}
+          >
             {!isLive && duration > 0 && (
               <div className="tv-player-progress-row">
                 <span className="tv-player-time">{formatTime(currentTime)}</span>
@@ -491,7 +648,10 @@ export function TVPlayer({
             )}
 
             <div className="tv-player-controls-row">
-              <div className="tv-player-controls-group">
+              <div
+                className="tv-player-controls-group"
+                style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12 }}
+              >
                 <button className="tv-player-btn" tabIndex={0} onClick={togglePlayPause}>
                   {isPlaying ? <Pause size={18} /> : <Play size={18} />}
                   <span>{isPlaying ? 'Pause' : 'Play'}</span>
@@ -521,15 +681,17 @@ export function TVPlayer({
                   </button>
                 )}
 
-                <button 
-                  className="tv-player-btn" 
-                  tabIndex={0}
-                  onClick={launchNativeHardwarePlayer}
-                  style={{ background: 'linear-gradient(135deg, #38bdf8, #0284c7)', color: '#000', fontWeight: 800 }}
-                >
-                  <Tv size={18} />
-                  <span>Hardware Player</span>
-                </button>
+                {hasNativePlayer() && (
+                  <button 
+                    className="tv-player-btn" 
+                    tabIndex={0}
+                    onClick={launchNativeHardwarePlayer}
+                    style={{ background: 'linear-gradient(135deg, #38bdf8, #0284c7)', color: '#000', fontWeight: 800 }}
+                  >
+                    <Tv size={18} />
+                    <span>Hardware Player</span>
+                  </button>
+                )}
 
                 <button 
                   className="tv-player-btn" 
@@ -569,7 +731,21 @@ export function TVPlayer({
 
       {/* Side Quick Drawer: Channels / Servers / Audio */}
       {showDrawer && (
-        <div className="tv-player-drawer">
+        <div
+          className="tv-player-drawer"
+          style={{
+            position: 'absolute',
+            top: 0,
+            right: 0,
+            bottom: 0,
+            width: 420,
+            maxWidth: '45%',
+            padding: 20,
+            background: 'rgba(2, 6, 23, 0.96)',
+            overflowY: 'auto',
+            zIndex: 120
+          }}
+        >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
             <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#fff' }}>
               {showDrawer === 'channels' && '📺 Live Channels'}
