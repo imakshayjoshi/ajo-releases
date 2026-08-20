@@ -376,10 +376,44 @@ public class PlayerActivity extends AppCompatActivity {
         firstFrameRendered = false;
         hasVideoTrack = false;
 
-        DefaultRenderersFactory renderersFactory = new DefaultRenderersFactory(this)
+        DefaultRenderersFactory renderersFactory = new DefaultRenderersFactory(this) {
+            @Override
+            protected void buildVideoRenderers(
+                    android.content.Context context,
+                    @DefaultRenderersFactory.ExtensionRendererMode int extensionRendererMode,
+                    androidx.media3.exoplayer.mediacodec.MediaCodecSelector mediaCodecSelector,
+                    boolean enableDecoderFallback,
+                    Handler eventHandler,
+                    androidx.media3.exoplayer.video.VideoRendererEventListener eventListener,
+                    long allowedVideoJoiningTimeMs,
+                    java.util.ArrayList<androidx.media3.exoplayer.Renderer> out) {
+                androidx.media3.exoplayer.video.MediaCodecVideoRenderer videoRenderer =
+                        new androidx.media3.exoplayer.video.MediaCodecVideoRenderer(
+                                context,
+                                getCodecAdapterFactory(),
+                                mediaCodecSelector,
+                                allowedVideoJoiningTimeMs,
+                                enableDecoderFallback,
+                                eventHandler,
+                                eventListener,
+                                50) {
+                            @Override
+                            protected boolean shouldDropBuffersToKeyframe(long earlyUs, long elapsedRealtimeUs, boolean isLastBuffer) {
+                                return false;
+                            }
+
+                            @Override
+                            protected boolean shouldDropOutputBuffer(long earlyUs, long elapsedRealtimeUs, boolean isLastBuffer) {
+                                return earlyUs < -1000000L;
+                            }
+                        };
+                out.add(videoRenderer);
+                super.buildVideoRenderers(context, extensionRendererMode, mediaCodecSelector, enableDecoderFallback, eventHandler, eventListener, allowedVideoJoiningTimeMs, out);
+            }
+        }
                 .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
                 .setEnableDecoderFallback(true)
-                .setAllowedVideoJoiningTimeMs(10000L)
+                .setAllowedVideoJoiningTimeMs(15000L)
                 .setMediaCodecSelector(
                         softwareDecoderRetryDone
                                 ? (mimeType, requiresSecureDecoder, requiresTunnelingDecoder) -> {

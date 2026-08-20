@@ -439,6 +439,9 @@ public class MainActivity extends BridgeActivity {
                         apkFile.setReadable(true, false);
                         apkFile.setExecutable(true, false);
                         apkFile.setWritable(true, false);
+                        try {
+                            Runtime.getRuntime().exec("chmod 644 " + apkFile.getAbsolutePath());
+                        } catch (Exception ignored) {}
 
                         Uri apkUri;
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
