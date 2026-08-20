@@ -12,6 +12,7 @@ import android.text.TextUtils;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.KeyEvent;
+import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.TextureView;
 import android.view.View;
@@ -255,6 +256,24 @@ public class PlayerActivity extends AppCompatActivity {
         // Hardware-direct SurfaceView with Z-Order Media Overlay (Netflix/YouTube pattern)
         surfaceView = new SurfaceView(this);
         surfaceView.setZOrderMediaOverlay(true);
+        surfaceView.getHolder().addCallback(new SurfaceHolder.Callback() {
+            @Override
+            public void surfaceCreated(@NonNull SurfaceHolder holder) {
+                if (player != null && !useTextureViewFallback) {
+                    player.setVideoSurface(holder.getSurface());
+                }
+            }
+
+            @Override
+            public void surfaceChanged(@NonNull SurfaceHolder holder, int format, int width, int height) { }
+
+            @Override
+            public void surfaceDestroyed(@NonNull SurfaceHolder holder) {
+                if (player != null && !useTextureViewFallback) {
+                    player.setVideoSurface(null);
+                }
+            }
+        });
         FrameLayout.LayoutParams surfaceParams = new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT, Gravity.CENTER);
         surfaceView.setLayoutParams(surfaceParams);
@@ -408,7 +427,6 @@ public class PlayerActivity extends AppCompatActivity {
                             }
                         };
                 out.add(videoRenderer);
-                super.buildVideoRenderers(context, extensionRendererMode, mediaCodecSelector, enableDecoderFallback, eventHandler, eventListener, allowedVideoJoiningTimeMs, out);
             }
         }
                 .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
@@ -431,7 +449,7 @@ public class PlayerActivity extends AppCompatActivity {
 
         androidx.media3.exoplayer.upstream.DefaultBandwidthMeter bandwidthMeter =
                 new androidx.media3.exoplayer.upstream.DefaultBandwidthMeter.Builder(this)
-                        .setInitialBitrateEstimate(30_000_000L)
+                        .setInitialBitrateEstimate(4_000_000L)
                         .build();
 
         androidx.media3.exoplayer.trackselection.AdaptiveTrackSelection.Factory adaptiveFactory =
@@ -439,23 +457,25 @@ public class PlayerActivity extends AppCompatActivity {
                         /* minDurationForQualityIncreaseMs= */ 1500,
                         /* maxDurationForQualityDecreaseMs= */ 3000,
                         /* minDurationToRetainAfterDiscardMs= */ 3000,
-                        /* bandwidthFraction= */ 0.85f);
+                        /* bandwidthFraction= */ 0.80f);
 
         DefaultTrackSelector trackSelector = new DefaultTrackSelector(this, adaptiveFactory);
         trackSelector.setParameters(trackSelector.buildUponParameters()
+                .setPreferredVideoMimeType(MimeTypes.VIDEO_H264)
                 .setMaxVideoSize(1920, 1080)
-                .setMaxVideoBitrate(15_000_000)
+                .setMaxVideoFrameRate(60)
+                .setExceedVideoConstraintsIfNecessary(true)
                 .setTunnelingEnabled(false)
                 .setForceLowestBitrate(false));
 
         DefaultLoadControl loadControl = new DefaultLoadControl.Builder()
                 .setBufferDurationsMs(
-                        /* minBufferMs= */ isLive ? 4000 : 8000,
-                        /* maxBufferMs= */ isLive ? 30000 : 60000,
+                        /* minBufferMs= */ isLive ? 3000 : 6000,
+                        /* maxBufferMs= */ isLive ? 25000 : 45000,
                         /* bufferForPlaybackMs= */ 500,
                         /* bufferForPlaybackAfterRebufferMs= */ 1000)
                 .setPrioritizeTimeOverSizeThresholds(true)
-                .setBackBuffer(10000, true)
+                .setBackBuffer(8000, true)
                 .build();
 
         ExoPlayer exo = new ExoPlayer.Builder(this, renderersFactory)

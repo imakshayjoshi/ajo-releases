@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "version": "3.1.5",
-  "versionCode": 52,
+  "version": "3.1.6",
+  "versionCode": 53,
   "releaseDate": "2026-08-20",
   "phone": {
     "version": "2.5.5",
@@ -19,21 +19,21 @@
     "size_mb": "4.3 MB"
   },
   "tv": {
-    "version": "3.1.5",
-    "versionCode": 52,
+    "version": "3.1.6",
+    "versionCode": 53,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
+      "🎬 Permanent Fix for Still-Image Freeze & Background Audio: Removed duplicate MediaCodecVideoRenderer conflict and enforced H.264 profile preference.",
+      "📺 SurfaceHolder Lifecycle Sync: Surface is fully attached and synchronized before video decoding starts.",
       "🌐 DNS-Over-HTTPS Bypass: Integrated Google DoH resolver to defeat ISP-level DNS blocks on movie streaming hosts (Jio/Airtel/ACT).",
-      "📦 Android 5.0+ / Fire OS 5 Package Parse Fix: Lowered minSdkVersion to 21 with dual v1/v2 signatures to resolve 'Problem parsing the package'.",
-      "📺 Zero-Frame-Drop Live Broadcast Video: Custom MediaCodecVideoRenderer prevents ExoPlayer from discarding jittery live stream video frames.",
-      "⚡ 30 Mbps High-Speed Streaming: Bandwidth meter baseline, 16-connection keep-alive pool, and instant 500ms playback start.",
-      "🏷️ Clean Labels: Eliminated [object Object] under thumbnails with strict category string normalization."
+      "📦 Android 5.0+ / Fire OS 5 Package Parse Fix: Lowered minSdkVersion to 21 with dual v1/v2 signatures.",
+      "⚡ 30 Mbps High-Speed Streaming: Bandwidth meter baseline, 16-connection keep-alive pool, and instant 500ms playback start."
     ],
     "size_mb": "8.6 MB",
-    "sha256": "265c9e8c8b383f47c114ee446a35869ba73ebd79dbee11a4a287a3ceee92f290"
+    "sha256": "7541fb20d94dd902195bdadd6109dc46f87cfcfa3effdac934c164eb389b93fd"
   }
 }
