@@ -200,9 +200,9 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
       }
 
       // 3. Enter / OK Selection Key
-      if (key === 'Enter' || keyCode === 13 || keyCode === 23) {
+      if (key === 'Enter' || key === 'Select' || keyCode === 13 || keyCode === 23 || keyCode === 66) {
         if (document.activeElement && typeof document.activeElement.click === 'function') {
-          // Trigger click smoothly
+          document.activeElement.click();
         }
       }
     };
