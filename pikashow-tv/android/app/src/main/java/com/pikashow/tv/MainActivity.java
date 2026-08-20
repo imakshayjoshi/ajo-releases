@@ -33,6 +33,44 @@ import java.net.URL;
 
 public class MainActivity extends BridgeActivity {
 
+    /**
+     * Stops WebView media and frees the hardware decoder. Runs before the native
+     * player opens.
+     *
+     * <p>Fire TV boxes have a very small MediaCodec budget. If Hls.js keeps its
+     * {@code <video>} element alive while ExoPlayer asks for a second decoder, the
+     * second request either fails or gets a surface it cannot draw to. The result
+     * is the exact symptom users report: audio plays, picture stays black.
+     */
+    private void releaseWebVideoDecoder() {
+        if (getBridge() == null || getBridge().getWebView() == null) return;
+        WebView webView = getBridge().getWebView();
+        webView.evaluateJavascript(
+                "(function(){try{"
+                        + "var vs=document.querySelectorAll('video');"
+                        + "for(var i=0;i<vs.length;i++){try{vs[i].pause();vs[i].removeAttribute('src');vs[i].load();}catch(e){}}"
+                        + "if(window.__ajoStopWebPlayback){try{window.__ajoStopWebPlayback();}catch(e){}}"
+                        + "window.dispatchEvent(new Event('ajo-native-player-open'));"
+                        + "}catch(e){}})();",
+                null);
+        // Best-effort pause of WebView compositing and media. This does not stop
+        // JavaScript, so the React app keeps its state while playback is native.
+        webView.onPause();
+    }
+
+    /** Brings the WebView back after the native player closes. */
+    private void resumeWebView(boolean notifyPlayerClosed) {
+        if (getBridge() == null || getBridge().getWebView() == null) return;
+        WebView webView = getBridge().getWebView();
+        webView.onResume();
+        if (notifyPlayerClosed) {
+            webView.evaluateJavascript(
+                    "(function(){try{window.dispatchEvent(new Event('ajo-native-player-closed'));}catch(e){}})();",
+                    null);
+        }
+        webView.requestFocus();
+    }
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -142,10 +180,17 @@ public class MainActivity extends BridgeActivity {
                             intent.putExtra("url", url);
                             intent.putExtra("title", title);
                             intent.putExtra("isLive", isLive);
-                            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                            // No NEW_TASK / CLEAR_TOP here on purpose. PlayerActivity is
+                            // declared singleTop in the same task, so a plain start keeps
+                            // the stack intact. NEW_TASK could launch the player into its
+                            // own task and CLEAR_TOP could finish MainActivity underneath
+                            // it, which leaves a black window that Back cannot clear.
                             startActivity(intent);
+                            // Hand the decoder over only after the player is on its way.
+                            releaseWebVideoDecoder();
                         } catch (Exception e) {
+                            // Never leave the WebView paused if the player failed to open.
+                            resumeWebView(true);
                             Toast.makeText(MainActivity.this, "Native Player error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
                         }
                     });
@@ -458,6 +503,16 @@ public class MainActivity extends BridgeActivity {
                             | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
                             | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
         }
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        // Coming back from PlayerActivity: repaint the WebView, tell the web layer
+        // the native player closed so it can reset its own player state, and take
+        // focus back for the D-pad.
+        resumeWebView(true);
+        enableImmersiveMode();
     }
 
     @Override
