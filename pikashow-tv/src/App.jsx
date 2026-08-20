@@ -33,6 +33,7 @@ export default function App() {
   const [selectedItem, setSelectedItem] = useState(null);
   const [activePlayback, setActivePlayback] = useState(null); // { item, server, episodes, episodeIndex }
   const [otaPrompt, setOtaPrompt] = useState(null);
+  const [downloadProgress, setDownloadProgress] = useState(null);
 
   // Load all catalogs on startup
   const loadData = useCallback(async () => {
@@ -65,6 +66,18 @@ export default function App() {
         setOtaPrompt(res);
       }
     }).catch(() => {});
+
+    window.onAJOUpdateProgress = (percent) => {
+      setDownloadProgress({ percent });
+    };
+    window.onAJOUpdateStatus = (status) => {
+      if (status === 'READY_TO_INSTALL') {
+        setDownloadProgress({ percent: 100, ready: true });
+      }
+    };
+    window.onAJOUpdateError = () => {
+      setDownloadProgress(null);
+    };
   }, [loadData]);
 
   // Handle item click (Live TV plays directly, Movies open details)
@@ -175,22 +188,29 @@ export default function App() {
           fontWeight: 700,
           fontSize: '0.95rem'
         }}>
-          <span>🚀 New Update Available: v{otaPrompt.latestVersion} (Fire TV Edition)</span>
+          <span>
+            {downloadProgress
+              ? (downloadProgress.ready ? '⚡ Update downloaded! Launching installer...' : `📥 Downloading Update: ${downloadProgress.percent || 0}%`)
+              : `🚀 New Update Available: v${otaPrompt.latestVersion} (Fire TV Edition)`}
+          </span>
           <div style={{ display: 'flex', gap: 10 }}>
-            <button
-              tabIndex={0}
-              className="tv-btn-primary"
-              style={{ padding: '6px 16px', fontSize: '0.85rem' }}
-              onClick={() => {
-                if (window.AndroidUpdater?.downloadAndInstall) {
-                  window.AndroidUpdater.downloadAndInstall(otaPrompt.apkUrl);
-                } else {
-                  window.open(otaPrompt.apkUrl, '_blank');
-                }
-              }}
-            >
-              Update Now
-            </button>
+            {!downloadProgress && (
+              <button
+                tabIndex={0}
+                className="tv-btn-primary"
+                style={{ padding: '6px 16px', fontSize: '0.85rem' }}
+                onClick={() => {
+                  setDownloadProgress({ percent: 0 });
+                  if (window.AndroidUpdater?.downloadAndInstall) {
+                    window.AndroidUpdater.downloadAndInstall(otaPrompt.apkUrl);
+                  } else {
+                    window.open(otaPrompt.apkUrl, '_blank');
+                  }
+                }}
+              >
+                Update Now
+              </button>
+            )}
             <button
               tabIndex={0}
               className="tv-btn-secondary"

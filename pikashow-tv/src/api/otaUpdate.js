@@ -1,5 +1,5 @@
-export const CURRENT_APP_VERSION = '3.1.2';
-export const CURRENT_VERSION_CODE = 49;
+export const CURRENT_APP_VERSION = '3.1.3';
+export const CURRENT_VERSION_CODE = 50;
 const MANIFEST_SOURCES = [
   'https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/version.json',
   'https://cdn.jsdelivr.net/gh/imakshayjoshi/ajo-releases@main/version.json',
@@ -80,13 +80,26 @@ export async function checkForAppUpdates(appType = 'tv') {
     }
 
     let installedVersion = CURRENT_APP_VERSION;
+    let installedCode = CURRENT_VERSION_CODE;
     try {
-      installedVersion = window.AndroidUpdater?.getAppVersionName?.() || installedVersion;
+      if (window.AndroidUpdater?.getAppVersionName) {
+        installedVersion = window.AndroidUpdater.getAppVersionName();
+      }
+      if (window.AndroidUpdater?.getAppVersionCode) {
+        installedCode = Number(window.AndroidUpdater.getAppVersionCode()) || CURRENT_VERSION_CODE;
+      }
     } catch {}
 
     const cleanLatest = String(latestVersion || '').trim().replace(/^v/, '');
     const cleanInstalled = String(installedVersion || '').trim().replace(/^v/, '');
-    const hasUpdate = compareVersions(cleanLatest, cleanInstalled) > 0;
+    const targetCode = Number(target.versionCode || manifestData.versionCode || 0);
+
+    let hasUpdate = false;
+    if (targetCode > 0 && installedCode > 0) {
+      hasUpdate = targetCode > installedCode;
+    } else {
+      hasUpdate = compareVersions(cleanLatest, cleanInstalled) > 0;
+    }
 
     return {
       hasUpdate,

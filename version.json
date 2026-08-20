@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "version": "3.1.2",
-  "versionCode": 49,
+  "version": "3.1.3",
+  "versionCode": 50,
   "releaseDate": "2026-08-20",
   "phone": {
     "version": "2.5.5",
@@ -19,20 +19,20 @@
     "size_mb": "4.3 MB"
   },
   "tv": {
-    "version": "3.1.2",
-    "versionCode": 49,
+    "version": "3.1.3",
+    "versionCode": 50,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "📺 Live TV Stream Freeze Fix: Zero-overhead SurfaceView with setZOrderMediaOverlay(true) renders full 60 FPS live broadcast video without still-image freezes.",
-      "⚡ Live Clock & Buffer Synchronization: Configured allowedVideoJoiningTimeMs and permissive HLS extractors to prevent late video frame dropping.",
-      "📱 Fire TV Mobile Remote App Compatibility: Direct key injection ensures 100% responsiveness without touch-mode swallowing.",
-      "🚀 O(1) Zero-Reflow Spatial Navigation: Sibling traversal and instant scrolling eliminate UI thread freezing."
+      "🏷️ Clean Labels: Eliminated [object Object] under thumbnails with strict category string normalization.",
+      "⚡ 30 Mbps High-Speed Streaming: Bandwidth meter baseline, 16-connection keep-alive pool, and instant 500ms playback start.",
+      "🔄 In-App OTA Update from Settings: Real-time download progress bar and direct installer launch.",
+      "🛡️ Smart Update Gate: Suppresses update prompt banner when already running the latest version."
     ],
     "size_mb": "8.5 MB",
-    "sha256": "8444feb88550c7b86d457c7de9b7e6398c2fe16e807a974290d855effdd1c2a8"
+    "sha256": "82cd37a3ee4edc91f87c2f4b1280223dc9b3572797219328be93dfc66da45816"
   }
 }

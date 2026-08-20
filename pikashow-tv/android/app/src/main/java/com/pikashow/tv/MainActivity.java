@@ -244,9 +244,9 @@ public class MainActivity extends BridgeActivity {
                 public String getAppVersionName() {
                     try {
                         PackageInfo pInfo = getPackageManager().getPackageInfo(getPackageName(), 0);
-                        return pInfo.versionName != null ? pInfo.versionName : "2.1.0";
+                        return pInfo.versionName != null ? pInfo.versionName : "3.1.3";
                     } catch (Exception e) {
-                        return "2.1.0";
+                        return "3.1.3";
                     }
                 }
 
@@ -260,7 +260,7 @@ public class MainActivity extends BridgeActivity {
                             return pInfo.versionCode;
                         }
                     } catch (Exception e) {
-                        return 1;
+                        return 50;
                     }
                 }
 
@@ -423,6 +423,19 @@ public class MainActivity extends BridgeActivity {
 
                 private void installApk(File apkFile) {
                     try {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            if (!getPackageManager().canRequestPackageInstalls()) {
+                                Intent settingsIntent = new Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES)
+                                        .setData(Uri.parse("package:" + getPackageName()))
+                                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                                startActivity(settingsIntent);
+                                runOnUiThread(() -> Toast.makeText(MainActivity.this,
+                                        "Please allow 'Install unknown apps' for AJO TV, then tap update again.",
+                                        Toast.LENGTH_LONG).show());
+                                return;
+                            }
+                        }
+
                         apkFile.setReadable(true, false);
                         apkFile.setExecutable(true, false);
                         apkFile.setWritable(true, false);

@@ -395,25 +395,39 @@ public class PlayerActivity extends AppCompatActivity {
                                 }
                                 : androidx.media3.exoplayer.mediacodec.MediaCodecSelector.DEFAULT);
 
-        DefaultTrackSelector trackSelector = new DefaultTrackSelector(this);
+        androidx.media3.exoplayer.upstream.DefaultBandwidthMeter bandwidthMeter =
+                new androidx.media3.exoplayer.upstream.DefaultBandwidthMeter.Builder(this)
+                        .setInitialBitrateEstimate(30_000_000L)
+                        .build();
+
+        androidx.media3.exoplayer.trackselection.AdaptiveTrackSelection.Factory adaptiveFactory =
+                new androidx.media3.exoplayer.trackselection.AdaptiveTrackSelection.Factory(
+                        /* minDurationForQualityIncreaseMs= */ 1500,
+                        /* maxDurationForQualityDecreaseMs= */ 3000,
+                        /* minDurationToRetainAfterDiscardMs= */ 3000,
+                        /* bandwidthFraction= */ 0.85f);
+
+        DefaultTrackSelector trackSelector = new DefaultTrackSelector(this, adaptiveFactory);
         trackSelector.setParameters(trackSelector.buildUponParameters()
                 .setMaxVideoSize(1920, 1080)
-                .setMaxVideoBitrate(8_000_000)
+                .setMaxVideoBitrate(15_000_000)
                 .setTunnelingEnabled(false)
                 .setForceLowestBitrate(false));
 
         DefaultLoadControl loadControl = new DefaultLoadControl.Builder()
                 .setBufferDurationsMs(
-                        /* minBufferMs= */ isLive ? 8000 : 15000,
-                        /* maxBufferMs= */ isLive ? 30000 : 50000,
-                        /* bufferForPlaybackMs= */ isLive ? 2000 : 1500,
-                        /* bufferForPlaybackAfterRebufferMs= */ isLive ? 3500 : 3000)
+                        /* minBufferMs= */ isLive ? 4000 : 8000,
+                        /* maxBufferMs= */ isLive ? 30000 : 60000,
+                        /* bufferForPlaybackMs= */ 500,
+                        /* bufferForPlaybackAfterRebufferMs= */ 1000)
                 .setPrioritizeTimeOverSizeThresholds(true)
+                .setBackBuffer(10000, true)
                 .build();
 
         ExoPlayer exo = new ExoPlayer.Builder(this, renderersFactory)
                 .setTrackSelector(trackSelector)
                 .setLoadControl(loadControl)
+                .setBandwidthMeter(bandwidthMeter)
                 .setMediaSourceFactory(new DefaultMediaSourceFactory(buildDataSourceFactory()))
                 .build();
 
@@ -532,6 +546,7 @@ public class PlayerActivity extends AppCompatActivity {
         SSLSocketFactory sslSocketFactory = sslContext.getSocketFactory();
 
         return new OkHttpClient.Builder()
+                .connectionPool(new okhttp3.ConnectionPool(16, 5, TimeUnit.MINUTES))
                 .sslSocketFactory(sslSocketFactory, trustAll)
                 .hostnameVerifier((hostname, session) -> true)
                 .connectionSpecs(Arrays.asList(
