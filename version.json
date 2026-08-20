@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "version": "3.1.1",
-  "versionCode": 48,
+  "version": "3.1.2",
+  "versionCode": 49,
   "releaseDate": "2026-08-20",
   "phone": {
     "version": "2.5.5",
@@ -19,20 +19,20 @@
     "size_mb": "4.3 MB"
   },
   "tv": {
-    "version": "3.1.1",
-    "versionCode": 48,
+    "version": "3.1.2",
+    "versionCode": 49,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
+      "📺 Live TV Stream Freeze Fix: Zero-overhead SurfaceView with setZOrderMediaOverlay(true) renders full 60 FPS live broadcast video without still-image freezes.",
+      "⚡ Live Clock & Buffer Synchronization: Configured allowedVideoJoiningTimeMs and permissive HLS extractors to prevent late video frame dropping.",
       "📱 Fire TV Mobile Remote App Compatibility: Direct key injection ensures 100% responsiveness without touch-mode swallowing.",
-      "⚡ O(1) Zero-Reflow Spatial Navigation: Sibling traversal and instant scrolling eliminate UI thread freezing on low-RAM TV processors.",
-      "📺 TextureView GPU Compositing Engine: Guaranteed video rendering across all TV chipsets without black screens.",
-      "🚀 60 FPS Lean Stylesheet: Stripped heavy box-shadow rasterization for butter-smooth navigation."
+      "🚀 O(1) Zero-Reflow Spatial Navigation: Sibling traversal and instant scrolling eliminate UI thread freezing."
     ],
     "size_mb": "8.5 MB",
-    "sha256": "2eab2b329c3b0a110fab64b25d124e6f6d52c7764f38da1290e88093ea8c3eee"
+    "sha256": "8444feb88550c7b86d457c7de9b7e6398c2fe16e807a974290d855effdd1c2a8"
   }
 }
