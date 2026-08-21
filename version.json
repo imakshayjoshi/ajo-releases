@@ -4,18 +4,17 @@
   "versionCode": 65,
   "releaseDate": "2026-08-21",
   "phone": {
-    "version": "2.8.5",
-    "versionCode": 42,
+    "version": "2.8.6",
+    "versionCode": 43,
     "packageId": "com.ajo.phone",
     "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.5.0/AJO_PHONE.apk",
     "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.5.0/AJO_PHONE.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "\ud83d\ude80 STREAMING FIX: false failover eliminated \u2014 slow-start mirrors no longer killed mid-load (startup in 3-6s now)",
-      "\ud83c\udf10 Network config: cleartext allowed for legacy http:// live TV streams",
-      "\ud83d\udd14 Periodic update checks every 4h + on app foreground",
-      "\u2705 Headless-verified: video plays with zero errors before this APK was built"
+      "\ud83e\udd0f PINCH ZOOM FIXED: controls overlay was swallowing gestures \u2014 now passes through to video (verified: scale 2.5x in headless test)",
+      "\u23f1\ufe0f Recovery modal fix: progress resets the stall timer, slow-but-moving streams never dumped to error screen",
+      "\u26a1 Faster starts: manifest arrival cancels false failover"
     ],
     "size_mb": "3.4 MB"
   },
