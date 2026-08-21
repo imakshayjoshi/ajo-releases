@@ -1,36 +1,37 @@
 {
   "schemaVersion": 2,
-  "version": "3.4.1",
-  "versionCode": 63,
+  "version": "3.5.0",
+  "versionCode": 64,
   "releaseDate": "2026-08-21",
   "phone": {
-    "version": "2.7.1",
-    "versionCode": 36,
+    "version": "2.8.0",
+    "versionCode": 37,
     "packageId": "com.ajo.phone",
-    "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.4.1/AJO_PHONE.apk",
-    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.4.1/AJO_PHONE.apk",
+    "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.5.0/AJO_PHONE.apk",
+    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.5.0/AJO_PHONE.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "\ud83e\udd0f NEW: Pinch-to-zoom on video (1x-4x) with live zoom % indicator",
-      "\ud83d\udcd0 NEW: Double-tap to cycle Fit \u2192 Fill \u2192 Stretch",
-      "\ud83d\udd04 Auto-landscape + rotate button retained"
+      "\ud83e\udde9 ADDONS: Stremio-compatible addon system in Settings",
+      "\u2764\ufe0f VPS mirror health ranking: healthy servers first",
+      "\ud83e\udd0f Pinch zoom + display fit modes retained"
     ],
     "size_mb": "3.4 MB"
   },
   "tv": {
-    "version": "3.4.1",
-    "versionCode": 63,
+    "version": "3.5.0",
+    "versionCode": 64,
     "packageId": "com.ajo.tv",
-    "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.4.1/AJO_TV.apk",
-    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.4.1/AJO_TV.apk",
+    "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.5.0/AJO_TV.apk",
+    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.5.0/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "\ud83d\udda5\ufe0f NEW: Display modes \u2014 long-press D-pad Up (or channel keys) to cycle Fit / Zoom / Stretch / Fill Width / Fill Height",
-      "\ud83e\uddca Freeze auto-recovery + RAM-adaptive buffering retained"
+      "\ud83e\udde9 ADDONS: Stremio-compatible addon system \u2014 install community addons from Settings for unlimited catalogs & streams",
+      "\u2764\ufe0f VPS mirror health-checker: dead mirrors auto-demoted before you tap play (11/17 verified live right now)",
+      "\ud83d\udda5\ufe0f Display modes: long-press D-pad Up cycles Fit/Zoom/Stretch/Fill"
     ],
-    "size_mb": "6.9 MB",
+    "size_mb": "7.0 MB",
     "sha256": "d7b516ef4086d4594a887f22201ee5eafb073fe02e40e824a9c1247fba227f40"
   }
 }
