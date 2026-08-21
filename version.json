@@ -4,17 +4,17 @@
   "versionCode": 64,
   "releaseDate": "2026-08-21",
   "phone": {
-    "version": "2.8.0",
-    "versionCode": 37,
+    "version": "2.8.1",
+    "versionCode": 38,
     "packageId": "com.ajo.phone",
     "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.5.0/AJO_PHONE.apk",
     "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.5.0/AJO_PHONE.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "\ud83e\udde9 ADDONS: Stremio-compatible addon system in Settings",
-      "\u2764\ufe0f VPS mirror health ranking: healthy servers first",
-      "\ud83e\udd0f Pinch zoom + display fit modes retained"
+      "\ud83d\udee0\ufe0f Crash fix: startup error on some devices eliminated (safe addon init + handler hardening)",
+      "\ud83e\udde9 Addon catalogs fixed: CinemetA now returns 498 titles across 8 categories",
+      "\ud83d\udcdb Error screen renamed to AJO Error with diagnostic stack"
     ],
     "size_mb": "3.4 MB"
   },
