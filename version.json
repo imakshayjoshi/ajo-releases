@@ -1,39 +1,40 @@
 {
   "schemaVersion": 2,
-  "version": "3.2.0",
-  "versionCode": 54,
-  "releaseDate": "2026-08-20",
+  "version": "3.2.2",
+  "versionCode": 56,
+  "releaseDate": "2026-08-21",
   "phone": {
-    "version": "2.5.5",
-    "versionCode": 26,
+    "version": "2.6.1",
+    "versionCode": 32,
     "packageId": "com.ajo.phone",
-    "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
-    "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
+    "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.2.2/AJO_PHONE.apk",
+    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.2.2/AJO_PHONE.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "✨ Streamlined Clean Phone UI: Instant access to content rows",
-      "🔥 Direct HLS Stream Engine: Restored high-speed multi-audio Hindi/English/South streams for all movies & series",
-      "⚡ Fixed OTA Update: Direct zero-redirect updater"
+      "🛡️ Dead-host filter: broken stream hosts are skipped automatically",
+      "🔁 Smarter server failover with deduped mirror queue",
+      "⬆️ Version-code based OTA update detection (more reliable)",
+      "🌐 APIPlayer web backup mirror as last-resort source"
     ],
-    "size_mb": "4.3 MB"
+    "size_mb": "3.3 MB"
   },
   "tv": {
-    "version": "3.2.0",
-    "versionCode": 54,
+    "version": "3.2.2",
+    "versionCode": 56,
     "packageId": "com.ajo.tv",
-    "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
-    "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
+    "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.2.2/AJO_TV.apk",
+    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.2.2/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "🔥 Fire OS 6.7.1.1 (NS6711/5908) Optimization: MediaTek MT8695 hardware decoder synchronization with 4K UHD 60fps support.",
-      "🏆 Dedicated Live Sports Hub: Real-time tournament fixtures and live channels (Cricket CPL/IPL, Football, WWE, Star Sports 1 HD, Sony Ten 1/2/5, Sports18, Willow, Sky Sports).",
-      "🌐 Enhanced DNS-over-HTTPS (DoH): Google & Cloudflare DoH to bypass ISP DNS sinkholes (Jio, Airtel, ACT, Vi).",
-      "⚡ Alexa Remote D-Pad Navigation: Complete key mapping with focus preservation across tabs.",
-      "📺 Rock-Solid Single-Instance Video Pipeline: Zero memory leaks, zero frame drops, and instantaneous 500ms playback startup."
+      "🔥 Latest streaming engine fixes now bundled (previous APK was stale)",
+      "🛡️ Dead-host filter: mainsstreaming.info and other dead hosts skipped",
+      "🌐 APIPlayer web backup mirror when all direct servers fail",
+      "⚡ Tap-what-you-play guarantee: only the selected item's servers are used",
+      "⬆️ Version-code based OTA update detection"
     ],
     "size_mb": "6.8 MB",
-    "sha256": "ada3e9630b8cba0a6966bc4c29b09e1f440022d7c4e68cb8b8e90d7f310956fd"
+    "sha256": "6a7bf4697d51061fcc13e18875273794f47ff0080520e7b15b59f7d2d1972bf9"
   }
 }
