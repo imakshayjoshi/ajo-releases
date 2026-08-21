@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "version": "3.2.6",
-  "versionCode": 60,
+  "version": "3.3.0",
+  "versionCode": 61,
   "releaseDate": "2026-08-21",
   "phone": {
     "version": "2.6.3",
@@ -19,20 +19,20 @@
     "size_mb": "3.3 MB"
   },
   "tv": {
-    "version": "3.2.6",
-    "versionCode": 60,
+    "version": "3.3.0",
+    "versionCode": 61,
     "packageId": "com.ajo.tv",
-    "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.2.6/AJO_TV.apk",
-    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.2.6/AJO_TV.apk",
+    "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.3.0/AJO_TV.apk",
+    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.3.0/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "\ud83e\uddca Freeze killer v2: stall detected in 4s (was 6), up to 2 recovery attempts, then auto mirror-switch",
-      "\ud83d\udda5\ufe0f UI-shift fix hardened: focus never scrolls the page horizontally anymore",
-      "\ud83c\udf0d Live TV expanded: India + USA + UK + UAE + Canada + Australia playlists (13,000+ channels source)",
-      "\u2705 Sports channels liveness-checked on-device before display"
+      "\ud83c\udfac Source overhaul: dead SuperStream mirror replaced with VidLink Pro (verified live)",
+      "\ud83e\udde0 Nuvio-style RAM-adaptive buffering: right-sized buffers for your exact TV (bigger buffer = fewer rebuffers)",
+      "\u26a1 40s VOD buffer window + 256KB allocator segments for smoother long playback",
+      "\ud83e\uddca All previous fixes retained: 4s freeze detection, 2-stage recovery, UI drift fix"
     ],
     "size_mb": "6.9 MB",
-    "sha256": "8ef290c15bfec4324879f3cea91e419b3c63c491a83aae700a8635630788b112"
+    "sha256": "84ac8e93e1ed649c26f924ef2b9d0abd5043531f041ed750a97b99ff11f6939b"
   }
 }
