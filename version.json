@@ -1,38 +1,38 @@
 {
   "schemaVersion": 2,
-  "version": "3.3.0",
-  "versionCode": 61,
+  "version": "3.4.0",
+  "versionCode": 62,
   "releaseDate": "2026-08-21",
   "phone": {
-    "version": "2.6.3",
-    "versionCode": 34,
+    "version": "2.7.0",
+    "versionCode": 35,
     "packageId": "com.ajo.phone",
-    "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.2.3/AJO_PHONE.apk",
-    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.2.3/AJO_PHONE.apk",
+    "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.4.0/AJO_PHONE.apk",
+    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.4.0/AJO_PHONE.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "\ud83d\udd04 Auto-landscape: video now rotates to fullscreen landscape automatically when playback starts",
-      "\ud83d\udd01 Manual rotate button in player controls (portrait \u21c4 landscape)",
-      "\ud83d\udcf1 Returns to normal portrait view when you close the player"
+      "\ud83c\udf0d TMDB integration: Trending Worldwide rail + popular movies/shows",
+      "\ud83d\udd11 Auto IMDb resolution \u2192 full mirror queue on every title",
+      "\ud83d\udd04 Auto-landscape + rotate button retained"
     ],
-    "size_mb": "3.3 MB"
+    "size_mb": "3.4 MB"
   },
   "tv": {
-    "version": "3.3.0",
-    "versionCode": 61,
+    "version": "3.4.0",
+    "versionCode": 62,
     "packageId": "com.ajo.tv",
-    "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.3.0/AJO_TV.apk",
-    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.3.0/AJO_TV.apk",
+    "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.4.0/AJO_TV.apk",
+    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.4.0/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "\ud83c\udfac Source overhaul: dead SuperStream mirror replaced with VidLink Pro (verified live)",
-      "\ud83e\udde0 Nuvio-style RAM-adaptive buffering: right-sized buffers for your exact TV (bigger buffer = fewer rebuffers)",
-      "\u26a1 40s VOD buffer window + 256KB allocator segments for smoother long playback",
-      "\ud83e\uddca All previous fixes retained: 4s freeze detection, 2-stage recovery, UI drift fix"
+      "\ud83c\udf0d WORLDWIDE CONTENT UNLOCKED: TMDB catalog integration \u2014 trending worldwide + popular movies & shows added",
+      "\ud83d\udd11 Every title now auto-resolves its IMDb ID \u2192 full 4-mirror server queue for ALL content (not just some)",
+      "\ud83c\udfac New verified mirrors: VidSrc.me v2 added; dead MultiEmbed removed",
+      "\ud83e\uddca Freeze auto-recovery, RAM-adaptive buffering, UI drift fixes all retained"
     ],
     "size_mb": "6.9 MB",
-    "sha256": "84ac8e93e1ed649c26f924ef2b9d0abd5043531f041ed750a97b99ff11f6939b"
+    "sha256": "d7b516ef4086d4594a887f22201ee5eafb073fe02e40e824a9c1247fba227f40"
   }
 }
