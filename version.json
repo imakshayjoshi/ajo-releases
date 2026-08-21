@@ -1,40 +1,41 @@
 {
   "schemaVersion": 2,
-  "version": "3.2.2",
-  "versionCode": 56,
+  "version": "3.2.3",
+  "versionCode": 57,
   "releaseDate": "2026-08-21",
   "phone": {
-    "version": "2.6.1",
-    "versionCode": 32,
+    "version": "2.6.2",
+    "versionCode": 33,
     "packageId": "com.ajo.phone",
-    "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.2.2/AJO_PHONE.apk",
-    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.2.2/AJO_PHONE.apk",
+    "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.2.3/AJO_PHONE.apk",
+    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.2.3/AJO_PHONE.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "🛡️ Dead-host filter: broken stream hosts are skipped automatically",
-      "🔁 Smarter server failover with deduped mirror queue",
-      "⬆️ Version-code based OTA update detection (more reliable)",
-      "🌐 APIPlayer web backup mirror as last-resort source"
+      "📺 Cast to TV now actually works: TV receiver was never listening — fixed on both ends",
+      "🎯 ShortTV integrity fix: wrong-video-under-wrong-title bug eliminated, dead episodes removed",
+      "🏆 Live Sports rebuilt from live playlists — 14+ real channels (Star Sports HD, DD Sports, more)",
+      "🚫 Adult content filtered from catalog",
+      "🛡️ Dead-host filter + smarter failover"
     ],
-    "size_mb": "3.3 MB"
+    "size_mb": "3.4 MB"
   },
   "tv": {
-    "version": "3.2.2",
-    "versionCode": 56,
+    "version": "3.2.3",
+    "versionCode": 57,
     "packageId": "com.ajo.tv",
-    "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.2.2/AJO_TV.apk",
-    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.2.2/AJO_TV.apk",
+    "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.2.3/AJO_TV.apk",
+    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.2.3/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "🔥 Latest streaming engine fixes now bundled (previous APK was stale)",
-      "🛡️ Dead-host filter: mainsstreaming.info and other dead hosts skipped",
-      "🌐 APIPlayer web backup mirror when all direct servers fail",
-      "⚡ Tap-what-you-play guarantee: only the selected item's servers are used",
-      "⬆️ Version-code based OTA update detection"
+      "📱 Cast RECEIVER added: phone's 'Play on TV' now plays instantly on the TV with hardware player",
+      "🎮 Phone as remote: play/pause/seek/tab-navigation commands from phone now work",
+      "🏆 Live Sports rail rebuilt from live playlists — 14+ verified channels, no more dead links",
+      "🎯 ShortTV integrity: every episode verified unique — wrong-video bug eliminated",
+      "🚫 Adult content filtered from catalog"
     ],
-    "size_mb": "6.8 MB",
-    "sha256": "6a7bf4697d51061fcc13e18875273794f47ff0080520e7b15b59f7d2d1972bf9"
+    "size_mb": "6.9 MB",
+    "sha256": "6cd6aad8f2d2a2377ab974b7a18b1b3f8900c56001d7ae3f323dc921abeba27e"
   }
 }
