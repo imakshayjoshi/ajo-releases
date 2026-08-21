@@ -1,36 +1,34 @@
 {
   "schemaVersion": 2,
-  "version": "3.4.0",
-  "versionCode": 62,
+  "version": "3.4.1",
+  "versionCode": 63,
   "releaseDate": "2026-08-21",
   "phone": {
-    "version": "2.7.0",
-    "versionCode": 35,
+    "version": "2.7.1",
+    "versionCode": 36,
     "packageId": "com.ajo.phone",
-    "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.4.0/AJO_PHONE.apk",
-    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.4.0/AJO_PHONE.apk",
+    "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.4.1/AJO_PHONE.apk",
+    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.4.1/AJO_PHONE.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "\ud83c\udf0d TMDB integration: Trending Worldwide rail + popular movies/shows",
-      "\ud83d\udd11 Auto IMDb resolution \u2192 full mirror queue on every title",
+      "\ud83e\udd0f NEW: Pinch-to-zoom on video (1x-4x) with live zoom % indicator",
+      "\ud83d\udcd0 NEW: Double-tap to cycle Fit \u2192 Fill \u2192 Stretch",
       "\ud83d\udd04 Auto-landscape + rotate button retained"
     ],
     "size_mb": "3.4 MB"
   },
   "tv": {
-    "version": "3.4.0",
-    "versionCode": 62,
+    "version": "3.4.1",
+    "versionCode": 63,
     "packageId": "com.ajo.tv",
-    "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.4.0/AJO_TV.apk",
-    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.4.0/AJO_TV.apk",
+    "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.4.1/AJO_TV.apk",
+    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.4.1/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "\ud83c\udf0d WORLDWIDE CONTENT UNLOCKED: TMDB catalog integration \u2014 trending worldwide + popular movies & shows added",
-      "\ud83d\udd11 Every title now auto-resolves its IMDb ID \u2192 full 4-mirror server queue for ALL content (not just some)",
-      "\ud83c\udfac New verified mirrors: VidSrc.me v2 added; dead MultiEmbed removed",
-      "\ud83e\uddca Freeze auto-recovery, RAM-adaptive buffering, UI drift fixes all retained"
+      "\ud83d\udda5\ufe0f NEW: Display modes \u2014 long-press D-pad Up (or channel keys) to cycle Fit / Zoom / Stretch / Fill Width / Fill Height",
+      "\ud83e\uddca Freeze auto-recovery + RAM-adaptive buffering retained"
     ],
     "size_mb": "6.9 MB",
     "sha256": "d7b516ef4086d4594a887f22201ee5eafb073fe02e40e824a9c1247fba227f40"
