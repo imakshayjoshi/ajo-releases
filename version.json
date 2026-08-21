@@ -4,17 +4,17 @@
   "versionCode": 64,
   "releaseDate": "2026-08-21",
   "phone": {
-    "version": "2.8.1",
-    "versionCode": 38,
+    "version": "2.8.2",
+    "versionCode": 39,
     "packageId": "com.ajo.phone",
     "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.5.0/AJO_PHONE.apk",
     "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.5.0/AJO_PHONE.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "\ud83d\udee0\ufe0f Crash fix: startup error on some devices eliminated (safe addon init + handler hardening)",
-      "\ud83e\udde9 Addon catalogs fixed: CinemetA now returns 498 titles across 8 categories",
-      "\ud83d\udcdb Error screen renamed to AJO Error with diagnostic stack"
+      "\ud83d\udee0\ufe0f FIXED: \"Cannot access before initialization\" crash \u2014 touch handler referenced an undefined control timer; every stream was affected",
+      "\u2705 Verified in headless browser: app loads, playback starts, touch events handled, zero errors",
+      "\ud83e\udde9 Addon catalogs working: 498 titles via CinemetA"
     ],
     "size_mb": "3.4 MB"
   },
