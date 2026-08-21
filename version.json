@@ -1,24 +1,22 @@
 {
   "schemaVersion": 2,
-  "version": "3.2.3",
+  "version": "2.6.3",
   "versionCode": 57,
   "releaseDate": "2026-08-21",
   "phone": {
-    "version": "2.6.2",
-    "versionCode": 33,
+    "version": "2.6.3",
+    "versionCode": 34,
     "packageId": "com.ajo.phone",
     "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.2.3/AJO_PHONE.apk",
     "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.2.3/AJO_PHONE.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "📺 Cast to TV now actually works: TV receiver was never listening — fixed on both ends",
-      "🎯 ShortTV integrity fix: wrong-video-under-wrong-title bug eliminated, dead episodes removed",
-      "🏆 Live Sports rebuilt from live playlists — 14+ real channels (Star Sports HD, DD Sports, more)",
-      "🚫 Adult content filtered from catalog",
-      "🛡️ Dead-host filter + smarter failover"
+      "\ud83d\udd04 Auto-landscape: video now rotates to fullscreen landscape automatically when playback starts",
+      "\ud83d\udd01 Manual rotate button in player controls (portrait \u21c4 landscape)",
+      "\ud83d\udcf1 Returns to normal portrait view when you close the player"
     ],
-    "size_mb": "3.4 MB"
+    "size_mb": "3.3 MB"
   },
   "tv": {
     "version": "3.2.3",
@@ -29,11 +27,11 @@
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "📱 Cast RECEIVER added: phone's 'Play on TV' now plays instantly on the TV with hardware player",
-      "🎮 Phone as remote: play/pause/seek/tab-navigation commands from phone now work",
-      "🏆 Live Sports rail rebuilt from live playlists — 14+ verified channels, no more dead links",
-      "🎯 ShortTV integrity: every episode verified unique — wrong-video bug eliminated",
-      "🚫 Adult content filtered from catalog"
+      "\ud83d\udcf1 Cast RECEIVER added: phone's 'Play on TV' now plays instantly on the TV with hardware player",
+      "\ud83c\udfae Phone as remote: play/pause/seek/tab-navigation commands from phone now work",
+      "\ud83c\udfc6 Live Sports rail rebuilt from live playlists \u2014 14+ verified channels, no more dead links",
+      "\ud83c\udfaf ShortTV integrity: every episode verified unique \u2014 wrong-video bug eliminated",
+      "\ud83d\udeab Adult content filtered from catalog"
     ],
     "size_mb": "6.9 MB",
     "sha256": "6cd6aad8f2d2a2377ab974b7a18b1b3f8900c56001d7ae3f323dc921abeba27e"
