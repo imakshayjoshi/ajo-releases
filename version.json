@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "version": "3.2.4",
-  "versionCode": 58,
+  "version": "3.2.5",
+  "versionCode": 59,
   "releaseDate": "2026-08-21",
   "phone": {
     "version": "2.6.3",
@@ -19,19 +19,19 @@
     "size_mb": "3.3 MB"
   },
   "tv": {
-    "version": "3.2.4",
-    "versionCode": 58,
+    "version": "3.2.5",
+    "versionCode": 59,
     "packageId": "com.ajo.tv",
-    "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.2.4/AJO_TV.apk",
-    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.2.4/AJO_TV.apk",
+    "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.2.5/AJO_TV.apk",
+    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.2.5/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "\ud83e\uddca Freeze fix: frozen-picture-with-audio now auto-detected within 6s and repaired (software decoder + TextureView rebuild)",
-      "\ud83d\udd01 If a mirror keeps freezing, auto-failover to next server",
-      "\u26a1 Previous fixes retained: black-screen watchdog, dead-host filter, cast receiver"
+      "\ud83d\udda5\ufe0f UI-shift fix: layout no longer drifts left when navigating rails with the D-pad",
+      "\u2705 Sports channels are now liveness-checked before appearing \u2014 dead streams never shown, so no more playback errors on tap",
+      "\ud83e\uddca Freeze auto-recovery retained from v3.2.4"
     ],
     "size_mb": "6.9 MB",
-    "sha256": "138063f380d479259697b2feeba3a9ca46fe3c4c05ef5e9ad40353f156fe2a07"
+    "sha256": "2302b0d3c7a72dbd067046fbf46710f667f3fa65535cf2d94d66b3fcf3d0f1dc"
   }
 }
