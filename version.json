@@ -1,14 +1,14 @@
 {
   "schemaVersion": 2,
-  "version": "3.5.1",
-  "versionCode": 65,
+  "version": "3.6.0",
+  "versionCode": 66,
   "releaseDate": "2026-08-21",
   "phone": {
-    "version": "2.8.6",
-    "versionCode": 43,
+    "version": "2.9.0",
+    "versionCode": 44,
     "packageId": "com.ajo.phone",
-    "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.5.0/AJO_PHONE.apk",
-    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.5.0/AJO_PHONE.apk",
+    "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.6.0/AJO_PHONE.apk",
+    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.6.0/AJO_PHONE.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
@@ -19,11 +19,11 @@
     "size_mb": "3.4 MB"
   },
   "tv": {
-    "version": "3.5.1",
-    "versionCode": 65,
+    "version": "3.6.0",
+    "versionCode": 66,
     "packageId": "com.ajo.tv",
-    "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.5.1/AJO_TV.apk",
-    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.5.1/AJO_TV.apk",
+    "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.6.0/AJO_TV.apk",
+    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.6.0/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
