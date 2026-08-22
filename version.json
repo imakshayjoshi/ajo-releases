@@ -1,35 +1,36 @@
 {
   "schemaVersion": 2,
-  "version": "3.6.0",
-  "versionCode": 66,
+  "version": "3.7.0",
+  "versionCode": 67,
   "releaseDate": "2026-08-21",
   "phone": {
-    "version": "2.9.0",
-    "versionCode": 44,
+    "version": "3.0.0",
+    "versionCode": 45,
     "packageId": "com.ajo.phone",
-    "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.6.0/AJO_PHONE.apk",
-    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.6.0/AJO_PHONE.apk",
+    "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.7.0/AJO_PHONE.apk",
+    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.7.0/AJO_PHONE.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "\ud83e\udd0f PINCH ZOOM FIXED: controls overlay was swallowing gestures \u2014 now passes through to video (verified: scale 2.5x in headless test)",
-      "\u23f1\ufe0f Recovery modal fix: progress resets the stall timer, slow-but-moving streams never dumped to error screen",
-      "\u26a1 Faster starts: manifest arrival cancels false failover"
+      "\ud83d\udd16 Watchlist with TV sync \u2014 add titles on phone, they appear on your TV",
+      "\ud83c\udfaf Because You Watched: personalized recommendations from your history",
+      "\u23ef\ufe0f (from 2.9.0) True pause-resume Continue Watching + 10s progress saves"
     ],
     "size_mb": "3.4 MB"
   },
   "tv": {
-    "version": "3.6.0",
-    "versionCode": 66,
+    "version": "3.7.0",
+    "versionCode": 67,
     "packageId": "com.ajo.tv",
-    "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.6.0/AJO_TV.apk",
-    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.6.0/AJO_TV.apk",
+    "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.7.0/AJO_TV.apk",
+    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.7.0/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "\ud83e\udde9 ADDONS: Stremio-compatible addon system \u2014 install community addons from Settings for unlimited catalogs & streams",
-      "\u2764\ufe0f VPS mirror health-checker: dead mirrors auto-demoted before you tap play (11/17 verified live right now)",
-      "\ud83d\udda5\ufe0f Display modes: long-press D-pad Up cycles Fit/Zoom/Stretch/Fill"
+      "\u25b6\ufe0f BINGE MODE: episode auto-advance with 12s countdown + Cancel (multi-episode titles)",
+      "\ud83c\udfaf Because You Watched: personalized rows from your history (TMDB recommendations)",
+      "\ud83d\udd16 My Watchlist: syncs with your phone over the cast channel",
+      "\ud83c\udfac Trailer autoplay in hero banner (muted, Netflix-style)"
     ],
     "size_mb": "7.0 MB",
     "sha256": "d7b516ef4086d4594a887f22201ee5eafb073fe02e40e824a9c1247fba227f40"
