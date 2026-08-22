@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "version": "3.8.1",
-  "versionCode": 69,
+  "version": "3.8.2",
+  "versionCode": 70,
   "releaseDate": "2026-08-22",
   "phone": {
     "version": "3.2.1",
@@ -21,20 +21,22 @@
     "signing": "debug"
   },
   "tv": {
-    "version": "3.8.1",
-    "versionCode": 69,
+    "version": "3.8.2",
+    "versionCode": 70,
     "packageId": "com.ajo.tv",
-    "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.8.1/AJO_TV.apk",
-    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.8.0/AJO_TV.apk",
+    "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.8.2/AJO_TV.apk",
+    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.8.1/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "\ud83d\udee0 HOTFIX: fixes \"problem parsing the package\" update error from v3.8.0 (signing reverted to the original key \u2014 updates install normally again)",
-      "\ud83e\uddca Includes the real freeze fix: frame-truth freeze detection + auto-recovery",
-      "\u23f1\ufe0f Bounded stream retries: dead mirrors fail over instead of hanging"
+      "\ud83c\udfac MOVIES FIXED: direct streams misclassified as embeds now play in the hardware player; embed mirrors open in the built-in web player instead of showing Not supported",
+      "\ud83e\uddca Live channels no longer flash Fixing video playback at start \u2014 recovery only triggers after real frames rendered",
+      "\u2328\ufe0f On-screen keyboard types single letters \u2014 double-input fixed",
+      "\ud83d\udcfa Full channel catalog: 12,800+ channels (was truncating to dozens on slow connections), counter shown on the Home rail",
+      "\ud83c\udfa8 Header fits every TV: logo, all tabs incl. Settings, and clock always visible"
     ],
     "size_mb": "7.1 MB",
-    "sha256": "59dce4bbe4946a77b4604be56f96e1ff22fce2998c7381b952f2ba52835e9b43",
+    "sha256": "b4776a648695f365264bc829447f2baf256398febd8121b4b90863426d768272",
     "signing": "debug"
   },
   "signing": "debug"
