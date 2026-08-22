@@ -33,10 +33,11 @@
       "\ud83e\uddca Live channels no longer flash Fixing video playback at start \u2014 recovery only triggers after real frames rendered",
       "\u2328\ufe0f On-screen keyboard types single letters \u2014 double-input fixed",
       "\ud83d\udcfa Full channel catalog: 12,800+ channels (was truncating to dozens on slow connections), counter shown on the Home rail",
-      "\ud83c\udfa8 Header fits every TV: logo, all tabs incl. Settings, and clock always visible"
+      "\ud83c\udfa8 Header fits every TV: logo, all tabs incl. Settings, and clock always visible",
+      "\ud83d\ude80 FIRE TV BUFFERING: deeper live buffers (12s min / 45s max), smarter quality switching that rides out origin slowdowns instead of stuttering, and longer segment-read windows"
     ],
     "size_mb": "7.1 MB",
-    "sha256": "b4776a648695f365264bc829447f2baf256398febd8121b4b90863426d768272",
+    "sha256": "a5d8b0f736025928111cf4664d652cbe71c020de2920091da24676690cc0d1b9",
     "signing": "debug"
   },
   "signing": "debug"
