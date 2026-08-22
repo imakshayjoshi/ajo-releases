@@ -1,39 +1,41 @@
 {
   "schemaVersion": 2,
-  "version": "3.8.0",
-  "versionCode": 68,
+  "version": "3.8.1",
+  "versionCode": 69,
   "releaseDate": "2026-08-22",
   "phone": {
-    "version": "3.2.0",
-    "versionCode": 47,
+    "version": "3.2.1",
+    "versionCode": 48,
     "packageId": "com.ajo.phone",
-    "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.8.0/AJO_PHONE.apk",
-    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.7.0/AJO_PHONE.apk",
+    "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.8.1/AJO_PHONE.apk",
+    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.8.0/AJO_PHONE.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "\ud83d\uddbc\ufe0f VIDEO FIT controls: Fit / Zoom to Fill / Stretch buttons in Stream Settings (+ pinch zoom & double-tap, now discoverable)",
-      "\ud83e\uddca Frame-truth watchdog: a stream that shows video for 6s+ with zero rendered frames auto-switches mirrors instead of sticking on Connecting \u2014 fixes stuck recovery modal",
-      "\ud83d\udd11 Permanent release signing key: first update after this is a guided one-time reinstall"
+      "\ud83d\udee0 HOTFIX: fixes \"problem parsing the package\" update error from v3.2.0 (original signing restored)",
+      "\ud83d\uddbc\ufe0f Video Fit buttons in Stream Settings + pinch/double-tap zoom",
+      "\ud83e\uddca Frame-truth watchdog ends stuck Connecting states"
     ],
     "size_mb": "3.4 MB",
-    "sha256": "a1773216cbd9164b98253c5179b49a3b919a900de4ce57619c02369d98663ff6"
+    "sha256": "f631b494fcda7945a6490d8996c5f2cd65a310ae5e9d26c42232a7a2ff292948",
+    "signing": "debug"
   },
   "tv": {
-    "version": "3.8.0",
-    "versionCode": 68,
+    "version": "3.8.1",
+    "versionCode": 69,
     "packageId": "com.ajo.tv",
-    "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.8.0/AJO_TV.apk",
-    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.7.0/AJO_TV.apk",
+    "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.8.1/AJO_TV.apk",
+    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.8.0/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "\ud83e\uddca FREEZE FIX (the real one): player now watches actual rendered-video-frame counts \u2014 frozen picture with live audio is detected in ~5s and auto-recovers (previous detector watched the audio clock and never fired)",
-      "\u23f1\ufe0f Bounded stream retries: dead CDNs now fail over to the next mirror instead of hanging on Connecting for minutes",
-      "\ud83d\udd11 Switched to the permanent release signing key \u2014 first update after this needs a one-time reinstall, then all future updates are one-tap again"
+      "\ud83d\udee0 HOTFIX: fixes \"problem parsing the package\" update error from v3.8.0 (signing reverted to the original key \u2014 updates install normally again)",
+      "\ud83e\uddca Includes the real freeze fix: frame-truth freeze detection + auto-recovery",
+      "\u23f1\ufe0f Bounded stream retries: dead mirrors fail over instead of hanging"
     ],
     "size_mb": "7.1 MB",
-    "sha256": "aa36f44f7393c396c3d00c685d0cc850a443e1f4d0a85ef9a5c15d9dbb75c484"
+    "sha256": "59dce4bbe4946a77b4604be56f96e1ff22fce2998c7381b952f2ba52835e9b43",
+    "signing": "debug"
   },
-  "signing": "release"
+  "signing": "debug"
 }
