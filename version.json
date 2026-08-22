@@ -1,43 +1,41 @@
 {
   "schemaVersion": 2,
-  "version": "3.8.2",
-  "versionCode": 70,
+  "version": "3.9.0",
+  "versionCode": 71,
   "releaseDate": "2026-08-22",
   "phone": {
-    "version": "3.2.1",
-    "versionCode": 48,
+    "version": "3.3.0",
+    "versionCode": 49,
     "packageId": "com.ajo.phone",
-    "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.8.1/AJO_PHONE.apk",
-    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.8.0/AJO_PHONE.apk",
+    "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.9.0/AJO_PHONE.apk",
+    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.8.1/AJO_PHONE.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "\ud83d\udee0 HOTFIX: fixes \"problem parsing the package\" update error from v3.2.0 (original signing restored)",
-      "\ud83d\uddbc\ufe0f Video Fit buttons in Stream Settings + pinch/double-tap zoom",
-      "\ud83e\uddca Frame-truth watchdog ends stuck Connecting states"
+      "\ud83c\uddee\ud83c\uddf3 MAHARASHTRA LINEUP: Marathi + Hindi + Sports channels only, popular brands listed first",
+      "\ud83d\udeab Removed other regional-language feeds (Bangla/Telugu/Tamil/Punjabi and more)",
+      "\ud83d\uddbc\ufe0f Includes Video Fit controls and the stuck-connect fix from 3.2.x"
     ],
     "size_mb": "3.4 MB",
-    "sha256": "f631b494fcda7945a6490d8996c5f2cd65a310ae5e9d26c42232a7a2ff292948",
+    "sha256": "ae3439f378817ad4320113b180698e9f6da87b5d68842efc5d4de9a89ef7280f",
     "signing": "debug"
   },
   "tv": {
-    "version": "3.8.2",
-    "versionCode": 70,
+    "version": "3.9.0",
+    "versionCode": 71,
     "packageId": "com.ajo.tv",
-    "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.8.2/AJO_TV.apk",
-    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.8.1/AJO_TV.apk",
+    "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.9.0/AJO_TV.apk",
+    "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.8.2/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "\ud83c\udfac MOVIES FIXED: direct streams misclassified as embeds now play in the hardware player; embed mirrors open in the built-in web player instead of showing Not supported",
-      "\ud83e\uddca Live channels no longer flash Fixing video playback at start \u2014 recovery only triggers after real frames rendered",
-      "\u2328\ufe0f On-screen keyboard types single letters \u2014 double-input fixed",
-      "\ud83d\udcfa Full channel catalog: 12,800+ channels (was truncating to dozens on slow connections), counter shown on the Home rail",
-      "\ud83c\udfa8 Header fits every TV: logo, all tabs incl. Settings, and clock always visible",
-      "\ud83d\ude80 FIRE TV BUFFERING: deeper live buffers (12s min / 45s max), smarter quality switching that rides out origin slowdowns instead of stuttering, and longer segment-read windows"
+      "\u26a1 LIGHTNING NAVIGATION: channel list curated from 12,800+ down to your channels \u2014 every D-pad press lands instantly",
+      "\ud83c\uddee\ud83c\uddf3 MAHARASHTRA LINEUP: all Marathi + Hindi + Sports channels (Zee Marathi, Colors Marathi, Star Pravah, Jai Maharashtra, ABP Majha, Star/Sony Sports, DD Sports\u2026) first in the grid",
+      "\ud83d\udeab Removed Bangla, Telugu, Tamil, Punjabi, Kannada, Malayalam, Odia, Gujarati and all other regional feeds",
+      "\ud83c\udfae Header \u21c4 content in a single keypress"
     ],
     "size_mb": "7.1 MB",
-    "sha256": "a5d8b0f736025928111cf4664d652cbe71c020de2920091da24676690cc0d1b9",
+    "sha256": "5af233cf51bb76fa90c125e67d343cbef12c2e89afe2b0758389c563337f34ed",
     "signing": "debug"
   },
   "signing": "debug"
