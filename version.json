@@ -1,39 +1,39 @@
 {
   "schemaVersion": 2,
-  "version": "3.7.0",
-  "versionCode": 67,
-  "releaseDate": "2026-08-21",
+  "version": "3.8.0",
+  "versionCode": 68,
+  "releaseDate": "2026-08-22",
   "phone": {
-    "version": "3.1.0",
-    "versionCode": 46,
+    "version": "3.2.0",
+    "versionCode": 47,
     "packageId": "com.ajo.phone",
-    "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.7.0/AJO_PHONE.apk",
+    "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.8.0/AJO_PHONE.apk",
     "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.7.0/AJO_PHONE.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "\ud83d\udcfa CATCH-UP TV: watch past programmes on live channels (History icon in player) \u2014 day + time picker, up to 7 days back",
-      "\ud83d\udd90\ufe0f LIVE FIX: tapping a live channel no longer pauses it \u2014 tap toggles controls only (pausing live made no sense)",
-      "\ud83d\uddd1\ufe0f Shorts TV removed from nav and home",
-      "\u2705 Headless-verified: live tap keeps video playing"
+      "\ud83d\uddbc\ufe0f VIDEO FIT controls: Fit / Zoom to Fill / Stretch buttons in Stream Settings (+ pinch zoom & double-tap, now discoverable)",
+      "\ud83e\uddca Frame-truth watchdog: a stream that shows video for 6s+ with zero rendered frames auto-switches mirrors instead of sticking on Connecting \u2014 fixes stuck recovery modal",
+      "\ud83d\udd11 Permanent release signing key: first update after this is a guided one-time reinstall"
     ],
-    "size_mb": "3.4 MB"
+    "size_mb": "3.4 MB",
+    "sha256": "a1773216cbd9164b98253c5179b49a3b919a900de4ce57619c02369d98663ff6"
   },
   "tv": {
-    "version": "3.7.0",
-    "versionCode": 67,
+    "version": "3.8.0",
+    "versionCode": 68,
     "packageId": "com.ajo.tv",
-    "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.7.0/AJO_TV.apk",
+    "apkUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.8.0/AJO_TV.apk",
     "apk_url": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.7.0/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "\u25b6\ufe0f BINGE MODE: episode auto-advance with 12s countdown + Cancel (multi-episode titles)",
-      "\ud83c\udfaf Because You Watched: personalized rows from your history (TMDB recommendations)",
-      "\ud83d\udd16 My Watchlist: syncs with your phone over the cast channel",
-      "\ud83c\udfac Trailer autoplay in hero banner (muted, Netflix-style)"
+      "\ud83e\uddca FREEZE FIX (the real one): player now watches actual rendered-video-frame counts \u2014 frozen picture with live audio is detected in ~5s and auto-recovers (previous detector watched the audio clock and never fired)",
+      "\u23f1\ufe0f Bounded stream retries: dead CDNs now fail over to the next mirror instead of hanging on Connecting for minutes",
+      "\ud83d\udd11 Switched to the permanent release signing key \u2014 first update after this needs a one-time reinstall, then all future updates are one-tap again"
     ],
-    "size_mb": "7.0 MB",
-    "sha256": "d7b516ef4086d4594a887f22201ee5eafb073fe02e40e824a9c1247fba227f40"
-  }
+    "size_mb": "7.1 MB",
+    "sha256": "aa36f44f7393c396c3d00c685d0cc850a443e1f4d0a85ef9a5c15d9dbb75c484"
+  },
+  "signing": "release"
 }
