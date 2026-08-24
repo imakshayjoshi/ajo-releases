@@ -1,40 +1,35 @@
 {
   "schemaVersion": 2,
-  "version": "3.11.1",
-  "versionCode": 81,
+  "version": "3.11.2",
+  "versionCode": 82,
   "releaseDate": "2026-08-25",
   "phone": {
-    "version": "3.3.1",
-    "versionCode": 50,
+    "version": "3.3.2",
+    "versionCode": 51,
     "packageId": "com.ajo.phone",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "📺 All-Indian live TV: 3655 channels (Telugu, Tamil, Kannada, Malayalam, Bengali, Punjabi, Gujarati added — Star Sports regional, Sun TV, Zee regional + more)",
-      "🆕 Recently Released Movies rail (new theatrical titles)",
-      "⚡ Lighter & faster: hls.js loads on demand; main bundle 993KB → 401KB",
-      "🛡️ Embed preflight: broken provider pages auto-skipped during movie streaming (same fix as TV)",
-      "📡 Cast & Remote pairing with TV app"
+      "⚽ Live Sports Upgrade: NTV live fixtures (cricket/football/tennis) added to Sports rail"
     ],
     "size_mb": "3.3 MB",
-    "sha256": "ffae842a6c41f99705feedffac4bce84220b1bca4ec1eda4eefc2ccdd9626978"
+    "sha256": "b6d3fb3f6e98d8f1758b8d4352ab0d38a9c7e61d3d72231bc9a9ab41479ac8b8"
   },
   "tv": {
-    "version": "3.11.1",
-    "versionCode": 81,
+    "version": "3.11.2",
+    "versionCode": 82,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "📡 Cast & Remote FIXED: TV now always generates & displays a pairing room code in Settings → Cast & Remote (previously the TV never showed a code, so phones could not pair at all)",
-      "📱 Phone remote now controls the hardware player: play/pause/seek/stop forwarded to ExoPlayer via native bridge",
-      "🔒 Role & room hardening: TV always boots as the cast host regardless of device detection"
+      "⚽ Live Sports Upgrade: real-time fixtures from the NTV API (186 live matches incl. Fulham vs Chelsea, Roma vs Fiorentina, Willow Cricket) — recovered from the Streamzy payload APK and verified live",
+      "🔍 Note: base_apk_decompiled = Fabulous habit app — its only videos are auth-gated coaching clips (401), no movie/TV source exists there"
     ],
     "size_mb": "6.8 MB",
-    "sha256": "45f00c32799c61bcbd5ced383ca7f10571b5a8f086f45131cc183cb12b3833b5"
+    "sha256": "37fa5d952332244fc09bfcef0b7d7d89bc38a63eff21ac602ef1d413a6faff0f"
   }
 }
