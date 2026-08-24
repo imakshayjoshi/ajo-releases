@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "version": "3.9.6",
-  "versionCode": 77,
+  "version": "3.10.0",
+  "versionCode": 78,
   "releaseDate": "2026-08-24",
   "phone": {
     "version": "2.5.5",
@@ -12,27 +12,30 @@
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "✨ Streamlined Clean Phone UI: Instant access to content rows",
-      "🔥 Direct HLS Stream Engine: Restored high-speed multi-audio Hindi/English/South streams for all movies & series",
-      "⚡ Fixed OTA Update: Direct zero-redirect updater"
+      "\u2728 Streamlined Clean Phone UI: Instant access to content rows",
+      "\ud83d\udd25 Direct HLS Stream Engine: Restored high-speed multi-audio Hindi/English/South streams for all movies & series",
+      "\u26a1 Fixed OTA Update: Direct zero-redirect updater"
     ],
     "size_mb": "4.3 MB"
   },
   "tv": {
-    "version": "3.9.6",
-    "versionCode": 77,
+    "version": "3.10.0",
+    "versionCode": 78,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "⚡ Fixed Mirror Failover: Direct HLS & playlist streams route properly to ExoPlayer, preventing hang on mirror 2/4",
-      "📺 Fixed Live Channel Icons: Dynamic high-contrast live channel badges ensure all live channel logos are crisp and visible",
-      "🎯 Fixed First-Frame Auto-Advancement: Automatically advances to working mirrors if a server stalls or times out",
-      "🇮🇳 Complete All-India Channels Lineup with Live HD Badges"
+      "\u26a1 Streaming Overhaul: removed 6 dead mirror providers (moviesapi, vidsrc.xyz/icu/cc, smashy, embed.su) \u2014 verified-alive mirrors (VidLink, AutoEmbed, 2Embed, VidSrc ME) now rank first",
+      "\ud83d\udee1\ufe0f Auto-Failover for Embeds: dead/blank mirrors now auto-skip after 12s instead of freezing forever",
+      "\ud83d\udcfa Fixed channel merging: 'Star Sports 2' no longer collapses into 'Star Sports' \u2014 all channels visible again",
+      "\ud83c\udfc6 Sports section expanded from 30 to 200 channels with live HD badges",
+      "\ud83c\udfaf Fixed Live TV: pruned dead IP mirrors, reordered verified-working primaries (Star Sports 2, Sony Max, SAB, SET)",
+      "\ud83c\udfae TV UX: Back closes the channel/server drawer first (no more losing your stream), search no longer traps focus, Backspace won't exit search",
+      "\ud83d\uddc2\ufe0f Playback position & focus restored exactly where you left off"
     ],
-    "size_mb": "9.5 MB",
-    "sha256": "b5ce4c9c5d53aa23191195a923b3849a516a69540bae418ade8b1984a2076832"
+    "size_mb": "10.6 MB",
+    "sha256": "8f0a9bae3285ad8e01932a7fc3bb813c8c70c9a82e7de54da9fd2bf3bf4d4bf9"
   }
 }
