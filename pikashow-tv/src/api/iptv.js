@@ -1,42 +1,239 @@
 import { isFavoriteChannel } from './history.js';
 import { isSafeHttpUrl } from '../utils/streamingEngines.js';
 
-
-const CACHE_KEY = 'ajo_iptv_cache_v3'; // v3: curated Maharashtra catalog (invalidates old mega-cache)
+const CACHE_KEY = 'ajo_iptv_cache_v4'; // v4: Full India Lineup + Sony SAB, Sony Sports Ten, Star Sports & all regional feeds
 const CUSTOM_KEY = 'ajo_custom_m3u_v2';
 const JIOTV_KEY = 'ajo_jiotv_host_v2';
 const CACHE_TTL = 30 * 60 * 1000;
 
-// v3.9.2 CURATION: Maharashtra & Hindi Lineup (Marathi + Hindi + Sports + News).
-// Excludes all other regional languages (Bangla, Telugu, Tamil, Malayalam, Kannada, Punjabi, Gujarati, etc.).
+// All Indian & global sports/entertainment playlists
 const PLAYLISTS = [
-  'https://iptv-org.github.io/iptv/languages/mar.m3u',     // Marathi (~31)
-  'https://iptv-org.github.io/iptv/languages/hin.m3u',     // Hindi (~336)
-  'https://iptv-org.github.io/iptv/countries/in.m3u',      // India Full (contains Sony SAB, Colors HD, etc.) (~731)
-  'https://iptv-org.github.io/iptv/categories/sports.m3u'  // Sports (~457)
+  'https://iptv-org.github.io/iptv/countries/in.m3u',              // India Full (~750+ channels: Hindi, Marathi, South, News, Entertainment)
+  'https://raw.githubusercontent.com/iptv-org/iptv/master/streams/in.m3u', // Direct stream mirrors for India
+  'https://iptv-org.github.io/iptv/languages/hin.m3u',             // Hindi Full (~336 channels)
+  'https://iptv-org.github.io/iptv/languages/mar.m3u',             // Marathi Full (~31 channels)
+  'https://iptv-org.github.io/iptv/categories/sports.m3u',          // Sports Full (Cricket, Football, Ten, Star)
+  'https://iptv-org.github.io/iptv/categories/news.m3u',            // News Full
+  'https://iptv-org.github.io/iptv/categories/movies.m3u',          // Movies Full
+  'https://iptv-org.github.io/iptv/categories/music.m3u',           // Music Full
+  'https://iptv-org.github.io/iptv/categories/entertainment.m3u'    // Entertainment Full
 ];
 
-// Strip anything whose NAME marks another regional language.
-const EXCLUDE_TITLE_RE =
-  /bangla|bengali|telugu|tamil|kannada|malayalam|malyalam|punjabi|panjabi|odia|oriya|assamese|gujarati|bhojpuri|marwari|rajasthani|nepali/i;
+// Built-in curated premium channels with direct verified multi-server mirrors
+const BUILTIN_INDIAN_CHANNELS = [
+  // --- SONY ENTERTAINMENT & SPORTS NETWORK ---
+  {
+    id: 'sony-sab-hd',
+    title: 'Sony SAB HD',
+    category: 'Entertainment',
+    poster: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/87/Sony_SAB_logo_2022.svg/512px-Sony_SAB_logo_2022.svg.png',
+    url: 'http://38.96.178.205/SONYSAB/index.m3u8',
+    players: [
+      { name: 'Server 1: Direct 1080p', url: 'http://38.96.178.205/SONYSAB/index.m3u8', source: 'hls', quality: '1080p' },
+      { name: 'Server 2: High-Speed Mirror', url: 'http://103.213.31.109:90/SonySabHD/playlist.m3u8', source: 'hls', quality: '1080p' },
+      { name: 'Server 3: Fast CDN', url: 'https://sl.vodep39240327.workers.dev/channel/SONY+SAB+HD.m3u8', source: 'hls', quality: '720p' },
+      { name: 'Server 4: Live Mirror', url: 'http://103.72.101.252:8080/live/1321.m3u8', source: 'hls', quality: 'HD' }
+    ]
+  },
+  {
+    id: 'sony-sports-ten-1-hd',
+    title: 'Sony Sports Ten 1 HD',
+    category: 'Sports',
+    poster: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d4/Sony_Sports_Ten_1_logo.svg/512px-Sony_Sports_Ten_1_logo.svg.png',
+    url: 'http://38.96.178.205/SONYTEN1/index.m3u8',
+    players: [
+      { name: 'Server 1: Direct 1080p', url: 'http://38.96.178.205/SONYTEN1/index.m3u8', source: 'hls', quality: '1080p' },
+      { name: 'Server 2: High-Speed Mirror', url: 'https://sl.vodep39240327.workers.dev/channel/SONY+TEN+1+HD.m3u8', source: 'hls', quality: '1080p' },
+      { name: 'Server 3: Live CDN', url: 'http://103.72.101.252:8080/live/1340.m3u8', source: 'hls', quality: 'HD' }
+    ]
+  },
+  {
+    id: 'sony-sports-ten-2-hd',
+    title: 'Sony Sports Ten 2 HD',
+    category: 'Sports',
+    poster: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/50/Sony_Sports_Ten_2_logo.svg/512px-Sony_Sports_Ten_2_logo.svg.png',
+    url: 'http://38.96.178.205/SONYTEN2/index.m3u8',
+    players: [
+      { name: 'Server 1: Direct 1080p', url: 'http://38.96.178.205/SONYTEN2/index.m3u8', source: 'hls', quality: '1080p' },
+      { name: 'Server 2: High-Speed Mirror', url: 'https://sl.vodep39240327.workers.dev/channel/SONY+TEN+2+HD.m3u8', source: 'hls', quality: '1080p' },
+      { name: 'Server 3: Live CDN', url: 'http://103.72.101.252:8080/live/1341.m3u8', source: 'hls', quality: 'HD' }
+    ]
+  },
+  {
+    id: 'sony-sports-ten-3-hd',
+    title: 'Sony Sports Ten 3 HD (Hindi)',
+    category: 'Sports',
+    poster: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f6/Sony_Sports_Ten_3_logo.svg/512px-Sony_Sports_Ten_3_logo.svg.png',
+    url: 'http://38.96.178.205/SONYTEN3/index.m3u8',
+    players: [
+      { name: 'Server 1: Direct 1080p (Hindi)', url: 'http://38.96.178.205/SONYTEN3/index.m3u8', source: 'hls', quality: '1080p' },
+      { name: 'Server 2: High-Speed Mirror', url: 'https://sl.vodep39240327.workers.dev/channel/SONY+TEN+3+HD.m3u8', source: 'hls', quality: '1080p' },
+      { name: 'Server 3: Live CDN', url: 'http://103.72.101.252:8080/live/1342.m3u8', source: 'hls', quality: 'HD' }
+    ]
+  },
+  {
+    id: 'sony-sports-ten-5-hd',
+    title: 'Sony Sports Ten 5 HD',
+    category: 'Sports',
+    poster: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4b/Sony_Sports_Ten_5_logo.svg/512px-Sony_Sports_Ten_5_logo.svg.png',
+    url: 'http://38.96.178.205/SONYTEN5/index.m3u8',
+    players: [
+      { name: 'Server 1: Direct 1080p', url: 'http://38.96.178.205/SONYTEN5/index.m3u8', source: 'hls', quality: '1080p' },
+      { name: 'Server 2: High-Speed Mirror', url: 'https://sl.vodep39240327.workers.dev/channel/SONY+SIX+HD.m3u8', source: 'hls', quality: '1080p' },
+      { name: 'Server 3: Live CDN', url: 'http://103.72.101.252:8080/live/1343.m3u8', source: 'hls', quality: 'HD' }
+    ]
+  },
+  {
+    id: 'sony-tv-hd',
+    title: 'Sony Entertainment Television HD (SET)',
+    category: 'Entertainment',
+    poster: 'https://dtil.tmsimg.com/assets/s159096_ld_h15_aa.png?lock=720x540',
+    url: 'http://38.96.178.205/SONYHD/index.m3u8',
+    players: [
+      { name: 'Server 1: Direct 1080p', url: 'http://38.96.178.205/SONYHD/index.m3u8', source: 'hls', quality: '1080p' },
+      { name: 'Server 2: Cloud Mirror', url: 'https://sl.vodep39240327.workers.dev/channel/SONY+HD.m3u8', source: 'hls', quality: '1080p' },
+      { name: 'Server 3: Live CDN', url: 'http://103.72.101.252:8080/live/1320.m3u8', source: 'hls', quality: 'HD' }
+    ]
+  },
+  {
+    id: 'sony-max-hd',
+    title: 'Sony Max HD',
+    category: 'Movies',
+    poster: 'https://dtil.tmsimg.com/assets/s179440_ld_h15_aa.png?lock=720x540',
+    url: 'http://38.96.178.205/SONYMAX/index.m3u8',
+    players: [
+      { name: 'Server 1: Direct 1080p', url: 'http://38.96.178.205/SONYMAX/index.m3u8', source: 'hls', quality: '1080p' },
+      { name: 'Server 2: Fast Mirror', url: 'http://103.159.180.34:5001/live/3418.m3u8', source: 'hls', quality: '720p' },
+      { name: 'Server 3: Live CDN', url: 'https://sl.vodep39240327.workers.dev/channel/SONY+MAX+HD.m3u8', source: 'hls', quality: '1080p' }
+    ]
+  },
+  {
+    id: 'sony-pix-hd',
+    title: 'Sony Pix HD',
+    category: 'Movies',
+    poster: 'https://i.postimg.cc/Z5G8j67L/PIX-HD-WHITE.png',
+    url: 'https://sl.vodep39240327.workers.dev/channel/SONY+PIX+HD.m3u8',
+    players: [
+      { name: 'Server 1: Direct 1080p', url: 'https://sl.vodep39240327.workers.dev/channel/SONY+PIX+HD.m3u8', source: 'hls', quality: '1080p' },
+      { name: 'Server 2: Live CDN', url: 'http://103.72.101.252:8080/live/1323.m3u8', source: 'hls', quality: 'HD' }
+    ]
+  },
+  {
+    id: 'sony-marathi-hd',
+    title: 'Sony Marathi HD',
+    category: 'Entertainment',
+    poster: 'https://xstreamcp-assets-msp.streamready.in/assets/LIVETV/LIVECHANNEL/LIVETV_LIVETVCHANNEL_SONY_MARATHI/images/LOGO_HD/image.png',
+    url: 'https://sl.vodep39240327.workers.dev/channel/SONY+MARATHI.m3u8',
+    players: [
+      { name: 'Server 1: Direct 1080p', url: 'https://sl.vodep39240327.workers.dev/channel/SONY+MARATHI.m3u8', source: 'hls', quality: '1080p' },
+      { name: 'Server 2: Live CDN', url: 'http://103.72.101.252:8080/live/1325.m3u8', source: 'hls', quality: 'HD' }
+    ]
+  },
+  {
+    id: 'sony-wah',
+    title: 'Sony Wah',
+    category: 'Movies',
+    poster: 'https://xstreamcp-assets-msp.streamready.in/assets/LIVETV/LIVECHANNEL/LIVETV_LIVETVCHANNEL_SONY_WAH/images/LOGO_HD/image.png',
+    url: 'https://sl.vodep39240327.workers.dev/channel/SONY+WAH.m3u8',
+    players: [
+      { name: 'Server 1: Direct 1080p', url: 'https://sl.vodep39240327.workers.dev/channel/SONY+WAH.m3u8', source: 'hls', quality: '1080p' },
+      { name: 'Server 2: Live CDN', url: 'http://103.72.101.252:8080/live/1327.m3u8', source: 'hls', quality: 'HD' }
+    ]
+  },
+  {
+    id: 'sony-yay',
+    title: 'Sony Yay!',
+    category: 'Kids',
+    poster: 'https://xstreamcp-assets-msp.streamready.in/assets/LIVETV/LIVECHANNEL/LIVETV_LIVETVCHANNEL_SONY_YAY/images/LOGO_HD/image.png',
+    url: 'https://s3.itcnbd.live/channel/b22941f1341d7243.m3u8',
+    players: [
+      { name: 'Server 1: Direct Live', url: 'https://s3.itcnbd.live/channel/b22941f1341d7243.m3u8', source: 'hls', quality: '720p' }
+    ]
+  },
+
+  // --- STAR NETWORK & SPORTS ---
+  {
+    id: 'star-sports-1-hd',
+    title: 'Star Sports 1 HD',
+    category: 'Sports',
+    poster: 'https://i.imgur.com/E5jjKHI.png',
+    url: 'http://41.205.93.154/STARSPORTS1/index.m3u8',
+    players: [
+      { name: 'Server 1: Direct 1080p', url: 'http://41.205.93.154/STARSPORTS1/index.m3u8', source: 'hls', quality: '1080p' },
+      { name: 'Server 2: High-Speed Mirror', url: 'https://tvsen7.aynaott.com/sspts1/index.m3u8', source: 'hls', quality: '720p' },
+      { name: 'Server 3: Live CDN', url: 'http://103.253.18.58:8000/play/a00m', source: 'hls', quality: '1080p' }
+    ]
+  },
+  {
+    id: 'star-sports-1-hindi-hd',
+    title: 'Star Sports 1 Hindi HD',
+    category: 'Sports',
+    poster: 'https://xstreamcp-assets-msp.streamready.in/assets/LIVETV/LIVECHANNEL/LIVETV_LIVETVCHANNEL_STAR_SPORTS_1_HD_HINDI/images/LOGO_HD/image.png',
+    url: 'http://103.253.18.58:8000/play/a00t',
+    players: [
+      { name: 'Server 1: Direct 1080p (Hindi)', url: 'http://103.253.18.58:8000/play/a00t', source: 'hls', quality: '1080p' },
+      { name: 'Server 2: High-Speed Mirror', url: 'http://103.253.18.58:8000/play/a03o', source: 'hls', quality: '720p' }
+    ]
+  },
+  {
+    id: 'star-sports-2-hd',
+    title: 'Star Sports 2 HD',
+    category: 'Sports',
+    poster: 'https://xstreamcp-assets-msp.streamready.in/assets/LIVETV/LIVECHANNEL/LIVETV_LIVETVCHANNEL_STAR_SPORTS_2/images/LOGO_HD/image.png',
+    url: 'https://tvsen7.aynaott.com/ssport2hd/index.m3u8',
+    players: [
+      { name: 'Server 1: Direct HD', url: 'https://tvsen7.aynaott.com/ssport2hd/index.m3u8', source: 'hls', quality: '720p' },
+      { name: 'Server 2: High-Speed Mirror', url: 'http://tvsen5.aynascope.net/cXPB2LKkErN9/index.m3u8', source: 'hls', quality: '720p' }
+    ]
+  },
+  {
+    id: 'star-sports-select-1-hd',
+    title: 'Star Sports Select 1 HD',
+    category: 'Sports',
+    poster: 'https://i.imgur.com/Mh9tKPx.png',
+    url: 'http://tvsen7.aynascope.net/sspts1/index.m3u8',
+    players: [
+      { name: 'Server 1: Direct HD', url: 'http://tvsen7.aynascope.net/sspts1/index.m3u8', source: 'hls', quality: '720p' }
+    ]
+  },
+  {
+    id: 'star-sports-select-2-hd',
+    title: 'Star Sports Select 2 HD',
+    category: 'Sports',
+    poster: 'https://i.imgur.com/FtRT73R.png',
+    url: 'http://tvsen7.aynascope.net/ssport2hd/index.m3u8',
+    players: [
+      { name: 'Server 1: Direct HD', url: 'http://tvsen7.aynascope.net/ssport2hd/index.m3u8', source: 'hls', quality: '720p' }
+    ]
+  },
+  {
+    id: 'dd-sports-hd',
+    title: 'DD Sports HD',
+    category: 'Sports',
+    poster: 'https://ltsk-cdn.s3.eu-west-1.amazonaws.com/jumpstart/Temp_Live/cdn/HLS/Channel/transparentImages/DD%20Sports.png',
+    url: 'https://cdn-3.pishow.tv/live/30/master.m3u8',
+    players: [
+      { name: 'Server 1: Direct Live', url: 'https://cdn-3.pishow.tv/live/30/master.m3u8', source: 'hls', quality: '720p' }
+    ]
+  }
+];
 
 // Most-wanted channels float to the FRONT of the grid.
 const PRIORITY_CHANNEL_RE = [
-  /sony\s*(sab|pal|entertainment|tv|max|wah|pix|yay|marathi)/i,
+  /sony\s*(sab|pal|entertainment|tv|max|wah|pix|yay|marathi|sports|ten|bbc|earth)/i,
   /sab\s*tv/i,
-  /zee\s*(marathi|24\s*taas|talkies|cinema|tv|anmol|bollywood|yuva|zest)/i,
-  /colors\s*(marathi|cineplex|cineplex\s*bollywood|hd|infinity)/i,
-  /star\s*(pravah|pravah\s*picture|plus|gold|bharat|sports)/i,
-  /abp\s*(majha|news|ganga|asmit)/i,
-  /news18\s*(lokmat|marathi|india)/i,
-  /tv9\s*marathi/i,
-  /saam\s*tv/i,
-  /jai\s*maharashtra/i,
-  /fakt\s*marathi|sangeet\s*marathi|shemaroo\s*marathi|ndtv\s*marathi/i,
-  /\baaj\s*tak\b|\bindia\s*today\b|ndtv|\bnews\b.*hindi/i,
-  /dd\s*(sports|national|news|retro|kisan|bharati|sahyadri)/i,
-  /sports18|eurosport|willow|astro\s*cricket/i,
-  /dangal|shemaroo/i
+  /star\s*(sports|plus|gold|bharat|pravah|utsav|select)/i,
+  /sports\s*18|sports18|eurosport|willow|astro\s*cricket|dd\s*sports/i,
+  /zee\s*(marathi|24\s*taas|talkies|cinema|tv|anmol|bollywood|yuva|zest|news|keralam|telugu|tamil|bangla|punjabi)/i,
+  /colors\s*(marathi|cineplex|cineplex\s*bollywood|hd|infinity|gujarati|kannada|tamil|bangla)/i,
+  /star\s*(pravah|pravah\s*picture|plus|gold|bharat|sports|vijay|maa|jalsha|suvarna)/i,
+  /abp\s*(majha|news|ganga|asmit|ananda)/i,
+  /news18\s*(lokmat|marathi|india|urdu|rajasthan|bihar|up|mp|punjab|gujarati|kannada|tamil|telugu|assam)/i,
+  /tv9\s*(marathi|bharatvarsh|telugu|kannada|gujarati|bangla)/i,
+  /saam\s*tv|jai\s*maharashtra|fakt\s*marathi|sangeet\s*marathi|shemaroo\s*marathi|ndtv\s*marathi/i,
+  /\baaj\s*tak\b|\bindia\s*today\b|ndtv|\bnews\b.*hindi|republic\s*(tv|bharat)|india\s*tv/i,
+  /dd\s*(sports|national|news|retro|kisan|bharati|sahyadri|india|girnar|yadagiri|chandana|saptagiri|malayalam|bangla|punjabi|kashir)/i,
+  /dangal|shemaroo|goldmines|b4u|9x|mastiii|zoom|mtv|bindass|zing/i
 ];
 
 function priorityRank(title) {
@@ -48,8 +245,10 @@ function priorityRank(title) {
 }
 
 export function isBlockedChannelTitle(title) {
-  return EXCLUDE_TITLE_RE.test(String(title || ''));
+  // Allow all Indian channels!
+  return false;
 }
+
 export function channelPriority(title) {
   return priorityRank(title);
 }
@@ -75,7 +274,6 @@ async function fetchText(url, timeout = 20000) {
 export function normalizeChannelItem(channel, index = 0) {
   if (!channel?.url || !isSafeHttpUrl(channel.url)) return null;
   const rawTitle = channel.title || channel.name || `Channel ${index + 1}`;
-  if (EXCLUDE_TITLE_RE.test(rawTitle)) return null;
   const displayTitle = cleanChannelTitle(rawTitle);
 
   const item = {
@@ -90,7 +288,9 @@ export function normalizeChannelItem(channel, index = 0) {
     type: 'live',
     year: 'LIVE',
     provider: channel.provider || null,
-    players: [{ name: channel.quality ? `Server 1 (${channel.quality})` : 'Server 1 (Auto)', url: channel.url, source: 'hls', quality: channel.quality || null, headers: channel.headers || {} }]
+    players: Array.isArray(channel.players) && channel.players.length > 0
+      ? channel.players
+      : [{ name: channel.quality ? `Server 1 (${channel.quality})` : 'Server 1 (Auto)', url: channel.url, source: 'hls', quality: channel.quality || null, headers: channel.headers || {} }]
   };
   item.player = item.players;
   item.is_favorite = isFavoriteChannel(item);
@@ -136,6 +336,16 @@ async function fetchAndBuildChannels(previousItems) {
 
   // Deduplicate by clean channel title and aggregate multiple streams as failover mirrors
   const byTitle = new Map();
+
+  // First seed with built-in high-priority Indian channels
+  for (const builtin of BUILTIN_INDIAN_CHANNELS) {
+    const normalized = normalizeChannelItem(builtin, byTitle.size);
+    if (normalized) {
+      const titleKey = normalized.title.toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (titleKey) byTitle.set(titleKey, normalized);
+    }
+  }
+
   for (const result of results) {
     if (result.status !== 'fulfilled') continue;
     for (const channel of parseM3U(result.value)) {

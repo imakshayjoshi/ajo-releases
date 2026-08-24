@@ -17,11 +17,9 @@ export const LandscapeMediaCard = React.memo(function LandscapeMediaCard({ item,
 
   const handleCastDirectly = (e) => {
     e.stopPropagation();
-    castEngine.sendToTV({
-      type: 'PLAY_MEDIA',
-      item: item,
+    castEngine.castMedia(item, {
       server: item.players?.[0] || item.player?.[0] || (item.url ? { url: item.url, source: 'm3u8' } : null)
-    });
+    }).catch(() => {});
     setCastSuccess(true);
     setTimeout(() => setCastSuccess(false), 2500);
     if (navigator.vibrate) {

@@ -41,11 +41,9 @@ export function MediaDetailsModal({ item, onClose, onStartPlayback }) {
   }, [item, availableServers]);
 
   const handleCastToTV = () => {
-    castEngine.sendToTV({
-      type: 'PLAY_MEDIA',
-      item: item,
+    castEngine.castMedia(item, {
       server: selectedServer
-    });
+    }).catch(() => {});
     setCastSent(true);
     setTimeout(() => setCastSent(false), 3000);
     if (navigator.vibrate) {
@@ -122,7 +120,7 @@ export function MediaDetailsModal({ item, onClose, onStartPlayback }) {
           <div className="mobile-sheet-actions" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             <button
               className="mobile-sheet-primary-btn"
-              style={{ flex: 1, minWidth: '130px' }}
+              style={{ flex: 1, minWidth: '130px', minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
               onClick={() => onStartPlayback(item, selectedServer)}
             >
               <Play size={18} fill="#06090e" />
@@ -132,6 +130,8 @@ export function MediaDetailsModal({ item, onClose, onStartPlayback }) {
             <button
               className="mobile-sheet-watchlist-btn"
               style={{
+                minHeight: '44px',
+                padding: '0 14px',
                 background: castSent ? 'rgba(56, 189, 248, 0.25)' : 'rgba(56, 189, 248, 0.12)',
                 border: '1px solid rgba(56, 189, 248, 0.4)',
                 color: '#38bdf8',
@@ -147,6 +147,7 @@ export function MediaDetailsModal({ item, onClose, onStartPlayback }) {
 
             <button
               className={`mobile-sheet-watchlist-btn ${isFav ? 'is-active' : ''}`}
+              style={{ minHeight: '44px', padding: '0 14px', display: 'flex', alignItems: 'center', gap: '6px' }}
               onClick={() => {
                 toggleFavorite(item);
                 setIsFav(prev => !prev);

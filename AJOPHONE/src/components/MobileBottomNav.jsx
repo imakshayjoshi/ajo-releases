@@ -1,12 +1,11 @@
 import React from 'react';
-import { Home, Film, Tv, Radio, Search, Cast, Flame } from 'lucide-react';
+import { Home, Film, Tv, Radio, Search, Cast } from 'lucide-react';
 
 export function MobileBottomNav({ activeTab, onTabChange }) {
   const tabs = [
     { id: 'home', label: 'Home', icon: Home },
     { id: 'movies', label: 'Movies', icon: Film },
     { id: 'shows', label: 'Shows', icon: Tv },
-    { id: 'short_tv', label: 'ShortTV', icon: Flame, badge: 'HOT' },
     { id: 'epg', label: 'Live TV', icon: Radio },
     { id: 'remote', label: 'TV Cast', icon: Cast },
     { id: 'search', label: 'Search', icon: Search },

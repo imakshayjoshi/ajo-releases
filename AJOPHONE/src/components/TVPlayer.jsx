@@ -1,1740 +1,1141 @@
-import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Hls from 'hls.js';
 import { 
-  Play, 
+  ArrowLeft, 
+  Check, 
+  Loader2, 
   Pause, 
+  Play, 
   RotateCcw, 
   RotateCw, 
+  Settings2,
+  History, 
   Volume2, 
   VolumeX, 
-  Maximize, 
-  ArrowLeft,
-  Radio,
-  AlertCircle,
-  Tv,
-  List,
-  Settings2,
-  PictureInPicture2,
-  Loader2,
-  Check,
-  ChevronLeft,
-  ChevronRight,
-  Subtitles,
-  Sparkles,
-  Moon,
-  FastForward,
-  Scan,
-  X
+  Cast, 
+  Tv, 
+  Radio, 
+  FastForward, 
+  Rewind 
 } from 'lucide-react';
-import { saveProgress } from '../api/history';
-import { generateUniversalServers, resolveTmdbId } from '../utils/streamingEngines';
-import { fetchSubtitlesForMedia } from '../api/subtitles';
+import { saveProgress, getWatchHistory } from '../api/history';
+import { CatchupDrawer } from './CatchupDrawer';
+import { detectStreamType, generateUniversalServers } from '../utils/streamingEngines';
+import { castEngine } from '../api/castSync';
 
-export function TVPlayer({ 
-  item, 
-  server, 
-  channels = [], 
-  episodes = [],
-  currentEpisodeIndex = 0,
-  onSelectEpisode,
-  onSelectChannel, 
-  onClose 
-}) {
+const STARTUP_TIMEOUT_MS = 15000;
+const REBUFFER_TIMEOUT_MS = 10000;
+const AUTO_DISMISS_DELAY_MS = 3000;
+
+function formatTime(seconds) {
+  if (!seconds || isNaN(seconds) || !isFinite(seconds)) return '00:00';
+  const total = Math.floor(seconds);
+  const hrs = Math.floor(total / 3600);
+  const mins = Math.floor((total % 3600) / 60);
+  const secs = total % 60;
+  if (hrs > 0) {
+    return `${hrs}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  }
+  return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+}
+
+export function TVPlayer({ item, server, channels = [], onSelectChannel, onClose }) {
   const videoRef = useRef(null);
-  const containerRef = useRef(null);
-  const iframeRef = useRef(null);
   const hlsRef = useRef(null);
-  const audioCtxRef = useRef(null);
-  const compressorRef = useRef(null);
+  const timeoutRef = useRef(null);
+  const controlsTimerRef = useRef(null);
+  const retriesRef = useRef(0);
+  // v3.2.0 watchdog: wall-clock timestamps (timeupdate fires ~4x/sec, so tick
+  // counting would be 4x too fast). 0 = timer not armed.
+  const noStartSinceRef = useRef(0);
+  const frameStallSinceRef = useRef(0);
 
-  const [resolvedTmdbId, setResolvedTmdbId] = useState(item?.tmdb_id || null);
-
-  const isLive = item?.is_live || 
-                 item?.type === 'live' || 
-                 item?.year === 'LIVE' || 
-                 item?.category === 'Sports' || 
-                 item?.category === 'News' || 
-                 item?.category === 'Live TV' || 
-                 item?.category === 'Live Channels' || 
-                 item?.category === 'Live Television';
-
-  const title = item?.title_en || item?.title || item?.name || (isLive ? "Live Broadcast" : "Cinema Stream");
-  const poster = item?.backdrop_url || item?.poster_url || item?.poster || item?.logo || '';
-
-  const [currentServerIndex, setCurrentServerIndex] = useState(0);
-
-  // Compute all servers: direct HLS for Live TV, Universal Multi-CDN for Movies & Series
-  const allServers = useMemo(() => {
-    if (isLive) {
-      const p = item?.players || item?.player;
-      if (Array.isArray(p) && p.length > 0) return p;
-      if (server && server.url) return [server];
-      if (item?.url) return [{ id: 'direct-live', name: item?.title || 'Direct Live Stream', url: item.url, source: 'm3u8', quality: '1080p HD' }];
-      return [];
-    }
-    const itemWithTmdb = resolvedTmdbId ? { ...item, tmdb_id: resolvedTmdbId } : item;
-    return generateUniversalServers(itemWithTmdb);
-  }, [item, server, isLive, resolvedTmdbId]);
-
-  const activeServer = allServers[currentServerIndex] || (isLive ? { url: item?.url, source: 'm3u8' } : allServers[0]) || server;
-  const streamUrl = activeServer?.url || item?.url;
-
-  // Automatically resolve TMDB ID if missing so all 4K multi-CDN servers load perfectly
-  useEffect(() => {
-    if (!isLive && !item?.tmdb_id && (item?.title || item?.title_en || item?.name)) {
-      resolveTmdbId(item).then(id => {
-        if (id) {
-          setResolvedTmdbId(id);
-        }
-      });
-    }
-  }, [item, isLive]);
-
-  // Auto-rotate phone to Landscape upon opening content, restore Portrait upon exit
-  useEffect(() => {
-    if (window.AndroidOrientation && window.AndroidOrientation.setLandscape) {
-      try { window.AndroidOrientation.setLandscape(); } catch (e) {}
-    } else if (window.screen?.orientation?.lock) {
-      try { window.screen.orientation.lock('landscape').catch(() => {}); } catch (e) {}
-    }
-
-    return () => {
-      if (window.AndroidOrientation && window.AndroidOrientation.setPortrait) {
-        try { window.AndroidOrientation.setPortrait(); } catch (e) {}
-      } else if (window.screen?.orientation?.unlock) {
-        try { window.screen.orientation.unlock(); } catch (e) {}
-      }
-    };
-  }, []);
-
-
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [isBuffering, setIsBuffering] = useState(true);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [showOsd, setShowOsd] = useState(true);
-  const [showChannelDrawer, setShowChannelDrawer] = useState(false);
-  const [showSettingsMenu, setShowSettingsMenu] = useState(false);
-  const [settingsTab, setSettingsTab] = useState('quality');
-  
-  const [errorMsg, setErrorMsg] = useState(null);
-  const [isMuted, setIsMuted] = useState(false);
-  const [aspectRatio, setAspectRatio] = useState('contain');
-  const [zoomScale, setZoomScale] = useState(1.0);
-  const [playbackRate, setPlaybackRate] = useState(1.0);
+  const [sourceIndex, setSourceIndex] = useState(0);
+  const [playing, setPlaying] = useState(false);
+  const [buffering, setBuffering] = useState(true);
+  const [muted, setMuted] = useState(false);
+  const [error, setError] = useState('');
+  const [showControls, setShowControls] = useState(true);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showCatchup, setShowCatchup] = useState(false);
   const [seekFeedback, setSeekFeedback] = useState(null);
+  const [levels, setLevels] = useState([]);
+  const [level, setLevel] = useState(-1);
+  const [time, setTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [bufferedEnd, setBufferedEnd] = useState(0);
+  const [castSuccess, setCastSuccess] = useState(false);
+  const rotateFlippedRef = useRef(false);
+  const resumePositionRef = useRef(null);
 
-  // New Features: Night Audio, Subtitles, Auto-Play Next, Channel OSD
-  const [nightModeAudio, setNightModeAudio] = useState(false);
-  const [subtitleTracks, setSubtitleTracks] = useState([]);
-  const [activeSubtitle, setActiveSubtitle] = useState('off');
-  const [nextEpisodePrompt, setNextEpisodePrompt] = useState(null);
-  const [channelBanner, setChannelBanner] = useState(null);
-  const [drawerCategory, setDrawerCategory] = useState('All');
+  // ---- ZOOM / FIT MODES (new): cycle Contain → Fill → Stretch.
+  // Pinch on the video adjusts free-form zoom (phone); double-tap cycles.
+  // NOTE: cycleFit references resetControlsTimer which is defined below —
+  // use a ref indirection so hoisting is never an issue.
+  const resetControlsTimerRef = useRef(() => {});
+  const FIT_MODES = ['contain', 'cover', 'fill'];
+  const [fitMode, setFitMode] = useState('contain');
+  const [pinchScale, setPinchScale] = useState(1);
+  const pinchStartRef = useRef(null);
+  const pinchDistRef = useRef(0);
+  const lastTapRef = useRef(0);
 
-  const channelNumBufferRef = useRef('');
-  const channelNumTimerRef = useRef(null);
-
-  // HLS Engine dynamic states
-  const [qualities, setQualities] = useState([]);
-  const [currentQuality, setCurrentQuality] = useState(-1);
-  const [audioTracks, setAudioTracks] = useState([]);
-  const [currentAudio, setCurrentAudio] = useState(0);
-
-  const osdTimerRef = useRef(null);
-  const touchStartXRef = useRef(null);
-  const lastTapRef = useRef({ time: 0, x: 0 });
-  const initialPinchDistRef = useRef(null);
-  const initialScaleRef = useRef(1.0);
-  const seekFeedbackTimerRef = useRef(null);
-  const lastSavedTimeRef = useRef(0);
-
-  const cycleAspectRatio = useCallback(() => {
-    const modes = ['contain', 'cover', 'fill', '4/3'];
-    const labels = {
-      contain: 'Fit (16:9 Standard)',
-      cover: 'Zoom / Fill (No Black Bars)',
-      fill: 'Stretch Full (100%)',
-      '4/3': 'Classic 4:3'
-    };
-    const nextIdx = (modes.indexOf(aspectRatio) + 1) % modes.length;
-    const nextMode = modes[nextIdx];
-    setAspectRatio(nextMode);
-    setZoomScale(1.0);
-    setSeekFeedback({ type: 'mode', text: `Screen: ${labels[nextMode]}` });
-    if (seekFeedbackTimerRef.current) clearTimeout(seekFeedbackTimerRef.current);
-    seekFeedbackTimerRef.current = setTimeout(() => setSeekFeedback(null), 2500);
-  }, [aspectRatio]);
-
-  const handleTouchStart = (e) => {
-    if (e.touches.length === 2) {
-      const dist = Math.hypot(
-        e.touches[0].clientX - e.touches[1].clientX,
-        e.touches[0].clientY - e.touches[1].clientY
-      );
-      initialPinchDistRef.current = dist;
-      initialScaleRef.current = zoomScale;
-    } else if (e.touches.length === 1) {
-      touchStartXRef.current = e.touches[0].clientX;
-    }
-  };
-
-  const handleTouchMove = (e) => {
-    if (e.touches.length === 2 && initialPinchDistRef.current) {
-      const currentDist = Math.hypot(
-        e.touches[0].clientX - e.touches[1].clientX,
-        e.touches[0].clientY - e.touches[1].clientY
-      );
-      const scaleFactor = currentDist / initialPinchDistRef.current;
-      const newScale = Math.min(3.0, Math.max(1.0, initialScaleRef.current * scaleFactor));
-      setZoomScale(parseFloat(newScale.toFixed(2)));
-      setSeekFeedback({ type: 'zoom', text: `Zoom: ${Math.round(newScale * 100)}%` });
-      if (seekFeedbackTimerRef.current) clearTimeout(seekFeedbackTimerRef.current);
-      seekFeedbackTimerRef.current = setTimeout(() => setSeekFeedback(null), 1500);
-    }
-  };
-
-  const handleTouchEnd = (e) => {
-    if (e.touches.length < 2) {
-      initialPinchDistRef.current = null;
-    }
-  };
-
-  const handleDoubleTap = (e) => {
-    const now = Date.now();
-    if (now - lastTapRef.current.time < 300) {
-      const newRatio = aspectRatio === 'cover' ? 'contain' : 'cover';
-      setAspectRatio(newRatio);
-      setZoomScale(1.0);
-      setSeekFeedback({ 
-        type: 'mode', 
-        text: newRatio === 'cover' ? '⚡ Zoom / Fill Screen' : '📺 Original 16:9 Fit' 
-      });
-      if (seekFeedbackTimerRef.current) clearTimeout(seekFeedbackTimerRef.current);
-      seekFeedbackTimerRef.current = setTimeout(() => setSeekFeedback(null), 2000);
-    }
-    lastTapRef.current = { time: now, x: e.clientX || 0 };
-  };
-
-  const bufferFailoverTimerRef = useRef(null);
-
-  // Automatic Server Failover Engine (Auto-switches mirror on slow/broken stream)
-  useEffect(() => {
-    if (isBuffering && allServers.length > 1) {
-      if (bufferFailoverTimerRef.current) clearTimeout(bufferFailoverTimerRef.current);
-      bufferFailoverTimerRef.current = setTimeout(() => {
-        const nextIdx = (currentServerIndex + 1) % allServers.length;
-        setCurrentServerIndex(nextIdx);
-        setErrorMsg(`⚡ Auto-switched to Server ${nextIdx + 1} (${allServers[nextIdx]?.name || `Server ${nextIdx + 1}`})`);
-        setTimeout(() => setErrorMsg(null), 3500);
-      }, 5500);
-    } else {
-      if (bufferFailoverTimerRef.current) clearTimeout(bufferFailoverTimerRef.current);
-    }
-    return () => {
-      if (bufferFailoverTimerRef.current) clearTimeout(bufferFailoverTimerRef.current);
-    };
-  }, [isBuffering, currentServerIndex, allServers]);
-
-  // Load Subtitles
-  useEffect(() => {
-    fetchSubtitlesForMedia(item).then(subs => {
-      setSubtitleTracks(subs);
+  const cycleFit = useCallback(() => {
+    setFitMode(prev => {
+      const next = FIT_MODES[(FIT_MODES.indexOf(prev) + 1) % FIT_MODES.length];
+      return next;
     });
-  }, [item]);
-
-  // Current Live Channel Index in Channel List
-  const currentChannelIdx = useMemo(() => {
-    if (!isLive || channels.length === 0) return 0;
-    const idx = channels.findIndex(c => (c.id && c.id === item?.id) || c.title === item?.title);
-    return idx !== -1 ? idx : 0;
-  }, [channels, item, isLive]);
-
-  const switchChannelTo = useCallback((newIdx) => {
-    if (!channels || channels.length === 0) return;
-    const safeIdx = (newIdx + channels.length) % channels.length;
-    const targetChannel = channels[safeIdx];
-    if (targetChannel && onSelectChannel) {
-      setChannelBanner({
-        channelNumber: 101 + safeIdx,
-        title: targetChannel.title || targetChannel.name,
-        category: targetChannel.category || 'Live Television'
-      });
-      setTimeout(() => setChannelBanner(null), 3500);
-      onSelectChannel(targetChannel);
-    }
-  }, [channels, onSelectChannel]);
-
-  // Auto-hide OSD
-  const bumpOsd = useCallback(() => {
-    setShowOsd(true);
-    if (osdTimerRef.current) clearTimeout(osdTimerRef.current);
-    if (!showChannelDrawer && !showSettingsMenu) {
-      osdTimerRef.current = setTimeout(() => {
-        setShowOsd(false);
-      }, 2500);
-    }
-  }, [showChannelDrawer, showSettingsMenu]);
-
-  useEffect(() => {
-    if (!showChannelDrawer && !showSettingsMenu && isPlaying) {
-      if (osdTimerRef.current) clearTimeout(osdTimerRef.current);
-      osdTimerRef.current = setTimeout(() => {
-        setShowOsd(false);
-      }, 2500);
-    }
-    return () => {
-      if (osdTimerRef.current) clearTimeout(osdTimerRef.current);
-    };
-  }, [showChannelDrawer, showSettingsMenu, isPlaying]);
-
-  const allServersRef = useRef(allServers);
-  allServersRef.current = allServers;
-
-  const currentServerIndexRef = useRef(currentServerIndex);
-  currentServerIndexRef.current = currentServerIndex;
-
-  const itemRef = useRef(item);
-  itemRef.current = item;
-
-  const isLiveRef = useRef(isLive);
-  isLiveRef.current = isLive;
-
-  // Periodic Progress Saving & Auto-Play Next Episode Detection
-  const handleTimeUpdate = useCallback(() => {
-    const video = videoRef.current;
-    if (!video || isLive) return;
-    
-    const cur = video.currentTime;
-    const dur = video.duration || 0;
-    setCurrentTime(cur);
-    setDuration(dur);
-
-    // Save progress every 5s
-    if (dur > 0 && Math.abs(cur - lastSavedTimeRef.current) >= 5) {
-      lastSavedTimeRef.current = cur;
-      saveProgress(item, cur, dur);
-    }
-
-    // Next Episode Auto-play Prompt (< 25s remaining in TV Series)
-    const hasNextEpisode = episodes.length > 0 && currentEpisodeIndex < episodes.length - 1;
-    if (dur > 60 && (dur - cur) <= 25 && hasNextEpisode && !nextEpisodePrompt) {
-      const nextEp = episodes[currentEpisodeIndex + 1];
-      setNextEpisodePrompt({
-        seconds: Math.round(dur - cur),
-        episode: nextEp
-      });
-    }
-  }, [isLive, item, episodes, currentEpisodeIndex, nextEpisodePrompt]);
-
-  const handlePlayNextEpisode = useCallback(() => {
-    if (episodes.length > 0 && currentEpisodeIndex < episodes.length - 1) {
-      const nextEp = episodes[currentEpisodeIndex + 1];
-      setNextEpisodePrompt(null);
-      if (onSelectEpisode) {
-        onSelectEpisode(nextEp, currentEpisodeIndex + 1);
-      }
-    }
-  }, [episodes, currentEpisodeIndex, onSelectEpisode]);
-
-  // Night Mode Audio Compressor Setup
-  const toggleNightModeAudio = () => {
-    const video = videoRef.current;
-    if (!video) return;
-
-    try {
-      if (!audioCtxRef.current) {
-        const AudioContext = window.AudioContext || window.webkitAudioContext;
-        audioCtxRef.current = new AudioContext();
-        const source = audioCtxRef.current.createMediaElementSource(video);
-        const compressor = audioCtxRef.current.createDynamicsCompressor();
-        
-        compressor.threshold.setValueAtTime(-24, audioCtxRef.current.currentTime);
-        compressor.knee.setValueAtTime(30, audioCtxRef.current.currentTime);
-        compressor.ratio.setValueAtTime(12, audioCtxRef.current.currentTime);
-        compressor.attack.setValueAtTime(0.003, audioCtxRef.current.currentTime);
-        compressor.release.setValueAtTime(0.25, audioCtxRef.current.currentTime);
-
-        source.connect(compressor);
-        compressor.connect(audioCtxRef.current.destination);
-        compressorRef.current = compressor;
-      }
-      setNightModeAudio(prev => !prev);
-    } catch (e) {
-      console.warn("Audio Context init notice:", e);
-      setNightModeAudio(prev => !prev);
-    }
-  };
-
-  const triggerAutoFailover = useCallback((reason = "Stream slow or unavailable") => {
-    const servers = allServersRef.current;
-    const currentIdx = currentServerIndexRef.current;
-    if (servers && servers.length > 1 && currentIdx < servers.length - 1) {
-      const nextIdx = currentIdx + 1;
-      const nextName = servers[nextIdx]?.name || `Server ${nextIdx + 1}`;
-      setErrorMsg(`⚡ ${reason}. Switching to ${nextName}...`);
-      setCurrentServerIndex(nextIdx);
-      setTimeout(() => setErrorMsg(null), 3500);
-    } else {
-      setErrorMsg("Playback error. Please select another server in Settings.");
-      setIsBuffering(false);
-    }
+    setPinchScale(1);
+    try { resetControlsTimerRef.current(); } catch {}
   }, []);
 
-  // Video and HLS initialization (with continuous 24/7 anti-stall and RAM flush)
+  // Pinch-to-zoom handlers
+  const onTouchStart = useCallback((e) => {
+    if (e.touches.length === 2) {
+      const [a, b] = e.touches;
+      pinchStartRef.current = pinchScale || 1;
+      pinchDistRef.current = Math.max(1, Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY));
+    }
+  }, [pinchScale]);
+
+  const onTouchMove = useCallback((e) => {
+    if (e.touches.length !== 2) return;
+    const [a, b] = e.touches;
+    const dist = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+    // Late-start tolerance: some devices/CDPs deliver touchstart with 1 finger
+    // then add the second. If pinch wasn't armed at start, arm it now using
+    // the current distance as baseline (first move sets the origin).
+    if (!pinchStartRef.current || pinchDistRef.current === 0) {
+      // Late-arm: second finger arrived after touchstart. Use current spread
+      // as baseline but apply an immediate 1.15x step so the user sees
+      // instant feedback instead of nothing on the first move.
+      pinchStartRef.current = 1.15;
+      pinchDistRef.current = dist;
+      setPinchScale(1.15);
+      return;
+    }
+    let scale = pinchStartRef.current * (dist / pinchDistRef.current);
+    scale = Math.min(4, Math.max(1, scale));
+    setPinchScale(scale);
+  }, []);
+
+  const onTouchEnd = useCallback(() => {
+    pinchStartRef.current = null;
+    pinchDistRef.current = 0;
+    // Snap back to 1x when close, otherwise keep zoom and switch to fill behavior
+    if (pinchScale < 1.08) {
+      setPinchScale(1);
+    }
+    try { resetControlsTimerRef.current(); } catch {}
+  }, [pinchScale]);
+
+  // Double-tap to cycle fit mode (single tap still toggles play via onClick)
+  const handleVideoTouch = useCallback((e) => {
+    const now = Date.now();
+    if (now - lastTapRef.current < 300) {
+      // double tap
+      e.preventDefault();
+      e.stopPropagation();
+      cycleFit();
+      lastTapRef.current = 0;
+    } else {
+      lastTapRef.current = now;
+    }
+  }, [cycleFit]);
+
+  const videoTransform = pinchScale > 1
+    ? `scale(${pinchScale})`
+    : 'none';
+
+
+  const isLive = Boolean(item?.is_live || item?.type === 'live' || item?.year === 'LIVE');
+  const sources = useMemo(() => {
+    return generateUniversalServers({
+      ...item,
+      players: [
+        ...(item?.players || item?.player || []),
+        ...(server ? [server] : [])
+      ]
+    });
+  }, [item, server]);
+  const activeSource = sources[sourceIndex];
+
+  const [autoFailoverMsg, setAutoFailoverMsg] = useState(null);
+
+  // Auto-dismiss Controls Timer (3 seconds inactivity)
+  const resetControlsTimer = useCallback(() => {
+    setShowControls(true);
+    if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current);
+
+    // Only auto-dismiss if video is playing and settings drawers are closed
+    controlsTimerRef.current = setTimeout(() => {
+      if (videoRef.current && !videoRef.current.paused && !showSettings) {
+        setShowControls(false);
+      }
+    }, AUTO_DISMISS_DELAY_MS);
+  }, [showSettings]);
+  // Keep the ref in sync so zoom handlers defined earlier can call it safely
+  useEffect(() => { resetControlsTimerRef.current = resetControlsTimer; }, [resetControlsTimer]);
+
+  const clearFailureTimer = useCallback(() => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = null;
+  }, []);
+
+  const failover = useCallback((message) => {
+    clearFailureTimer();
+    if (sourceIndex + 1 < sources.length) {
+      const nextIdx = sourceIndex + 1;
+      const nextServer = sources[nextIdx];
+      setAutoFailoverMsg(`⚡ Mirror ${sourceIndex + 1} busy. Auto-connecting to ${nextServer?.name || `Server ${nextIdx + 1}`}...`);
+      setTimeout(() => setAutoFailoverMsg(null), 3500);
+      setSourceIndex(nextIdx);
+    } else {
+      setBuffering(false);
+      setError('Primary streams are currently busy. Select a backup mirror below:');
+    }
+  }, [clearFailureTimer, sourceIndex, sources]);
+
+  const armFailureTimer = useCallback((delay, message) => {
+    clearFailureTimer();
+    timeoutRef.current = setTimeout(() => failover(message), delay);
+  }, [clearFailureTimer, failover]);
+
   useEffect(() => {
-    if (!streamUrl) {
-      setIsBuffering(false);
+    setSourceIndex(0);
+    setError('');
+    // RESUME FIX: restore last watched position for this title (Continue
+    // Watching). Saved by saveProgress on close; looked up by id/title.
+    try {
+      const history = getWatchHistory() || [];
+      const entry = history.find(h =>
+        (item?.id && h.id === item.id) ||
+        (h.title && item?.title && h.title === item.title)
+      );
+      if (entry && entry.currentTime > 15) {
+        resumePositionRef.current = entry.currentTime;
+      } else {
+        resumePositionRef.current = null;
+      }
+    } catch {
+      resumePositionRef.current = null;
+    }
+  }, [item?.id, item?.title]);
+
+  // ---- ORIENTATION (fix): auto-rotate to landscape when playback starts,
+  // restore sensor/auto when the player closes. Uses the AndroidOrientation
+  // bridge exposed by MainActivity; falls back to the Fullscreen API on
+  // devices where the bridge is unavailable.
+  const lockLandscape = useCallback(() => {
+    try {
+      if (window.AndroidOrientation?.setLandscape) { window.AndroidOrientation.setLandscape(); return; }
+    } catch {}
+    try {
+      if (document.documentElement.requestFullscreen) {
+        document.documentElement.requestFullscreen().then(() =>
+          window.screen?.orientation?.lock?.('landscape').catch(() => {})
+        ).catch(() => {});
+      }
+    } catch {}
+  }, []);
+
+  const unlockOrientation = useCallback(() => {
+    try {
+      if (window.AndroidOrientation?.setAuto) { window.AndroidOrientation.setAuto(); return; }
+    } catch {}
+    try {
+      window.screen?.orientation?.unlock?.();
+      if (document.fullscreenElement?.exitFullscreen) document.fullscreenElement.exitFullscreen().catch(() => {});
+    } catch {}
+  }, []);
+
+  // Lock landscape as soon as the player mounts
+  useEffect(() => {
+    lockLandscape();
+    return () => unlockOrientation();
+  }, [lockLandscape, unlockOrientation]);
+
+
+  const isEmbed = useMemo(() => {
+    return activeSource?.type === 'embed' || activeSource?.source === 'embed' || detectStreamType(activeSource?.url) === 'embed';
+  }, [activeSource]);
+
+  useEffect(() => {
+    if (isEmbed) {
+      setBuffering(false);
+      setPlaying(true);
+      setError('');
+      clearFailureTimer();
+      resetControlsTimer();
       return;
     }
 
-    setErrorMsg(null);
-    setIsBuffering(true);
     const video = videoRef.current;
-    if (!video) return;
+    if (!video || !activeSource?.url) {
+      setBuffering(false);
+      setError('No checked stream is available for this title.');
+      return;
+    }
 
-    let hls = null;
-    let initialPlayAttempted = false;
-    let retryCount = 0;
-    let watchdogTimer = null;
-    let lastProgressTime = 0;
+    let disposed = false;
+    retriesRef.current = 0;
+    setBuffering(true);
+    setError('');
+    setLevels([]);
+    // Startup tolerance: CDNs can take 10-15s to first segment. The failure
+    // timer only fires if hls.js has NOT received ANY data (manifest parsed
+    // resets it). Prevents false failovers on slow-but-working mirrors.
+    armFailureTimer(STARTUP_TIMEOUT_MS, 'The stream took too long to start.');
 
-    const isLiveStream = isLiveRef.current;
+    const startPlayback = () => {
+      video.play().then(() => {
+        if (!disposed) {
+          setPlaying(true);
+          setBuffering(false);
+          clearFailureTimer();
+          resetControlsTimer();
+        }
+      }).catch(() => {
+        if (!disposed) setPlaying(false);
+      });
+    };
 
-    if (Hls.isSupported() && (streamUrl.includes('.m3u8') || streamUrl.includes('/getm3u8/') || isLiveStream || streamUrl.startsWith('http'))) {
-      hls = new Hls({
-        enableWorker: true,
-        lowLatencyMode: isLiveStream,
-        startLevel: -1, // Netflix-Style Smart Auto Adaptive Quality
-        capLevelToPlayerSize: true, // Cap rendering to device specs & resolution
-        abrEwmaDefaultEstimate: 5000000, // Instant Crisp HD Startup (5 Mbps initial estimate)
-        abrBandWidthFactor: 0.95, // Maximize resolution based on connection speed
-        abrBandWidthUpFactor: 0.7, // Fast upward quality switching
-        abrMaxWithRealBitrate: true,
-        backBufferLength: isLiveStream ? 0 : 30, // 0 for Live immediately purges old segments from RAM
-        maxBufferLength: isLiveStream ? 10 : 60,
-        maxMaxBufferLength: isLiveStream ? 20 : 120,
-        maxBufferSize: isLiveStream ? 15 * 1024 * 1024 : 60 * 1024 * 1024,
-        liveSyncDurationCount: 3,
-        liveMaxLatencyDurationCount: 6,
-        liveDurationInfinity: isLiveStream,
-        maxBufferHole: 0.5,
-        highBufferWatchdogPeriod: 2,
-        nudgeOffset: 0.2,
-        nudgeMaxRetry: 8,
-        startFragPrefetch: true,
-        progressive: true,
-        testBandwidth: false,
-        manifestLoadingTimeOut: 12000,
-        manifestLoadingMaxRetry: 4,
-        levelLoadingTimeOut: 12000,
-        levelLoadingMaxRetry: 4,
+    const type = detectStreamType(activeSource.url, activeSource.type || activeSource.source);
+
+    if (type === 'hls' && Hls.isSupported()) {
+      const hls = new Hls({
+        enableWorker: false,
+        startLevel: -1,
+        capLevelToPlayerSize: true,
+        testBandwidth: true,
+        abrEwmaDefaultEstimate: isLive ? 1200000 : 2000000,
+        abrBandWidthFactor: 0.85,
+        abrBandWidthUpFactor: 0.7,
+        maxBufferLength: isLive ? 8 : 24,
+        maxMaxBufferLength: isLive ? 15 : 45,
+        backBufferLength: isLive ? 0 : 15,
+        maxBufferHole: 0.3,
+        lowLatencyMode: false,
+        manifestLoadingTimeOut: 10000,
+        manifestLoadingMaxRetry: 2,
+        levelLoadingMaxRetry: 2,
         fragLoadingTimeOut: 15000,
-        fragLoadingMaxRetry: 4,
+        fragLoadingMaxRetry: 3,
+        xhrSetup: xhr => {
+          for (const [name, value] of Object.entries(activeSource.headers || {})) {
+            try { xhr.setRequestHeader(name, value); } catch {}
+          }
+        }
       });
       hlsRef.current = hls;
-
-      hls.loadSource(streamUrl);
+      hls.loadSource(activeSource.url);
       hls.attachMedia(video);
-
-      hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
-        setIsBuffering(false);
-        if (data.levels && data.levels.length > 0) {
-          setQualities(data.levels.map((l, idx) => ({
-            id: idx,
-            label: l.height ? `${l.height}p` : `${Math.round(l.bitrate / 1000)}k`,
-            height: l.height
-          })));
+      hls.on(Hls.Events.MANIFEST_PARSED, (_e, data) => {
+        if (disposed) return;
+        setLevels(data.levels.map((lvl, index) => ({ index, label: `${lvl.height || 720}p` })));
+        // Manifest arrived = mirror is alive. Cancel the startup failover so
+        // slow segment loads don't trigger a false "took too long" switch.
+        clearFailureTimer();
+        // RESUME: jump to last watched position before starting playback
+        if (resumePositionRef.current && Number.isFinite(resumePositionRef.current)) {
+          try { video.currentTime = resumePositionRef.current; } catch {}
+          resumePositionRef.current = null;
         }
-        if (hls.audioTracks && hls.audioTracks.length > 0) {
-          setAudioTracks(hls.audioTracks.map((t, idx) => ({
-            id: idx,
-            label: t.name || t.lang || `Track ${idx + 1}`
-          })));
-        }
-        if (itemRef.current?.currentTime && !isLiveStream && !initialPlayAttempted) {
-          try {
-            video.currentTime = itemRef.current.currentTime;
-          } catch (_) {}
-        }
-        initialPlayAttempted = true;
-        video.play().then(() => {
-          setIsPlaying(true);
-          setIsBuffering(false);
-        }).catch(e => console.warn("Autoplay notice:", e));
+        startPlayback();
       });
-
-      hls.on(Hls.Events.AUDIO_TRACK_SWITCHED, (event, data) => {
-        setCurrentAudio(data.id);
-      });
-
-      hls.on(Hls.Events.ERROR, (event, data) => {
-        if (data.details === Hls.ErrorDetails.BUFFER_STALLED_ERROR || data.details === Hls.ErrorDetails.BUFFER_NUDGE_ON_STALL) {
-          if (isLiveStream && hls.liveSyncPosition) {
-            try { video.currentTime = hls.liveSyncPosition; } catch (_) {}
-          }
-          hls.recoverMediaError();
-          if (video && video.paused) {
-            video.play().catch(() => {});
-          }
+      hls.on(Hls.Events.ERROR, (_e, data) => {
+        if (!data?.fatal || disposed) return;
+        if (data.type === Hls.ErrorTypes.NETWORK_ERROR && retriesRef.current < 2) {
+          retriesRef.current += 1;
+          hls.startLoad();
           return;
         }
-        if (data.fatal) {
-          retryCount++;
-          if (retryCount > 4) {
-            hls.destroy();
-            triggerAutoFailover("Stream unreachable");
-            return;
-          }
-          switch (data.type) {
-            case Hls.ErrorTypes.NETWORK_ERROR:
-              hls.startLoad();
-              break;
-            case Hls.ErrorTypes.MEDIA_ERROR:
-              hls.recoverMediaError();
-              if (video && video.paused) video.play().catch(() => {});
-              break;
-            default:
-              hls.destroy();
-              triggerAutoFailover("Stream decoding error");
-              break;
-          }
+        if (data.type === Hls.ErrorTypes.MEDIA_ERROR && retriesRef.current < 2) {
+          retriesRef.current += 1;
+          hls.recoverMediaError();
+          return;
+        }
+        // Fallback to Native Player
+        try {
+          hls.destroy();
+          hlsRef.current = null;
+          video.src = activeSource.url;
+          video.load();
+          startPlayback();
+        } catch {
+          failover('Stream playback error encountered.');
         }
       });
-
-      // 24/7 Anti-Freeze Watchdog Timer for continuous live streams
-      if (isLiveStream) {
-        watchdogTimer = setInterval(() => {
-          if (video && !video.paused && !document.hidden && video.readyState >= 2) {
-            if (video.currentTime === lastProgressTime) {
-              // Video playback is frozen or stalled on segment boundary
-              if (hls && hls.liveSyncPosition) {
-                try { video.currentTime = hls.liveSyncPosition; } catch (_) {}
-              }
-              hls?.recoverMediaError();
-              video.play().catch(() => {});
-            }
-            lastProgressTime = video.currentTime;
-          }
-        }, 4000);
-      }
-    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      video.src = streamUrl;
-      video.play().then(() => {
-        setIsPlaying(true);
-        setIsBuffering(false);
-      }).catch(e => console.warn(e));
     } else {
-      video.src = streamUrl;
-      video.play().then(() => {
-        setIsPlaying(true);
-        setIsBuffering(false);
-      }).catch(e => console.warn(e));
+      video.src = activeSource.url;
+      video.load();
+      // RESUME for non-HLS (mp4 etc): seek once metadata is known
+      if (resumePositionRef.current) {
+        const rp = resumePositionRef.current;
+        const onMeta = () => {
+          try { video.currentTime = rp; } catch {}
+          resumePositionRef.current = null;
+          video.removeEventListener('loadedmetadata', onMeta);
+        };
+        video.addEventListener('loadedmetadata', onMeta);
+      }
+      startPlayback();
     }
 
+    const onWaiting = () => {
+      setBuffering(true);
+      armFailureTimer(REBUFFER_TIMEOUT_MS, 'Playback stalled.');
+    };
+    const onPlaying = () => {
+      setPlaying(true);
+      setBuffering(false);
+      setError('');
+      noStartSinceRef.current = 0;
+      frameStallSinceRef.current = 0;
+      clearFailureTimer();
+    };
+    const onPause = () => {
+      setPlaying(false);
+      setShowControls(true);
+    };
+    const onError = () => failover('The device could not play this source.');
+    const onTime = () => {
+      setTime(video.currentTime || 0);
+      setDuration(Number.isFinite(video.duration) ? video.duration : 0);
+      if (video.buffered && video.buffered.length > 0) {
+        setBufferedEnd(video.buffered.end(video.buffered.length - 1));
+      }
+      // PROGRESS = ALIVE: any timeupdate while stalled means data is flowing.
+      // Reset the rebuffer failover so slow-but-moving streams never get
+      // killed and dumped into the Recovery modal.
+      if (!video.paused) clearFailureTimer();
+
+      // ---- v3.2.0 FRAME-TRUTH WATCHDOG (fixes ">1min stuck" modal hang) ----
+      // play() resolving or timeupdate firing is NOT proof of video. The
+      // playback clock can tick on audio alone while the video plane shows a
+      // frozen frame forever. Watch DECODED-FRAME COUNTS instead (wall-clock
+      // based; timeupdate fires ~4x/sec so tick counting would be 4x fast):
+      const now = Date.now();
+      const frames =
+        (typeof video.getVideoPlaybackQuality === 'function'
+          ? video.getVideoPlaybackQuality().totalVideoFrames
+          : (video.webkitDecodedFrameCount ?? 0)) || 0;
+      const hasEverRendered = frames > 0;
+
+      if (!hasEverRendered && !isLive && video.duration > 0 && video.readyState < 2) {
+        // VOD that never decoded its first frame — give it 12s, then fail over.
+        if (!noStartSinceRef.current) noStartSinceRef.current = now;
+        else if (now - noStartSinceRef.current >= 12000) {
+          noStartSinceRef.current = 0;
+          failover('This source never produced video.');
+          return;
+        }
+      } else {
+        noStartSinceRef.current = 0;
+      }
+
+      if (!video.paused && hasEverRendered) {
+        frameStallSinceRef.current = 0;
+      } else if (!video.paused) {
+        // Playing per the clock but zero rendered frames: the exact "frozen
+        // picture, audio continues" case. 6s → failover instead of hanging.
+        if (!frameStallSinceRef.current) frameStallSinceRef.current = now;
+        else if (now - frameStallSinceRef.current >= 6000) {
+          frameStallSinceRef.current = 0;
+          failover('Video froze while audio continued.');
+          return;
+        }
+      }
+
+      if (!isLive && video.duration > 0 && Math.floor(video.currentTime) % 10 === 0) {
+        saveProgress(item, video.currentTime, video.duration);
+      }
+    };
+
+    video.addEventListener('waiting', onWaiting);
+    video.addEventListener('playing', onPlaying);
+    video.addEventListener('pause', onPause);
+    video.addEventListener('error', onError);
+    video.addEventListener('timeupdate', onTime);
+
     return () => {
-      if (watchdogTimer) clearInterval(watchdogTimer);
-      if (hls) {
-        hls.destroy();
+      disposed = true;
+      clearFailureTimer();
+      if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current);
+      video.removeEventListener('waiting', onWaiting);
+      video.removeEventListener('playing', onPlaying);
+      video.removeEventListener('pause', onPause);
+      video.removeEventListener('error', onError);
+      video.removeEventListener('timeupdate', onTime);
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
         hlsRef.current = null;
       }
+      video.removeAttribute('src');
+      video.load();
     };
-  }, [streamUrl, triggerAutoFailover]);
+  }, [activeSource?.url]);
 
-  // Auto-focus active elements when drawers or OSD open
-  useEffect(() => {
-    if (showChannelDrawer) {
-      const timer = setTimeout(() => {
-        const activeCard = document.querySelector('.player-channel-card.server-active, .player-channel-card, .player-channel-drawer [data-focusable="true"]');
-        if (activeCard) {
-          activeCard.focus();
-          activeCard.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-        }
-      }, 60);
-      return () => clearTimeout(timer);
-    }
-  }, [showChannelDrawer]);
-
-  useEffect(() => {
-    if (showSettingsMenu) {
-      const timer = setTimeout(() => {
-        const activeTab = document.querySelector('.player-settings-drawer .tab-pill-active, .player-settings-drawer [data-focusable="true"]');
-        if (activeTab) {
-          activeTab.focus();
-        }
-      }, 60);
-      return () => clearTimeout(timer);
-    }
-  }, [showSettingsMenu]);
-
-  useEffect(() => {
-    if (showOsd) {
-      const timer = setTimeout(() => {
-        const playBtn = document.querySelector('.player-osd .player-center-play-btn, .player-osd .player-btn');
-        if (playBtn) {
-          playBtn.focus();
-        }
-      }, 60);
-      return () => clearTimeout(timer);
-    }
-  }, [showOsd]);
-
-  // Remote Keys (D-Pad, Number Pad, Channel+/Channel-, Media Keys)
-  const backPressedWhileHiddenRef = useRef(false);
-
-  useEffect(() => {
-    const handleRemoteKeys = (e) => {
-      const video = videoRef.current;
-      const key = e.key;
-
-      // 1. Number Pad Direct Channel Tuning (0-9)
-      if (/^[0-9]$/.test(key) && isLive && channels.length > 0) {
-        channelNumBufferRef.current += key;
-        const buf = channelNumBufferRef.current;
-        setChannelBanner({
-          channelNumber: buf,
-          title: `Tuning to Channel ${buf}...`,
-          category: 'Direct Tuning'
-        });
-
-        if (channelNumTimerRef.current) clearTimeout(channelNumTimerRef.current);
-        channelNumTimerRef.current = setTimeout(() => {
-          const num = parseInt(channelNumBufferRef.current, 10);
-          channelNumBufferRef.current = '';
-          const targetIdx = num >= 101 ? num - 101 : num - 1;
-          switchChannelTo(targetIdx);
-        }, 1200);
-        return;
-      }
-
-      // 2. Back / Escape / GoBack
-      if (key === 'Escape' || key === 'Backspace' || key === 'GoBack') {
-        e.preventDefault();
-        e.stopPropagation();
-        e.stopImmediatePropagation();
-
-        if (nextEpisodePrompt) {
-          setNextEpisodePrompt(null);
-          return;
-        }
-        if (showSettingsMenu) {
-          setShowSettingsMenu(false);
-          return;
-        }
-        if (showChannelDrawer) {
-          setShowChannelDrawer(false);
-          return;
-        }
-        if (showOsd) {
-          setShowOsd(false);
-          if (osdTimerRef.current) clearTimeout(osdTimerRef.current);
-          backPressedWhileHiddenRef.current = false;
-          return;
-        }
-        if (!backPressedWhileHiddenRef.current) {
-          backPressedWhileHiddenRef.current = true;
-          bumpOsd();
-          return;
-        }
-        backPressedWhileHiddenRef.current = false;
-        if (video && !isLive && duration > 0) {
-          saveProgress(item, video.currentTime, duration);
-        }
-        onClose();
-        return;
-      }
-
-      // 3. Quick Channel Switcher Drawer D-Pad Navigation
-      if (showChannelDrawer) {
-        const drawer = document.querySelector('.player-channel-drawer');
-        if (drawer) {
-          const tabs = Array.from(drawer.querySelectorAll('.tab-pill'));
-          const cards = Array.from(drawer.querySelectorAll('.player-channel-card'));
-          const active = document.activeElement;
-
-          if (key === 'ArrowRight' || key === 'Right') {
-            e.preventDefault();
-            e.stopPropagation();
-            if (tabs.includes(active)) {
-              const curr = tabs.indexOf(active);
-              const next = (curr + 1) % tabs.length;
-              tabs[next]?.focus();
-            } else if (cards.includes(active)) {
-              const curr = cards.indexOf(active);
-              const next = (curr + 1) % cards.length;
-              cards[next]?.focus();
-              cards[next]?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-            } else if (cards.length > 0) {
-              cards[0]?.focus();
-            }
-            return;
-          }
-
-          if (key === 'ArrowLeft' || key === 'Left') {
-            e.preventDefault();
-            e.stopPropagation();
-            if (tabs.includes(active)) {
-              const curr = tabs.indexOf(active);
-              const prev = (curr - 1 + tabs.length) % tabs.length;
-              tabs[prev]?.focus();
-            } else if (cards.includes(active)) {
-              const curr = cards.indexOf(active);
-              const prev = (curr - 1 + cards.length) % cards.length;
-              cards[prev]?.focus();
-              cards[prev]?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-            } else if (cards.length > 0) {
-              cards[0]?.focus();
-            }
-            return;
-          }
-
-          if (key === 'ArrowDown' || key === 'Down') {
-            e.preventDefault();
-            e.stopPropagation();
-            if (tabs.includes(active) && cards.length > 0) {
-              const activeCard = cards.find(c => c.classList.contains('server-active')) || cards[0];
-              activeCard?.focus();
-              activeCard?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-            }
-            return;
-          }
-
-          if (key === 'ArrowUp' || key === 'Up') {
-            e.preventDefault();
-            e.stopPropagation();
-            if (cards.includes(active) && tabs.length > 0) {
-              const activeTab = tabs.find(t => t.classList.contains('tab-pill-active')) || tabs[0];
-              activeTab?.focus();
-            }
-            return;
-          }
-
-          if (key === 'Enter' || key === ' ' || key === 'Select') {
-            e.preventDefault();
-            e.stopPropagation();
-            if (active && typeof active.click === 'function') {
-              active.click();
-            }
-            return;
-          }
-        }
-      }
-
-      // 4. Settings Menu Drawer D-Pad Navigation
-      if (showSettingsMenu) {
-        const drawer = document.querySelector('.player-settings-drawer');
-        if (drawer) {
-          const tabs = Array.from(drawer.querySelectorAll('.settings-drawer-header .tab-pill'));
-          const options = Array.from(drawer.querySelectorAll('.settings-drawer-content .settings-opt-btn'));
-          const active = document.activeElement;
-
-          if (key === 'ArrowRight' || key === 'Right') {
-            if (tabs.includes(active)) {
-              e.preventDefault();
-              e.stopPropagation();
-              const curr = tabs.indexOf(active);
-              const next = (curr + 1) % tabs.length;
-              tabs[next]?.focus();
-              return;
-            }
-          }
-
-          if (key === 'ArrowLeft' || key === 'Left') {
-            if (tabs.includes(active)) {
-              e.preventDefault();
-              e.stopPropagation();
-              const curr = tabs.indexOf(active);
-              const prev = (curr - 1 + tabs.length) % tabs.length;
-              tabs[prev]?.focus();
-              return;
-            }
-          }
-
-          if (key === 'ArrowDown' || key === 'Down') {
-            e.preventDefault();
-            e.stopPropagation();
-            if (tabs.includes(active) && options.length > 0) {
-              options[0]?.focus();
-            } else if (options.includes(active)) {
-              const curr = options.indexOf(active);
-              const next = (curr + 1) % options.length;
-              options[next]?.focus();
-            }
-            return;
-          }
-
-          if (key === 'ArrowUp' || key === 'Up') {
-            e.preventDefault();
-            e.stopPropagation();
-            if (options.includes(active)) {
-              const curr = options.indexOf(active);
-              if (curr === 0) {
-                const activeTab = tabs.find(t => t.classList.contains('tab-pill-active')) || tabs[0];
-                activeTab?.focus();
-              } else {
-                options[curr - 1]?.focus();
-              }
-            }
-            return;
-          }
-
-          if (key === 'Enter' || key === ' ' || key === 'Select') {
-            e.preventDefault();
-            e.stopPropagation();
-            if (active && typeof active.click === 'function') {
-              active.click();
-            }
-            return;
-          }
-        }
-      }
-
-      // 5. OSD Navigation
-      if (showOsd) {
-        const osdEl = document.querySelector('.player-osd');
-        const active = document.activeElement;
-
-        if (key === 'Enter' || key === ' ' || key === 'Select') {
-          if (osdEl && active && osdEl.contains(active) && typeof active.click === 'function') {
-            e.preventDefault();
-            e.stopPropagation();
-            active.click();
-            return;
-          }
-        }
-      }
-
-      bumpOsd();
-      backPressedWhileHiddenRef.current = false;
-
-      // 6. Channel Up & Next Channel (D-Pad UP / ChannelUp / PageUp)
-      if (key === 'ChannelUp' || key === 'PageUp' || (key === 'ArrowUp' && isLive && !showChannelDrawer && !showSettingsMenu)) {
-        if (isLive && channels.length > 0) {
-          e.preventDefault();
-          e.stopPropagation();
-          switchChannelTo(currentChannelIdx + 1);
-          return;
-        }
-      }
-
-      // 7. Channel Down & Previous Channel (D-Pad DOWN / ChannelDown / PageDown)
-      if (key === 'ChannelDown' || key === 'PageDown' || (key === 'ArrowDown' && isLive && !showChannelDrawer && !showSettingsMenu)) {
-        if (isLive && channels.length > 0) {
-          e.preventDefault();
-          e.stopPropagation();
-          switchChannelTo(currentChannelIdx - 1);
-          return;
-        }
-      }
-
-      switch (key) {
-        case ' ':
-        case 'Enter':
-        case 'Select':
-        case 'MediaPlayPause':
-          if (nextEpisodePrompt) {
-            e.preventDefault();
-            handlePlayNextEpisode();
-            return;
-          }
-          if (video && !showChannelDrawer && !showSettingsMenu) {
-            e.preventDefault();
-            if (video.paused) {
-              video.play();
-              setIsPlaying(true);
-            } else {
-              video.pause();
-              setIsPlaying(false);
-            }
-          }
-          break;
-        case 'ArrowLeft':
-        case 'MediaRewind':
-          if (isLive && channels.length > 0 && !showChannelDrawer) {
-            e.preventDefault();
-            setShowChannelDrawer(true);
-          } else if (video && !isLive && !showSettingsMenu) {
-            e.preventDefault();
-            e.stopPropagation();
-            seek(-10);
-          }
-          break;
-        case 's':
-        case 'S':
-        case 'MediaTrackNext':
-          if (!isLive && allServers.length > 1) {
-            e.preventDefault();
-            const nextIdx = (currentServerIndex + 1) % allServers.length;
-            setCurrentServerIndex(nextIdx);
-            setErrorMsg(`⚡ Switched to ${allServers[nextIdx]?.name || `Server ${nextIdx + 1}`}`);
-            setTimeout(() => setErrorMsg(null), 3500);
-          }
-          break;
-        case 'ArrowRight':
-        case 'MediaFastForward':
-          if (isLive && channels.length > 0 && !showChannelDrawer) {
-            e.preventDefault();
-            setShowChannelDrawer(true);
-          } else if (video && !isLive && !showSettingsMenu) {
-            e.preventDefault();
-            e.stopPropagation();
-            seek(10);
-          }
-          break;
-      }
-    };
-
-    window.addEventListener('keydown', handleRemoteKeys, { capture: true });
-    window.addEventListener('mousemove', bumpOsd);
-    
-    return () => {
-      window.removeEventListener('keydown', handleRemoteKeys, { capture: true });
-      window.removeEventListener('mousemove', bumpOsd);
-    };
-  }, [bumpOsd, onClose, isLive, channels, currentChannelIdx, switchChannelTo, showChannelDrawer, showSettingsMenu, showOsd, duration, item, nextEpisodePrompt, handlePlayNextEpisode, drawerCategory]);
+  const close = useCallback(() => {
+    if (!isLive && duration > 0) saveProgress(item, time, duration);
+    onClose?.(time, duration);
+  }, [duration, isLive, item, onClose, time]);
 
   const togglePlay = () => {
+    resetControlsTimer();
     const video = videoRef.current;
     if (!video) return;
-    if (video.paused) {
-      video.play();
-      setIsPlaying(true);
-    } else {
-      video.pause();
-      setIsPlaying(false);
+    // LIVE channels never pause — a tap just toggles the controls overlay.
+    // Pausing a live stream makes no sense (you'd fall behind the broadcast).
+    if (isLive) {
+      setShowControls(prev => !prev);
+      return;
     }
-    bumpOsd();
+    if (video.paused) video.play().catch(() => {});
+    else video.pause();
   };
 
-  const seek = (seconds) => {
+  const seekRelative = (delta) => {
+    resetControlsTimer();
     const video = videoRef.current;
     if (!video || isLive) return;
-    video.currentTime = Math.max(0, Math.min(video.duration || 0, video.currentTime + seconds));
-    bumpOsd();
+    const target = Math.max(0, Math.min(duration || Infinity, (video.currentTime || 0) + delta));
+    video.currentTime = target;
+    setTime(target);
+
+    setSeekFeedback(delta > 0 ? `+${delta}s` : `${delta}s`);
+    setTimeout(() => setSeekFeedback(null), 600);
   };
 
-  const formatTime = (secs) => {
-    if (!secs || isNaN(secs)) return "00:00";
-    const h = Math.floor(secs / 3600);
-    const m = Math.floor((secs % 3600) / 60);
-    const s = Math.floor(secs % 60);
-    if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  const handleScrubberClick = (e) => {
+    resetControlsTimer();
+    const video = videoRef.current;
+    if (!video || isLive || !duration) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const pos = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    const target = pos * duration;
+    video.currentTime = target;
+    setTime(target);
   };
 
-  const handleQualityChange = (levelId) => {
-    setCurrentQuality(levelId);
-    if (hlsRef.current) hlsRef.current.currentLevel = levelId;
+  const chooseLevel = (value) => {
+    setLevel(value);
+    if (hlsRef.current) hlsRef.current.currentLevel = value;
+    setShowSettings(false);
+    resetControlsTimer();
   };
 
-  const handleAudioChange = (trackId) => {
-    setCurrentAudio(trackId);
-    if (hlsRef.current) hlsRef.current.audioTrack = trackId;
+  const chooseSource = (idx) => {
+    setSourceIndex(idx);
+    setShowSettings(false);
+    resetControlsTimer();
   };
 
-  const handleSpeedChange = (rate) => {
-    setPlaybackRate(rate);
-    if (videoRef.current) videoRef.current.playbackRate = rate;
+  const handleCastFromPlayer = () => {
+    resetControlsTimer();
+    castEngine.castMedia(item, {
+      server: activeSource,
+      startPosition: Math.floor(time) || 0
+    }).catch(() => {});
+    setCastSuccess(true);
+    setTimeout(() => setCastSuccess(false), 3000);
   };
 
-  const handleExitPlayer = () => {
-    if (videoRef.current && !isLive && duration > 0) {
-      saveProgress(item, videoRef.current.currentTime, duration);
-    }
-    onClose();
-  };
+  useEffect(() => {
+    const onKey = (event) => {
+      if (!showControls) {
+        event.preventDefault();
+        event.stopPropagation();
+        resetControlsTimer();
+        return;
+      }
+      resetControlsTimer();
+
+      if (event.key === 'Escape' || event.key === 'GoBack' || event.key === 'Backspace') {
+        event.preventDefault();
+        if (showSettings) setShowSettings(false);
+        else close();
+      } else if (event.key === 'Enter' || event.key === ' ') {
+        if (!document.activeElement || document.activeElement === document.body || document.activeElement.tagName === 'VIDEO') {
+          event.preventDefault();
+          togglePlay();
+        }
+      } else if (!isLive && event.key === 'ArrowRight') {
+        event.preventDefault();
+        seekRelative(10);
+      } else if (!isLive && event.key === 'ArrowLeft') {
+        event.preventDefault();
+        seekRelative(-10);
+      }
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [showControls, showSettings, close, duration, isLive, resetControlsTimer]);
+
+  const progressPercent = duration > 0 ? (time / duration) * 100 : 0;
+  const bufferedPercent = duration > 0 ? (bufferedEnd / duration) * 100 : 0;
 
   return (
     <div 
-      className="tv-player-container"
-      ref={containerRef}
-      onClick={bumpOsd}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
+      className="tv-player-container" 
+      onMouseMove={resetControlsTimer}
+      onTouchStart={resetControlsTimer}
+      style={{ 
+        position: 'fixed', 
+        inset: 0, 
+        zIndex: 10000, 
+        background: '#000',
+        cursor: showControls ? 'default' : 'none',
+        overflow: 'hidden'
+      }}
     >
+      {isEmbed ? (
+        <div style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', background: '#000', zIndex: 1 }}>
+          <iframe
+            src={activeSource.url}
+            title={item?.title || 'Player'}
+            allow="autoplay; fullscreen; encrypted-media; picture-in-picture; accelerometer; gyroscope"
+            allowFullScreen
+            style={{
+              width: '100%',
+              height: '100%',
+              border: 'none',
+              background: '#000',
+              position: 'absolute',
+              inset: 0
+            }}
+          />
+        </div>
+      ) : (
+        <video 
+          ref={videoRef} 
+          playsInline 
+          poster={playing ? undefined : (item?.backdrop_url || item?.poster_url || item?.poster || '')} 
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: pinchScale > 1 ? 'cover' : fitMode,
+            transform: videoTransform,
+            transition: 'transform 0.15s ease-out',
+            backgroundColor: '#000000',
+            touchAction: 'none'
+          }} 
+          onClick={togglePlay}
+          onTouchStart={onTouchStart}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
+          onTouchStartCapture={handleVideoTouch}
+        />
+      )}
 
-      <video
-        ref={videoRef}
-        className="tv-video-element"
-        style={{
-          objectFit: aspectRatio === 'fill' ? 'fill' : (aspectRatio === 'cover' ? 'cover' : 'contain'),
-          aspectRatio: aspectRatio === '4/3' ? '4/3' : 'unset',
-          transform: zoomScale !== 1.0 ? `scale(${zoomScale})` : undefined,
-          transformOrigin: 'center center',
-          transition: 'transform 0.1s ease-out'
-        }}
-        playsInline
-        onWaiting={() => setIsBuffering(true)}
-        onPlaying={() => {
-          setIsBuffering(false);
-          setIsPlaying(true);
-        }}
-        onCanPlay={() => setIsBuffering(false)}
-        onTimeUpdate={handleTimeUpdate}
-        onPlay={() => setIsPlaying(true)}
-        onPause={() => setIsPlaying(false)}
-        onClick={(e) => {
-          handleDoubleTap(e);
-          togglePlay();
-        }}
-      />
-
-      {/* Live TV Channel Switcher OSD Banner */}
-      {channelBanner && (
+      {/* Fit mode indicator (brief toast when cycling) */}
+      {fitMode !== 'contain' && pinchScale === 1 && (
         <div style={{
           position: 'absolute',
-          top: '36px',
-          left: '48px',
-          background: 'rgba(10, 14, 23, 0.98)',
-          border: '1px solid rgba(56, 189, 248, 0.6)',
-          borderRadius: '18px',
-          padding: '14px 24px',
+          bottom: '84px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: 'rgba(15, 23, 42, 0.9)',
+          border: '1px solid rgba(56, 189, 248, 0.5)',
+          color: '#38bdf8',
+          padding: '6px 14px',
+          borderRadius: 16,
+          fontSize: 12,
+          fontWeight: 800,
+          pointerEvents: 'none'
+        }}>
+          {fitMode === 'cover' ? '🔍 Zoom to Fill' : '📐 Stretch'}
+        </div>
+      )}
+      {pinchScale > 1 && (
+        <div style={{
+          position: 'absolute',
+          bottom: '84px',
+          right: '16px',
+          background: 'rgba(15, 23, 42, 0.9)',
+          border: '1px solid rgba(56, 189, 248, 0.5)',
+          color: '#38bdf8',
+          padding: '6px 12px',
+          borderRadius: 16,
+          fontSize: 12,
+          fontWeight: 800,
+          pointerEvents: 'none'
+        }}>
+          🔍 {Math.round(pinchScale * 100)}%
+        </div>
+      )}
+
+      {/* Auto-Failover Live Toast HUD */}
+      {autoFailoverMsg && (
+        <div style={{
+          position: 'absolute',
+          top: '24px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: 'rgba(15, 23, 42, 0.96)',
+          border: '1.5px solid #38bdf8',
+          borderRadius: '24px',
+          padding: '8px 20px',
           display: 'flex',
           alignItems: 'center',
-          gap: '16px',
-          zIndex: 80,
-          boxShadow: '0 16px 40px rgba(0,0,0,0.9), 0 0 24px rgba(56, 189, 248, 0.25)',
-          animation: 'slideInLeft 0.3s ease-out'
+          gap: '8px',
+          zIndex: 95,
+          boxShadow: '0 12px 30px rgba(0,0,0,0.8)',
+          maxWidth: '90%'
         }}>
-          <div style={{
-            background: 'var(--accent-gradient)',
-            color: '#fff',
-            fontWeight: 900,
-            fontSize: '18px',
-            padding: '6px 14px',
-            borderRadius: '12px'
-          }}>
-            {channelBanner.channelNumber}
+          <Loader2 className="spin-animation" size={16} color="#38bdf8" />
+          <span style={{ fontSize: '13px', fontWeight: 800, color: '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {autoFailoverMsg}
+          </span>
+        </div>
+      )}
+
+      {/* Seek Ripple Feedback */}
+      {seekFeedback && (
+        <div className={`seek-ripple-box ${seekFeedback.startsWith('+') ? 'seek-ripple-right' : 'seek-ripple-left'}`}>
+          {seekFeedback.startsWith('+') ? <FastForward size={32} color="#38bdf8" /> : <Rewind size={32} color="#38bdf8" />}
+          <span style={{ fontSize: '16px', fontWeight: 900, color: '#ffffff' }}>{seekFeedback}</span>
+        </div>
+      )}
+
+      {/* Center Buffering Spinner */}
+      {buffering && !error && (
+        <div style={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '10px',
+          background: 'rgba(15, 23, 42, 0.85)',
+          padding: '16px 24px',
+          borderRadius: '16px',
+          border: '1px solid rgba(56, 189, 248, 0.3)',
+          zIndex: 80,
+          pointerEvents: 'none'
+        }}>
+          <Loader2 className="spin-animation" size={32} color="#38bdf8" />
+          <span style={{ fontSize: '13px', fontWeight: 800, color: '#ffffff' }}>
+            {activeSource?.name ? `Connecting to ${activeSource.name}...` : 'Loading stream...'}
+          </span>
+        </div>
+      )}
+
+      {/* Stream Recovery Center */}
+      {error && (
+        <div style={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          background: 'rgba(15, 23, 42, 0.98)',
+          border: '1.5px solid rgba(56, 189, 248, 0.5)',
+          borderRadius: '20px',
+          padding: '24px',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '14px',
+          zIndex: 90,
+          boxShadow: '0 16px 40px rgba(0,0,0,0.9)',
+          maxWidth: '440px',
+          width: '90%',
+          textAlign: 'center'
+        }}>
+          <div style={{ fontSize: '16px', fontWeight: 900, color: '#38bdf8' }}>
+            ⚡ Smart Stream Recovery
           </div>
-          <div>
-            <div style={{ fontSize: '18px', fontWeight: 800, color: '#fff' }}>
-              {channelBanner.title}
-            </div>
-            <div style={{ fontSize: '12px', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px' }}>
-              <span className="live-pulse-dot" style={{ display: 'inline-block' }} />
-              <span>Full HD 1080p 60fps</span>
-              <span>•</span>
-              <span style={{ color: '#38bdf8' }}>{channelBanner.category}</span>
-            </div>
+          <span style={{ fontSize: '13px', fontWeight: 700, color: '#cbd5e1' }}>
+            {error}
+          </span>
+
+          {/* Server Mirror Picker */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '100%', maxHeight: '180px', overflowY: 'auto' }}>
+            {sources.map((src, idx) => (
+              <button
+                key={src.id || idx}
+                onClick={() => {
+                  setError('');
+                  setBuffering(true);
+                  setSourceIndex(idx);
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  background: sourceIndex === idx ? 'rgba(56, 189, 248, 0.25)' : 'rgba(255, 255, 255, 0.06)',
+                  border: sourceIndex === idx ? '1px solid #38bdf8' : '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: '10px',
+                  padding: '8px 14px',
+                  color: '#ffffff',
+                  fontSize: '12px',
+                  fontWeight: 800,
+                  cursor: 'pointer'
+                }}
+              >
+                <span>{src.name || `Mirror ${idx + 1}`}</span>
+                {sourceIndex === idx ? <Check size={14} color="#38bdf8" /> : <span style={{ fontSize: '10px', color: '#94a3b8' }}>Connect</span>}
+              </button>
+            ))}
+          </div>
+
+          <div style={{ display: 'flex', gap: '10px', marginTop: '6px', width: '100%', justifyContent: 'center' }}>
+            <button
+              className="player-btn"
+              onClick={() => {
+                setError('');
+                setBuffering(true);
+                setSourceIndex(0);
+              }}
+              style={{ borderRadius: '10px', width: 'auto', padding: '0 16px', fontSize: '12px', fontWeight: 800, background: '#38bdf8', color: '#06090e' }}
+            >
+              Retry Primary
+            </button>
+            <button
+              className="player-btn"
+              onClick={close}
+              style={{ borderRadius: '10px', width: 'auto', padding: '0 16px', fontSize: '12px', fontWeight: 800 }}
+            >
+              Close
+            </button>
           </div>
         </div>
       )}
 
-      {/* Auto-Play Next Episode Floating Prompt */}
-      {nextEpisodePrompt && (
-        <div className="next-episode-banner">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <FastForward size={24} color="#38bdf8" />
+      {/* Auto-Dismissing OSD Controls */}
+      <div
+        className={`player-osd ${showControls ? 'is-visible' : 'is-hidden'}`}
+        style={{
+          position: 'absolute',
+          inset: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+          padding: '20px',
+          background: 'linear-gradient(180deg, rgba(0,0,0,0.8) 0%, transparent 35%, transparent 60%, rgba(0,0,0,0.85) 100%)',
+          opacity: showControls ? 1 : 0,
+          transition: 'opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+          // PINCH FIX: the overlay must never swallow touches meant for the
+          // video. Only the top/bottom bars (buttons) capture; the middle
+          // region passes gestures (pinch/double-tap) through to the video.
+          pointerEvents: 'none'
+        }}
+      >
+        {/* Top Header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pointerEvents: 'auto' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <button 
+              className="player-btn" 
+              onClick={close} 
+              style={{ minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            >
+              <ArrowLeft size={22} />
+            </button>
             <div>
-              <span style={{ fontSize: '13px', color: '#94a3b8', fontWeight: 600 }}>Up Next</span>
-              <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#fff' }}>
-                {nextEpisodePrompt.episode?.title || `Episode ${currentEpisodeIndex + 2}`}
-              </h3>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <strong style={{ fontSize: '16px' }}>{item?.title_en || item?.title || 'Playback'}</strong>
+                {isLive && (
+                  <span style={{ background: '#ef4444', color: '#fff', fontSize: '9px', fontWeight: 900, padding: '2px 6px', borderRadius: '4px' }}>
+                    LIVE
+                  </span>
+                )}
+              </div>
+              <div style={{ opacity: 0.75, fontSize: '12px', marginTop: '2px' }}>
+                {activeSource?.name || 'Fast Server'} • {item?.category || (isLive ? 'Live TV' : (item?.year || '2026'))}
+              </div>
             </div>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <button
-              className="tv-btn tv-btn-primary"
-              data-focusable="true"
-              tabIndex={0}
-              onClick={handlePlayNextEpisode}
-              style={{ background: '#38bdf8', color: '#06090e', fontWeight: 900 }}
-            >
-              Play Now
-            </button>
-            <button
-              className="tv-btn tv-btn-secondary"
-              data-focusable="true"
-              tabIndex={0}
-              onClick={() => setNextEpisodePrompt(null)}
-            >
-              <X size={16} />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Buffering Loader with 1-Click Server Switch Option */}
-      {isBuffering && (
-        <div className="player-loading-overlay">
-          <div className="player-spinner-box">
-            <Loader2 size={48} className="animate-spin" color="#38bdf8" />
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-              <span style={{ fontSize: '18px', fontWeight: 800, color: '#fff', letterSpacing: '-0.3px' }}>
-                Buffering High-Speed Stream...
-              </span>
-              <span style={{ fontSize: '13px', color: '#94a3b8', fontWeight: 600 }}>
-                {title} • {activeServer?.name || `Server ${currentServerIndex + 1}`}
-              </span>
-            </div>
-
-            {allServers.length > 1 && (
-              <button
-                className="tv-btn tv-btn-secondary"
-                data-focusable="true"
-                tabIndex={0}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  const nextIdx = (currentServerIndex + 1) % allServers.length;
-                  setCurrentServerIndex(nextIdx);
-                  setErrorMsg(`Switched to ${allServers[nextIdx]?.name || `Server ${nextIdx + 1}`}`);
-                  setTimeout(() => setErrorMsg(null), 3000);
-                }}
-                style={{ marginTop: '12px', fontSize: '12px', padding: '8px 18px', borderRadius: '14px', background: 'rgba(56, 189, 248, 0.15)', borderColor: '#38bdf8' }}
-              >
-                <span>⚡ Stream Slow? Switch to Next Server ({allServers[(currentServerIndex + 1) % allServers.length]?.name || 'Next'})</span>
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
-      {errorMsg && (
-        <div style={{ position: 'absolute', top: '40px', left: '50%', transform: 'translateX(-50%)', padding: '14px 22px', background: 'rgba(239,68,68,0.95)', borderRadius: '14px', color: '#fff', display: 'flex', alignItems: 'center', gap: '10px', zIndex: 120, boxShadow: '0 10px 30px rgba(0,0,0,0.8)' }}>
-          <AlertCircle size={20} />
-          <span style={{ fontWeight: 700, fontSize: '14px' }}>{errorMsg}</span>
-        </div>
-      )}
-
-      {/* Prominent High-Visibility Server Switcher with Automatic Failover */}
-      {!isLive && allServers.length > 1 && (
-        <div 
-          onClick={e => e.stopPropagation()}
-          style={{
-            position: 'fixed',
-            bottom: showOsd ? '95px' : '20px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            zIndex: 95,
-            display: 'flex',
-            gap: '8px',
-            alignItems: 'center',
-            background: 'rgba(10, 15, 29, 0.95)',
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)',
-            padding: '6px 14px',
-            borderRadius: '30px',
-            border: '1px solid rgba(56, 189, 248, 0.6)',
-            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.8), 0 0 16px rgba(56, 189, 248, 0.2)',
-            maxWidth: '94vw',
-            overflowX: 'auto',
-            transition: 'bottom 0.2s ease-out'
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}>
-            <span className="live-pulse-dot" style={{ background: '#22c55e', width: '6px', height: '6px' }} />
-            <span style={{ fontSize: '11px', fontWeight: 900, color: '#38bdf8', letterSpacing: '0.5px' }}>AUTO SERVERS:</span>
-          </div>
-
-          <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', scrollbarWidth: 'none' }}>
-            {allServers.map((s, idx) => {
-              const isActive = currentServerIndex === idx;
-              return (
-                <button
-                  key={s.id || idx}
-                  data-focusable="true"
-                  tabIndex={0}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setCurrentServerIndex(idx);
-                    setIsBuffering(true);
-                    setErrorMsg(`Switched to Server ${idx + 1}`);
-                    setTimeout(() => setErrorMsg(null), 2500);
-                    setTimeout(() => setIsBuffering(false), 1000);
-                  }}
-                  style={{
-                    fontSize: '11px',
-                    fontWeight: 800,
-                    padding: '5px 12px',
-                    borderRadius: '16px',
-                    background: isActive ? 'linear-gradient(135deg, #38bdf8 0%, #0284c7 100%)' : 'rgba(255, 255, 255, 0.08)',
-                    color: isActive ? '#06090e' : '#cbd5e1',
-                    border: isActive ? '1px solid #38bdf8' : '1px solid rgba(255, 255, 255, 0.12)',
-                    cursor: 'pointer',
-                    whiteSpace: 'nowrap',
-                    boxShadow: isActive ? '0 2px 10px rgba(56, 189, 248, 0.4)' : 'none'
-                  }}
-                >
-                  {s.name || `Server ${idx + 1}`}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Advanced Settings Drawer */}
-      {showSettingsMenu && (
-        <div className="player-settings-drawer" onClick={e => e.stopPropagation()}>
-          <div className="settings-drawer-header">
-            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-              <button 
-                className={`tab-pill ${settingsTab === 'quality' ? 'tab-pill-active' : ''}`}
-                data-focusable="true"
-                tabIndex={0}
-                onClick={() => setSettingsTab('quality')}
-              >
-                Quality
-              </button>
-              <button 
-                className={`tab-pill ${settingsTab === 'subtitles' ? 'tab-pill-active' : ''}`}
-                data-focusable="true"
-                tabIndex={0}
-                onClick={() => setSettingsTab('subtitles')}
-              >
-                Subtitles
-              </button>
-              <button 
-                className={`tab-pill ${settingsTab === 'audio' ? 'tab-pill-active' : ''}`}
-                data-focusable="true"
-                tabIndex={0}
-                onClick={() => setSettingsTab('audio')}
-              >
-                Audio & Night Mode
-              </button>
-              <button 
-                className={`tab-pill ${settingsTab === 'aspect' ? 'tab-pill-active' : ''}`}
-                data-focusable="true"
-                tabIndex={0}
-                onClick={() => setSettingsTab('aspect')}
-              >
-                Aspect & Ambilight
-              </button>
-              <button 
-                className={`tab-pill ${settingsTab === 'speed' ? 'tab-pill-active' : ''}`}
-                data-focusable="true"
-                tabIndex={0}
-                onClick={() => setSettingsTab('speed')}
-              >
-                Speed
-              </button>
-              {allServers.length > 1 && (
-                <button 
-                  className={`tab-pill ${settingsTab === 'server' ? 'tab-pill-active' : ''}`}
-                  data-focusable="true"
-                  tabIndex={0}
-                  onClick={() => setSettingsTab('server')}
-                >
-                  Servers ({allServers.length})
-                </button>
-              )}
-            </div>
-
-            <button
-              className="player-btn"
-              data-focusable="true"
-              tabIndex={0}
-              onClick={() => setShowSettingsMenu(false)}
-              style={{ width: '36px', height: '36px' }}
-            >
-              ✕
-            </button>
-          </div>
-
-          <div className="settings-drawer-content">
-            {settingsTab === 'quality' && (
-              <div className="settings-options-grid">
-                <button
-                  className={`settings-opt-btn ${currentQuality === -1 ? 'is-selected' : ''}`}
-                  data-focusable="true"
-                  tabIndex={0}
-                  onClick={() => handleQualityChange(-1)}
-                >
-                  <span>Auto (Adaptive HD)</span>
-                  {currentQuality === -1 && <Check size={16} color="#38bdf8" />}
-                </button>
-                {qualities.map((q) => (
-                  <button
-                    key={q.id}
-                    className={`settings-opt-btn ${currentQuality === q.id ? 'is-selected' : ''}`}
-                    data-focusable="true"
-                    tabIndex={0}
-                    onClick={() => handleQualityChange(q.id)}
-                  >
-                    <span>{q.label}</span>
-                    {currentQuality === q.id && <Check size={16} color="#38bdf8" />}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* Subtitles Tab */}
-            {settingsTab === 'subtitles' && (
-              <div className="settings-options-grid">
-                <button
-                  className={`settings-opt-btn ${activeSubtitle === 'off' ? 'is-selected' : ''}`}
-                  data-focusable="true"
-                  tabIndex={0}
-                  onClick={() => setActiveSubtitle('off')}
-                >
-                  <span>Subtitles Off</span>
-                  {activeSubtitle === 'off' && <Check size={16} color="#38bdf8" />}
-                </button>
-                {subtitleTracks.map((sub) => (
-                  <button
-                    key={sub.id}
-                    className={`settings-opt-btn ${activeSubtitle === sub.id ? 'is-selected' : ''}`}
-                    data-focusable="true"
-                    tabIndex={0}
-                    onClick={() => setActiveSubtitle(sub.id)}
-                  >
-                    <span>{sub.label}</span>
-                    {activeSubtitle === sub.id && <Check size={16} color="#38bdf8" />}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* Audio & Night Mode */}
-            {settingsTab === 'audio' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                <button
-                  className={`settings-opt-btn ${nightModeAudio ? 'is-selected' : ''}`}
-                  data-focusable="true"
-                  tabIndex={0}
-                  onClick={toggleNightModeAudio}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <Moon size={18} color="#a855f7" />
-                    <div style={{ textAlign: 'left' }}>
-                      <div style={{ fontWeight: 800 }}>Night Mode Vocal Booster</div>
-                      <div style={{ fontSize: '12px', color: '#94a3b8' }}>Compresses loud sounds and clarifies quiet dialogue</div>
-                    </div>
-                  </div>
-                  {nightModeAudio && <Check size={16} color="#38bdf8" />}
-                </button>
-
-                <div className="settings-options-grid" style={{ marginTop: '8px' }}>
-                  {audioTracks.length > 0 ? (
-                    audioTracks.map((a) => (
-                      <button
-                        key={a.id}
-                        className={`settings-opt-btn ${currentAudio === a.id ? 'is-selected' : ''}`}
-                        data-focusable="true"
-                        tabIndex={0}
-                        onClick={() => handleAudioChange(a.id)}
-                      >
-                        <span>{a.label}</span>
-                        {currentAudio === a.id && <Check size={16} color="#38bdf8" />}
-                      </button>
-                    ))
-                  ) : (
-                    <span style={{ color: 'var(--text-muted)', padding: '12px' }}>Default Multi-Channel Audio (Auto)</span>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Aspect Ratio */}
-            {settingsTab === 'aspect' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                <div className="settings-options-grid">
-                  {[
-                    { id: 'contain', label: '16:9 Fit (Standard Cinema)' },
-                    { id: 'cover', label: 'Zoom & Crop (Fill Screen)' },
-                    { id: 'fill', label: 'Stretch Full (No Black Bars)' },
-                    { id: '4/3', label: '4:3 Classic TV' },
-                  ].map(opt => (
-                    <button
-                      key={opt.id}
-                      className={`settings-opt-btn ${aspectRatio === opt.id ? 'is-selected' : ''}`}
-                      data-focusable="true"
-                      tabIndex={0}
-                      onClick={() => setAspectRatio(opt.id)}
-                    >
-                      <span>{opt.label}</span>
-                      {aspectRatio === opt.id && <Check size={16} color="#38bdf8" />}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {settingsTab === 'speed' && (
-              <div className="settings-options-grid">
-                {[0.75, 1.0, 1.25, 1.5, 2.0].map(s => (
-                  <button
-                    key={s}
-                    className={`settings-opt-btn ${playbackRate === s ? 'is-selected' : ''}`}
-                    data-focusable="true"
-                    tabIndex={0}
-                    onClick={() => handleSpeedChange(s)}
-                  >
-                    <span>{s === 1.0 ? '1.0x (Normal)' : `${s}x`}</span>
-                    {playbackRate === s && <Check size={16} color="#38bdf8" />}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {settingsTab === 'server' && (
-              <div className="settings-options-grid">
-                {allServers.map((srv, idx) => (
-                  <button
-                    key={idx}
-                    className={`settings-opt-btn ${currentServerIndex === idx ? 'is-selected' : ''}`}
-                    data-focusable="true"
-                    tabIndex={0}
-                    onClick={() => {
-                      setCurrentServerIndex(idx);
-                      setShowSettingsMenu(false);
-                    }}
-                  >
-                    <span>{srv.translator || `Server ${idx + 1}`} ({srv.source || 'HLS'})</span>
-                    {currentServerIndex === idx && <Check size={16} color="#38bdf8" />}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Quick Channel Switcher Overlay with Category Filters */}
-      {showChannelDrawer && isLive && channels.length > 0 && (
-        <div className="player-channel-drawer" onClick={e => e.stopPropagation()}>
-          <div className="player-channel-header">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span className="player-channel-badge">⚡ QUICK SWITCHER</span>
-                <span style={{ fontSize: '15px', fontWeight: 800, color: '#f8fafc' }}>Live Channels</span>
-              </div>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                {['All', 'Sports', 'News', 'Entertainment', 'Movies'].map(cat => (
-                  <button
-                    key={cat}
-                    className={`tab-pill ${drawerCategory === cat ? 'tab-pill-active' : ''}`}
-                    data-focusable="true"
-                    tabIndex={0}
-                    onClick={() => setDrawerCategory(cat)}
-                  >
-                    {cat}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 600 }}>
-                Press D-Pad ◄ ► to Surf • Enter to Watch • Back to Close
-              </span>
-              <button
-                className="player-btn"
-                data-focusable="true"
-                tabIndex={0}
-                onClick={() => setShowChannelDrawer(false)}
-                style={{ width: '32px', height: '32px' }}
-              >
-                ✕
-              </button>
-            </div>
-          </div>
-
-          <div className="player-channel-scroll">
-            {channels
-              .filter(ch => {
-                if (drawerCategory === 'All') return true;
-                const cat = (ch.category || '').toLowerCase();
-                const title = (ch.title || '').toLowerCase();
-                const target = drawerCategory.toLowerCase();
-                if (target === 'sports') return cat.includes('sport') || title.includes('sport') || title.includes('cricket') || title.includes('ten') || title.includes('willow') || title.includes('fancode');
-                if (target === 'news') return cat.includes('news') || title.includes('news') || title.includes('tak') || title.includes('abp') || title.includes('republic');
-                if (target === 'movies') return cat.includes('movie') || title.includes('cinema') || title.includes('max') || title.includes('film');
-                if (target === 'entertainment') return cat.includes('entertainment') || title.includes('star') || title.includes('sony') || title.includes('zee') || title.includes('colors');
-                return true;
-              })
-              .map((ch, idx) => {
-                const isCurrent = ch.title === item.title;
-                const chNum = 100 + idx + 1;
-                return (
-                  <button
-                    key={ch.id || idx}
-                    className={`player-channel-card ${isCurrent ? 'server-active' : ''}`}
-                    data-focusable="true"
-                    tabIndex={0}
-                    onClick={() => {
-                      setShowChannelDrawer(false);
-                      if (onSelectChannel) {
-                        onSelectChannel(ch);
-                      } else {
-                        const originalIdx = channels.findIndex(c => c.title === ch.title);
-                        if (originalIdx >= 0) switchChannelTo(originalIdx);
-                      }
-                    }}
-                  >
-                    <div className="channel-card-top">
-                      <span className="channel-num-tag">#{chNum}</span>
-                      {isCurrent && (
-                        <span className="channel-live-dot-tag">
-                          <span className="live-pulse-dot" /> LIVE
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="channel-card-body">
-                      {ch.poster_url || ch.poster || ch.logo ? (
-                        <img 
-                          src={ch.poster_url || ch.poster || ch.logo} 
-                          alt={ch.title} 
-                          className="channel-card-img"
-                          referrerPolicy="no-referrer"
-                        />
-                      ) : (
-                        <div className="channel-card-fallback-icon">
-                          <Radio size={22} color={isCurrent ? '#38bdf8' : '#94a3b8'} />
-                        </div>
-                      )}
-                      <span className="channel-card-name" title={ch.title}>{ch.title}</span>
-                    </div>
-
-                    <div className="channel-card-footer">
-                      <span>{ch.category || 'Live TV'}</span>
-                      <span style={{ color: '#38bdf8' }}>1080p</span>
-                    </div>
-                  </button>
-                );
-              })}
-          </div>
-        </div>
-      )}
-
-      {/* ON-SCREEN DISPLAY (OSD) */}
-      <div 
-        className={`player-osd ${showOsd ? 'is-visible' : 'is-hidden'}`}
-        onClick={(e) => {
-          if (e.target === e.currentTarget) togglePlay();
-        }}
-      >
-        <div className="player-top-bar">
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
             <button 
-              className="player-btn"
-              data-focusable="true"
-              tabIndex={0}
-              onClick={handleExitPlayer}
-              style={{ marginTop: '2px' }}
+              className="player-btn" 
+              onClick={handleCastFromPlayer}
+              style={{ 
+                minWidth: 44, 
+                minHeight: 44, 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center', 
+                background: castSuccess ? 'rgba(56,189,248,0.35)' : 'rgba(255,255,255,0.12)', 
+                color: '#38bdf8' 
+              }}
+              title="Cast to TV"
             >
-              <ArrowLeft size={24} />
+              <Cast size={20} />
             </button>
-            <div>
-              <h2 className="player-media-title">{title}</h2>
-              <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                {isLive ? '1080p • Live Broadcast' : '4K Ultra HD • Cinema Stream'}
-              </span>
-
-              {/* Quick Server Switcher Pills for VOD Cinema / Series */}
-              {!isLive && allServers.length > 1 && (
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '8px' }}>
-                  {allServers.map((s, idx) => (
-                    <button
-                      key={s.id || idx}
-                      className={`tab-pill ${currentServerIndex === idx ? 'tab-pill-active' : ''}`}
-                      data-focusable="true"
-                      tabIndex={0}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setCurrentServerIndex(idx);
-                        setIsBuffering(true);
-                        setTimeout(() => setIsBuffering(false), 1500);
-                      }}
-                      style={{ fontSize: '11px', padding: '4px 12px' }}
-                    >
-                      {s.name || `Server ${idx + 1}`}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            {isLive ? (
-              <span className="hero-badge" style={{ background: 'rgba(239,68,68,0.9)', color: '#fff', display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 14px' }}>
-                <Radio size={14} className="animate-pulse" /> LIVE
-              </span>
-            ) : (
-              <span className="hero-badge badge-quality" style={{ padding: '6px 14px' }}>
-                {activeServer?.quality || '4K UHD'}
-              </span>
-            )}
 
             <button
-              className="player-btn"
-              data-focusable="true"
-              tabIndex={0}
-              onClick={() => setShowSettingsMenu(!showSettingsMenu)}
-              title="Settings"
-              style={{ width: '42px', height: '42px' }}
+              className={`player-btn ${showSettings ? 'is-focused' : ''}`}
+              onClick={() => setShowSettings(!showSettings)}
+              style={{ minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              title="Stream Settings"
             >
               <Settings2 size={20} />
             </button>
 
-            <button
-              className="player-btn"
-              data-focusable="true"
-              tabIndex={0}
-              onClick={(e) => {
-                e.stopPropagation();
-                cycleAspectRatio();
-              }}
-              title="Screen Fit / Aspect Ratio (Zoom / Crop)"
-              style={{ width: '42px', height: '42px' }}
-            >
-              <Scan size={20} />
-            </button>
-
-            <button
-              className="player-btn"
-              data-focusable="true"
-              tabIndex={0}
-              onClick={(e) => {
-                e.stopPropagation();
-                if (containerRef.current) {
-                  if (document.fullscreenElement) {
-                    document.exitFullscreen().catch(() => {});
-                    if (window.AndroidOrientation?.setPortrait) {
-                      window.AndroidOrientation.setPortrait();
-                    }
-                  } else {
-                    containerRef.current.requestFullscreen().catch(() => {});
-                    if (window.AndroidOrientation?.setLandscape) {
-                      window.AndroidOrientation.setLandscape();
-                    }
-                  }
-                }
-              }}
-              title="Fullscreen"
-              style={{ width: '42px', height: '42px' }}
-            >
-              <Maximize size={20} />
-            </button>
-
-            {isLive && channels.length > 0 && (
+            {/* CATCH-UP TV button — only for live channels */}
+            {isLive && (
               <button
-                className="player-btn"
-                data-focusable="true"
-                tabIndex={0}
-                onClick={() => setShowChannelDrawer(!showChannelDrawer)}
-                title="Channels"
-                style={{ width: '42px', height: '42px' }}
+                className={`player-btn ${showCatchup ? 'is-focused' : ''}`}
+                onClick={() => setShowCatchup(!showCatchup)}
+                style={{ minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                title="Catch-Up TV — watch past programmes"
               >
-                <List size={20} />
+                <History size={20} />
               </button>
             )}
+
+            {/* Manual rotate toggle (fix): flips landscape/portrait on demand */}
+            <button
+              className="player-btn"
+              onClick={() => {
+                try {
+                  if (window.AndroidOrientation?.setPortrait) {
+                    window.AndroidOrientation.setPortrait();
+                    // Toggle back to landscape on next tap via state flip below
+                    rotateFlippedRef.current = !rotateFlippedRef.current;
+                    if (!rotateFlippedRef.current) window.AndroidOrientation.setLandscape();
+                  } else {
+                    window.screen?.orientation?.unlock?.();
+                  }
+                } catch {}
+              }}
+              style={{ minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              title="Rotate Screen"
+            >
+              <RotateCcw size={20} />
+            </button>
           </div>
         </div>
 
-        {/* Bottom bar for native video streams */}
-        <div className="player-bottom-bar">
-            {/* Progress Timeline for VOD */}
-            {!isLive && (
-              <div>
-                <div 
-                  className="player-scrubber-track"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    const rect = e.currentTarget.getBoundingClientRect();
-                    const pos = (e.clientX - rect.left) / rect.width;
-                    if (videoRef.current && duration) {
-                      videoRef.current.currentTime = pos * duration;
-                    }
-                  }}
-                  style={{ cursor: 'pointer' }}
-                >
-                  <div 
-                    className="player-scrubber-fill"
-                    style={{ width: `${duration > 0 ? (currentTime / duration) * 100 : 0}%` }}
-                  />
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginTop: '6px', color: 'var(--text-secondary)' }}>
-                  <span>{formatTime(currentTime)}</span>
-                  <span>{formatTime(duration)}</span>
-                </div>
-              </div>
-            )}
+        {/* Bottom Controls Bar */}
+        <div style={{ pointerEvents: 'auto' }}>
+          {/* VOD Scrubber Track */}
+          {!isLive && (
+            <div 
+              className="player-scrubber-track"
+              onClick={handleScrubberClick}
+              style={{ 
+                position: 'relative', 
+                height: '6px', 
+                borderRadius: '3px', 
+                background: 'rgba(255, 255, 255, 0.25)', 
+                cursor: 'pointer',
+                marginBottom: '14px'
+              }}
+            >
+              <div 
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  bottom: 0,
+                  width: `${bufferedPercent}%`,
+                  background: 'rgba(255, 255, 255, 0.35)',
+                  borderRadius: '3px',
+                  pointerEvents: 'none'
+                }}
+              />
+              <div 
+                className="player-scrubber-fill"
+                style={{
+                  width: `${progressPercent}%`,
+                  background: 'linear-gradient(90deg, #38bdf8 0%, #0284c7 100%)',
+                  borderRadius: '3px',
+                  pointerEvents: 'none'
+                }}
+              />
+            </div>
+          )}
 
-            <div className="player-controls-row">
-              <div className="player-btn-group">
-                {!isLive && (
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <button 
+                className="player-btn" 
+                onClick={togglePlay} 
+                style={{ minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#38bdf8', color: '#06090e' }}
+              >
+                {playing ? <Pause size={22} fill="#06090e" /> : <Play size={22} fill="#06090e" style={{ marginLeft: '2px' }} />}
+              </button>
+
+              {!isLive && (
+                <>
                   <button 
-                    className="player-btn"
-                    data-focusable="true"
-                    tabIndex={0}
-                    onClick={() => seek(-10)}
+                    className="player-btn" 
+                    onClick={() => seekRelative(-10)} 
+                    style={{ minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    title="Rewind 10s"
                   >
-                    <RotateCcw size={20} />
+                    <RotateCcw size={18} />
                   </button>
-                )}
+                  <button 
+                    className="player-btn" 
+                    onClick={() => seekRelative(10)} 
+                    style={{ minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    title="Forward 10s"
+                  >
+                    <RotateCw size={18} />
+                  </button>
+                </>
+              )}
 
+              <button 
+                className="player-btn" 
+                onClick={() => { 
+                  if (videoRef.current) { 
+                    videoRef.current.muted = !videoRef.current.muted; 
+                    setMuted(videoRef.current.muted); 
+                  } 
+                }} 
+                style={{ minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                {muted ? <VolumeX size={20} /> : <Volume2 size={20} />}
+              </button>
+            </div>
+
+            <span style={{ fontSize: '13px', fontWeight: 800, color: '#ffffff' }}>
+              {isLive ? (
+                <span style={{ color: '#ef4444' }}>● LIVE</span>
+              ) : (
+                `${formatTime(time)} / ${formatTime(duration)}`
+              )}
+            </span>
+          </div>
+
+          {/* CATCH-UP TV Drawer: watch past programmes on this channel */}
+          {showCatchup && isLive && (
+            <CatchupDrawer
+              channel={item}
+              onClose={() => setShowCatchup(false)}
+              onPlay={(url) => {
+                setShowCatchup(false);
+                // swap the live stream to the catch-up (timeshift) URL
+                const v = videoRef.current;
+                if (v) {
+                  v.src = url;
+                  v.load();
+                  v.play().catch(() => {});
+                }
+              }}
+            />
+          )}
+
+          {/* Settings Drawer */}
+          {showSettings && (
+            <div style={{ 
+              marginTop: '14px', 
+              padding: '14px', 
+              background: 'rgba(15, 23, 42, 0.98)', 
+              border: '1px solid rgba(56, 189, 248, 0.4)',
+              borderRadius: '16px',
+              boxShadow: '0 12px 30px rgba(0,0,0,0.8)'
+            }}>
+              <div style={{ fontSize: '12px', fontWeight: 900, color: '#38bdf8', marginBottom: '8px', textTransform: 'uppercase' }}>
+                Stream Quality
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '12px' }}>
                 <button 
-                  className="player-btn"
-                  data-focusable="true"
-                  tabIndex={0}
-                  onClick={togglePlay}
-                  style={{ width: '56px', height: '56px' }}
+                  onClick={() => chooseLevel(-1)} 
+                  style={{ 
+                    padding: '6px 12px', 
+                    borderRadius: '8px', 
+                    background: level === -1 ? '#38bdf8' : 'rgba(255,255,255,0.08)',
+                    color: level === -1 ? '#06090e' : '#fff',
+                    border: 'none',
+                    fontWeight: 800,
+                    fontSize: '12px',
+                    cursor: 'pointer'
+                  }}
                 >
-                  {isPlaying ? <Pause size={26} fill="currentColor" /> : <Play size={26} fill="currentColor" />}
+                  Auto
                 </button>
-
-                {!isLive && (
-                  <>
-                    <button 
-                      className="player-btn"
-                      data-focusable="true"
-                      tabIndex={0}
-                      onClick={() => seek(10)}
-                      title="Forward 10s"
-                    >
-                      <RotateCw size={20} />
-                    </button>
-
-                    <button 
-                      className="player-btn"
-                      data-focusable="true"
-                      tabIndex={0}
-                      onClick={() => seek(85)}
-                      title="Skip Intro (+85s)"
-                      style={{ width: 'auto', padding: '0 16px', borderRadius: '24px', fontSize: '12px', fontWeight: 800, gap: '6px' }}
-                    >
-                      <FastForward size={16} color="#38bdf8" />
-                      <span>Skip Intro</span>
-                    </button>
-                  </>
-                )}
+                {levels.map(entry => (
+                  <button 
+                    key={entry.index} 
+                    onClick={() => chooseLevel(entry.index)} 
+                    style={{ 
+                      padding: '6px 12px', 
+                      borderRadius: '8px', 
+                      background: level === entry.index ? '#38bdf8' : 'rgba(255,255,255,0.08)',
+                      color: level === entry.index ? '#06090e' : '#fff',
+                      border: 'none',
+                      fontWeight: 800,
+                      fontSize: '12px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {entry.label}
+                  </button>
+                ))}
               </div>
 
-              <div className="player-btn-group">
-                <button 
-                  className="player-btn"
-                  data-focusable="true"
-                  tabIndex={0}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    cycleAspectRatio();
-                  }}
-                  title="Aspect Ratio (Fit / Zoom / Fill)"
-                >
-                  <Scan size={20} />
-                </button>
+              {sources.length > 1 && (
+                <>
+                  <div style={{ fontSize: '12px', fontWeight: 900, color: '#38bdf8', marginBottom: '8px', textTransform: 'uppercase' }}>
+                    Streaming Servers
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                    {sources.map((entry, index) => (
+                      <button 
+                        key={entry.id || index} 
+                        onClick={() => chooseSource(index)} 
+                        style={{ 
+                          padding: '6px 12px', 
+                          borderRadius: '8px', 
+                          background: sourceIndex === index ? '#38bdf8' : 'rgba(255,255,255,0.08)',
+                          color: sourceIndex === index ? '#06090e' : '#fff',
+                          border: 'none',
+                          fontWeight: 800,
+                          fontSize: '12px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        {entry.name || `Server ${index + 1}`}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
 
-                <button 
-                  className="player-btn"
-                  data-focusable="true"
-                  tabIndex={0}
-                  onClick={() => {
-                    if (videoRef.current) {
-                      videoRef.current.muted = !videoRef.current.muted;
-                      setIsMuted(videoRef.current.muted);
-                    }
-                  }}
-                >
-                  {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
-                </button>
+              {/* v3.2.0: Video Fit / Zoom controls (gestures existed but were
+                  undiscoverable — user reported "aspect ratio fit zoom doesnt work") */}
+              <div style={{ fontSize: '12px', fontWeight: 900, color: '#38bdf8', marginBottom: '8px', textTransform: 'uppercase' }}>
+                Video Fit
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '4px' }}>
+                {FIT_MODES.map(mode => (
+                  <button
+                    key={mode}
+                    onClick={() => {
+                      setFitMode(mode);
+                      setPinchScale(1);
+                      resetControlsTimer();
+                    }}
+                    style={{
+                      padding: '6px 12px',
+                      borderRadius: '8px',
+                      background: fitMode === mode && pinchScale === 1 ? '#38bdf8' : 'rgba(255,255,255,0.08)',
+                      color: fitMode === mode && pinchScale === 1 ? '#06090e' : '#fff',
+                      border: 'none',
+                      fontWeight: 800,
+                      fontSize: '12px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {mode === 'contain' ? 'Fit' : mode === 'cover' ? 'Zoom to Fill' : 'Stretch'}
+                  </button>
+                ))}
+              </div>
+              <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '10px' }}>
+                Or pinch the video to zoom free-form • double-tap cycles modes.
               </div>
             </div>
-          </div>
+          )}
+        </div>
       </div>
     </div>
   );
 }
+

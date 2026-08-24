@@ -34,11 +34,14 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // --- FULLSCREEN IMMERSIVE MODE ---
+        // --- FULLSCREEN IMMERSIVE MODE & PURE BLACK BACKGROUND ---
         enableImmersiveMode();
+        getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.BLACK));
+        getWindow().getDecorView().setBackgroundColor(android.graphics.Color.BLACK);
 
         if (getBridge() != null && getBridge().getWebView() != null) {
             WebView webView = getBridge().getWebView();
+            webView.setBackgroundColor(android.graphics.Color.BLACK);
             webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
             webView.setOverScrollMode(View.OVER_SCROLL_NEVER);
             webView.setVerticalScrollBarEnabled(false);
@@ -98,6 +101,30 @@ public class MainActivity extends BridgeActivity {
                         }
                     } catch (Exception e) {
                         return 1;
+                    }
+                }
+
+                // v3.2.0 keystore cutover: lets the web app detect whether THIS
+                // install is signed with the release key. Debug-signed installs
+                // cannot update in place to release-signed builds (Android
+                // INSTALL_FAILED_UPDATE_INCOMPATIBLE), so they are routed to a
+                // guided one-time reinstall instead of a broken silent update.
+                @JavascriptInterface
+                public boolean isReleaseSigned() {
+                    try {
+                        PackageInfo pInfo = getPackageManager().getPackageInfo(
+                                getPackageName(), android.content.pm.PackageManager.GET_SIGNATURES);
+                        if (pInfo.signatures == null || pInfo.signatures.length == 0) return false;
+                        java.security.MessageDigest md =
+                                java.security.MessageDigest.getInstance("SHA-256");
+                        byte[] digest = md.digest(pInfo.signatures[0].toByteArray());
+                        StringBuilder hex = new StringBuilder();
+                        for (byte b : digest) hex.append(String.format("%02X", b));
+                        // SHA-256 of the ajo-release.keystore certificate (keytool-verified)
+                        return "354DE313E697EA83D73E89D09CF14CBF533BFFBE4563ADFC2790BBCA29D4FEE6"
+                                .equals(hex.toString());
+                    } catch (Exception e) {
+                        return false;
                     }
                 }
 

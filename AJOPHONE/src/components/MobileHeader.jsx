@@ -65,19 +65,54 @@ export function MobileHeader({ activeTab, onTabChange }) {
             }}>
               A
             </div>
-            <span style={{
-              fontSize: '20px',
-              fontWeight: 900,
-              color: '#ffffff',
-              letterSpacing: '-0.5px'
-            }}>
-              AJO
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{
+                fontSize: '20px',
+                fontWeight: 900,
+                color: '#ffffff',
+                letterSpacing: '-0.5px'
+              }}>
+                AJO
+              </span>
+              <span style={{
+                color: '#ef4444',
+                fontSize: '11px',
+                fontWeight: 900,
+                letterSpacing: '0.5px',
+                background: 'rgba(239, 68, 68, 0.18)',
+                padding: '2px 6px',
+                borderRadius: '4px',
+                border: '1px solid rgba(239, 68, 68, 0.35)'
+              }}>
+                PHONE
+              </span>
+            </div>
           </div>
         )}
 
         {/* Right Actions */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {activeTab !== 'remote' && (
+            <button
+              onClick={() => onTabChange('remote')}
+              style={{
+                width: '36px',
+                height: '36px',
+                borderRadius: '50%',
+                background: 'rgba(255, 255, 255, 0.08)',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
+                color: '#38bdf8',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer'
+              }}
+              title="Cast to TV / Firestick"
+            >
+              <Tv size={17} />
+            </button>
+          )}
+
           {activeTab !== 'search' && !isSettings && (
             <button
               onClick={() => onTabChange('search')}
@@ -95,7 +130,7 @@ export function MobileHeader({ activeTab, onTabChange }) {
               }}
               title="Search"
             >
-              <Search size={18} />
+              <Search size={17} />
             </button>
           )}
 
@@ -115,7 +150,7 @@ export function MobileHeader({ activeTab, onTabChange }) {
             }}
             title="Settings"
           >
-            <Settings size={18} />
+            <Settings size={17} />
           </button>
         </div>
       </div>

@@ -19,10 +19,7 @@ export const MediaCard = React.memo(function MediaCard({ item, onClick, onFocus 
 
   const handleCastToTV = (e) => {
     e.stopPropagation();
-    castEngine.sendToTV({
-      type: 'PLAY_MEDIA',
-      item: item
-    });
+    castEngine.castMedia(item).catch(() => {});
     setCasted(true);
     setTimeout(() => setCasted(false), 2000);
     if (navigator.vibrate) {

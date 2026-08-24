@@ -14,14 +14,44 @@ import {
   Download,
   ArrowUpCircle,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  Puzzle,
+  CheckCircle2,
+  Plus
 } from 'lucide-react';
 import { clearWatchHistory, clearAppCache, setSleepTimer as applySleepTimer } from '../api/history';
 import { getIPTVConfig, saveIPTVConfig } from '../api/iptv';
+import { getInstalledAddons, installAddon, removeAddon, FEATURED_ADDONS } from '../api/stremio';
 import { checkForAppUpdates, startAppUpdate, CURRENT_APP_VERSION } from '../api/otaUpdate';
 
 export function SettingsView({ onClearHistory, onReloadApp }) {
   const currentConfig = getIPTVConfig();
+  let __addonsInit = [];
+try { __addonsInit = getInstalledAddons() || []; } catch {}
+const [addons, setAddons] = useState(__addonsInit);
+  const [addonUrl, setAddonUrl] = useState('');
+  const [addonStatus, setAddonStatus] = useState(null);
+
+  const refreshAddons = () => setAddons(getInstalledAddons());
+
+  const handleInstallAddon = async (url) => {
+    setAddonStatus({ type: 'loading', msg: 'Installing...' });
+    try {
+      const addon = await installAddon(url || addonUrl);
+      setAddonUrl('');
+      refreshAddons();
+      setAddonStatus({ type: 'ok', msg: `${addon.name} installed!` });
+      setTimeout(() => setAddonStatus(null), 3000);
+    } catch (e) {
+      setAddonStatus({ type: 'err', msg: e.message });
+      setTimeout(() => setAddonStatus(null), 4000);
+    }
+  };
+
+  const handleRemoveAddon = (id) => {
+    removeAddon(id);
+    refreshAddons();
+  };
   const [jioTvHost, setJioTvHost] = useState(currentConfig.jioTvHost);
   const [customM3uUrl, setCustomM3uUrl] = useState(currentConfig.customM3uUrl);
   const [sleepTimer, setSleepTimer] = useState('off');
@@ -60,9 +90,16 @@ export function SettingsView({ onClearHistory, onReloadApp }) {
     setUpdateError(null);
     try {
       const info = await checkForAppUpdates('phone', true);
+      // v3.2.0 keystore cutover: debug-signed installs can't update in place
+      // to a release-signed APK — show the one-time reinstall path instead.
+      if (info.targetSigning === 'release' && !info.isReleaseSigned) {
+        info.needsReinstall = true;
+      }
       setUpdateInfo(info);
       if (!info.hasUpdate) {
         showNotice(`✓ App is up to date (v${info.currentVersion})`);
+      } else if (info.needsReinstall) {
+        showNotice('⚠ One-time reinstall needed for the new release key');
       } else {
         showNotice(`🚀 New update ready: v${info.latestVersion}!`);
       }
@@ -299,15 +336,15 @@ export function SettingsView({ onClearHistory, onReloadApp }) {
         {updateInfo && updateInfo.hasUpdate && !isUpdating && (
           <div style={{
             marginTop: '14px',
-            background: 'rgba(56, 189, 248, 0.08)',
-            border: '1px solid rgba(56, 189, 248, 0.25)',
+            background: updateInfo.needsReinstall ? 'rgba(245, 158, 11, 0.08)' : 'rgba(56, 189, 248, 0.08)',
+            border: updateInfo.needsReinstall ? '1px solid rgba(245, 158, 11, 0.35)' : '1px solid rgba(56, 189, 248, 0.25)',
             borderRadius: '12px',
             padding: '14px'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
               <div>
                 <span style={{
-                  background: '#22c55e',
+                  background: updateInfo.needsReinstall ? '#f59e0b' : '#22c55e',
                   color: '#fff',
                   fontSize: '10px',
                   fontWeight: 900,
@@ -315,12 +352,18 @@ export function SettingsView({ onClearHistory, onReloadApp }) {
                   borderRadius: '10px',
                   marginRight: '6px'
                 }}>
-                  NEW UPDATE
+                  {updateInfo.needsReinstall ? 'ONE-TIME REINSTALL' : 'NEW UPDATE'}
                 </span>
                 <strong style={{ color: '#fff', fontSize: '14px' }}>Version {updateInfo.latestVersion}</strong>
               </div>
               <span style={{ fontSize: '12px', color: '#94a3b8' }}>Size: {updateInfo.size}</span>
             </div>
+
+            {updateInfo.needsReinstall && (
+              <div style={{ margin: '10px 0', fontSize: '12px', color: '#fbbf24', lineHeight: '1.6', fontWeight: 700 }}>
+                ⚠ AJO is switching to its permanent release key. Android requires a one-time uninstall → reinstall for this switch. Your watch history is preserved if you keep app data; the app reopens normally afterwards.
+              </div>
+            )}
 
             {updateInfo.changelog && updateInfo.changelog.length > 0 && (
               <div style={{ margin: '10px 0', fontSize: '12px', color: '#cbd5e1', lineHeight: '1.6' }}>
@@ -354,7 +397,7 @@ export function SettingsView({ onClearHistory, onReloadApp }) {
               }}
             >
               <Download size={16} />
-              <span>1-Tap Download & Install Update</span>
+              <span>{updateInfo.needsReinstall ? 'Download & Reinstall (One Time)' : '1-Tap Download & Install Update'}</span>
             </button>
           </div>
         )}
@@ -475,6 +518,74 @@ export function SettingsView({ onClearHistory, onReloadApp }) {
             <span>Reset App Cache & Reload</span>
           </button>
         </div>
+      </div>
+
+      {/* STREMIO ADDONS */}
+      <div className="mobile-settings-card" style={{
+        background: 'rgba(14, 20, 31, 0.9)',
+        border: '1px solid rgba(255, 255, 255, 0.08)',
+        borderRadius: '16px',
+        padding: '18px'
+      }}>
+        <h3 style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '0 0 8px', fontSize: '1rem' }}>
+          <Puzzle size={18} color="#38bdf8" /> Addons (Stremio Compatible)
+        </h3>
+        <p style={{ color: '#94a3b8', fontSize: '0.85rem', margin: '0 0 12px' }}>
+          Install community addons for unlimited catalogs & streams.
+        </p>
+
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
+          {FEATURED_ADDONS.map(fa => {
+            const installed = addons.some(a => a.id === fa.id);
+            return (
+              <button
+                key={fa.id}
+                onClick={() => handleInstallAddon(fa.url)}
+                disabled={installed}
+                style={{
+                  padding: '8px 14px', borderRadius: 20, fontSize: '0.8rem', fontWeight: 700,
+                  background: installed ? 'rgba(34,197,94,0.15)' : 'rgba(56,189,248,0.12)',
+                  border: `1px solid ${installed ? 'rgba(34,197,94,0.4)' : 'rgba(56,189,248,0.4)'}`,
+                  color: installed ? '#22c55e' : '#38bdf8',
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6
+                }}
+              >
+                {installed ? <CheckCircle2 size={13} /> : <Plus size={13} />}
+                {installed ? fa.name : `Add ${fa.name}`}
+              </button>
+            );
+          })}
+        </div>
+
+        <div style={{ display: 'flex', gap: 8 }}>
+          <input
+            value={addonUrl}
+            onChange={(e) => setAddonUrl(e.target.value)}
+            placeholder="Paste addon manifest URL..."
+            style={{ flex: 1, padding: '10px 12px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(148,163,184,0.3)', borderRadius: 8, color: '#fff', fontSize: '0.85rem' }}
+          />
+          <button onClick={() => handleInstallAddon()} disabled={!addonUrl} style={{
+            padding: '10px 16px', borderRadius: 8, fontWeight: 800, fontSize: '0.85rem',
+            background: addonUrl ? '#38bdf8' : 'rgba(148,163,184,0.2)', color: addonUrl ? '#06121f' : '#64748b', border: 'none', cursor: 'pointer'
+          }}>Add</button>
+        </div>
+        {addonStatus && (
+          <p style={{ marginTop: 8, fontSize: '0.8rem', fontWeight: 700, color: addonStatus.type === 'ok' ? '#22c55e' : addonStatus.type === 'err' ? '#ef4444' : '#38bdf8' }}>
+            {addonStatus.msg}
+          </p>
+        )}
+        {addons.length > 0 && (
+          <div style={{ marginTop: 12 }}>
+            {addons.map(a => (
+              <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 0', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                <span style={{ fontSize: '0.85rem' }}>{a.name}</span>
+                <button onClick={() => handleRemoveAddon(a.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <Trash2 size={11} /> Remove
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* IPTV & M3U Playlist Source */}

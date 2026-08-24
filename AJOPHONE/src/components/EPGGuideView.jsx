@@ -61,10 +61,7 @@ export function EPGGuideView({ channels = [], onSelectChannel }) {
 
   const handleCastToTV = (e, ch) => {
     e.stopPropagation();
-    castEngine.sendToTV({
-      type: 'PLAY_MEDIA',
-      item: ch
-    });
+    castEngine.castMedia(ch).catch(() => {});
     setCastAlert(`Casting ${ch.title} to TV...`);
     setTimeout(() => setCastAlert(null), 2500);
     if (navigator.vibrate) {

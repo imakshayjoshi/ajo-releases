@@ -22,6 +22,9 @@ import { AppProvidersRow } from './components/AppProvidersRow';
 import { TVRemoteControlView } from './components/TVRemoteControlView';
 import { getDocumentariesCatalog, getAnimeCatalog, getNetworkOriginalsCatalog } from './api/hubCatalog';
 import { getShortTVSummaryList } from './api/shortTvCatalog';
+import { getTmdbTrending, getTmdbCatalog, enrichWithImdb, getBecauseYouWatched } from './api/tmdb';
+import { getWatchlist, toggleWatchlist as toggleWL, mergeRemoteWatchlist, pushWatchlist } from './api/watchlistSync';
+import { getRankedServers } from './api/mirrorHealth';
 import { ShortTVView } from './components/ShortTVView';
 import { checkForAppUpdates, startAppUpdate } from './api/otaUpdate';
 import { Film, Video, Tv, Radio, Bookmark, Cast, Rocket, X, ArrowUpCircle, Flame } from 'lucide-react';
@@ -36,15 +39,23 @@ export default function App() {
   const [otaProgress, setOtaProgress] = useState(0);
 
   useEffect(() => {
-    // Check for updates silently on app startup
-    const timer = setTimeout(() => {
+    // Check for updates silently on startup, then every 4h and on app resume
+    const runUpdateCheck = () => {
       checkForAppUpdates('phone', false).then(info => {
         if (info && info.hasUpdate) {
           setOtaNotice(info);
         }
       }).catch(() => {});
-    }, 1500);
-    return () => clearTimeout(timer);
+    };
+    const timer = setTimeout(runUpdateCheck, 1500);
+    const updateInterval = setInterval(runUpdateCheck, 4 * 60 * 60 * 1000);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') runUpdateCheck();
+    });
+    return () => {
+      clearTimeout(timer);
+      clearInterval(updateInterval);
+    };
   }, []);
   
   // Catalogs & Favorites
@@ -58,6 +69,11 @@ export default function App() {
   const [hollywoodItems, setHollywoodItems] = useState([]);
   const [serialsItems, setSerialsItems] = useState([]);
   const [docuItems, setDocuItems] = useState([]);
+  const [tmdbTrending, setTmdbTrending] = useState([]);
+  const [tmdbMovies, setTmdbMovies] = useState([]);
+  const [tmdbSeries, setTmdbSeries] = useState([]);
+  const [becauseYouWatched, setBecauseYouWatched] = useState([]);
+  const [watchlistItems, setWatchlistItems] = useState(() => getWatchlist());
   const [animeItems, setAnimeItems] = useState([]);
   const [networkItems, setNetworkItems] = useState([]);
   const [shortTvItems, setShortTvItems] = useState([]);
@@ -114,12 +130,19 @@ export default function App() {
     try {
       setContinueWatching(getWatchHistory());
       refreshFavorites();
+      // "Because you watched" personalization
+      getBecauseYouWatched(getWatchHistory() || []).then(recs => {
+        setBecauseYouWatched(recs || []);
+      }).catch(() => {});
 
-      const [live, bolly, holly, serials] = await Promise.allSettled([
+      const [live, bolly, holly, serials, trending, popMovies, popTv] = await Promise.allSettled([
         getLiveBroadcasts(),
         getBollywoodCatalog(6), // Pre-load Bollywood movies (120+ titles)
         getHollywoodCatalog(6), // Pre-load Hollywood movies (120+ titles)
-        getSerialsCatalog(6)    // Pre-load Series (120+ titles)
+        getSerialsCatalog(6),   // Pre-load Series (120+ titles)
+        getTmdbTrending('all', 'week'),
+        getTmdbCatalog('movie', 'popular'),
+        getTmdbCatalog('tv', 'popular')
       ]);
 
       const lList = live.status === 'fulfilled' && Array.isArray(live.value) ? live.value : [];
@@ -162,6 +185,9 @@ export default function App() {
       setBollywoodItems(bList);
       setHollywoodItems(hList);
       setSerialsItems(sList);
+      if (trending.status === 'fulfilled') setTmdbTrending(trending.value || []);
+      if (popMovies.status === 'fulfilled') setTmdbMovies(popMovies.value || []);
+      if (popTv.status === 'fulfilled') setTmdbSeries(popTv.value || []);
       setDocuItems(getDocumentariesCatalog());
       setNetworkItems(getNetworkOriginalsCatalog());
       setShortTvItems(getShortTVSummaryList());
@@ -275,10 +301,23 @@ export default function App() {
     }
   }, [showPage, loadingMoreShows, hasMoreShows]);
 
-  const handleStartPlayback = useCallback((item, server) => {
+  const handleStartPlayback = useCallback(async (item, server) => {
     setSelectedItem(null);
-    const chosenPlayer = server || item.players?.[0] || item.player?.[0] || { url: item.url, source: 'm3u8' };
-    setActivePlayback({ item, server: chosenPlayer });
+    // AUTO-ID-RESOLUTION: resolve IMDb id from TMDB id so the mirror queue
+    // is fully populated for every TMDB-sourced title (same as TV app).
+    let resolvedItem = item;
+    try {
+      resolvedItem = await enrichWithImdb(item) || item;
+    } catch {}
+    let chosenPlayer = server || resolvedItem.players?.[0] || resolvedItem.player?.[0] || { url: resolvedItem.url, source: 'm3u8' };
+    const queue = resolvedItem.players || resolvedItem.player || [];
+    if (!server && queue.length > 1) {
+      try {
+        const ranked = await getRankedServers(queue);
+        chosenPlayer = ranked[0] || chosenPlayer;
+      } catch {}
+    }
+    setActivePlayback({ item: resolvedItem, server: chosenPlayer });
   }, []);
 
   const handleCardClick = useCallback((item) => {
@@ -367,7 +406,7 @@ export default function App() {
             title="Web Series, Documentaries & Anime"
             icon={Tv}
             type="shows"
-            items={[...serialsItems, ...docuItems, ...animeItems, ...networkItems, ...shortTvItems]}
+            items={[...serialsItems, ...docuItems, ...animeItems, ...networkItems]}
             onSelectItem={handleCardClick}
             onLoadMore={handleLoadMoreShows}
             hasMore={hasMoreShows}
@@ -375,27 +414,6 @@ export default function App() {
           />
         ) : (
           <>
-            {/* FEATURED SPOTLIGHT HERO */}
-            {featuredItem && (
-              <HeroBanner
-                featuredItem={featuredItem}
-                onPlay={(item) => handleStartPlayback(item, item.players?.[0] || item.player?.[0])}
-                onSelectInfo={(item) => setSelectedItem(item)}
-                onFavoritesChanged={refreshFavorites}
-              />
-            )}
-
-            {/* 🔥 SHORT TV & DRAMA SHORTS (REELS MODE) */}
-            {shortTvItems.length > 0 && (
-              <MediaRail 
-                title="🔥 ShortTV & Drama Shorts (Reels Mode)" 
-                items={shortTvItems}
-                landscape={false}
-                onSelectItem={() => setActiveTab('short_tv')}
-                onSeeAll={() => setActiveTab('short_tv')}
-              />
-            )}
-
             {/* CONTINUE WATCHING (Landscape) */}
             {continueWatching.length > 0 && (
               <MediaRail 
@@ -414,6 +432,37 @@ export default function App() {
                 onSelectItem={handleCardClick}
               />
             )}
+
+            {/* WATCHLIST (synced with TV) */}
+            {watchlistItems.length > 0 && (
+              <MediaRail
+                title="🔖 My Watchlist"
+                items={watchlistItems}
+                onSelectItem={handleCardClick}
+              />
+            )}
+
+            {/* BECAUSE YOU WATCHED (personalized) */}
+            {becauseYouWatched.length > 0 && (
+              <MediaRail
+                title={`🎯 Because you watched ${becauseYouWatched[0]?.becauseOf || 'recent titles'}`}
+                items={becauseYouWatched}
+                landscape={true}
+                onSelectItem={handleCardClick}
+              />
+            )}
+
+            {/* TMDB TRENDING WORLDWIDE */}
+            {tmdbTrending.length > 0 && (
+              <MediaRail
+                title="🌍 Trending Worldwide This Week"
+                items={tmdbTrending}
+                landscape={true}
+                onSelectItem={handleCardClick}
+              />
+            )}
+
+            {/* Shorts TV removed per user request — vertical shorts don't fit AJO's TV-first identity */}
 
             {/* ⭐ MY WATCHLIST */}
             {favoritesList.length > 0 && (

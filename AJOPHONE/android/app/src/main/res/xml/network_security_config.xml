@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  AJO Phone network security config.
+  - DoH (DNS-over-HTTPS) providers allowed in cleartext-blocked world:
+    dns.google and cloudflare-dns.com run HTTPS-only, so no cleartext needed.
+  - Cleartext permitted for legacy stream CDNs that some mirrors still serve
+    over http:// (Live TV playlists frequently contain http:// m3u8s).
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>
