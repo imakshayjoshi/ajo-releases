@@ -1,8 +1,8 @@
 {
   "schemaVersion": 2,
-  "version": "3.9.2",
-  "versionCode": 73,
-  "releaseDate": "2026-08-20",
+  "version": "3.9.3",
+  "versionCode": 74,
+  "releaseDate": "2026-08-24",
   "phone": {
     "version": "2.5.5",
     "versionCode": 26,
@@ -19,20 +19,22 @@
     "size_mb": "4.3 MB"
   },
   "tv": {
-    "version": "3.9.2",
-    "versionCode": 73,
+    "version": "3.9.3",
+    "versionCode": 74,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "🎬 Fixed Movie Streaming: Multi-server resolution for all TMDB & IMDb titles with high-speed direct & embed playback.",
-      "📺 Curated Maharashtra & Hindi Live TV: Full lineup with Sony SAB, Sony TV HD, Colors Marathi, Star Pravah, Zee Marathi, ABP Majha, Zee 24 Taas, Aaj Tak HD, and DD Sports.",
-      "⚡ Multi-Mirror Failover: Multiple backup streams per channel for zero-interruption live TV.",
-      "🔥 Hybrid Native Player Engine: Seamless hardware playback on Fire TV."
+      "🛠 Fixed player lifecycle: onPause/onResume prevents decoder thrashing on Fire TV remote events",
+      "🎬 Fixed binge countdown import crash (BINGE_COUNTDOWN_SECONDS ReferenceError)",
+      "📺 Fixed useEffect dependency warning in binge countdown",
+      "🔧 Fixed streamingEngines crash when item.id is numeric",
+      "⚡ Improved OTA version comparison for pre-release/metadata suffixes",
+      "🔄 Improved multi-server failover and error recovery"
     ],
-    "size_mb": "6.8 MB",
-    "sha256": "5dab4255049effe309805ef54d8ba7bdb4aa1afcb49581313c9d2ddf62502d61"
+    "size_mb": "7.3 MB",
+    "sha256": "be58551e14d4b9b5c4307ba501fb2ca01bdbf59de61df90c5cae9e3c919570fe"
   }
 }

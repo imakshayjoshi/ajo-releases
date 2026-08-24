@@ -162,14 +162,21 @@ export function MediaDetailsModal({ item, onClose, onStartPlayback }) {
               <span>Watch Now</span>
             </button>
 
-            <button 
-              className="tv-btn-secondary" 
-              tabIndex={0} 
+            <button
+              className="tv-btn-secondary"
+              tabIndex={0}
               onClick={() => {
                 const srv = servers[selectedServer] || servers[0];
                 const streamUrl = srv?.url || srv?.src || '';
+                if (!streamUrl) return;
                 // Direct native handoff — skips the WebView video pipeline entirely.
-                if (!playInNativePlayer(streamUrl, title, false)) {
+                // Pass the full server queue so the native activity can fail over
+                // automatically when the first mirror is dead.
+                const fallbacks = servers
+                  .filter((_, i) => i !== selectedServer)
+                  .map((s) => s?.url)
+                  .filter(Boolean);
+                if (!playInNativePlayer(streamUrl, title, false, fallbacks)) {
                   handlePlay();
                 }
               }}

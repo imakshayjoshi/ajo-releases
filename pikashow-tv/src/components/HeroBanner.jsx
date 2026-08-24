@@ -52,7 +52,10 @@ export function HeroBanner({ featuredItem, onPlay, onSelectInfo, onFavoritesChan
         <div 
           style={{
             position: 'absolute',
-            inset: 0,
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
             backgroundImage: `url(${poster})`,
             backgroundSize: 'cover',
             backgroundPosition: 'top center',
@@ -66,7 +69,10 @@ export function HeroBanner({ featuredItem, onPlay, onSelectInfo, onFavoritesChan
       <div 
         style={{
           position: 'absolute',
-          inset: 0,
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
           background: 'linear-gradient(180deg, rgba(6, 9, 14, 0.2) 0%, rgba(6, 9, 14, 0.1) 40%, rgba(6, 9, 14, 0.8) 75%, #06090e 100%)',
           pointerEvents: 'none'
         }} 
@@ -143,6 +149,9 @@ export function HeroBanner({ featuredItem, onPlay, onSelectInfo, onFavoritesChan
         >
           {/* 1. My List Button */}
           <button 
+            className="tv-hero-action-btn tv-focusable-btn"
+            data-focusable="true"
+            tabIndex={0}
             onClick={handleToggleWatchlist}
             style={{
               flex: 1,
@@ -165,6 +174,9 @@ export function HeroBanner({ featuredItem, onPlay, onSelectInfo, onFavoritesChan
 
           {/* 2. Solid White Netflix Play Button */}
           <button 
+            className="tv-hero-action-btn tv-focusable-btn"
+            data-focusable="true"
+            tabIndex={0}
             onClick={() => onPlay(featuredItem)}
             style={{
               flex: 2,
@@ -190,6 +202,9 @@ export function HeroBanner({ featuredItem, onPlay, onSelectInfo, onFavoritesChan
 
           {/* 3. Info Button */}
           <button 
+            className="tv-hero-action-btn tv-focusable-btn"
+            data-focusable="true"
+            tabIndex={0}
             onClick={() => onSelectInfo(featuredItem)}
             style={{
               flex: 1,

@@ -10,34 +10,44 @@ import {
   ListOrdered, 
   Heart, 
   Bookmark, 
-  Share2, 
   Sparkles, 
   Layers,
   X,
-  Check,
+  Flame,
+  ArrowLeft,
+  Tv,
+  Star,
   Film
 } from 'lucide-react';
 import { SHORT_TV_SERIES } from '../api/shortTvCatalog';
 
 export function ShortTVView({ onPlayFullscreen }) {
-  const [activeSeriesIndex, setActiveSeriesIndex] = useState(0);
+  const [selectedSeries, setSelectedSeries] = useState(null);
   const [activeEpisodeIndex, setActiveEpisodeIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(true);
   const [isMuted, setIsMuted] = useState(false);
   const [liked, setLiked] = useState(false);
   const [bookmarked, setBookmarked] = useState(false);
   const [episodeDrawerOpen, setEpisodeDrawerOpen] = useState(false);
-  const [seriesDrawerOpen, setSeriesDrawerOpen] = useState(false);
+  const [filterGenre, setFilterGenre] = useState('all');
   const [progress, setProgress] = useState(0);
 
   const videoRef = useRef(null);
   const hlsRef = useRef(null);
 
-  const currentSeries = SHORT_TV_SERIES[activeSeriesIndex] || SHORT_TV_SERIES[0];
+  const currentSeries = selectedSeries || SHORT_TV_SERIES[0];
   const currentEpisode = currentSeries?.episodes?.[activeEpisodeIndex] || currentSeries?.episodes?.[0];
 
-  // Initialize Hls.js stream on episode change
+  // Filter series
+  const filteredSeries = SHORT_TV_SERIES.filter(s => {
+    if (filterGenre === 'all') return true;
+    const g = (s.genre || '').toLowerCase() + ' ' + (s.description || '').toLowerCase();
+    return g.includes(filterGenre);
+  });
+
+  // Initialize Hls.js when in player mode
   useEffect(() => {
+    if (!selectedSeries) return;
     const video = videoRef.current;
     if (!video || !currentEpisode?.url) return;
 
@@ -80,10 +90,11 @@ export function ShortTVView({ onPlayFullscreen }) {
         hlsRef.current = null;
       }
     };
-  }, [currentSeries, currentEpisode]);
+  }, [selectedSeries, activeEpisodeIndex, currentEpisode]);
 
-  // Video progress and auto-advance
+  // Video progress & auto-advance
   useEffect(() => {
+    if (!selectedSeries) return;
     const video = videoRef.current;
     if (!video) return;
 
@@ -94,12 +105,10 @@ export function ShortTVView({ onPlayFullscreen }) {
     };
 
     const handleEnded = () => {
-      // Auto advance to next episode
       if (activeEpisodeIndex < (currentSeries.episodes.length - 1)) {
         setActiveEpisodeIndex(prev => prev + 1);
-      } else if (activeSeriesIndex < (SHORT_TV_SERIES.length - 1)) {
-        setActiveSeriesIndex(prev => prev + 1);
-        setActiveEpisodeIndex(0);
+      } else {
+        setIsPlaying(false);
       }
     };
 
@@ -110,7 +119,7 @@ export function ShortTVView({ onPlayFullscreen }) {
       video.removeEventListener('timeupdate', handleTimeUpdate);
       video.removeEventListener('ended', handleEnded);
     };
-  }, [activeEpisodeIndex, activeSeriesIndex, currentSeries]);
+  }, [selectedSeries, activeEpisodeIndex, currentSeries]);
 
   const togglePlay = () => {
     const video = videoRef.current;
@@ -119,536 +128,530 @@ export function ShortTVView({ onPlayFullscreen }) {
       video.pause();
       setIsPlaying(false);
     } else {
-      video.play();
-      setIsPlaying(true);
+      video.play().then(() => setIsPlaying(true)).catch(() => {});
     }
   };
 
-  const toggleMute = (e) => {
-    e.stopPropagation();
+  const toggleMute = () => {
     const video = videoRef.current;
     if (!video) return;
-    video.muted = !video.muted;
-    setIsMuted(video.muted);
+    video.muted = !isMuted;
+    setIsMuted(!isMuted);
   };
 
-  const handleNextEpisode = () => {
-    if (activeEpisodeIndex < currentSeries.episodes.length - 1) {
-      setActiveEpisodeIndex(prev => prev + 1);
-    }
-  };
+  // IF NO SERIES SELECTED: SHOW GORGEOUS 10-FOOT SHORT TV DRAMA GALLERY GRID
+  if (!selectedSeries) {
+    const heroDrama = SHORT_TV_SERIES[0];
+    const genres = [
+      { id: 'all', label: '🔥 All Short Dramas' },
+      { id: 'romance', label: '❤️ Romance & CEO' },
+      { id: 'action', label: '⚔️ Action & War' },
+      { id: 'revenge', label: '👑 Heiress & Revenge' }
+    ];
 
-  const handlePrevEpisode = () => {
-    if (activeEpisodeIndex > 0) {
-      setActiveEpisodeIndex(prev => prev - 1);
-    }
-  };
-
-  return (
-    <div className="short-tv-viewport" style={{
-      position: 'relative',
-      width: '100%',
-      height: 'calc(100vh - 75px)',
-      background: '#000000',
-      overflow: 'hidden',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 20
-    }}>
-      {/* Video Element */}
-      <video
-        ref={videoRef}
-        playsInline
-        muted={isMuted}
-        onClick={togglePlay}
-        style={{
-          width: '100%',
-          height: '100%',
-          objectFit: 'cover',
-          background: '#0a0a0a',
-          cursor: 'pointer'
-        }}
-      />
-
-      {/* Progress Bar (Bottom) */}
-      <div style={{
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        height: '3px',
-        background: 'rgba(255, 255, 255, 0.2)',
-        zIndex: 50
-      }}>
-        <div style={{
-          height: '100%',
-          width: `${progress}%`,
-          background: '#38bdf8',
-          transition: 'width 0.2s linear'
-        }} />
-      </div>
-
-      {/* Top Overlay: Series Title & Switcher */}
-      <div style={{
-        position: 'absolute',
-        top: '12px',
-        left: '12px',
-        right: '12px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        zIndex: 40,
-        pointerEvents: 'auto'
-      }}>
-        <button
-          onClick={() => setSeriesDrawerOpen(true)}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            background: 'rgba(0, 0, 0, 0.65)',
-            backdropFilter: 'blur(10px)',
-            border: '1px solid rgba(255, 255, 255, 0.15)',
-            padding: '6px 14px',
-            borderRadius: '20px',
-            color: '#fff',
-            fontSize: '13px',
-            fontWeight: 800,
-            cursor: 'pointer',
-            boxShadow: '0 4px 14px rgba(0, 0, 0, 0.5)'
-          }}
-        >
-          <Sparkles size={14} color="#f59e0b" />
-          <span style={{ maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {currentSeries.title}
-          </span>
-          <Layers size={13} color="#94a3b8" />
-        </button>
-
-        {/* Mute Button */}
-        <button
-          onClick={toggleMute}
-          style={{
-            background: 'rgba(0, 0, 0, 0.65)',
-            backdropFilter: 'blur(10px)',
-            border: '1px solid rgba(255, 255, 255, 0.15)',
-            width: '36px',
-            height: '36px',
-            borderRadius: '50%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#fff',
-            cursor: 'pointer'
-          }}
-        >
-          {isMuted ? <VolumeX size={18} color="#ef4444" /> : <Volume2 size={18} color="#38bdf8" />}
-        </button>
-      </div>
-
-      {/* Center Play/Pause Indicator (Only when paused) */}
-      {!isPlaying && (
-        <div 
-          onClick={togglePlay}
-          style={{
-            position: 'absolute',
-            inset: 0,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: 'rgba(0, 0, 0, 0.3)',
-            zIndex: 30,
-            cursor: 'pointer'
-          }}
-        >
+    return (
+      <div className="tv-short-gallery" style={{ position: 'relative', zIndex: 20, width: '100%', padding: '0 0 40px 0' }}>
+        {/* Spotlight Hero Banner */}
+        {heroDrama && (
           <div style={{
-            width: '64px',
-            height: '64px',
-            borderRadius: '50%',
-            background: 'rgba(56, 189, 248, 0.9)',
+            position: 'relative',
+            width: '100%',
+            height: '320px',
+            borderRadius: '16px',
+            overflow: 'hidden',
+            marginBottom: '28px',
+            background: 'linear-gradient(135deg, #0b1329 0%, #1e1b4b 100%)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: '0 0 30px rgba(56, 189, 248, 0.6)'
+            padding: '0 36px',
+            boxShadow: '0 16px 40px rgba(0, 0, 0, 0.7)'
           }}>
-            <Play size={30} fill="#fff" color="#fff" style={{ marginLeft: '4px' }} />
-          </div>
-        </div>
-      )}
-
-      {/* Right Action Sidebar (Like, Bookmark, Episodes, Up/Down) */}
-      <div style={{
-        position: 'absolute',
-        right: '12px',
-        bottom: '80px',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        gap: '16px',
-        zIndex: 40
-      }}>
-        {/* Like */}
-        <button
-          onClick={() => setLiked(!liked)}
-          style={{
-            background: 'rgba(0,0,0,0.6)',
-            backdropFilter: 'blur(8px)',
-            border: '1px solid rgba(255,255,255,0.1)',
-            width: '42px',
-            height: '42px',
-            borderRadius: '50%',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer'
-          }}
-        >
-          <Heart size={20} fill={liked ? '#ef4444' : 'none'} color={liked ? '#ef4444' : '#fff'} />
-        </button>
-
-        {/* Bookmark */}
-        <button
-          onClick={() => setBookmarked(!bookmarked)}
-          style={{
-            background: 'rgba(0,0,0,0.6)',
-            backdropFilter: 'blur(8px)',
-            border: '1px solid rgba(255,255,255,0.1)',
-            width: '42px',
-            height: '42px',
-            borderRadius: '50%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer'
-          }}
-        >
-          <Bookmark size={20} fill={bookmarked ? '#f59e0b' : 'none'} color={bookmarked ? '#f59e0b' : '#fff'} />
-        </button>
-
-        {/* Episodes Drawer Button */}
-        <button
-          onClick={() => setEpisodeDrawerOpen(true)}
-          style={{
-            background: 'rgba(56, 189, 248, 0.25)',
-            backdropFilter: 'blur(8px)',
-            border: '1px solid #38bdf8',
-            width: '42px',
-            height: '42px',
-            borderRadius: '50%',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer'
-          }}
-        >
-          <ListOrdered size={20} color="#38bdf8" />
-        </button>
-
-        {/* Next / Prev Buttons */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          <button
-            onClick={handlePrevEpisode}
-            disabled={activeEpisodeIndex === 0}
-            style={{
-              background: 'rgba(0,0,0,0.6)',
-              border: '1px solid rgba(255,255,255,0.1)',
-              width: '36px',
-              height: '36px',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: activeEpisodeIndex === 0 ? 'not-allowed' : 'pointer',
-              opacity: activeEpisodeIndex === 0 ? 0.3 : 1
-            }}
-          >
-            <ChevronUp size={20} color="#fff" />
-          </button>
-          <button
-            onClick={handleNextEpisode}
-            disabled={activeEpisodeIndex >= currentSeries.episodes.length - 1}
-            style={{
-              background: 'rgba(0,0,0,0.6)',
-              border: '1px solid rgba(255,255,255,0.1)',
-              width: '36px',
-              height: '36px',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: activeEpisodeIndex >= currentSeries.episodes.length - 1 ? 'not-allowed' : 'pointer',
-              opacity: activeEpisodeIndex >= currentSeries.episodes.length - 1 ? 0.3 : 1
-            }}
-          >
-            <ChevronDown size={20} color="#fff" />
-          </button>
-        </div>
-      </div>
-
-      {/* Bottom Info Overlay */}
-      <div style={{
-        position: 'absolute',
-        bottom: '16px',
-        left: '14px',
-        right: '70px',
-        zIndex: 40,
-        pointerEvents: 'none'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-          <span style={{
-            background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-            color: '#fff',
-            fontSize: '10px',
-            fontWeight: 900,
-            padding: '2px 8px',
-            borderRadius: '6px'
-          }}>
-            EP {activeEpisodeIndex + 1} / {currentSeries.total_episodes}
-          </span>
-          <span style={{ color: '#38bdf8', fontSize: '11px', fontWeight: 800 }}>
-            {currentSeries.genre}
-          </span>
-          <span style={{ color: '#94a3b8', fontSize: '11px', fontWeight: 600 }}>
-            {currentSeries.country}
-          </span>
-        </div>
-
-        <h3 style={{
-          fontSize: '15px',
-          fontWeight: 900,
-          color: '#ffffff',
-          margin: '0 0 4px 0',
-          textShadow: '0 2px 8px rgba(0,0,0,0.9)'
-        }}>
-          {currentEpisode.title}
-        </h3>
-
-        <p style={{
-          fontSize: '12px',
-          color: '#cbd5e1',
-          margin: 0,
-          lineHeight: '1.4',
-          display: '-webkit-box',
-          WebkitLineClamp: 2,
-          WebkitBoxOrient: 'vertical',
-          overflow: 'hidden',
-          textShadow: '0 1px 4px rgba(0,0,0,0.9)'
-        }}>
-          {currentSeries.description}
-        </p>
-      </div>
-
-      {/* Episodes Drawer Modal */}
-      {episodeDrawerOpen && (
-        <div
-          onClick={() => setEpisodeDrawerOpen(false)}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0, 0, 0, 0.75)',
-            backdropFilter: 'blur(8px)',
-            zIndex: 9999,
-            display: 'flex',
-            alignItems: 'flex-end',
-            justifyContent: 'center'
-          }}
-        >
-          <div
-            onClick={e => e.stopPropagation()}
-            style={{
-              background: '#0f172a',
-              width: '100%',
-              maxWidth: '500px',
-              maxHeight: '70vh',
-              borderTopLeftRadius: '20px',
-              borderTopRightRadius: '20px',
-              border: '1px solid rgba(255, 255, 255, 0.15)',
-              display: 'flex',
-              flexDirection: 'column',
-              overflow: 'hidden'
-            }}
-          >
             <div style={{
-              padding: '14px 18px',
-              borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between'
-            }}>
-              <h3 style={{ fontSize: '15px', fontWeight: 900, color: '#fff', margin: 0 }}>
-                Select Episode ({currentSeries.episodes.length} Available)
-              </h3>
-              <button
-                onClick={() => setEpisodeDrawerOpen(false)}
+              position: 'absolute',
+              inset: 0,
+              backgroundImage: `url(${heroDrama.cover})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center 20%',
+              opacity: 0.35,
+              filter: 'blur(12px)',
+              transform: 'scale(1.1)'
+            }} />
+            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg, #06090e 0%, rgba(6, 9, 14, 0.85) 50%, rgba(6, 9, 14, 0.3) 100%)' }} />
+
+            <div style={{ position: 'relative', zIndex: 2, display: 'flex', alignItems: 'center', gap: '32px', width: '100%' }}>
+              <img
+                src={heroDrama.cover}
+                alt={heroDrama.title}
                 style={{
-                  background: 'rgba(255, 255, 255, 0.08)',
-                  border: 'none',
-                  borderRadius: '50%',
-                  width: '28px',
-                  height: '28px',
-                  color: '#fff',
-                  cursor: 'pointer'
+                  width: '140px',
+                  height: '210px',
+                  borderRadius: '12px',
+                  objectFit: 'cover',
+                  boxShadow: '0 12px 32px rgba(0, 0, 0, 0.8)',
+                  border: '2px solid rgba(56, 189, 248, 0.5)',
+                  flexShrink: 0
                 }}
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            <div style={{
-              padding: '12px',
-              overflowY: 'auto',
-              display: 'grid',
-              gridTemplateColumns: 'repeat(4, 1fr)',
-              gap: '8px'
-            }}>
-              {currentSeries.episodes.map((ep, idx) => {
-                const isSelected = activeEpisodeIndex === idx;
-                return (
+              />
+              <div style={{ maxWidth: '680px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+                  <span style={{ fontSize: '11px', fontWeight: 900, background: '#ef4444', color: '#fff', padding: '3px 8px', borderRadius: '6px', letterSpacing: '0.5px' }}>
+                    🔥 TRENDING SHORT DRAMA
+                  </span>
+                  <span style={{ fontSize: '12px', fontWeight: 800, color: '#38bdf8', background: 'rgba(56, 189, 248, 0.15)', padding: '3px 8px', borderRadius: '6px' }}>
+                    ★ {heroDrama.rating}
+                  </span>
+                  <span style={{ fontSize: '12px', fontWeight: 800, color: '#cbd5e1' }}>
+                    {heroDrama.total_episodes} Episodes
+                  </span>
+                </div>
+                <h1 style={{ fontSize: '28px', fontWeight: 900, color: '#fff', margin: '0 0 10px 0', letterSpacing: '-0.5px' }}>
+                  {heroDrama.title}
+                </h1>
+                <p style={{ fontSize: '13px', color: '#94a3b8', margin: '0 0 20px 0', lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                  {heroDrama.description}
+                </p>
+                <div style={{ display: 'flex', gap: '12px' }}>
                   <button
-                    key={idx}
                     onClick={() => {
-                      setActiveEpisodeIndex(idx);
-                      setEpisodeDrawerOpen(false);
-                    }}
-                    style={{
-                      padding: '10px 4px',
-                      borderRadius: '10px',
-                      background: isSelected ? 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)' : 'rgba(255, 255, 255, 0.05)',
-                      border: isSelected ? '1px solid #60a5fa' : '1px solid rgba(255, 255, 255, 0.08)',
-                      color: isSelected ? '#ffffff' : '#94a3b8',
-                      fontSize: '13px',
-                      fontWeight: 800,
-                      cursor: 'pointer'
-                    }}
-                  >
-                    EP {idx + 1}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Series Switcher Drawer Modal */}
-      {seriesDrawerOpen && (
-        <div
-          onClick={() => setSeriesDrawerOpen(false)}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0, 0, 0, 0.75)',
-            backdropFilter: 'blur(8px)',
-            zIndex: 9999,
-            display: 'flex',
-            alignItems: 'flex-end',
-            justifyContent: 'center'
-          }}
-        >
-          <div
-            onClick={e => e.stopPropagation()}
-            style={{
-              background: '#0f172a',
-              width: '100%',
-              maxWidth: '500px',
-              maxHeight: '75vh',
-              borderTopLeftRadius: '20px',
-              borderTopRightRadius: '20px',
-              border: '1px solid rgba(255, 255, 255, 0.15)',
-              display: 'flex',
-              flexDirection: 'column',
-              overflow: 'hidden'
-            }}
-          >
-            <div style={{
-              padding: '14px 18px',
-              borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between'
-            }}>
-              <h3 style={{ fontSize: '15px', fontWeight: 900, color: '#fff', margin: 0 }}>
-                Explore Drama Shorts & Mini-Series
-              </h3>
-              <button
-                onClick={() => setSeriesDrawerOpen(false)}
-                style={{
-                  background: 'rgba(255, 255, 255, 0.08)',
-                  border: 'none',
-                  borderRadius: '50%',
-                  width: '28px',
-                  height: '28px',
-                  color: '#fff',
-                  cursor: 'pointer'
-                }}
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            <div style={{
-              padding: '12px',
-              overflowY: 'auto',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '10px'
-            }}>
-              {SHORT_TV_SERIES.map((series, sIdx) => {
-                const isSelected = activeSeriesIndex === sIdx;
-                return (
-                  <div
-                    key={series.id}
-                    onClick={() => {
-                      setActiveSeriesIndex(sIdx);
+                      setSelectedSeries(heroDrama);
                       setActiveEpisodeIndex(0);
-                      setSeriesDrawerOpen(false);
                     }}
                     style={{
                       display: 'flex',
-                      gap: '12px',
-                      padding: '10px',
-                      borderRadius: '12px',
-                      background: isSelected ? 'rgba(56, 189, 248, 0.15)' : 'rgba(255, 255, 255, 0.03)',
-                      border: isSelected ? '1px solid #38bdf8' : '1px solid rgba(255, 255, 255, 0.06)',
-                      cursor: 'pointer'
+                      alignItems: 'center',
+                      gap: '8px',
+                      background: 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)',
+                      border: 'none',
+                      padding: '10px 24px',
+                      borderRadius: '10px',
+                      color: '#fff',
+                      fontSize: '14px',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      boxShadow: '0 4px 20px rgba(56, 189, 248, 0.4)'
                     }}
                   >
-                    <img
-                      src={series.cover}
-                      alt={series.title}
-                      style={{
-                        width: '56px',
-                        height: '76px',
-                        borderRadius: '8px',
-                        objectFit: 'cover'
-                      }}
-                    />
-                    <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-                        <span style={{ fontSize: '10px', fontWeight: 900, color: '#f59e0b', background: 'rgba(245, 158, 11, 0.15)', padding: '2px 6px', borderRadius: '4px' }}>
-                          {series.country}
-                        </span>
-                        <span style={{ fontSize: '10px', fontWeight: 800, color: '#38bdf8' }}>
-                          {series.total_episodes} Episodes
-                        </span>
-                      </div>
-                      <h4 style={{ fontSize: '14px', fontWeight: 800, color: '#fff', margin: '0 0 2px 0' }}>
-                        {series.title}
-                      </h4>
-                      <p style={{ fontSize: '11px', color: '#94a3b8', margin: 0 }}>
-                        {series.genre} • ★ {series.rating}
-                      </p>
-                    </div>
-                  </div>
-                );
-              })}
+                    <Play size={16} fill="#fff" />
+                    <span>Watch Series Now</span>
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
+        )}
+
+        {/* Section Header & Filters */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px', padding: '0 4px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: 'rgba(239, 68, 68, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Flame size={16} color="#ef4444" />
+            </div>
+            <h2 style={{ fontSize: '20px', fontWeight: 900, color: '#fff', margin: 0 }}>
+              ShortTV Mini-Drama Series Hub
+            </h2>
+            <span style={{ fontSize: '11px', fontWeight: 800, color: '#38bdf8', background: 'rgba(56, 189, 248, 0.15)', padding: '2px 8px', borderRadius: '10px' }}>
+              {filteredSeries.length} Series
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', gap: '8px' }}>
+            {genres.map(g => (
+              <button
+                key={g.id}
+                onClick={() => setFilterGenre(g.id)}
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: '20px',
+                  background: filterGenre === g.id ? '#38bdf8' : 'rgba(255, 255, 255, 0.08)',
+                  color: filterGenre === g.id ? '#06090e' : '#cbd5e1',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  fontSize: '12px',
+                  fontWeight: 800,
+                  cursor: 'pointer'
+                }}
+              >
+                {g.label}
+              </button>
+            ))}
+          </div>
         </div>
-      )}
+
+        {/* 6-Column Responsive TV Grid */}
+        <div 
+          className="tv-portrait-grid"
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+            gap: '24px 18px',
+            width: '100%'
+          }}
+        >
+          {filteredSeries.map((series, idx) => (
+            <div
+              key={series.id || idx}
+              className="tv-card tv-portrait-card tv-focusable-card"
+              data-focusable="true"
+              tabIndex={0}
+              onClick={() => {
+                setSelectedSeries(series);
+                setActiveEpisodeIndex(0);
+              }}
+              style={{
+                cursor: 'pointer',
+                display: 'flex',
+                flexDirection: 'column',
+                position: 'relative'
+              }}
+            >
+              <div 
+                className="mobile-card-poster-box"
+                style={{
+                  position: 'relative',
+                  width: '100%',
+                  aspectRatio: '2 / 3',
+                  borderRadius: '12px',
+                  overflow: 'hidden',
+                  background: '#0e141f',
+                  border: '1px solid rgba(255, 255, 255, 0.12)'
+                }}
+              >
+                <img
+                  src={series.cover}
+                  alt={series.title}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  loading="lazy"
+                />
+                <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.15) 0%, transparent 40%, rgba(0,0,0,0.85) 100%)' }} />
+
+                {/* Top Badges */}
+                <div style={{ position: 'absolute', top: '6px', left: '6px', right: '6px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '9px', fontWeight: 900, background: '#f59e0b', color: '#06090e', padding: '2px 5px', borderRadius: '4px' }}>
+                    ★ {series.rating}
+                  </span>
+                  <span style={{ fontSize: '9px', fontWeight: 900, background: '#ef4444', color: '#fff', padding: '2px 5px', borderRadius: '4px' }}>
+                    {series.total_episodes} EPS
+                  </span>
+                </div>
+
+                {/* Play hover pill */}
+                <div style={{ position: 'absolute', bottom: '8px', right: '8px', width: '30px', height: '30px', borderRadius: '50%', background: '#38bdf8', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(56, 189, 248, 0.5)' }}>
+                  <Play size={14} fill="#06090e" color="#06090e" style={{ marginLeft: '2px' }} />
+                </div>
+              </div>
+
+              {/* Title Info */}
+              <div style={{ marginTop: '8px', padding: '0 2px' }}>
+                <h3 style={{
+                  fontSize: '13px',
+                  fontWeight: 800,
+                  color: '#ffffff',
+                  margin: '0 0 2px 0',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis'
+                }}>
+                  {series.title}
+                </h3>
+                <div style={{ fontSize: '11px', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span>{series.country}</span>
+                  <span>•</span>
+                  <span style={{ color: '#38bdf8' }}>{series.genre}</span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // PLAYER VIEW WHEN A SHORT DRAMA SERIES IS PLAYING
+  return (
+    <div className="tv-short-player" style={{
+      position: 'fixed',
+      inset: 0,
+      background: '#000',
+      zIndex: 300,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center'
+    }}>
+      {/* Video Container (Cinema Vertical Container with Blurred Ambient Background) */}
+      <div 
+        style={{
+          position: 'absolute',
+          inset: 0,
+          backgroundImage: `url(${currentSeries.cover})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          filter: 'blur(30px) brightness(0.25)',
+          transform: 'scale(1.2)'
+        }}
+      />
+
+      <div style={{
+        position: 'relative',
+        width: '100%',
+        maxWidth: '460px',
+        height: '92vh',
+        background: '#06090e',
+        borderRadius: '16px',
+        overflow: 'hidden',
+        boxShadow: '0 0 60px rgba(0, 0, 0, 0.95), 0 0 0 1px rgba(255, 255, 255, 0.1)',
+        display: 'flex',
+        flexDirection: 'column',
+        zIndex: 10
+      }}>
+        {/* Video Element */}
+        <video
+          ref={videoRef}
+          onClick={togglePlay}
+          playsInline
+          style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#000', cursor: 'pointer' }}
+        />
+
+        {/* Top Floating Bar */}
+        <div style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          padding: '16px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          background: 'linear-gradient(180deg, rgba(0,0,0,0.8) 0%, transparent 100%)',
+          zIndex: 40
+        }}>
+          <button
+            onClick={() => setSelectedSeries(null)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              background: 'rgba(0, 0, 0, 0.6)',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              borderRadius: '20px',
+              padding: '6px 14px',
+              color: '#fff',
+              fontSize: '13px',
+              fontWeight: 800,
+              cursor: 'pointer'
+            }}
+          >
+            <ArrowLeft size={16} />
+            <span>All Dramas</span>
+          </button>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <button
+              onClick={() => setEpisodeDrawerOpen(true)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                background: 'rgba(56, 189, 248, 0.2)',
+                border: '1px solid #38bdf8',
+                borderRadius: '20px',
+                padding: '6px 14px',
+                color: '#38bdf8',
+                fontSize: '12px',
+                fontWeight: 800,
+                cursor: 'pointer'
+              }}
+            >
+              <ListOrdered size={14} />
+              <span>Ep {activeEpisodeIndex + 1}/{currentSeries.episodes.length}</span>
+            </button>
+
+            <button
+              onClick={toggleMute}
+              style={{
+                background: 'rgba(0, 0, 0, 0.6)',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                width: '34px',
+                height: '34px',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#fff',
+                cursor: 'pointer'
+              }}
+            >
+              {isMuted ? <VolumeX size={16} color="#ef4444" /> : <Volume2 size={16} color="#38bdf8" />}
+            </button>
+          </div>
+        </div>
+
+        {/* Center Pause Indicator */}
+        {!isPlaying && (
+          <div 
+            onClick={togglePlay}
+            style={{
+              position: 'absolute',
+              inset: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'rgba(0, 0, 0, 0.35)',
+              zIndex: 30,
+              cursor: 'pointer'
+            }}
+          >
+            <div style={{
+              width: '60px',
+              height: '60px',
+              borderRadius: '50%',
+              background: '#38bdf8',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 0 30px rgba(56, 189, 248, 0.6)'
+            }}>
+              <Play size={28} fill="#06090e" color="#06090e" style={{ marginLeft: '3px' }} />
+            </div>
+          </div>
+        )}
+
+        {/* Bottom Details Overlay */}
+        <div style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          padding: '24px 16px 16px 16px',
+          background: 'linear-gradient(0deg, rgba(0,0,0,0.9) 0%, transparent 100%)',
+          zIndex: 40
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+            <span style={{ fontSize: '11px', fontWeight: 900, color: '#f59e0b', background: 'rgba(245, 158, 11, 0.15)', padding: '2px 6px', borderRadius: '4px' }}>
+              {currentSeries.country}
+            </span>
+            <span style={{ fontSize: '12px', fontWeight: 800, color: '#38bdf8' }}>
+              Episode {activeEpisodeIndex + 1}: {currentEpisode.title}
+            </span>
+          </div>
+          <h2 style={{ fontSize: '16px', fontWeight: 900, color: '#fff', margin: '0 0 6px 0' }}>
+            {currentSeries.title}
+          </h2>
+
+          {/* Progress bar */}
+          <div style={{ width: '100%', height: '4px', background: 'rgba(255, 255, 255, 0.2)', borderRadius: '2px', overflow: 'hidden', marginTop: '10px' }}>
+            <div style={{ width: `${progress}%`, height: '100%', background: '#38bdf8' }} />
+          </div>
+
+          {/* Prev/Next Episode Controls */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px' }}>
+            <button
+              disabled={activeEpisodeIndex === 0}
+              onClick={() => setActiveEpisodeIndex(prev => Math.max(0, prev - 1))}
+              style={{
+                padding: '6px 16px',
+                borderRadius: '8px',
+                background: activeEpisodeIndex === 0 ? 'rgba(255, 255, 255, 0.05)' : 'rgba(255, 255, 255, 0.15)',
+                color: activeEpisodeIndex === 0 ? '#64748b' : '#fff',
+                border: 'none',
+                fontWeight: 800,
+                fontSize: '12px',
+                cursor: activeEpisodeIndex === 0 ? 'default' : 'pointer'
+              }}
+            >
+              ◀ Prev Episode
+            </button>
+            <button
+              disabled={activeEpisodeIndex >= currentSeries.episodes.length - 1}
+              onClick={() => setActiveEpisodeIndex(prev => Math.min(currentSeries.episodes.length - 1, prev + 1))}
+              style={{
+                padding: '6px 16px',
+                borderRadius: '8px',
+                background: activeEpisodeIndex >= currentSeries.episodes.length - 1 ? 'rgba(255, 255, 255, 0.05)' : '#38bdf8',
+                color: activeEpisodeIndex >= currentSeries.episodes.length - 1 ? '#64748b' : '#06090e',
+                border: 'none',
+                fontWeight: 900,
+                fontSize: '12px',
+                cursor: activeEpisodeIndex >= currentSeries.episodes.length - 1 ? 'default' : 'pointer'
+              }}
+            >
+              Next Episode ▶
+            </button>
+          </div>
+        </div>
+
+        {/* Episode Drawer */}
+        {episodeDrawerOpen && (
+          <div 
+            onClick={() => setEpisodeDrawerOpen(false)}
+            style={{
+              position: 'absolute',
+              inset: 0,
+              background: 'rgba(0, 0, 0, 0.75)',
+              backdropFilter: 'blur(8px)',
+              zIndex: 60,
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'flex-end'
+            }}
+          >
+            <div 
+              onClick={e => e.stopPropagation()}
+              style={{
+                background: '#0f172a',
+                borderTopLeftRadius: '20px',
+                borderTopRightRadius: '20px',
+                padding: '16px',
+                maxHeight: '65vh',
+                display: 'flex',
+                flexDirection: 'column'
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <h3 style={{ fontSize: '15px', fontWeight: 900, color: '#fff', margin: 0 }}>
+                  Select Episode ({currentSeries.episodes.length} Total)
+                </h3>
+                <button
+                  onClick={() => setEpisodeDrawerOpen(false)}
+                  style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {currentSeries.episodes.map((ep, eIdx) => (
+                  <button
+                    key={ep.episode || eIdx}
+                    onClick={() => {
+                      setActiveEpisodeIndex(eIdx);
+                      setEpisodeDrawerOpen(false);
+                    }}
+                    style={{
+                      padding: '10px 14px',
+                      borderRadius: '10px',
+                      background: activeEpisodeIndex === eIdx ? 'rgba(56, 189, 248, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                      border: activeEpisodeIndex === eIdx ? '1px solid #38bdf8' : '1px solid rgba(255, 255, 255, 0.08)',
+                      color: activeEpisodeIndex === eIdx ? '#38bdf8' : '#fff',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      cursor: 'pointer',
+                      textAlign: 'left'
+                    }}
+                  >
+                    <span style={{ fontWeight: 800, fontSize: '13px' }}>
+                      {ep.title}
+                    </span>
+                    <span style={{ fontSize: '11px', color: '#94a3b8' }}>
+                      {ep.duration}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

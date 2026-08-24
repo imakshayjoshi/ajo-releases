@@ -5,6 +5,8 @@ import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
+import android.net.http.SslError;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -18,6 +20,11 @@ import android.view.TextureView;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
+import android.webkit.SslErrorHandler;
+import android.webkit.WebChromeClient;
+import android.webkit.WebSettings;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
@@ -54,10 +61,14 @@ import androidx.media3.extractor.DefaultExtractorsFactory;
 import androidx.media3.extractor.ts.DefaultTsPayloadReaderFactory;
 import androidx.media3.ui.AspectRatioFrameLayout;
 
+import org.json.JSONArray;
+
 import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
@@ -72,9 +83,10 @@ import okhttp3.OkHttpClient;
 /**
  * Dedicated native video player for Fire TV OS / Android TV.
  *
- * <p>Uses hardware-accelerated SurfaceView with setZOrderMediaOverlay(true)
- * inside an AspectRatioFrameLayout. This gives 0% CPU/GPU overhead for 60fps Live TV,
- * eliminates still-image freezing, and avoids hardware hole-punch occlusion bugs.
+ * <p>Supports:
+ * 1. Hardware-direct SurfaceView with setZOrderMediaOverlay(true) for 4K UHD / 60fps Live TV & direct HLS/MP4.
+ * 2. Fullscreen hardware-accelerated Web Video Engine for rich multi-audio embed streams (VidSrc, SuperStream, AutoEmbed, SmashyStream).
+ * 3. Automatic multi-server failover across all provided stream mirrors with in-app DNS-over-HTTPS (DoH).
  */
 @OptIn(markerClass = UnstableApi.class)
 public class PlayerActivity extends AppCompatActivity {
@@ -85,21 +97,44 @@ public class PlayerActivity extends AppCompatActivity {
             "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 (KHTML, like Gecko) "
                     + "Chrome/120.0.0.0 Safari/537.36 AJO-TV";
 
-    private static final int CONNECT_TIMEOUT_MS = 20000;
-    private static final int READ_TIMEOUT_MS = 30000;
+    // v3.8.2 buffering: generous read windows. A short read timeout on a slow
+    // origin (not the user's pipe — 40mbps is plenty) aborts segment reads
+    // mid-flight and causes repeated rebuffers on Fire TV.
+    private static final int CONNECT_TIMEOUT_MS = 8000;
+    private static final int READ_TIMEOUT_MS = 15000;
     private static final long SEEK_STEP_MS = 10000L;
     private static final long OSD_HIDE_DELAY_MS = 4000L;
-
-    /**
-     * How long to wait for a decoded frame to reach the surface before retrying with
-     * software decoders if hardware decoder hangs.
-     */
     private static final long FIRST_FRAME_TIMEOUT_MS = 8000L;
+    private static final int FREEZE_STALL_SECONDS = 4;
+    private static final int MAX_FREEZE_RECOVERY_ATTEMPTS = 2;
+
+    // Zoom modes cycled by remote (D-pad Up long-press / PROG+ keys)
+    private int currentResizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT;
+    private int zoomModeIndex = 0;
+    private static final int[] ZOOM_MODES = {
+            AspectRatioFrameLayout.RESIZE_MODE_FIT,        // 0: Fit (default)
+            AspectRatioFrameLayout.RESIZE_MODE_ZOOM,       // 1: Zoom (crop to fill)
+            AspectRatioFrameLayout.RESIZE_MODE_FILL,       // 2: Stretch
+            AspectRatioFrameLayout.RESIZE_MODE_FIXED_WIDTH,// 3: Fill width
+            AspectRatioFrameLayout.RESIZE_MODE_FIXED_HEIGHT// 4: Fill height
+    };
+    private static final String[] ZOOM_NAMES = { "Fit", "Zoom", "Stretch", "Fill Width", "Fill Height" };
+
+    private void cycleZoomMode() {
+        zoomModeIndex = (zoomModeIndex + 1) % ZOOM_MODES.length;
+        currentResizeMode = ZOOM_MODES[zoomModeIndex];
+        if (aspectRatioFrameLayout != null) {
+            aspectRatioFrameLayout.setResizeMode(currentResizeMode);
+        }
+        Toast.makeText(this, "Display: " + ZOOM_NAMES[zoomModeIndex], Toast.LENGTH_SHORT).show();
+        showOsd();
+    }
 
     @Nullable private ExoPlayer player;
     @Nullable private AspectRatioFrameLayout aspectRatioFrameLayout;
     @Nullable private SurfaceView surfaceView;
     @Nullable private TextureView textureView;
+    @Nullable private WebView webVideoView;
 
     private RelativeLayout osdOverlay;
     private ProgressBar bufferSpinner;
@@ -111,10 +146,51 @@ public class PlayerActivity extends AppCompatActivity {
     private boolean isLive = false;
     private String streamUrl = "";
     private String streamTitle = "";
+    private final List<String> serverQueue = new ArrayList<>();
+    private int currentServerIdx = 0;
+    private boolean isWebEmbedMode = false;
 
     private boolean useTextureViewFallback = false;
     private boolean softwareDecoderRetryDone = false;
     private long resumePositionMs = C.TIME_UNSET;
+
+    // ---- FREEZE DETECTION (fix): audio-plays-but-picture-frozen on Fire OS.
+    // The first-frame watchdog cannot catch this because the first frame DOES
+    // render — the hardware decoder just stops delivering subsequent frames.
+    // We track ExoPlayer's rendered-video-buffer counter: if playback is
+    // READY+playing yet the counter stops growing for FREEZE_STALL_SECONDS,
+    // rebuild the pipeline with software decoding + TextureView.
+    private long lastRenderedOutputBuffers = -1L;
+    private int freezeStableSeconds = 0;
+    private int freezeRecoveryAttempts = 0;
+    // Real rendered-VIDEO-frame counter for the freeze detector. The playback
+    // position clock is driven by the AUDIO pipeline, so during the reported
+    // "picture frozen, sound continues" stall getCurrentPosition() keeps
+    // advancing and a position-based detector never fires. We capture the
+    // video renderer's DecoderCounters instance at enable-time and poll its
+    // renderedOutputBufferCount — it only grows when frames actually render.
+    private androidx.media3.exoplayer.DecoderCounters activeVideoCounters = null;
+    private final androidx.media3.exoplayer.analytics.AnalyticsListener frameCounterListener =
+            new androidx.media3.exoplayer.analytics.AnalyticsListener() {
+                @Override
+                public void onVideoEnabled(
+                        androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime eventTime,
+                        androidx.media3.exoplayer.DecoderCounters counters) {
+                    activeVideoCounters = counters;
+                    lastRenderedOutputBuffers = -1L;
+                    freezeStableSeconds = 0;
+                }
+
+                @Override
+                public void onVideoDisabled(
+                        androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime eventTime,
+                        androidx.media3.exoplayer.DecoderCounters counters) {
+                    if (activeVideoCounters == counters) {
+                        activeVideoCounters = null;
+                    }
+                }
+            };
+    private final boolean isFireTvDevice = detectFireTv();
 
     private boolean firstFrameRendered = false;
     private boolean hasVideoTrack = false;
@@ -128,14 +204,84 @@ public class PlayerActivity extends AppCompatActivity {
         @Override
         public void run() {
             updateProgressText();
+            checkVideoFreeze();
             uiHandler.postDelayed(this, 1000L);
         }
     };
 
+    /**
+     * FREEZE DETECTOR — runs once per second alongside the progress ticker.
+     * If ExoPlayer reports READY + playing but the count of rendered video
+     * buffers hasn't increased for several consecutive seconds, the hardware
+     * decoder has stalled (audio renderer is a separate pipeline, which is why
+     * sound keeps going). Recovery: rebuild with software decode + TextureView,
+     * or fail over to the next mirror if that was already tried.
+     */
+    private void checkVideoFreeze() {
+        if (player == null || isWebEmbedMode || !firstFrameRendered) return;
+        if (player.getPlaybackState() != Player.STATE_READY || !player.isPlaying()) {
+            freezeStableSeconds = 0;
+            lastRenderedOutputBuffers = -1L;
+            return;
+        }
+
+        androidx.media3.exoplayer.DecoderCounters counters = activeVideoCounters;
+        long rendered = counters != null ? counters.renderedOutputBufferCount : -1L;
+        if (counters == null || rendered == 0) {
+            // No video renderer yet, OR decoder attached but first frame not
+            // rendered yet (normal on channel start: manifest fetch + codec
+            // init can take several seconds). v3.8.2: grace period — do NOT
+            // accumulate stall time before the first frame, otherwise the
+            // detector fires "Fixing video playback..." a second into every
+            // live stream and needlessly rebuilds the pipeline.
+            freezeStableSeconds = 0;
+            lastRenderedOutputBuffers = -1L;
+            return;
+        }
+        if (lastRenderedOutputBuffers >= 0 && rendered == lastRenderedOutputBuffers) {
+            freezeStableSeconds++;
+        } else {
+            freezeStableSeconds = 0;
+            lastRenderedOutputBuffers = rendered;
+        }
+
+        // Video-frame counter frozen for 4s while state says "playing" = the video
+        // decoder stalled (audio renderer is a separate pipeline, so sound keeps
+        // going — this is exactly the field symptom). v3.8.0: detector now watches
+        // real rendered-frame counts instead of the audio-driven position clock,
+        // which is why previous hardening never caught these freezes.
+        if (freezeStableSeconds >= FREEZE_STALL_SECONDS && freezeRecoveryAttempts < MAX_FREEZE_RECOVERY_ATTEMPTS) {
+            freezeRecoveryAttempts++;
+            freezeStableSeconds = 0;
+            Log.w(TAG, "VIDEO_FREEZE_DETECTED (attempt " + freezeRecoveryAttempts + "/"
+                    + MAX_FREEZE_RECOVERY_ATTEMPTS + "): position stalled while playing.");
+            Toast.makeText(this, "Fixing video playback...", Toast.LENGTH_SHORT).show();
+            resumePositionMs = isLive ? C.TIME_UNSET : player.getCurrentPosition();
+            useTextureViewFallback = true;
+            softwareDecoderRetryDone = true; // go straight to software decode
+            showOsd();
+            initializeExoPlayer();
+        } else if (freezeStableSeconds >= FREEZE_STALL_SECONDS) {
+            // Already recovered once and it froze again — this mirror is bad.
+            Log.w(TAG, "VIDEO_FREEZE persists after recovery. Failing over to next mirror.");
+            freezeStableSeconds = 0;
+            failoverToNextServer();
+        }
+    }
+    private static boolean detectFireTv() {
+        try {
+            String manufacturer = String.valueOf(android.os.Build.MANUFACTURER).toLowerCase(java.util.Locale.US);
+            String model = String.valueOf(android.os.Build.MODEL).toLowerCase(java.util.Locale.US);
+            return manufacturer.contains("amazon") || model.contains("aft") || model.contains("fire");
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     private final Runnable firstFrameWatchdog = new Runnable() {
         @Override
         public void run() {
-            if (firstFrameRendered || player == null) return;
+            if (firstFrameRendered || player == null || isWebEmbedMode) return;
             if (!hasVideoTrack) return;
 
             Log.w(TAG, "NO_FIRST_FRAME after " + FIRST_FRAME_TIMEOUT_MS
@@ -149,7 +295,7 @@ public class PlayerActivity extends AppCompatActivity {
                         "Optimizing live video stream...",
                         Toast.LENGTH_SHORT).show();
                 showOsd();
-                initializePlayer();
+                initializeExoPlayer();
             }
         }
     };
@@ -166,21 +312,16 @@ public class PlayerActivity extends AppCompatActivity {
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED);
         enableImmersiveMode();
 
-        streamUrl = getIntent().getStringExtra("url");
-        streamTitle = getIntent().getStringExtra("title");
-        isLive = getIntent().getBooleanExtra("isLive", false);
+        parseIntentData(getIntent());
 
-        if (TextUtils.isEmpty(streamUrl)) {
+        if (serverQueue.isEmpty()) {
             Toast.makeText(this, "No video URL provided", Toast.LENGTH_SHORT).show();
             finish();
             return;
         }
-        if (TextUtils.isEmpty(streamTitle)) {
-            streamTitle = isLive ? "Live Channel" : "Video Stream";
-        }
 
         setContentView(buildUi());
-        initializePlayer();
+        playCurrentStream();
         showOsd();
     }
 
@@ -190,27 +331,79 @@ public class PlayerActivity extends AppCompatActivity {
         if (intent == null) return;
         setIntent(intent);
 
-        String newUrl = intent.getStringExtra("url");
-        if (TextUtils.isEmpty(newUrl)) return;
+        parseIntentData(intent);
+        if (serverQueue.isEmpty()) return;
 
-        streamUrl = newUrl;
-        isLive = intent.getBooleanExtra("isLive", false);
+        softwareDecoderRetryDone = false;
+        resumePositionMs = C.TIME_UNSET;
+        freezeRecoveryAttempts = 0;
+
+        applyStreamMetadataToUi();
+        playCurrentStream();
+        showOsd();
+    }
+
+    private void parseIntentData(Intent intent) {
+        if (intent == null) return;
+        String url = intent.getStringExtra("url");
         streamTitle = intent.getStringExtra("title");
+        isLive = intent.getBooleanExtra("isLive", false);
         if (TextUtils.isEmpty(streamTitle)) {
             streamTitle = isLive ? "Live Channel" : "Video Stream";
         }
 
-        softwareDecoderRetryDone = false;
-        resumePositionMs = C.TIME_UNSET;
+        serverQueue.clear();
+        currentServerIdx = 0;
+        if (!TextUtils.isEmpty(url)) {
+            serverQueue.add(url);
+        }
 
-        applyStreamMetadataToUi();
-        initializePlayer();
-        showOsd();
+        String fallbacksJson = intent.getStringExtra("fallbacks");
+        if (!TextUtils.isEmpty(fallbacksJson)) {
+            try {
+                JSONArray arr = new JSONArray(fallbacksJson);
+                for (int i = 0; i < arr.length(); i++) {
+                    String u = arr.optString(i);
+                    if (!TextUtils.isEmpty(u) && !serverQueue.contains(u)) {
+                        serverQueue.add(u);
+                    }
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "Failed parsing fallbacks: " + e.getMessage());
+            }
+        }
+
+        if (!serverQueue.isEmpty()) {
+            streamUrl = serverQueue.get(0);
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        // Just pause — don't release the decoder. This handles transient system
+        // overlays (volume panel, remote menu, Fire TV settings popup) without
+        // the expensive codec teardown+rebuild cycle that onStop/onStart does.
+        if (player != null && !isWebEmbedMode) {
+            resumePositionMs = isLive ? C.TIME_UNSET : player.getCurrentPosition();
+            player.setPlayWhenReady(false);
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // Resume playback if the player is still alive (onStop wasn't called).
+        if (player != null && !isWebEmbedMode) {
+            player.setPlayWhenReady(true);
+        }
     }
 
     @Override
     protected void onStop() {
         super.onStop();
+        // Fully release the decoder — app is now truly invisible (Home pressed,
+        // task switched, etc.). Free the hardware codec for other apps.
         if (player != null) {
             resumePositionMs = isLive ? C.TIME_UNSET : player.getCurrentPosition();
         }
@@ -222,8 +415,8 @@ public class PlayerActivity extends AppCompatActivity {
     @Override
     protected void onStart() {
         super.onStart();
-        if (player == null && !TextUtils.isEmpty(streamUrl)) {
-            initializePlayer();
+        if (!isWebEmbedMode && player == null && !TextUtils.isEmpty(streamUrl)) {
+            initializeExoPlayer();
             showOsd();
         } else if (player != null && !player.isPlaying()
                 && player.getPlaybackState() != Player.STATE_ENDED) {
@@ -236,6 +429,14 @@ public class PlayerActivity extends AppCompatActivity {
         super.onDestroy();
         uiHandler.removeCallbacksAndMessages(null);
         releasePlayer();
+        if (webVideoView != null) {
+            try {
+                webVideoView.stopLoading();
+                webVideoView.loadUrl("about:blank");
+                webVideoView.destroy();
+            } catch (Exception ignored) {}
+            webVideoView = null;
+        }
     }
 
     // ------------------------------------------------------------------- the UI
@@ -245,6 +446,69 @@ public class PlayerActivity extends AppCompatActivity {
         root.setLayoutParams(new RelativeLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
+        // 1. Fullscreen Web Video Engine (for iframe/embed mirrors)
+        webVideoView = new WebView(this);
+        webVideoView.setLayoutParams(new RelativeLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        webVideoView.setBackgroundColor(Color.BLACK);
+        webVideoView.setVisibility(View.GONE);
+
+        WebSettings ws = webVideoView.getSettings();
+        ws.setJavaScriptEnabled(true);
+        ws.setDomStorageEnabled(true);
+        ws.setDatabaseEnabled(true);
+        ws.setAllowFileAccess(true);
+        ws.setAllowContentAccess(true);
+        ws.setAllowFileAccessFromFileURLs(true);
+        ws.setAllowUniversalAccessFromFileURLs(true);
+        ws.setLoadWithOverviewMode(true);
+        ws.setUseWideViewPort(true);
+        ws.setMediaPlaybackRequiresUserGesture(false);
+        ws.setUserAgentString(USER_AGENT);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            ws.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+        }
+
+        webVideoView.setWebViewClient(new WebViewClient() {
+            @Override
+            public void onReceivedSslError(WebView view, SslErrorHandler handler, SslError error) {
+                handler.proceed();
+            }
+
+            @Override
+            public void onReceivedError(WebView view, int errorCode, String description, String failingUrl) {
+                Log.w(TAG, "Web video onReceivedError (" + errorCode + "): " + description);
+                failoverToNextServer();
+            }
+
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                bufferSpinner.setVisibility(View.GONE);
+                view.evaluateJavascript(
+                        "(function(){"
+                                + "if(document.body && (document.body.innerText.includes('Error code 522') || document.body.innerText.includes('Error code 520') || document.title.includes('502') || document.title.includes('504'))){"
+                                + "  return 'ERROR_PAGE';"
+                                + "}"
+                                + "try{"
+                                + "  if(window.ppl && typeof window.ppl.api === 'function'){ window.ppl.api('play'); }"
+                                + "  if(window.player && typeof window.player.api === 'function'){ window.player.api('play'); }"
+                                + "  var v=document.querySelector('video'); if(v){v.play();}"
+                                + "  var btn=document.querySelector('.play,.play-btn,.jw-display-icon-container,[aria-label=\"Play\"],pjsdiv'); if(btn){btn.click();}"
+                                + "}catch(e){}"
+                                + "return 'OK';"
+                                + "})();",
+                        value -> {
+                            if (value != null && value.contains("ERROR_PAGE")) {
+                                Log.w(TAG, "Detected Cloudflare/host error page in WebView embed");
+                                failoverToNextServer();
+                            }
+                        });
+            }
+        });
+        webVideoView.setWebChromeClient(new WebChromeClient());
+        root.addView(webVideoView);
+
+        // 2. Hardware Video ExoPlayer Surface
         RelativeLayout.LayoutParams fill = new RelativeLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
         fill.addRule(RelativeLayout.CENTER_IN_PARENT);
@@ -253,7 +517,10 @@ public class PlayerActivity extends AppCompatActivity {
         aspectRatioFrameLayout.setResizeMode(AspectRatioFrameLayout.RESIZE_MODE_FIT);
         aspectRatioFrameLayout.setLayoutParams(fill);
 
-        // Hardware-direct SurfaceView with Z-Order Media Overlay (Netflix/YouTube pattern)
+        // ---- ZOOM MODES (new): D-pad long-press-up or PROG keys cycle
+        // Fit → Zoom → Stretch → Fill → 16:9 → back to Fit.
+        currentResizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT;
+
         surfaceView = new SurfaceView(this);
         surfaceView.setZOrderMediaOverlay(true);
         surfaceView.getHolder().addCallback(new SurfaceHolder.Callback() {
@@ -279,7 +546,6 @@ public class PlayerActivity extends AppCompatActivity {
         surfaceView.setLayoutParams(surfaceParams);
         aspectRatioFrameLayout.addView(surfaceView);
 
-        // Fallback TextureView
         textureView = new TextureView(this);
         textureView.setOpaque(true);
         textureView.setVisibility(View.GONE);
@@ -288,6 +554,7 @@ public class PlayerActivity extends AppCompatActivity {
 
         root.addView(aspectRatioFrameLayout);
 
+        // 3. Buffer Spinner
         bufferSpinner = new ProgressBar(this);
         bufferSpinner.setIndeterminate(true);
         RelativeLayout.LayoutParams spinnerParams = new RelativeLayout.LayoutParams(
@@ -296,6 +563,7 @@ public class PlayerActivity extends AppCompatActivity {
         bufferSpinner.setLayoutParams(spinnerParams);
         root.addView(bufferSpinner);
 
+        // 4. OSD Overlay
         osdOverlay = new RelativeLayout(this);
         osdOverlay.setLayoutParams(new RelativeLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
@@ -303,7 +571,6 @@ public class PlayerActivity extends AppCompatActivity {
         osdOverlay.setClickable(false);
         osdOverlay.setFocusable(false);
 
-        // --- top bar: LIVE/HD badge + title ---
         LinearLayout topBar = new LinearLayout(this);
         topBar.setOrientation(LinearLayout.HORIZONTAL);
         topBar.setGravity(Gravity.CENTER_VERTICAL);
@@ -329,11 +596,11 @@ public class PlayerActivity extends AppCompatActivity {
         titleView.setTypeface(Typeface.DEFAULT_BOLD);
         titleView.setSingleLine(true);
         titleView.setEllipsize(TextUtils.TruncateAt.END);
+        titleView.setPadding(24, 0, 0, 0);
         topBar.addView(titleView);
 
         osdOverlay.addView(topBar);
 
-        // --- bottom bar: elapsed/duration + remote hint ---
         LinearLayout bottomBar = new LinearLayout(this);
         bottomBar.setOrientation(LinearLayout.VERTICAL);
         bottomBar.setPadding(48, 48, 48, 36);
@@ -387,9 +654,127 @@ public class PlayerActivity extends AppCompatActivity {
         }
     }
 
-    // -------------------------------------------------------------- the player
+    // --------------------------------------------------------- stream dispatcher
 
-    private void initializePlayer() {
+    private boolean isWebEmbedUrl(String url) {
+        if (TextUtils.isEmpty(url)) return false;
+        String lower = url.toLowerCase(java.util.Locale.US);
+        return lower.contains("/embed/") || lower.contains("/play/") || lower.contains("apiplayer.ru")
+                || lower.contains("vidlink.pro") || lower.contains("vidsrc") || lower.contains("autoembed.co")
+                || lower.contains("smashy.stream") || lower.contains("multiembed.mov") || lower.contains("rasta428jem.com")
+                || lower.contains("2embed.cc") || lower.contains("embed.su") || lower.contains("v2.vidsrc.me");
+    }
+
+    private void playCurrentStream() {
+        if (serverQueue.isEmpty()) {
+            Toast.makeText(this, "No video stream available", Toast.LENGTH_SHORT).show();
+            finish();
+            return;
+        }
+
+        if (currentServerIdx < 0 || currentServerIdx >= serverQueue.size()) {
+            currentServerIdx = 0;
+        }
+
+        streamUrl = serverQueue.get(currentServerIdx);
+        Log.i(TAG, "playCurrentStream [" + (currentServerIdx + 1) + "/" + serverQueue.size() + "]: " + streamUrl);
+
+        if (isWebEmbedUrl(streamUrl)) {
+            playInWebEngine(streamUrl);
+        } else {
+            playInNativeExoPlayer(streamUrl);
+        }
+    }
+
+    /**
+     * Returns Referer/Origin headers each mirror wants to see. Bare requests
+     * get blocked by every embed provider, so a hard-coded Referer to the
+     * mirror's own origin fixes most "loads but plays nothing" cases.
+     */
+    private Map<String, String> buildEmbedHeaders(String url) {
+        Map<String, String> headers = new HashMap<>();
+        headers.put("User-Agent", USER_AGENT);
+        try {
+            String host = Uri.parse(url).getHost();
+            if (host == null) return headers;
+            String lower = host.toLowerCase(java.util.Locale.US);
+            // Mirror-specific origins. Keep in sync with EMBED_PATTERNS in
+            // streamingEngines.js so any new provider added there gets a header
+            // here too.
+            if (lower.contains("vidlink.pro")) {
+                headers.put("Referer", "https://vidlink.pro/");
+                headers.put("Origin", "https://vidlink.pro");
+            } else if (lower.contains("embed.su")) {
+                headers.put("Referer", "https://embed.su/");
+                headers.put("Origin", "https://embed.su");
+            } else if (lower.contains("humma429gix.com")) {
+                headers.put("Referer", "https://allmovielandapp.app/");
+                headers.put("Origin", "https://allmovielandapp.app");
+            } else if (lower.contains("autoembed.co")) {
+                headers.put("Referer", "https://autoembed.co/");
+                headers.put("Origin", "https://autoembed.co");
+            } else if (lower.contains("2embed.cc")) {
+                headers.put("Referer", "https://www.2embed.cc/");
+                headers.put("Origin", "https://www.2embed.cc");
+            } else if (lower.contains("vidsrc")) {
+                headers.put("Referer", "https://vidsrc.cc/");
+                headers.put("Origin", "https://vidsrc.cc");
+            } else if (lower.contains("multiembed.mov")) {
+                headers.put("Referer", "https://multiembed.mov/");
+                headers.put("Origin", "https://multiembed.mov");
+            } else if (lower.contains("smashy.stream")) {
+                headers.put("Referer", "https://smashy.stream/");
+                headers.put("Origin", "https://smashy.stream");
+            } else if (lower.contains("apiplayer.ru")) {
+                headers.put("Referer", "https://apiplayer.ru/");
+                headers.put("Origin", "https://apiplayer.ru");
+            } else if (lower.contains("v2.vidsrc.me") || lower.contains("vidsrc.me") || lower.contains("vidsrc.cc") || lower.contains("vidsrc.to")) {
+                headers.put("Referer", "https://vidsrc.cc/");
+                headers.put("Origin", "https://vidsrc.cc");
+            } else {
+                // Generic fallback: referer = the host itself so providers that
+                // require same-origin referers still get a valid value.
+                headers.put("Referer", "https://" + host + "/");
+            }
+        } catch (Exception ignored) {}
+        return headers;
+    }
+
+    private void playInWebEngine(String url) {
+        isWebEmbedMode = true;
+        releasePlayer();
+
+        if (aspectRatioFrameLayout != null) {
+            aspectRatioFrameLayout.setVisibility(View.GONE);
+        }
+        if (webVideoView != null) {
+            webVideoView.setVisibility(View.VISIBLE);
+            Map<String, String> headers = buildEmbedHeaders(url);
+            webVideoView.loadUrl(url, headers);
+            webVideoView.requestFocus();
+        }
+
+        bufferSpinner.setVisibility(View.VISIBLE);
+        // Hide spinner on page-finished, not after a fixed delay — embed pages
+        // regularly take >3.5s to resolve the Cloudflare interstitial.
+    }
+
+    private void playInNativeExoPlayer(String url) {
+        isWebEmbedMode = false;
+        if (webVideoView != null) {
+            webVideoView.stopLoading();
+            webVideoView.loadUrl("about:blank");
+            webVideoView.setVisibility(View.GONE);
+        }
+        if (aspectRatioFrameLayout != null) {
+            aspectRatioFrameLayout.setVisibility(View.VISIBLE);
+        }
+        initializeExoPlayer();
+    }
+
+    // -------------------------------------------------------------- ExoPlayer
+
+    private void initializeExoPlayer() {
         releasePlayer();
 
         firstFrameRendered = false;
@@ -454,28 +839,55 @@ public class PlayerActivity extends AppCompatActivity {
 
         androidx.media3.exoplayer.trackselection.AdaptiveTrackSelection.Factory adaptiveFactory =
                 new androidx.media3.exoplayer.trackselection.AdaptiveTrackSelection.Factory(
-                        /* minDurationForQualityIncreaseMs= */ 1500,
-                        /* maxDurationForQualityDecreaseMs= */ 3000,
-                        /* minDurationToRetainAfterDiscardMs= */ 3000,
-                        /* bandwidthFraction= */ 0.80f);
+                        /* minDurationForQualityIncreaseMs= */ 5000,
+                        /* maxDurationForQualityDecreaseMs= */ 10000,
+                        /* minDurationToRetainAfterDiscardMs= */
+                                25000,
+                        /* bandwidthFraction= */ 0.7f);
 
         DefaultTrackSelector trackSelector = new DefaultTrackSelector(this, adaptiveFactory);
         trackSelector.setParameters(trackSelector.buildUponParameters()
                 .setPreferredVideoMimeType(MimeTypes.VIDEO_H264)
-                .setMaxVideoSize(1920, 1080)
+                .setMaxVideoSize(3840, 2160)
                 .setMaxVideoFrameRate(60)
                 .setExceedVideoConstraintsIfNecessary(true)
                 .setTunnelingEnabled(false)
                 .setForceLowestBitrate(false));
 
+        // Nuvio-style RAM-adaptive buffering: FireTV Stick 4K (1.5GB) gets
+        // right-sized buffers instead of one-size-fits-all. Bigger target on
+        // bigger TVs eliminates mid-stream rebuffering.
+        int totalMemMb;
+        android.app.ActivityManager.MemoryInfo mi = new android.app.ActivityManager.MemoryInfo();
+        ((android.app.ActivityManager) getSystemService(ACTIVITY_SERVICE)).getMemoryInfo(mi);
+        long gb = 1024L * 1024L * 1024L;
+        if (mi.totalMem <= 0) {
+            totalMemMb = 250;
+        } else if (mi.totalMem < 1.15 * gb) {
+            totalMemMb = 150;   // 1GB-class sticks
+        } else if (mi.totalMem < 1.45 * gb) {
+            totalMemMb = 200;   // FireTV Stick 4K (1.5GB)
+        } else if (mi.totalMem < 2.3 * gb) {
+            totalMemMb = 250;
+        } else if (mi.totalMem < 3.2 * gb) {
+            totalMemMb = 500;
+        } else if (mi.totalMem < 4.8 * gb) {
+            totalMemMb = 1000;
+        } else {
+            totalMemMb = 1600;  // high-end TVs
+        }
+        int targetBufferBytes = Math.min(totalMemMb * 1024 * 1024, Integer.MAX_VALUE);
+
         DefaultLoadControl loadControl = new DefaultLoadControl.Builder()
+                .setAllocator(new androidx.media3.exoplayer.upstream.DefaultAllocator(true, 256 * 1024))
                 .setBufferDurationsMs(
-                        /* minBufferMs= */ isLive ? 3000 : 6000,
-                        /* maxBufferMs= */ isLive ? 25000 : 45000,
-                        /* bufferForPlaybackMs= */ 500,
-                        /* bufferForPlaybackAfterRebufferMs= */ 1000)
-                .setPrioritizeTimeOverSizeThresholds(true)
-                .setBackBuffer(8000, true)
+                        /* minBufferMs= */ isLive ? 6000 : 30000,
+                        /* maxBufferMs= */ isLive ? 25000 : 90000,
+                        /* bufferForPlaybackMs= */ isLive ? 1000 : 2500,
+                        /* bufferForPlaybackAfterRebufferMs= */ isLive ? 2500 : 5000)
+                .setTargetBufferBytes(targetBufferBytes)
+                .setPrioritizeTimeOverSizeThresholds(false)
+                .setBackBuffer(12000, true)
                 .build();
 
         ExoPlayer exo = new ExoPlayer.Builder(this, renderersFactory)
@@ -487,6 +899,8 @@ public class PlayerActivity extends AppCompatActivity {
 
         exo.setHandleAudioBecomingNoisy(true);
         exo.addListener(new PlayerEventListener());
+        // Feed the freeze detector with real rendered-video-frame counts.
+        exo.addAnalyticsListener(frameCounterListener);
 
         if (useTextureViewFallback && textureView != null) {
             if (surfaceView != null) surfaceView.setVisibility(View.GONE);
@@ -603,15 +1017,22 @@ public class PlayerActivity extends AppCompatActivity {
             try {
                 java.util.List<java.net.InetAddress> addresses =
                         java.util.Arrays.asList(java.net.InetAddress.getAllByName(hostname));
-                if (!addresses.isEmpty()) return addresses;
+                boolean hasValid = false;
+                for (java.net.InetAddress a : addresses) {
+                    if (!a.isAnyLocalAddress() && !a.isLoopbackAddress()) {
+                        hasValid = true;
+                        break;
+                    }
+                }
+                if (hasValid) return addresses;
             } catch (Exception ignored) {}
 
-            // Bypass ISP DNS blocks (Jio/Airtel/ACT) via DNS-over-HTTPS
+            // Bypass ISP DNS blocks (Jio/Airtel/ACT) via DNS-over-HTTPS (Google & Cloudflare)
             try {
                 java.net.URL dohUrl = new java.net.URL("https://dns.google/resolve?name=" + hostname + "&type=A");
                 java.net.HttpURLConnection conn = (java.net.HttpURLConnection) dohUrl.openConnection();
-                conn.setConnectTimeout(3000);
-                conn.setReadTimeout(3000);
+                conn.setConnectTimeout(2500);
+                conn.setReadTimeout(2500);
                 conn.setRequestProperty("Accept", "application/json");
                 if (conn.getResponseCode() == 200) {
                     java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(conn.getInputStream()));
@@ -649,6 +1070,9 @@ public class PlayerActivity extends AppCompatActivity {
                         ConnectionSpec.CLEARTEXT))
                 .connectTimeout(CONNECT_TIMEOUT_MS, TimeUnit.MILLISECONDS)
                 .readTimeout(READ_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+                // v3.9.0: reduced from 120s — a dead segment was hanging the
+                // player for 2 full minutes before failover could trigger.
+                .callTimeout(15, TimeUnit.SECONDS)
                 .followRedirects(true)
                 .followSslRedirects(true)
                 .retryOnConnectionFailure(true)
@@ -664,6 +1088,21 @@ public class PlayerActivity extends AppCompatActivity {
                 Log.w(TAG, "Error releasing ExoPlayer", e);
             }
             player = null;
+        }
+    }
+
+    private void failoverToNextServer() {
+        if (currentServerIdx + 1 < serverQueue.size()) {
+            currentServerIdx++;
+            uiHandler.post(() -> {
+                Toast.makeText(PlayerActivity.this, "Switching to next mirror (" + (currentServerIdx + 1) + "/" + serverQueue.size() + ")...", Toast.LENGTH_SHORT).show();
+                playCurrentStream();
+            });
+        } else {
+            uiHandler.post(() -> {
+                Toast.makeText(PlayerActivity.this, "Stream unavailable across all mirrors. Returning...", Toast.LENGTH_LONG).show();
+                finish();
+            });
         }
     }
 
@@ -690,8 +1129,14 @@ public class PlayerActivity extends AppCompatActivity {
 
         @Override
         public void onPlayerError(@NonNull PlaybackException error) {
-            Log.e(TAG, "PLAYER_ERROR: " + error.getMessage() + " (code " + error.errorCode + ")", error);
+            Log.e(TAG, "PLAYER_ERROR on server " + (currentServerIdx + 1) + ": " + error.getMessage() + " (code " + error.errorCode + ")", error);
             bufferSpinner.setVisibility(View.GONE);
+
+            // Failover to next stream server in queue
+            if (currentServerIdx + 1 < serverQueue.size()) {
+                failoverToNextServer();
+                return;
+            }
 
             int code = error.errorCode;
             if (code == PlaybackException.ERROR_CODE_DECODER_INIT_FAILED
@@ -704,7 +1149,7 @@ public class PlayerActivity extends AppCompatActivity {
                             "Switching to compatible video engine...",
                             Toast.LENGTH_SHORT).show();
                     showOsd();
-                    initializePlayer();
+                    initializeExoPlayer();
                     return;
                 }
             }
@@ -754,32 +1199,39 @@ public class PlayerActivity extends AppCompatActivity {
                 if (group.getType() == C.TRACK_TYPE_AUDIO) audioTracks += group.length;
             }
             hasVideoTrack = videoTracks > 0;
-            Log.i(TAG, "TRACKS: video=" + videoTracks + " audio=" + audioTracks);
+            Log.i(TAG, "TRACKS_CHANGED: video=" + videoTracks + ", audio=" + audioTracks);
         }
     }
 
-    // ---------------------------------------------------------------- OSD + keys
+    // ------------------------------------------------------------- OSD and D-Pad controls
 
     private void showOsd() {
-        osdOverlay.setVisibility(View.VISIBLE);
+        if (osdOverlay == null) return;
         isOsdVisible = true;
-        scheduleHideOsd();
-    }
-
-    private void hideOsd() {
-        osdOverlay.setVisibility(View.GONE);
-        isOsdVisible = false;
-    }
-
-    private void scheduleHideOsd() {
+        osdOverlay.setVisibility(View.VISIBLE);
         uiHandler.removeCallbacks(hideOsdRunnable);
         uiHandler.postDelayed(hideOsdRunnable, OSD_HIDE_DELAY_MS);
     }
 
+    private void hideOsd() {
+        if (osdOverlay == null) return;
+        isOsdVisible = false;
+        osdOverlay.setVisibility(View.GONE);
+    }
+
+    private void toggleOsd() {
+        if (isOsdVisible) hideOsd();
+        else showOsd();
+    }
+
     private void updateProgressText() {
-        if (player == null || timeView == null) return;
-        if (isLive || player.getDuration() == C.TIME_UNSET) {
-            timeView.setText("Live broadcast");
+        if (timeView == null) return;
+        if (isLive || isWebEmbedMode) {
+            timeView.setText("LIVE HD BROADCAST");
+            return;
+        }
+        if (player == null || player.getDuration() == C.TIME_UNSET) {
+            timeView.setText("--:-- / --:--");
             return;
         }
         timeView.setText(formatTime(player.getCurrentPosition())
@@ -787,6 +1239,13 @@ public class PlayerActivity extends AppCompatActivity {
     }
 
     private void togglePlayPause() {
+        if (isWebEmbedMode && webVideoView != null) {
+            webVideoView.evaluateJavascript(
+                    "(function(){var v=document.querySelector('video'); if(v){if(v.paused)v.play();else v.pause();}else{var btn=document.querySelector('.play,.play-btn,.jw-display-icon-container,[aria-label=\"Play\"]'); if(btn)btn.click();}})();",
+                    null);
+            showOsd();
+            return;
+        }
         if (player == null) return;
         if (player.isPlaying()) {
             player.pause();
@@ -799,6 +1258,19 @@ public class PlayerActivity extends AppCompatActivity {
     }
 
     private void seekRelative(long deltaMs) {
+        if (isWebEmbedMode && webVideoView != null) {
+            if (deltaMs > 0) {
+                webVideoView.evaluateJavascript(
+                        "(function(){var v=document.querySelector('video'); if(v){v.currentTime=Math.min(v.duration||99999, v.currentTime+10);}})();",
+                        null);
+            } else {
+                webVideoView.evaluateJavascript(
+                        "(function(){var v=document.querySelector('video'); if(v){v.currentTime=Math.max(0, v.currentTime-10);}})();",
+                        null);
+            }
+            showOsd();
+            return;
+        }
         if (player == null || isLive || !player.isCurrentMediaItemSeekable()) return;
         long duration = player.getDuration();
         long target = player.getCurrentPosition() + deltaMs;
@@ -810,7 +1282,24 @@ public class PlayerActivity extends AppCompatActivity {
     }
 
     @Override
+    public boolean onKeyLongPress(int keyCode, KeyEvent event) {
+        // Long-press D-pad Up = cycle display/zoom mode
+        if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
+            cycleZoomMode();
+            return true;
+        }
+        return super.onKeyLongPress(keyCode, event);
+    }
+
+    @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
+        // PROG_UP / PROG_DOWN / channel keys also cycle zoom modes
+        if (keyCode == KeyEvent.KEYCODE_PROG_RED || keyCode == KeyEvent.KEYCODE_PROG_GREEN
+                || keyCode == KeyEvent.KEYCODE_CHANNEL_UP || keyCode == KeyEvent.KEYCODE_CHANNEL_DOWN) {
+            cycleZoomMode();
+            return true;
+        }
+        // Use KEYCODE_DPAD_UP long-press; short press handled below (OSD)
         switch (keyCode) {
             case KeyEvent.KEYCODE_DPAD_CENTER:
             case KeyEvent.KEYCODE_ENTER:
@@ -820,12 +1309,20 @@ public class PlayerActivity extends AppCompatActivity {
                 return true;
 
             case KeyEvent.KEYCODE_MEDIA_PLAY:
-                if (player != null) player.play();
+                if (isWebEmbedMode && webVideoView != null) {
+                    webVideoView.evaluateJavascript("(function(){var v=document.querySelector('video'); if(v)v.play();})();", null);
+                } else if (player != null) {
+                    player.play();
+                }
                 showOsd();
                 return true;
 
             case KeyEvent.KEYCODE_MEDIA_PAUSE:
-                if (player != null) player.pause();
+                if (isWebEmbedMode && webVideoView != null) {
+                    webVideoView.evaluateJavascript("(function(){var v=document.querySelector('video'); if(v)v.pause();})();", null);
+                } else if (player != null) {
+                    player.pause();
+                }
                 showOsd();
                 return true;
 
@@ -845,8 +1342,7 @@ public class PlayerActivity extends AppCompatActivity {
             case KeyEvent.KEYCODE_DPAD_DOWN:
             case KeyEvent.KEYCODE_MENU:
             case KeyEvent.KEYCODE_INFO:
-                if (isOsdVisible) hideOsd();
-                else showOsd();
+                toggleOsd();
                 return true;
 
             case KeyEvent.KEYCODE_BACK:

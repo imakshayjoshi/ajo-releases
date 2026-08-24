@@ -32,7 +32,7 @@ class ErrorBoundary extends React.Component {
           padding: '40px',
           textAlign: 'center'
         }}>
-          <h1 style={{ fontSize: '32px', marginBottom: '16px', color: '#f87171' }}>PikaShow TV Error</h1>
+          <h1 style={{ fontSize: '32px', marginBottom: '16px', color: '#f87171' }}>AJO TV Error</h1>
           <p style={{ color: '#94a3b8', maxWidth: '600px', marginBottom: '24px', lineHeight: '1.6' }}>
             {this.state.error?.message || "An unexpected rendering error occurred."}
           </p>

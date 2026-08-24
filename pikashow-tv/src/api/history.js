@@ -15,7 +15,8 @@ export function saveProgress(item, currentTime, duration) {
 
   const percentage = Math.min(100, Math.max(0, Math.round((currentTime / duration) * 100)));
   
-  if (percentage > 95 || percentage < 1) return;
+  if (percentage > 95) return;
+  if (currentTime < 30) return; // skip accidental taps; any real watch counts
 
   try {
     const history = getWatchHistory();

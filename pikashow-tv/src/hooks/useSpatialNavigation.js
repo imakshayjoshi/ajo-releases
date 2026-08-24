@@ -8,10 +8,31 @@ import { useEffect, useRef, useCallback } from 'react';
 export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelector = null }) {
   const lastFocusedRef = useRef(null);
 
-  // Fast check if an element is focusable and visible without triggering reflow
+  // Fast check if an element is focusable and visible without triggering reflow.
+  // offsetParent is null for position:fixed and position:sticky elements, so
+  // the OSD / player chrome / modals all failed the original check.
   const isElementVisible = (el) => {
     if (!el || el.disabled) return false;
-    return el.offsetParent !== null || el.offsetWidth > 0;
+    if (el.offsetWidth === 0 && el.offsetHeight === 0) return false;
+    try {
+      const style = window.getComputedStyle(el);
+      if (style.visibility === 'hidden' || style.display === 'none') return false;
+      if (parseFloat(style.opacity || '1') === 0) return false;
+    } catch {
+      // ignore — fall through to offsetParent check below
+    }
+    // offsetParent covers normal flow; check parent chain for fixed/sticky.
+    if (el.offsetParent !== null) return true;
+    let node = el.parentElement;
+    while (node) {
+      const pos = (node.style && node.style.position) || '';
+      const clsPos = (typeof window !== 'undefined' && node.className && typeof node.className === 'string')
+        ? node.className.indexOf('fixed') !== -1 || node.className.indexOf('sticky') !== -1
+        : false;
+      if (pos === 'fixed' || pos === 'sticky' || clsPos) return true;
+      node = node.parentElement;
+    }
+    return false;
   };
 
   const getFocusableElements = useCallback((container = document) => {
@@ -48,11 +69,35 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
     // 2. FAST-PATH: Inter-rail vertical navigation
     if (direction === 'ArrowDown' || direction === 'ArrowUp') {
       const currentRail = current.closest('.tv-rail, .tv-header, .tv-hero, .tv-modal-card');
+
+      // v3.9: header <-> content in ONE press. Previously the rail-walk only
+      // visited rail SIBLINGS — the header isn't one — so every ArrowUp from
+      // content fell through to the slow full-document scan (thousands of
+      // elements pre-curation), which felt like dead keypresses.
+      const inHeader = !!current.closest('.tv-header');
+      if (inHeader && direction === 'ArrowDown') {
+        const firstRail = document.querySelector('.tv-main-content .tv-rail, .tv-main-content .tv-hero');
+        if (firstRail) {
+          const railEls = getFocusableElements(firstRail);
+          if (railEls.length > 0) {
+            const currentLeft = current.getBoundingClientRect().left;
+            let closest = railEls[0];
+            let minDiff = Infinity;
+            for (const el of railEls) {
+              const diff = Math.abs(el.getBoundingClientRect().left - currentLeft);
+              if (diff < minDiff) { minDiff = diff; closest = el; }
+            }
+            return closest;
+          }
+        }
+      }
+
       if (currentRail) {
         let targetRail = direction === 'ArrowDown'
           ? currentRail.nextElementSibling
           : currentRail.previousElementSibling;
-        
+
+        let exhausted = false;
         while (targetRail) {
           const railElements = getFocusableElements(targetRail);
           if (railElements.length > 0) {
@@ -72,6 +117,22 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
           targetRail = direction === 'ArrowDown'
             ? targetRail.nextElementSibling
             : targetRail.previousElementSibling;
+          exhausted = true;
+        }
+
+        // Rail walk found nothing above us: snap straight into the header.
+        if (exhausted && direction === 'ArrowUp') {
+          const headerEls = getFocusableElements(document.querySelector('.tv-header'));
+          if (headerEls.length > 0) {
+            const currentLeft = current.getBoundingClientRect().left;
+            let closest = headerEls[0];
+            let minDiff = Infinity;
+            for (const el of headerEls) {
+              const diff = Math.abs(el.getBoundingClientRect().left - currentLeft);
+              if (diff < minDiff) { minDiff = diff; closest = el; }
+            }
+            return closest;
+          }
         }
       }
     }
@@ -147,6 +208,43 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
     return bestCandidate;
   }, [getFocusableElements]);
 
+  /**
+   * Focus + VERTICAL-ONLY scrolling.
+   * BUG FIX: scrollIntoView(inline:'nearest') was scrolling the whole
+   * .tv-main-content / body horizontally when a rail card received focus,
+   * shoving the entire UI off to the left where it stayed. Horizontal rails
+   * handle their own internal scrolling via CSS; we only ever correct the
+   * vertical position here, and force-reset any stray horizontal scroll.
+   */
+  const focusAndScroll = useCallback((el) => {
+    try { el.focus({ preventScroll: true }); } catch { try { el.focus(); } catch (_) {} }
+
+    // Vertical alignment within the main scroll area
+    const scroller = el.closest('.tv-main-content') || document.querySelector('.tv-main-content');
+    try {
+      if (scroller) {
+        const er = el.getBoundingClientRect();
+        const sr = scroller.getBoundingClientRect();
+        if (er.top < sr.top + 8) {
+          scroller.scrollTop -= (sr.top + 8 - er.top);
+        } else if (er.bottom > sr.bottom - 8) {
+          scroller.scrollTop += (er.bottom - sr.bottom + 8);
+        }
+      }
+    } catch (_) {}
+
+    // Kill any horizontal drift on every ancestor (the actual bug)
+    try {
+      let node = el.parentElement;
+      while (node) {
+        if (node.scrollLeft !== 0) node.scrollLeft = 0;
+        node = node.parentElement;
+      }
+      if (document.documentElement.scrollLeft !== 0) document.documentElement.scrollLeft = 0;
+      if (document.body && document.body.scrollLeft !== 0) document.body.scrollLeft = 0;
+    } catch (_) {}
+  }, []);
+
   useEffect(() => {
     const handleKeyDown = (e) => {
       const key = e.key;
@@ -164,6 +262,13 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
 
       // 2. D-Pad Directional Navigation
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(key) || [19, 20, 21, 22, 37, 38, 39, 40].includes(keyCode)) {
+        // v3.8.2: never steal keys while the user is typing in a text field —
+        // arrow-key navigation inside the search input moved caret AND jumped
+        // focus to other cards simultaneously.
+        const ae = document.activeElement;
+        if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA')) {
+          return;
+        }
         let dir = key;
         if (keyCode === 19 || keyCode === 38) dir = 'ArrowUp';
         if (keyCode === 20 || keyCode === 40) dir = 'ArrowDown';
@@ -184,8 +289,7 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
             const target = lastFocusedRef.current && elements.includes(lastFocusedRef.current)
               ? lastFocusedRef.current
               : elements[0];
-            target.focus();
-            target.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'nearest' });
+            focusAndScroll(target);
           }
           return;
         }
@@ -193,16 +297,24 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
         const next = findNextElement(current, dir, elements);
         if (next) {
           e.preventDefault();
-          next.focus();
-          next.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'nearest' });
+          focusAndScroll(next);
           lastFocusedRef.current = next;
         }
       }
 
       // 3. Enter / OK Selection Key
+      // v3.8.2 DOUBLE-INPUT FIX: native form controls (button/a/input/select)
+      // synthesize their OWN click on Enter/Space — force-calling .click() here
+      // too fired every action twice (on-screen keyboard typed double letters).
+      // We only synthesize clicks for non-native focusables (div/span cards).
       if (key === 'Enter' || key === 'Select' || keyCode === 13 || keyCode === 23 || keyCode === 66) {
-        if (document.activeElement && typeof document.activeElement.click === 'function') {
-          document.activeElement.click();
+        const el = document.activeElement;
+        if (el && typeof el.click === 'function') {
+          const tag = el.tagName;
+          const selfActivates =
+            tag === 'BUTTON' || tag === 'A' ||
+            tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA';
+          if (!selfActivates) el.click();
         }
       }
     };
@@ -216,8 +328,16 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
       const el = document.querySelector(selector);
       if (el) {
         try {
-          el.focus();
-          el.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'nearest' });
+          el.focus({ preventScroll: true });
+          // Vertical-only alignment; never horizontal (see focusAndScroll note)
+          const scroller = el.closest('.tv-main-content');
+          if (scroller) {
+            const er = el.getBoundingClientRect();
+            const sr = scroller.getBoundingClientRect();
+            if (er.top < sr.top || er.bottom > sr.bottom) {
+              el.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'nearest' });
+            }
+          }
           lastFocusedRef.current = el;
         } catch (_) {}
       }

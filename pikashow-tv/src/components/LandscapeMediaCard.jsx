@@ -1,11 +1,9 @@
 import React, { useState } from 'react';
-import { Star, Radio, Play, Tv } from 'lucide-react';
+import { Star, Radio, Play } from 'lucide-react';
 import { getSourceProvider } from '../utils/sourceProvider';
-import { castEngine } from '../api/castSync';
 
 export const LandscapeMediaCard = React.memo(function LandscapeMediaCard({ item, onClick, onFocus }) {
   const [imgError, setImgError] = useState(false);
-  const [castSuccess, setCastSuccess] = useState(false);
 
   if (!item) return null;
 
@@ -15,24 +13,13 @@ export const LandscapeMediaCard = React.memo(function LandscapeMediaCard({ item,
   const logo = item.logo || item.poster_url || item.poster || item.image || '';
   const provider = getSourceProvider(item);
 
-  const handleCastDirectly = (e) => {
-    e.stopPropagation();
-    castEngine.sendToTV({
-      type: 'PLAY_MEDIA',
-      item: item,
-      server: item.players?.[0] || item.player?.[0] || (item.url ? { url: item.url, source: 'm3u8' } : null)
-    });
-    setCastSuccess(true);
-    setTimeout(() => setCastSuccess(false), 2500);
-    if (navigator.vibrate) {
-      try { navigator.vibrate([40, 30, 40]); } catch (_) {}
-    }
-  };
-
   return (
     <div
-      className="mobile-landscape-card"
+      className="tv-card tv-landscape-card tv-focusable-card"
+      data-focusable="true"
+      tabIndex={0}
       onClick={() => onClick && onClick(item)}
+      onFocus={() => onFocus && onFocus(item)}
       style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 10 }}
     >
       <div className="mobile-landscape-media-box" style={{
@@ -64,7 +51,7 @@ export const LandscapeMediaCard = React.memo(function LandscapeMediaCard({ item,
           </div>
         )}
 
-        <div className="mobile-card-gradient" style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.1) 0%, transparent 40%, rgba(0,0,0,0.85) 100%)', pointerEvents: 'none' }} />
+        <div className="mobile-card-gradient" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.1) 0%, transparent 40%, rgba(0,0,0,0.85) 100%)', pointerEvents: 'none' }} />
 
         {/* Live Badge */}
         <div className="mobile-live-badge" style={{
@@ -81,33 +68,6 @@ export const LandscapeMediaCard = React.memo(function LandscapeMediaCard({ item,
           <span className="mobile-live-dot" style={{ width: '4px', height: '4px', background: '#fff', borderRadius: '50%' }} />
           <span style={{ fontSize: '9px', fontWeight: 900, color: '#fff' }}>LIVE</span>
         </div>
-
-        {/* 1-Tap Play on TV Button */}
-        <button
-          onClick={handleCastDirectly}
-          className="mobile-card-tv-cast-btn"
-          title="Play on TV"
-          style={{
-            position: 'absolute',
-            top: '6px',
-            right: '6px',
-            width: '28px',
-            height: '28px',
-            borderRadius: '50%',
-            background: castSuccess ? 'rgba(34, 197, 94, 0.95)' : 'rgba(15, 23, 42, 0.85)',
-            backdropFilter: 'blur(8px)',
-            border: castSuccess ? '1px solid rgba(74, 222, 128, 0.8)' : '1px solid rgba(255, 255, 255, 0.25)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer',
-            zIndex: 30,
-            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.7)',
-            transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
-          }}
-        >
-          <Tv size={14} color={castSuccess ? '#ffffff' : '#38bdf8'} />
-        </button>
 
         {/* Play Icon on Bottom */}
         <div className="mobile-landscape-play-overlay" style={{

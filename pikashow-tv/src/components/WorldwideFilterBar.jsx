@@ -228,7 +228,10 @@ export function WorldwideFilterBar({ filters, onFilterChange, totalResults = nul
           onClick={() => setModalOpen(false)}
           style={{
             position: 'fixed',
-            inset: 0,
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
             background: 'rgba(0, 0, 0, 0.75)',
             backdropFilter: 'blur(10px)',
             WebkitBackdropFilter: 'blur(10px)',

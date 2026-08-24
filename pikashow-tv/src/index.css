@@ -55,13 +55,19 @@ html, body, #root {
 }
 
 /* Top Navigation Bar */
+/* v3.8.2 UI FIX: on 720p-class TVs the 7-tab nav plus logo plus clock
+   exceeded the viewport — the Settings pill got clipped off the right edge
+   while space-between held a big empty gap on the left. Tightened paddings,
+   made sections non-shrinking, and dropped the tagline + shrank pills on
+   narrow screens so everything fits. */
 .tv-header {
   height: 72px;
   min-height: 72px;
-  padding: 0 48px;
+  padding: 0 24px;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 16px;
   background: rgba(7, 9, 14, 0.85);
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   z-index: 100;
@@ -71,6 +77,7 @@ html, body, #root {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-shrink: 0;
 }
 
 .tv-logo-badge {
@@ -93,15 +100,17 @@ html, body, #root {
 .tv-nav-pills {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
+  min-width: 0;
+  flex-wrap: nowrap;
 }
 
 .tv-nav-pill {
-  padding: 8px 18px;
+  padding: 8px 14px;
   border-radius: var(--radius-full);
   background: rgba(255, 255, 255, 0.05);
   color: var(--text-secondary);
-  font-size: 0.95rem;
+  font-size: 0.88rem;
   font-weight: 600;
   border: 1px solid transparent;
   cursor: pointer;
@@ -109,6 +118,8 @@ html, body, #root {
   display: flex;
   align-items: center;
   gap: 8px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .tv-nav-pill:focus,
@@ -130,6 +141,16 @@ html, body, #root {
   color: var(--text-secondary);
   font-size: 0.95rem;
   font-weight: 600;
+  flex-shrink: 0;
+}
+
+/* Narrow / 720p-class screens: drop the tagline, tighten pills */
+@media (max-width: 1360px) {
+  .tv-logo-title { display: none; }
+  .tv-nav-pill { padding: 7px 11px; font-size: 0.8rem; }
+}
+@media (max-width: 1000px) {
+  .tv-header-info { display: none; }
 }
 
 /* Main Content Area */
@@ -139,6 +160,14 @@ html, body, #root {
   overflow-x: hidden;
   padding: 24px 48px 48px;
   scroll-behavior: auto;
+  /* UI-shift fix: horizontal rails scroll internally; this container must
+     never drift sideways when focus moves between rail cards. */
+  overscroll-behavior-x: none;
+}
+
+.tv-main-content,
+.tv-rail-items {
+  scrollbar-width: none;
 }
 
 .tv-main-content::-webkit-scrollbar {

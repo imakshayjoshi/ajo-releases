@@ -103,15 +103,33 @@ public class MainActivity extends BridgeActivity {
                 public boolean shouldOverrideUrlLoading(WebView view, android.webkit.WebResourceRequest request) {
                     if (request == null || request.getUrl() == null)
                         return true;
-                    String url = request.getUrl().toString();
-                    if (url.startsWith("http://localhost") ||
-                            url.startsWith("https://localhost") ||
-                            url.startsWith("capacitor://") ||
-                            url.contains("raw.githubusercontent.com") ||
-                            url.contains("github.com/imakshayjoshi/ajo-releases")) {
+                    android.net.Uri uri = request.getUrl();
+                    String scheme = uri.getScheme();
+                    String host = uri.getHost();
+                    String path = uri.getPath() == null ? "" : uri.getPath();
+
+                    // Allow the Capacitor local origin (https://localhost)
+                    if ("localhost".equalsIgnoreCase(host) && ("https".equals(scheme) || "http".equals(scheme))) {
                         return false;
                     }
-                    // Intercept and drop any third-party ad / new tab launches
+                    // Allow capacitor:// scheme used internally
+                    if ("capacitor".equals(scheme)) {
+                        return false;
+                    }
+                    // Allow OTA update manifests: only the exact releases repo, with optional path.
+                    if ("raw.githubusercontent.com".equalsIgnoreCase(host) &&
+                            path.startsWith("/imakshayjoshi/ajo-releases/")) {
+                        return false;
+                    }
+                    if ("github.com".equalsIgnoreCase(host) &&
+                            path.startsWith("/imakshayjoshi/ajo-releases/")) {
+                        return false;
+                    }
+                    if ("api.github.com".equalsIgnoreCase(host) &&
+                            path.startsWith("/repos/imakshayjoshi/ajo-releases/")) {
+                        return false;
+                    }
+                    // Drop everything else (ads, popups, third-party navigations).
                     return true;
                 }
             });
@@ -173,6 +191,11 @@ public class MainActivity extends BridgeActivity {
             webView.addJavascriptInterface(new Object() {
                 @JavascriptInterface
                 public void playStream(final String url, final String title, final boolean isLive) {
+                    playStreamWithFallbacks(url, title, isLive, null);
+                }
+
+                @JavascriptInterface
+                public void playStreamWithFallbacks(final String url, final String title, final boolean isLive, final String fallbacksJson) {
                     if (url == null || url.isEmpty()) return;
                     runOnUiThread(() -> {
                         try {
@@ -180,16 +203,12 @@ public class MainActivity extends BridgeActivity {
                             intent.putExtra("url", url);
                             intent.putExtra("title", title);
                             intent.putExtra("isLive", isLive);
-                            // No NEW_TASK / CLEAR_TOP here on purpose. PlayerActivity is
-                            // declared singleTop in the same task, so a plain start keeps
-                            // the stack intact. NEW_TASK could launch the player into its
-                            // own task and CLEAR_TOP could finish MainActivity underneath
-                            // it, which leaves a black window that Back cannot clear.
+                            if (fallbacksJson != null && !fallbacksJson.isEmpty()) {
+                                intent.putExtra("fallbacks", fallbacksJson);
+                            }
                             startActivity(intent);
-                            // Hand the decoder over only after the player is on its way.
                             releaseWebVideoDecoder();
                         } catch (Exception e) {
-                            // Never leave the WebView paused if the player failed to open.
                             resumeWebView(true);
                             Toast.makeText(MainActivity.this, "Native Player error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
                         }
@@ -261,6 +280,30 @@ public class MainActivity extends BridgeActivity {
                         }
                     } catch (Exception e) {
                         return 50;
+                    }
+                }
+
+                // v3.8.0 keystore cutover: lets the web app detect whether THIS
+                // install is signed with the release key. Debug-signed installs
+                // cannot update in place to release-signed builds (Android
+                // INSTALL_FAILED_UPDATE_INCOMPATIBLE), so they are routed to a
+                // guided one-time reinstall instead of a broken silent update.
+                @JavascriptInterface
+                public boolean isReleaseSigned() {
+                    try {
+                        PackageInfo pInfo = getPackageManager().getPackageInfo(
+                                getPackageName(), android.content.pm.PackageManager.GET_SIGNATURES);
+                        if (pInfo.signatures == null || pInfo.signatures.length == 0) return false;
+                        java.security.MessageDigest md =
+                                java.security.MessageDigest.getInstance("SHA-256");
+                        byte[] digest = md.digest(pInfo.signatures[0].toByteArray());
+                        StringBuilder hex = new StringBuilder();
+                        for (byte b : digest) hex.append(String.format("%02X", b));
+                        // SHA-256 of the ajo-release.keystore certificate (keytool-verified)
+                        return "354DE313E697EA83D73E89D09CF14CBF533BFFBE4563ADFC2790BBCA29D4FEE6"
+                                .equals(hex.toString());
+                    } catch (Exception e) {
+                        return false;
                     }
                 }
 
@@ -522,6 +565,20 @@ public class MainActivity extends BridgeActivity {
         // focus back for the D-pad.
         resumeWebView(true);
         enableImmersiveMode();
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        // Pause the WebView when the app is backgrounded so Hls.js stops holding
+        // a hardware decoder. Without this, returning from background can race
+        // the native player for the decoder and produce the black-picture /
+        // working-audio symptom that v3.2.1 was supposed to eliminate.
+        if (getBridge() != null && getBridge().getWebView() != null) {
+            try {
+                getBridge().getWebView().onPause();
+            } catch (Exception ignored) {}
+        }
     }
 
     @Override

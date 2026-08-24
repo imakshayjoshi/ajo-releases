@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-    <title>AJO TV — Universal Entertainment & 24/7 Live Broadcasts</title>
+    <title>AJO TV — 10-Foot Google TV & Android TV Experience</title>
     <!-- Google Fonts for rich TV typography -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -12,15 +12,24 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/src/index.css" />
-    <!-- Global Anti-Ad & Sandbox Warning Suppressor -->
+    <!-- Global Diagnostic & Anti-Ad Interceptor -->
     <script>
       (function() {
+        // Global error display to prevent silent black screen crashes on legacy Smart TVs
+        window.addEventListener('error', function(e) {
+          console.error("Global uncaught error:", e);
+          var root = document.getElementById('root');
+          if (root && !root.hasChildNodes()) {
+            root.innerHTML = '<div style="padding:40px;color:#f87171;background:#07090e;font-size:22px;font-family:sans-serif;text-align:center;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;"><h2>AJO TV Engine Notice</h2><p style="color:#94a3b8;font-size:16px;max-width:600px;margin:16px 0;">' + (e.message || e.error || 'Initialization error') + '</p><button onclick="location.reload()" style="padding:12px 24px;background:#38bdf8;color:#000;border:none;border-radius:8px;font-weight:700;font-size:16px;cursor:pointer;">Reload Interface</button></div>';
+          }
+        });
+
         // 1. Suppress all sandbox notices and third-party iframe console noise
-        const shouldFilter = function(args) {
+        var shouldFilter = function(args) {
           try {
             return args.some(function(a) {
               if (!a) return false;
-              const str = (typeof a === 'string' ? a : (a.message || a.toString() || '')).toLowerCase();
+              var str = (typeof a === 'string' ? a : (a.message || a.toString() || '')).toLowerCase();
               return str.includes('sandbox') || 
                      str.includes('blocked script') || 
                      str.includes('allow-popups') || 
@@ -30,58 +39,24 @@
           } catch(e) { return false; }
         };
 
-        const origError = console.error;
+        var origError = console.error;
         console.error = function() {
           if (shouldFilter(Array.from(arguments))) return;
           origError.apply(console, arguments);
         };
 
-        const origWarn = console.warn;
+        var origWarn = console.warn;
         console.warn = function() {
           if (shouldFilter(Array.from(arguments))) return;
           origWarn.apply(console, arguments);
         };
 
         // 2. Intercept window.open
-        window.open = function(url, target, features) {
-          return null;
-        };
-
-        // 3. Intercept window.showModalDialog
-        if (window.showModalDialog) {
-          window.showModalDialog = function() { return null; };
-        }
-
-        // 4. Intercept programmatic anchor clicks
-        const origClick = HTMLAnchorElement.prototype.click;
-        HTMLAnchorElement.prototype.click = function() {
-          const href = this.href || '';
-          const target = this.target || '';
-          if (target === '_blank' || (href.startsWith('http') && !href.includes(window.location.host))) {
-            return;
-          }
-          return origClick.apply(this, arguments);
-        };
-
-        // 5. Intercept capture-phase window click events for rogue external URLs
-        window.addEventListener('click', function(e) {
-          let node = e.target;
-          while (node && node.tagName !== 'A') {
-            node = node.parentElement;
-          }
-          if (node && node.tagName === 'A') {
-            const href = node.getAttribute('href') || '';
-            const target = node.getAttribute('target') || '';
-            if (target === '_blank' && !href.includes(window.location.host) && !href.startsWith('#') && !href.startsWith('/')) {
-              e.preventDefault();
-              e.stopPropagation();
-            }
-          }
-        }, true);
+        window.open = function() { return null; };
       })();
     </script>
   </head>
-  <body>
+  <body style="background-color: #07090e; margin: 0; padding: 0;">
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

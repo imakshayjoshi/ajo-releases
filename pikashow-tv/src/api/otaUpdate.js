@@ -1,5 +1,5 @@
-export const CURRENT_APP_VERSION = '3.1.6';
-export const CURRENT_VERSION_CODE = 53;
+export const CURRENT_APP_VERSION = '3.9.3';
+export const CURRENT_VERSION_CODE = 74;
 const MANIFEST_SOURCES = [
   'https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/version.json',
   'https://cdn.jsdelivr.net/gh/imakshayjoshi/ajo-releases@main/version.json',
@@ -8,8 +8,10 @@ const MANIFEST_SOURCES = [
 const RELEASE_PREFIX = 'https://github.com/imakshayjoshi/ajo-releases/releases/download/';
 
 export function compareVersions(a, b) {
-  const left = String(a || '0').replace(/^v/, '').split('.').map(Number);
-  const right = String(b || '0').replace(/^v/, '').split('.').map(Number);
+  const cleanA = String(a || '0').replace(/^v/, '').split(/[-+]/)[0];
+  const cleanB = String(b || '0').replace(/^v/, '').split(/[-+]/)[0];
+  const left = cleanA.split('.').map(Number);
+  const right = cleanB.split('.').map(Number);
   for (let index = 0; index < Math.max(left.length, right.length); index += 1) {
     if ((left[index] || 0) > (right[index] || 0)) return 1;
     if ((left[index] || 0) < (right[index] || 0)) return -1;
@@ -110,7 +112,15 @@ export async function checkForAppUpdates(appType = 'tv') {
       size,
       releaseDate,
       packageId,
-      sha256: target.sha256 || null
+      sha256: target.sha256 || null,
+      // v3.2.0 keystore cutover: manifest declares which key signs new builds.
+      // Debug-signed installs must NOT update in place to release-signed APKs
+      // (INSTALL_FAILED_UPDATE_INCOMPATIBLE) — UI routes them to a guided
+      // one-time reinstall instead.
+      targetSigning: String(target.signing || manifestData.signing || 'debug'),
+      isReleaseSigned: (() => {
+        try { return window.AndroidUpdater?.isReleaseSigned?.() === true; } catch { return false; }
+      })()
     };
   } catch {
     return {

@@ -2,7 +2,7 @@ import React from 'react';
 import { Film, Flame } from 'lucide-react';
 import { getSourceProvider } from '../utils/sourceProvider';
 
-export function Top10Rail({ title = "🔥 Top 10 in India Today", items = [], onSelectItem }) {
+export function Top10Rail({ title = "🔥 Top 10 in India Today", items = [], onSelectItem, onFocusItem }) {
   if (!items || items.length === 0) return null;
 
   const top10 = items.slice(0, 10);
@@ -35,13 +35,13 @@ export function Top10Rail({ title = "🔥 Top 10 in India Today", items = [], on
         </div>
       </div>
 
-      <div className="mobile-top10-scroll" style={{
+      <div className="mobile-rail-scroll mobile-top10-scroll tv-media-rail" style={{
         position: 'relative',
         zIndex: 20,
         display: 'flex',
-        gap: '12px',
+        gap: '16px',
         overflowX: 'auto',
-        padding: '0 16px 10px 16px',
+        padding: '12px 16px 16px 16px',
         scrollSnapType: 'x mandatory',
         scrollbarWidth: 'none',
         WebkitOverflowScrolling: 'touch'
@@ -55,8 +55,11 @@ export function Top10Rail({ title = "🔥 Top 10 in India Today", items = [], on
           return (
             <div
               key={item.id || index}
-              className="mobile-top10-card"
-              onClick={() => onSelectItem(item)}
+              className="tv-card tv-portrait-card tv-focusable-card mobile-top10-card"
+              data-focusable="true"
+              tabIndex={0}
+              onClick={() => onSelectItem && onSelectItem(item)}
+              onFocus={() => onFocusItem && onFocusItem(item)}
               style={{
                 display: 'flex',
                 alignItems: 'flex-end',
@@ -64,8 +67,9 @@ export function Top10Rail({ title = "🔥 Top 10 in India Today", items = [], on
                 flex: '0 0 auto',
                 scrollSnapAlign: 'start',
                 cursor: 'pointer',
-                transition: 'transform 0.1s ease',
-                userSelect: 'none'
+                transition: 'transform 0.15s ease',
+                userSelect: 'none',
+                outline: 'none'
               }}
             >
               {/* Massive Stylized Outlined Rank Number */}

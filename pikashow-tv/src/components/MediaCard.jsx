@@ -21,11 +21,13 @@ export function MediaCard({ item, onClick, isLive = false }) {
     : '';
 
   let rating = '';
-  if (typeof item.rating === 'string' || typeof item.rating === 'number') {
-    rating = String(item.rating);
+  if (typeof item.rating === 'number' || (typeof item.rating === 'string' && item.rating !== '[object Object]')) {
+    rating = String(item.rating).trim();
   } else if (typeof item.ratings === 'object' && item.ratings !== null) {
-    rating = String(item.ratings.imdb || item.ratings.kinopoisk || '');
+    const r = item.ratings.imdb || item.ratings.kinopoisk || item.ratings.rating || '';
+    rating = typeof r === 'string' || typeof r === 'number' ? String(r).trim() : '';
   }
+  if (rating === '[object Object]') rating = '';
 
   let category = item.category;
   if (typeof category === 'object' && category !== null) {

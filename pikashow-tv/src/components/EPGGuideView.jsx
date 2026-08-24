@@ -1,28 +1,20 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
-  Tv, 
-  Play, 
-  Clock, 
   Radio, 
   Star, 
-  Flame, 
-  Sparkles, 
   Search, 
   X, 
-  Heart,
-  Cast
+  Play
 } from 'lucide-react';
 import { getCurrentAndNextProgram } from '../api/epg';
 import { getIPTVChannels } from '../api/iptv';
 import { toggleFavoriteChannel, isFavoriteChannel } from '../api/history';
-import { castEngine } from '../api/castSync';
 
-export function EPGGuideView({ channels = [], onSelectChannel }) {
+export function EPGGuideView({ channels = [], onSelectChannel, onFocusItem }) {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchFilter, setSearchFilter] = useState('');
   const [channelData, setChannelData] = useState([]);
   const [favRefreshCount, setFavRefreshCount] = useState(0);
-  const [castAlert, setCastAlert] = useState(null);
 
   const categories = [
     '⭐ Favorites',
@@ -59,19 +51,6 @@ export function EPGGuideView({ channels = [], onSelectChannel }) {
     setFavRefreshCount(prev => prev + 1);
   };
 
-  const handleCastToTV = (e, ch) => {
-    e.stopPropagation();
-    castEngine.sendToTV({
-      type: 'PLAY_MEDIA',
-      item: ch
-    });
-    setCastAlert(`Casting ${ch.title} to TV...`);
-    setTimeout(() => setCastAlert(null), 2500);
-    if (navigator.vibrate) {
-      try { navigator.vibrate([40, 30, 40]); } catch (err) {}
-    }
-  };
-
   const filteredChannels = useMemo(() => {
     return channelData.filter(ch => {
       const q = searchFilter.toLowerCase().trim();
@@ -102,44 +81,18 @@ export function EPGGuideView({ channels = [], onSelectChannel }) {
   }, [channelData, selectedCategory, searchFilter, favRefreshCount]);
 
   return (
-    <div className="mobile-epg-container" style={{ position: 'relative', zIndex: 20, padding: '14px 14px 90px 14px', width: '100%', boxSizing: 'border-box' }}>
-      {/* Toast Alert */}
-      {castAlert && (
-        <div style={{
-          position: 'fixed',
-          top: '20px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          background: 'rgba(15, 23, 42, 0.95)',
-          border: '1px solid #38bdf8',
-          color: '#ffffff',
-          padding: '10px 20px',
-          borderRadius: '24px',
-          fontSize: '13px',
-          fontWeight: 800,
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          boxShadow: '0 8px 24px rgba(56, 189, 248, 0.4)',
-          zIndex: 99999
-        }}>
-          <Cast size={16} color="#38bdf8" />
-          <span>{castAlert}</span>
-        </div>
-      )}
-
-      {/* Top Page Header Banner */}
+    <div className="mobile-epg-container" style={{ position: 'relative', zIndex: 20, padding: '16px 24px 80px 24px', width: '100%', boxSizing: 'border-box' }}>
+      {/* Top Header Banner */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        marginBottom: '16px',
-        padding: '0 2px'
+        marginBottom: '16px'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <div style={{
-            width: '34px',
-            height: '34px',
+            width: '36px',
+            height: '36px',
             borderRadius: '10px',
             background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
             display: 'flex',
@@ -147,53 +100,36 @@ export function EPGGuideView({ channels = [], onSelectChannel }) {
             justifyContent: 'center',
             boxShadow: '0 4px 14px rgba(239, 68, 68, 0.5)'
           }}>
-            <Radio size={18} color="#ffffff" />
+            <Radio size={20} color="#ffffff" />
           </div>
           <div>
-            <h1 style={{ fontSize: '20px', fontWeight: 900, color: '#ffffff', letterSpacing: '-0.4px', margin: 0 }}>
-              Live TV Guide & Channels
-            </h1>
-            <p style={{ fontSize: '12px', fontWeight: 700, color: '#94a3b8', margin: '2px 0 0 0' }}>
-              {filteredChannels.length} Curated HD Channels • 24/7 Live
-            </p>
+            <h2 style={{ fontSize: '20px', fontWeight: 900, color: '#ffffff', margin: 0, letterSpacing: '-0.3px' }}>
+              Live Satellite TV & EPG Guide
+            </h2>
+            <span style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 600 }}>
+              {filteredChannels.length} Live Channels Available
+            </span>
           </div>
         </div>
 
+        {/* Search Bar */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '6px',
-          background: 'rgba(239, 68, 68, 0.95)',
-          padding: '4px 10px',
-          borderRadius: '8px',
-          boxShadow: '0 2px 8px rgba(239, 68, 68, 0.4)'
+          gap: '8px',
+          background: 'rgba(15, 23, 42, 0.8)',
+          border: '1px solid rgba(255, 255, 255, 0.15)',
+          borderRadius: '20px',
+          padding: '8px 16px',
+          width: '260px'
         }}>
-          <span style={{ width: '6px', height: '6px', background: '#fff', borderRadius: '50%' }} />
-          <span style={{ fontSize: '11px', fontWeight: 900, color: '#fff' }}>24/7 LIVE</span>
-        </div>
-      </div>
-
-      {/* Search Input Bar */}
-      <div style={{
-        position: 'relative',
-        zIndex: 25,
-        marginBottom: '14px',
-        width: '100%'
-      }}>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '10px',
-          background: 'rgba(15, 23, 42, 0.9)',
-          border: '1.5px solid rgba(255, 255, 255, 0.15)',
-          borderRadius: '14px',
-          padding: '10px 14px',
-          boxShadow: '0 2px 10px rgba(0, 0, 0, 0.4)'
-        }}>
-          <Search size={18} color="#38bdf8" />
+          <Search size={16} color="#38bdf8" />
           <input
             type="text"
-            placeholder="Search Live Channels..."
+            className="search-bar-input tv-focusable-card"
+            data-focusable="true"
+            tabIndex={0}
+            placeholder="Search channels..."
             value={searchFilter}
             onChange={(e) => setSearchFilter(e.target.value)}
             style={{
@@ -201,7 +137,7 @@ export function EPGGuideView({ channels = [], onSelectChannel }) {
               background: 'transparent',
               border: 'none',
               color: '#ffffff',
-              fontSize: '14px',
+              fontSize: '13px',
               fontWeight: 700,
               outline: 'none'
             }}
@@ -217,26 +153,28 @@ export function EPGGuideView({ channels = [], onSelectChannel }) {
         </div>
       </div>
 
-      {/* Category Pills Bar (Including ⭐ Favorites) */}
+      {/* Category Pills Bar */}
       <div style={{
         position: 'relative',
         zIndex: 25,
         display: 'flex',
-        gap: '8px',
+        gap: '10px',
         overflowX: 'auto',
         paddingBottom: '12px',
-        marginBottom: '12px',
-        scrollbarWidth: 'none',
-        WebkitOverflowScrolling: 'touch'
+        marginBottom: '16px',
+        scrollbarWidth: 'none'
       }}>
         {categories.map(cat => {
           const isSelected = selectedCategory === cat;
           return (
             <button
               key={cat}
+              className="tv-focusable-card"
+              data-focusable="true"
+              tabIndex={0}
               onClick={() => setSelectedCategory(cat)}
               style={{
-                padding: '9px 16px',
+                padding: '9px 18px',
                 borderRadius: '20px',
                 fontSize: '13px',
                 fontWeight: 800,
@@ -257,26 +195,14 @@ export function EPGGuideView({ channels = [], onSelectChannel }) {
         })}
       </div>
 
-      {/* Channel Count */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        margin: '6px 0 12px 0'
-      }}>
-        <span style={{ fontSize: '13px', fontWeight: 800, color: '#f8fafc' }}>
-          {filteredChannels.length} Channels {selectedCategory === '⭐ Favorites' ? 'in Favorites' : `in ${selectedCategory}`}
-        </span>
-      </div>
-
       {/* Vertical Channels List */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%' }}>
         {filteredChannels.length === 0 ? (
-          <div style={{ padding: '40px 20px', textAlign: 'center', color: '#94a3b8' }}>
-            <Radio size={40} color="#64748b" style={{ margin: '0 auto 12px auto' }} />
-            <p style={{ fontWeight: 700, fontSize: '14px' }}>
+          <div style={{ padding: '50px 20px', textAlign: 'center', color: '#94a3b8' }}>
+            <Radio size={44} color="#64748b" style={{ margin: '0 auto 12px auto' }} />
+            <p style={{ fontWeight: 700, fontSize: '15px' }}>
               {selectedCategory === '⭐ Favorites' 
-                ? 'No favorite channels pinned yet. Tap the ❤️ heart icon on any channel to pin it!' 
+                ? 'No favorite channels pinned yet. Click the ⭐ star on any channel to pin it!' 
                 : 'No live channels found matching your filter.'}
             </p>
           </div>
@@ -289,14 +215,18 @@ export function EPGGuideView({ channels = [], onSelectChannel }) {
             return (
               <div
                 key={ch.id || ch.url || idx}
+                className="channel-guide-row tv-card tv-focusable-card"
+                data-focusable="true"
+                tabIndex={0}
                 onClick={() => onSelectChannel && onSelectChannel(ch)}
+                onFocus={() => onFocusItem && onFocusItem(ch)}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '14px',
-                  padding: '12px 14px',
+                  gap: '16px',
+                  padding: '14px 18px',
                   borderRadius: '16px',
-                  background: '#111827',
+                  background: 'rgba(17, 24, 39, 0.9)',
                   border: '1px solid rgba(255, 255, 255, 0.1)',
                   cursor: 'pointer',
                   width: '100%',
@@ -306,8 +236,8 @@ export function EPGGuideView({ channels = [], onSelectChannel }) {
                 {/* Channel Logo & Number */}
                 <div style={{
                   position: 'relative',
-                  width: '52px',
-                  height: '52px',
+                  width: '56px',
+                  height: '56px',
                   borderRadius: '12px',
                   background: '#0a0e17',
                   display: 'flex',
@@ -315,7 +245,7 @@ export function EPGGuideView({ channels = [], onSelectChannel }) {
                   justifyContent: 'center',
                   flexShrink: 0,
                   overflow: 'hidden',
-                  border: '1px solid rgba(255,255,255,0.12)'
+                  border: '1px solid rgba(255,255,255,0.15)'
                 }}>
                   {logo ? (
                     <img 
@@ -326,7 +256,7 @@ export function EPGGuideView({ channels = [], onSelectChannel }) {
                       referrerPolicy="no-referrer"
                     />
                   ) : (
-                    <Radio size={24} color="#38bdf8" />
+                    <Radio size={26} color="#38bdf8" />
                   )}
                   <span style={{
                     position: 'absolute',
@@ -344,22 +274,21 @@ export function EPGGuideView({ channels = [], onSelectChannel }) {
                 </div>
 
                 {/* Channel Title & Program Details */}
-                <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
                     <span style={{
-                      fontSize: '15px',
+                      fontSize: '16px',
                       fontWeight: 800,
                       color: '#ffffff',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                      display: 'block'
+                      whiteSpace: 'nowrap'
                     }}>
                       {ch.title}
                     </span>
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#38bdf8', fontWeight: 700 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#38bdf8', fontWeight: 700 }}>
                     <span>{ch.category || 'Live TV'}</span>
                     <span>•</span>
                     <span style={{ color: '#4ade80' }}>24/7 LIVE HD</span>
@@ -367,7 +296,7 @@ export function EPGGuideView({ channels = [], onSelectChannel }) {
 
                   <span style={{
                     fontSize: '12px',
-                    color: '#cbd5e1',
+                    color: '#94a3b8',
                     fontWeight: 600,
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
@@ -377,58 +306,41 @@ export function EPGGuideView({ channels = [], onSelectChannel }) {
                   </span>
                 </div>
 
-                {/* Favorite Heart + Cast to TV + Play Icon */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                {/* Direct Play Pill + Favorite Star */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
                   <button
                     onClick={(e) => handleToggleFav(e, ch)}
                     style={{
-                      background: isFav ? 'rgba(239, 68, 68, 0.2)' : 'rgba(255, 255, 255, 0.08)',
-                      border: isFav ? '1px solid #ef4444' : '1px solid rgba(255, 255, 255, 0.1)',
+                      background: isFav ? 'rgba(234, 179, 8, 0.2)' : 'rgba(255, 255, 255, 0.08)',
+                      border: isFav ? '1px solid #eab308' : '1px solid rgba(255, 255, 255, 0.1)',
                       borderRadius: '50%',
-                      width: '34px',
-                      height: '34px',
+                      width: '36px',
+                      height: '36px',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      color: isFav ? '#ef4444' : '#94a3b8',
+                      color: isFav ? '#eab308' : '#94a3b8',
                       cursor: 'pointer'
                     }}
                     title={isFav ? "Remove from Favorites" : "Add to Favorites"}
                   >
-                    <Heart size={16} fill={isFav ? "#ef4444" : "none"} />
-                  </button>
-
-                  <button
-                    onClick={(e) => handleCastToTV(e, ch)}
-                    style={{
-                      background: 'rgba(56, 189, 248, 0.15)',
-                      border: '1px solid rgba(56, 189, 248, 0.4)',
-                      borderRadius: '50%',
-                      width: '34px',
-                      height: '34px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: '#38bdf8',
-                      cursor: 'pointer'
-                    }}
-                    title="Play on TV"
-                  >
-                    <Cast size={16} />
+                    <Star size={16} fill={isFav ? "#eab308" : "none"} />
                   </button>
 
                   <div style={{
-                    width: '34px',
-                    height: '34px',
-                    borderRadius: '50%',
-                    background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#fff',
-                    boxShadow: '0 2px 8px rgba(239, 68, 68, 0.4)'
+                    gap: '6px',
+                    background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                    color: '#ffffff',
+                    padding: '8px 16px',
+                    borderRadius: '20px',
+                    fontSize: '13px',
+                    fontWeight: 900,
+                    boxShadow: '0 4px 14px rgba(239, 68, 68, 0.4)'
                   }}>
-                    <Play size={15} fill="#fff" />
+                    <Play size={14} fill="#fff" />
+                    <span>PLAY</span>
                   </div>
                 </div>
               </div>

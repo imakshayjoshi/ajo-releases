@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { RefreshCw, Trash2, ShieldCheck, Download, Tv, Info, CheckCircle2, AlertCircle } from 'lucide-react';
+import { RefreshCw, Trash2, ShieldCheck, Download, Tv, Info, CheckCircle2, AlertCircle, Puzzle, Plus } from 'lucide-react';
 import { checkForAppUpdates, CURRENT_APP_VERSION } from '../api/otaUpdate';
+import { getInstalledAddons, installAddon, removeAddon, FEATURED_ADDONS } from '../api/stremio';
 
 export function SettingsView() {
   const [updateStatus, setUpdateStatus] = useState(null);
@@ -8,6 +9,31 @@ export function SettingsView() {
   const [cacheCleared, setCacheCleared] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(null);
   const [downloadError, setDownloadError] = useState(null);
+  const [addons, setAddons] = useState([]);
+  const [addonUrl, setAddonUrl] = useState('');
+  const [addonStatus, setAddonStatus] = useState(null);
+
+  const refreshAddons = () => setAddons(getInstalledAddons());
+  useEffect(() => { refreshAddons(); }, []);
+
+  const handleInstallAddon = async (url) => {
+    setAddonStatus({ type: 'loading', msg: 'Installing...' });
+    try {
+      const addon = await installAddon(url || addonUrl);
+      setAddonUrl('');
+      refreshAddons();
+      setAddonStatus({ type: 'ok', msg: `${addon.name} installed!` });
+      setTimeout(() => setAddonStatus(null), 3000);
+    } catch (e) {
+      setAddonStatus({ type: 'err', msg: e.message });
+      setTimeout(() => setAddonStatus(null), 4000);
+    }
+  };
+
+  const handleRemoveAddon = (id) => {
+    removeAddon(id);
+    refreshAddons();
+  };
 
   useEffect(() => {
     window.onAJOUpdateProgress = (percent, total, totalLength) => {
@@ -36,6 +62,11 @@ export function SettingsView() {
     setDownloadError(null);
     try {
       const result = await checkForAppUpdates('tv');
+      // v3.8.0 keystore cutover: debug-signed installs can't update in place
+      // to a release-signed APK — show the one-time reinstall path instead.
+      if (result.targetSigning === 'release' && !result.isReleaseSigned) {
+        result.needsReinstall = true;
+      }
       setUpdateStatus(result);
     } catch (err) {
       setUpdateStatus({ hasUpdate: false, error: 'Could not connect to update servers.' });
@@ -66,6 +97,75 @@ export function SettingsView() {
   return (
     <div className="tv-settings-grid">
       {/* App Version & OTA Update Card */}
+      <div className="tv-settings-card">
+        <h2 className="tv-settings-title">
+          <Puzzle size={20} style={{ display: 'inline', marginRight: 8 }} />
+          Addons (Stremio Compatible)
+        </h2>
+        <p className="tv-settings-desc">
+          Install community addons for unlimited catalogs and streams. Paste any Stremio addon URL.
+        </p>
+
+        {/* Featured one-tap addons */}
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '10px 0' }}>
+          {FEATURED_ADDONS.map(fa => {
+            const installed = addons.some(a => a.id === fa.id);
+            return (
+              <button
+                key={fa.id}
+                tabIndex={0}
+                className="tv-btn-secondary"
+                onClick={() => handleInstallAddon(fa.url)}
+                disabled={installed}
+                style={{ padding: '8px 14px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: 6 }}
+              >
+                {installed ? <CheckCircle2 size={14} color="#22c55e" /> : <Plus size={14} />}
+                {installed ? fa.name : `Add ${fa.name}`}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Custom URL input */}
+        <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+          <input
+            tabIndex={0}
+            value={addonUrl}
+            onChange={(e) => setAddonUrl(e.target.value)}
+            placeholder="https://addon.example.com/manifest.json"
+            style={{
+              flex: 1, minWidth: 260, padding: '10px 12px',
+              background: 'rgba(15,20,31,0.9)', border: '1px solid rgba(148,163,184,0.3)',
+              borderRadius: 8, color: '#fff', fontSize: '0.9rem'
+            }}
+          />
+          <button tabIndex={0} className="tv-btn-primary" onClick={() => handleInstallAddon()} disabled={!addonUrl}>
+            <Plus size={16} /> Install
+          </button>
+        </div>
+
+        {addonStatus && (
+          <p style={{ marginTop: 10, fontWeight: 700, color: addonStatus.type === 'ok' ? '#22c55e' : addonStatus.type === 'err' ? '#ef4444' : '#38bdf8' }}>
+            {addonStatus.msg}
+          </p>
+        )}
+
+        {/* Installed list */}
+        {addons.length > 0 && (
+          <div style={{ marginTop: 14 }}>
+            <strong style={{ color: '#94a3b8', fontSize: '0.85rem' }}>INSTALLED ({addons.length}):</strong>
+            {addons.map(a => (
+              <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                <span>{a.name} <span style={{ color: '#64748b', fontSize: '0.8rem' }}>v{a.version}</span></span>
+                <button tabIndex={0} className="tv-btn-secondary" onClick={() => handleRemoveAddon(a.id)} style={{ padding: '4px 10px', fontSize: '0.75rem' }}>
+                  <Trash2 size={12} /> Remove
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       <div className="tv-settings-card">
         <h2 className="tv-settings-title">
           <RefreshCw size={20} style={{ display: 'inline', marginRight: 8 }} />
@@ -117,17 +217,19 @@ export function SettingsView() {
           <div style={{ marginTop: 12, padding: 12, background: 'rgba(15, 20, 31, 0.8)', borderRadius: 8 }}>
             {updateStatus.hasUpdate ? (
               <div>
-                <p style={{ color: '#38bdf8', fontWeight: 700, marginBottom: 6 }}>
-                  🚀 New Update Available: v{updateStatus.latestVersion}
+                <p style={{ color: updateStatus.needsReinstall ? '#f59e0b' : '#38bdf8', fontWeight: 700, marginBottom: 6 }}>
+                  {updateStatus.needsReinstall
+                    ? '⚠ AJO is switching to its permanent release key. This one-time reinstall keeps your app updatable forever — your data and watch history are preserved.'
+                    : `🚀 New Update Available: v${updateStatus.latestVersion}`}
                 </p>
                 <button
                   tabIndex={0}
                   className="tv-btn-primary"
                   onClick={() => handleInstallUpdate(updateStatus.apkUrl)}
-                  style={{ background: '#22c55e', marginTop: 6 }}
+                  style={{ background: updateStatus.needsReinstall ? '#f59e0b' : '#22c55e', marginTop: 6 }}
                 >
                   <Download size={16} />
-                  <span>Download & Install Now</span>
+                  <span>{updateStatus.needsReinstall ? 'One-Time Reinstall' : 'Download & Install Now'}</span>
                 </button>
               </div>
             ) : (
