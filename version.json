@@ -1,35 +1,36 @@
 {
   "schemaVersion": 2,
-  "version": "3.11.3",
-  "versionCode": 83,
+  "version": "3.11.4",
+  "versionCode": 84,
   "releaseDate": "2026-08-25",
   "phone": {
-    "version": "3.3.3",
-    "versionCode": 52,
+    "version": "3.3.4",
+    "versionCode": 53,
     "packageId": "com.ajo.phone",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "📡 FIXED: cast pairing reliability (dead broker removed, retries until connected) — verified pairing + Play on TV with the TV app"
+      "⚡ FIXED: connection stuck at \"Connecting\" — now uses AJO’s own fast relay server",
+      "✅ Made simple for everyone: one screen, one button \"Connect to TV\" (removed confusing \"Pair TV\"), plus a plain-language \"How to connect\" guide on screen"
     ],
     "size_mb": "3.3 MB",
-    "sha256": "28feecdbc74f67a7f769334385054520b6b9b663a5ed29c72e7e4fd8b49b491d"
+    "sha256": "2eeaf595ea989cbb39121fab19486080170edb6756bc90c5b7fb5348823e18ac"
   },
   "tv": {
-    "version": "3.11.3",
-    "versionCode": 83,
+    "version": "3.11.4",
+    "versionCode": 84,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "🛠️ FIXED: Cast option unreachable in Settings — settings is now a single-column list and the Cast & Remote card is FIRST (no scrolling needed, D-pad DOWN walks straight to it)",
-      "📡 FIXED: pairing reliability — removed dead MQTT broker, longer connect timeout, pairing retries until the link is live (verified end-to-end: phone pairs, TV shows PAIRED • AJO Phone, Play on TV starts hardware playback)"
+      "⚡ FIXED: phone connection stuck at \"Connecting\" — casting now uses AJO’s own high-speed relay server (no more slow/failing public servers)",
+      "🔑 Simpler wording: Settings card is now \"Connect Your Phone (Remote)\" — code on top, \"Waiting for your phone\" / \"CONNECTED • Phone\" status"
     ],
     "size_mb": "6.8 MB",
-    "sha256": "7ff8af21666e88973dc9c419448e317e5ff17cd082f7b7d484d0241b7bbe0f73"
+    "sha256": "cac9ad2e8a8cd5d2b105093477cd0aa4fc3d1f03bc36d49ce1589874c5e90663"
   }
 }
