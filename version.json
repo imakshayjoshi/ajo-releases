@@ -19,21 +19,20 @@
     "size_mb": "4.3 MB"
   },
   "tv": {
-    "version": "3.9.1",
-    "versionCode": 72,
+    "version": "3.9.2",
+    "versionCode": 73,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "🚀 v3.9.0 Performance Overhaul: Removed 96s startup blocking sports probe, lazy server computation, and hero trailer iframe — app loads 10x faster on Fire TV.",
-      "📺 Fixed duplicate channel titles: channels now deduplicated by name with multi-mirror failover.",
-      "⚡ ExoPlayer timeout fix: dead streams fail over in 8s instead of hanging for 2 minutes.",
-      "🎮 Progressive grid rendering: Live TV tab scrolls smoothly on low-RAM devices.",
-      "🔧 Code cleanup: removed PikaShow legacy dead code and rebranded."
+      "🎬 Fixed Movie Streaming: Multi-server resolution for all TMDB & IMDb titles with high-speed direct & embed playback.",
+      "📺 Curated Maharashtra & Hindi Live TV: Full lineup with Sony SAB, Sony TV HD, Colors Marathi, Star Pravah, Zee Marathi, ABP Majha, Zee 24 Taas, Aaj Tak HD, and DD Sports.",
+      "⚡ Multi-Mirror Failover: Multiple backup streams per channel for zero-interruption live TV.",
+      "🔥 Hybrid Native Player Engine: Seamless hardware playback on Fire TV."
     ],
     "size_mb": "6.8 MB",
-    "sha256": "fd508c10a3d1f1bf24e0379d0fbf4300ba4bec07bc81306bb0e95c1e1484f310"
+    "sha256": "5dab4255049effe309805ef54d8ba7bdb4aa1afcb49581313c9d2ddf62502d61"
   }
 }
