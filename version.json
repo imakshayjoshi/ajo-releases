@@ -4,18 +4,19 @@
   "versionCode": 88,
   "releaseDate": "2026-08-25",
   "phone": {
-    "version": "3.3.8",
-    "versionCode": 57,
+    "version": "3.3.9",
+    "versionCode": 58,
     "packageId": "com.ajo.phone",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "📺 Same Live TV rework as the TV app: verified channels only, Marathi / Hindi / English + sports, no duplicates, logos, faster buffering"
+      "📱 FIXED: horizontal swiping in categories & filter bars now works on phone (chips and rails scroll with your finger)",
+      "⚡ Smoother scrolling everywhere"
     ],
     "size_mb": "3.3 MB",
-    "sha256": "1db60c600a008ea17d61e6af65625454037e7319623e48b65f41423d6e20b907"
+    "sha256": "b522073bc3b5c5df94bd2979b1b75d2cb3870c7d27048836fbe70573b4b62a6a"
   },
   "tv": {
     "version": "3.12.1",
