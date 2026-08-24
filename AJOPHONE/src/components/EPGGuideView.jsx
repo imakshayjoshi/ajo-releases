@@ -220,7 +220,7 @@ export function EPGGuideView({ channels = [], onSelectChannel }) {
         zIndex: 25,
         display: 'flex',
         gap: '8px',
-        overflowX: 'auto',
+        overflowX: 'auto', WebkitOverflowScrolling: 'touch', touchAction: 'pan-x pan-y',
         paddingBottom: '12px',
         marginBottom: '12px',
         scrollbarWidth: 'none',

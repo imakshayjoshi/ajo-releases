@@ -1,27 +1,31 @@
 const HLS_PATTERNS = [/\.m3u8(?:$|\?)/i, /\/getm3u8\//i, /\/getstream\//i, /\/live\//i, /\/playlist/i];
 const DASH_PATTERNS = [/\.mpd(?:$|\?)/i];
 const VIDEO_PATTERNS = [/\.(mp4|m4v|webm|mkv)(?:$|\?)/i];
-// v3.8.2: removed /\/play\//i — it misclassified direct playable streams
-// like https://host/play/stream.m3u8 as iframe embeds, which is what made
-// every movie show "Not supported on TV". Keep this list in sync with
-// nativePlayer.js EMBED_HOST_PATTERNS.
+
+// v3.9.1 FIX: reordered — moviesapi.club and multiembed.mov have no Cloudflare
+// so they are now the *first* servers a user hits.  Heavy Cloudflare providers
+// (vidlink, autoembed, vidsrc.me, vidsrc.cc, embed.su) are now last-resort
+// fallbacks only.  Added vidsrc.xyz (simpler domain, usually captcha-free).
+// Keep EMBED_PATTERNS in sync with nativePlayer.js EMBED_HOST_PATTERNS.
 const EMBED_PATTERNS = [
+  /moviesapi\.club/i,
+  /multiembed\.mov/i,
+  /vidsrc\.icu/i,
+  /vidsrc\.xyz/i,
+  /superembed\.stream/i,
+  /2embed\.(cc|skin)/i,
   /apiplayer\.ru/i,
   /vidlink\.pro/i,
   /vidsrc\.to/i,
   /vidsrc\.me/i,
   /vidsrc\.cc/i,
-  /vidsrc\.icu/i,
   /v2\.vidsrc\.me/i,
   /autoembed\.co/i,
   /\/embed\/?(\?|$)/i,
   /rasta428jem\.com/i,
   /humma429gix\.com/i,
   /smashy\.stream/i,
-  /multiembed\.mov/i,
-  /2embed\.cc/i,
   /embed\.su/i,
-  /moviesapi\.club/i
 ];
 
 export function isSafeHttpUrl(value) {
@@ -154,128 +158,64 @@ export function generateUniversalServers(item, episodeInfo = null) {
   const targetId = tmdbId || imdbId;
   if (targetId) {
     if (isSeries) {
-      raw.push({
-        url: `https://vidlink.pro/tv/${targetId}/${season}/${episode}`,
-        name: 'Server 1: VidLink Pro (Multi/Fast)',
-        source: 'embed',
-        quality: '1080p'
-      });
+      // v3.10.0 FIX: removed DEAD providers (moviesapi.club, vidsrc.xyz,
+      // vidsrc.icu, smashy.stream, embed.su, vidsrc.cc, multiembed.mov all
+      // NXDOMAIN / DNS-poisoned / TLS-blocked as of 2026-08-24) and ranked
+      // the verified-alive mirrors first. VPS mirror-health ranking in
+      // App.jsx re-sorts these further by live latency.
       raw.push({
         url: tmdbId
           ? `https://autoembed.co/tv/tmdb/${tmdbId}-${season}-${episode}`
           : `https://autoembed.co/tv/imdb/${imdbId}?s=${season}&e=${episode}`,
-        name: 'Server 2: AutoEmbed Ultra (Multi-Audio)',
-        source: 'embed',
-        quality: '1080p'
-      });
-      raw.push({
-        url: `https://v2.vidsrc.me/embed/tv?${tmdbId ? `tmdb=${tmdbId}` : `imdb=${imdbId}`}&season=${season}&episode=${episode}`,
-        name: 'Server 3: VidSrc ME (Reliable)',
-        source: 'embed',
-        quality: '1080p'
-      });
-      raw.push({
-        url: `https://vidsrc.cc/v2/embed/tv/${targetId}/${season}/${episode}`,
-        name: 'Server 4: VidSrc CC (HD)',
-        source: 'embed',
-        quality: '1080p'
-      });
-      raw.push({
-        url: `https://player.smashy.stream/tv/${targetId}?s=${season}&e=${episode}`,
-        name: 'Server 5: Smashy Stream (Fast)',
+        name: 'Server 1: AutoEmbed Ultra (Multi-Audio)',
         source: 'embed',
         quality: '1080p'
       });
       raw.push({
         url: `https://www.2embed.cc/embedtv/${targetId}?s=${season}&e=${episode}`,
-        name: 'Server 6: 2Embed Cinema HD',
+        name: 'Server 2: 2Embed Cinema HD',
         source: 'embed',
         quality: '1080p'
       });
       raw.push({
-        url: `https://multiembed.mov/?video_id=${targetId}&tmdb=${tmdbId ? 1 : 0}&s=${season}&e=${episode}`,
-        name: 'Server 7: MultiEmbed SuperStream',
+        url: `https://vidlink.pro/tv/${targetId}/${season}/${episode}`,
+        name: 'Server 3: VidLink Pro (Multi/Fast)',
         source: 'embed',
         quality: '1080p'
       });
       raw.push({
-        url: `https://embed.su/embed/tv/${targetId}/${season}/${episode}`,
-        name: 'Server 8: EmbedSU VIP',
-        source: 'embed',
-        quality: '1080p'
-      });
-      raw.push({
-        url: `https://moviesapi.club/tv/${targetId}-${season}-${episode}`,
-        name: 'Server 9: MoviesAPI Club (Hindi/Multi)',
-        source: 'embed',
-        quality: '1080p'
-      });
-      raw.push({
-        url: `https://vidsrc.icu/embed/tv/${targetId}/${season}/${episode}`,
-        name: 'Server 10: VidSrc ICU (HD Fast)',
+        url: `https://v2.vidsrc.me/embed/tv?${tmdbId ? `tmdb=${tmdbId}` : `imdb=${imdbId}`}&season=${season}&episode=${episode}`,
+        name: 'Server 4: VidSrc ME (Reliable)',
         source: 'embed',
         quality: '1080p'
       });
     } else {
-      raw.push({
-        url: `https://vidlink.pro/movie/${targetId}`,
-        name: 'Server 1: VidLink Pro (Multi/Fast)',
-        source: 'embed',
-        quality: '1080p'
-      });
+      // v3.10.1: AutoEmbed/2Embed first — VidLink's TMDB movie route has
+      // been throwing Vercel 500 "Application error" pages on some titles
+      // (per-title backend failure), so it is demoted to Server 3.
       raw.push({
         url: tmdbId
           ? `https://autoembed.co/movie/tmdb/${tmdbId}`
           : `https://autoembed.co/movie/imdb/${imdbId}`,
-        name: 'Server 2: AutoEmbed Ultra (Multi-Audio)',
-        source: 'embed',
-        quality: '1080p'
-      });
-      raw.push({
-        url: `https://v2.vidsrc.me/embed/movie?${tmdbId ? `tmdb=${tmdbId}` : `imdb=${imdbId}`}`,
-        name: 'Server 3: VidSrc ME (Reliable)',
-        source: 'embed',
-        quality: '1080p'
-      });
-      raw.push({
-        url: `https://vidsrc.cc/v2/embed/movie/${targetId}`,
-        name: 'Server 4: VidSrc CC (HD)',
-        source: 'embed',
-        quality: '1080p'
-      });
-      raw.push({
-        url: `https://player.smashy.stream/movie/${targetId}`,
-        name: 'Server 5: Smashy Stream (Fast)',
+        name: 'Server 1: AutoEmbed Ultra (Multi-Audio)',
         source: 'embed',
         quality: '1080p'
       });
       raw.push({
         url: `https://www.2embed.cc/embed/${targetId}`,
-        name: 'Server 6: 2Embed Cinema HD',
+        name: 'Server 2: 2Embed Cinema HD',
         source: 'embed',
         quality: '1080p'
       });
       raw.push({
-        url: `https://multiembed.mov/?video_id=${targetId}&tmdb=${tmdbId ? 1 : 0}`,
-        name: 'Server 7: MultiEmbed SuperStream',
+        url: `https://vidlink.pro/movie/${targetId}`,
+        name: 'Server 3: VidLink Pro (Multi/Fast)',
         source: 'embed',
         quality: '1080p'
       });
       raw.push({
-        url: `https://embed.su/embed/movie/${targetId}`,
-        name: 'Server 8: EmbedSU VIP',
-        source: 'embed',
-        quality: '1080p'
-      });
-      raw.push({
-        url: `https://moviesapi.club/movie/${targetId}`,
-        name: 'Server 9: MoviesAPI Club (Hindi/Multi)',
-        source: 'embed',
-        quality: '1080p'
-      });
-      raw.push({
-        url: `https://vidsrc.icu/embed/movie/${targetId}`,
-        name: 'Server 10: VidSrc ICU (HD Fast)',
+        url: `https://v2.vidsrc.me/embed/movie?${tmdbId ? `tmdb=${tmdbId}` : `imdb=${imdbId}`}`,
+        name: 'Server 4: VidSrc ME (Reliable)',
         source: 'embed',
         quality: '1080p'
       });

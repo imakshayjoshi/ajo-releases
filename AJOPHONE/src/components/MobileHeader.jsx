@@ -163,7 +163,7 @@ export function MobileHeader({ activeTab, onTabChange }) {
           justifyContent: 'flex-start',
           gap: '8px',
           padding: '6px 16px 10px 16px',
-          overflowX: 'auto',
+          overflowX: 'auto', WebkitOverflowScrolling: 'touch', touchAction: 'pan-x pan-y',
           scrollbarWidth: 'none'
         }}>
           <button 

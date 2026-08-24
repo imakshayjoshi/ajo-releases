@@ -38,7 +38,7 @@ export function AppProvidersRow({ onSelectApp }) {
         zIndex: 20,
         display: 'flex',
         gap: '8px',
-        overflowX: 'auto',
+        overflowX: 'auto', WebkitOverflowScrolling: 'touch', touchAction: 'pan-x pan-y',
         padding: '0 16px 8px 16px',
         scrollbarWidth: 'none'
       }}>

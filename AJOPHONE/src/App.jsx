@@ -22,7 +22,7 @@ import { AppProvidersRow } from './components/AppProvidersRow';
 import { TVRemoteControlView } from './components/TVRemoteControlView';
 import { getDocumentariesCatalog, getAnimeCatalog, getNetworkOriginalsCatalog } from './api/hubCatalog';
 import { getShortTVSummaryList } from './api/shortTvCatalog';
-import { getTmdbTrending, getTmdbCatalog, enrichWithImdb, getBecauseYouWatched } from './api/tmdb';
+import { getTmdbTrending, getTmdbCatalog, getTmdbNowPlaying, enrichWithImdb, getBecauseYouWatched } from './api/tmdb';
 import { getWatchlist, toggleWatchlist as toggleWL, mergeRemoteWatchlist, pushWatchlist } from './api/watchlistSync';
 import { getRankedServers } from './api/mirrorHealth';
 import { ShortTVView } from './components/ShortTVView';
@@ -70,6 +70,7 @@ export default function App() {
   const [serialsItems, setSerialsItems] = useState([]);
   const [docuItems, setDocuItems] = useState([]);
   const [tmdbTrending, setTmdbTrending] = useState([]);
+  const [nowPlaying, setNowPlaying] = useState([]);
   const [tmdbMovies, setTmdbMovies] = useState([]);
   const [tmdbSeries, setTmdbSeries] = useState([]);
   const [becauseYouWatched, setBecauseYouWatched] = useState([]);
@@ -135,14 +136,15 @@ export default function App() {
         setBecauseYouWatched(recs || []);
       }).catch(() => {});
 
-      const [live, bolly, holly, serials, trending, popMovies, popTv] = await Promise.allSettled([
+      const [live, bolly, holly, serials, trending, popMovies, popTv, newReleases] = await Promise.allSettled([
         getLiveBroadcasts(),
         getBollywoodCatalog(6), // Pre-load Bollywood movies (120+ titles)
         getHollywoodCatalog(6), // Pre-load Hollywood movies (120+ titles)
         getSerialsCatalog(6),   // Pre-load Series (120+ titles)
         getTmdbTrending('all', 'week'),
         getTmdbCatalog('movie', 'popular'),
-        getTmdbCatalog('tv', 'popular')
+        getTmdbCatalog('tv', 'popular'),
+        getTmdbNowPlaying(15)
       ]);
 
       const lList = live.status === 'fulfilled' && Array.isArray(live.value) ? live.value : [];
@@ -186,6 +188,7 @@ export default function App() {
       setHollywoodItems(hList);
       setSerialsItems(sList);
       if (trending.status === 'fulfilled') setTmdbTrending(trending.value || []);
+      if (newReleases.status === 'fulfilled') setNowPlaying(newReleases.value || []);
       if (popMovies.status === 'fulfilled') setTmdbMovies(popMovies.value || []);
       if (popTv.status === 'fulfilled') setTmdbSeries(popTv.value || []);
       setDocuItems(getDocumentariesCatalog());
@@ -438,6 +441,15 @@ export default function App() {
               <MediaRail
                 title="🔖 My Watchlist"
                 items={watchlistItems}
+                onSelectItem={handleCardClick}
+              />
+            )}
+
+            {/* v3.3.1: Recently Released Movies (TMDB now_playing, India region) */}
+            {nowPlaying.length > 0 && (
+              <MediaRail
+                title="🆕 Recently Released Movies (In Theatres Now)"
+                items={nowPlaying}
                 onSelectItem={handleCardClick}
               />
             )}

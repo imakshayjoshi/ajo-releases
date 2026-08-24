@@ -136,7 +136,8 @@ html, body, #root {
   overflow-y: scroll !important;
   overflow-x: hidden !important;
   -webkit-overflow-scrolling: touch !important;
-  touch-action: pan-y !important;
+  /* pan-x pan-y: rails + category chips inside must be swipeable horizontally */
+  touch-action: pan-x pan-y !important;
   overscroll-behavior-y: contain;
   transform: translateZ(0);
   will-change: scroll-position;
@@ -153,7 +154,7 @@ html, body, #root {
   width: 100%;
   min-height: 100%;
   overflow-y: visible !important;
-  touch-action: pan-y !important;
+  touch-action: pan-x pan-y !important;
   -webkit-overflow-scrolling: touch !important;
   transform: translateZ(0);
 }

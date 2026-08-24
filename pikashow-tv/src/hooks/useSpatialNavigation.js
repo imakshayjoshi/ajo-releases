@@ -76,6 +76,23 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
       // elements pre-curation), which felt like dead keypresses.
       const inHeader = !!current.closest('.tv-header');
       if (inHeader && direction === 'ArrowDown') {
+        // v3.10.0: the OTA update banner (between header and main) used to be
+        // unreachable — its Update/Dismiss buttons could never take focus.
+        // Check it first, then fall through to the content rails.
+        const banner = document.querySelector('.tv-ota-rail');
+        if (banner) {
+          const bannerEls = getFocusableElements(banner);
+          if (bannerEls.length > 0) {
+            const currentLeft = current.getBoundingClientRect().left;
+            let closestBanner = bannerEls[0];
+            let minBannerDiff = Infinity;
+            for (const el of bannerEls) {
+              const diff = Math.abs(el.getBoundingClientRect().left - currentLeft);
+              if (diff < minBannerDiff) { minBannerDiff = diff; closestBanner = el; }
+            }
+            return closestBanner;
+          }
+        }
         const firstRail = document.querySelector('.tv-main-content .tv-rail, .tv-main-content .tv-hero');
         if (firstRail) {
           const railEls = getFocusableElements(firstRail);
@@ -233,7 +250,10 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
     }
 
     // 2. Vertical alignment within the main scroll area
-    const scroller = el.closest('.tv-main-content, .tv-modal-scroll') || document.querySelector('.tv-main-content');
+    // v3.10.0 FIX: the modal's real scroller is .tv-modal-body (the
+    // .tv-modal-scroll class never existed), and the player drawer scrolls
+    // independently — include both so focused items scroll into view.
+    const scroller = el.closest('.tv-main-content, .tv-modal-body, .tv-player-drawer, .tv-modal-scroll') || document.querySelector('.tv-main-content');
     if (scroller) {
       try {
         const er = el.getBoundingClientRect();
@@ -260,23 +280,32 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
       const keyCode = e.keyCode;
 
       // 1. Back Key Handling
-      if (key === 'Escape' || key === 'Backspace' || keyCode === 4 || keyCode === 27 || keyCode === 8) {
-        if (onBack) {
-          e.preventDefault();
-          e.stopPropagation();
-          onBack();
-          return;
-        }
+      // v3.10.0 FIX: Backspace (keyCode 8) must NOT act as remote Back while
+      // the user is typing in a text field — it would navigate home and wipe
+      // their search. Only KEYCODE_BACK (4) and Escape are global Back.
+      const ae = document.activeElement;
+      const typing = ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA') && ae.value.length > 0;
+      const isGlobalBack = key === 'Escape' || keyCode === 4 || keyCode === 27;
+      const isTypingBackspace = typing && (key === 'Backspace' || keyCode === 8);
+      if ((isGlobalBack || (key === 'Backspace' || keyCode === 8)) && onBack) {
+        if (isTypingBackspace) return; // let the field delete characters
+        e.preventDefault();
+        e.stopPropagation();
+        onBack();
+        return;
       }
 
       // 2. D-Pad Directional Navigation
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(key) || [19, 20, 21, 22, 37, 38, 39, 40].includes(keyCode)) {
-        // v3.8.2: never steal keys while the user is typing in a text field —
-        // arrow-key navigation inside the search input moved caret AND jumped
-        // focus to other cards simultaneously.
+        // v3.8.2 base rule; v3.10.0 refinement: while typing in a text field,
+        // LEFT/RIGHT move the caret (swallow them), but UP/DOWN fall through
+        // to spatial navigation so the user can actually leave the search
+        // input on a D-pad-only remote (previously the field was a focus
+        // trap — you could never reach the results grid or keyboard).
         const ae = document.activeElement;
         if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA')) {
-          return;
+          if (dir === 'ArrowLeft' || dir === 'ArrowRight') return;
+          // Up/Down: fall through to spatial nav below
         }
         let dir = key;
         if (keyCode === 19 || keyCode === 38) dir = 'ArrowUp';

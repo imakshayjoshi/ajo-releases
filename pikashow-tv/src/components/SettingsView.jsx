@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { RefreshCw, Trash2, ShieldCheck, Download, Tv, Info, CheckCircle2, AlertCircle, Puzzle, Plus } from 'lucide-react';
+import { RefreshCw, Trash2, ShieldCheck, Download, Tv, Info, CheckCircle2, AlertCircle, Puzzle, Plus, Cast } from 'lucide-react';
 import { checkForAppUpdates, CURRENT_APP_VERSION } from '../api/otaUpdate';
 import { getInstalledAddons, installAddon, removeAddon, FEATURED_ADDONS } from '../api/stremio';
 
@@ -15,6 +15,42 @@ export function SettingsView() {
 
   const refreshAddons = () => setAddons(getInstalledAddons());
   useEffect(() => { refreshAddons(); }, []);
+
+  // ---- v3.11.1 Cast & Remote pairing surface ----
+  const [castState, setCastState] = useState(null);
+  useEffect(() => {
+    let unsub = null;
+    let cancelled = false;
+    import('../api/castSync').then(({ castEngine, ensureTvRole, setPairingRoom, generateShortCode, getStoredRoomCode }) => {
+      if (cancelled) return;
+      const engine = ensureTvRole();
+      const refresh = () => setCastState({
+        roomCode: engine.roomCode || getStoredRoomCode() || null,
+        isPaired: Boolean(engine.session?.sessionId),
+        phoneName: engine.session?.phoneName || null
+      });
+      refresh();
+      unsub = engine.subscribeState(() => refresh());
+    }).catch(() => { setCastState({ roomCode: null, isPaired: false, phoneName: null }); });
+    return () => { cancelled = true; if (unsub) unsub(); };
+  }, []);
+
+  const handleNewRoomCode = () => {
+    import('../api/castSync').then(({ castEngine, setPairingRoom, setStoredSession, generateShortCode }) => {
+      const code = setPairingRoom(generateShortCode(4));
+      castEngine.updateRoom(code);
+      setStoredSession(null); // old paired phone no longer valid
+      setCastState({ roomCode: code, isPaired: false, phoneName: null });
+    });
+  };
+
+  const handleForgetPairing = () => {
+    import('../api/castSync').then(({ castEngine, setStoredSession }) => {
+      castEngine.session = null;
+      setStoredSession(null);
+      setCastState((prev) => ({ ...prev, isPaired: false, phoneName: null }));
+    });
+  };
 
   const handleInstallAddon = async (url) => {
     setAddonStatus({ type: 'loading', msg: 'Installing...' });
@@ -96,6 +132,61 @@ export function SettingsView() {
 
   return (
     <div className="tv-settings-grid">
+      {/* v3.11.1 Cast & Remote — THE pairing surface. Before this, the TV
+          never displayed its room code, so a phone could never pair. */}
+      <div className="tv-settings-card">
+        <h2 className="tv-settings-title">
+          <Cast size={20} style={{ display: 'inline', marginRight: 8 }} />
+          Connect Your Phone (Remote)
+        </h2>
+        <p className="tv-settings-desc">
+          On your phone: open AJO Phone → press Connect to TV → type this code.
+          Your phone becomes your remote and can play any movie, show or channel on this TV.
+        </p>
+
+        {castState === null ? (
+          <p style={{ color: '#94a3b8', fontSize: '0.9rem' }}>Starting cast engine…</p>
+        ) : (
+          <>
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 14, margin: '12px 0',
+              background: 'rgba(229,9,20,0.12)', border: '1px solid #e50914',
+              borderRadius: 10, padding: '14px 18px'
+            }}>
+              <span style={{ fontSize: 15, color: '#e2e8f0', fontWeight: 600 }}>Room Code</span>
+              <span style={{
+                fontSize: 26, fontWeight: 800, letterSpacing: 3, color: '#fff',
+                fontVariantNumeric: 'tabular-nums'
+              }}>
+                {castState.roomCode || '—'}
+              </span>
+              <span style={{
+                marginLeft: 'auto', fontSize: 12, padding: '4px 10px', borderRadius: 999,
+                background: castState.isPaired ? '#16a34a' : '#475569', color: '#fff', fontWeight: 700
+              }}>
+                {castState.isPaired ? `CONNECTED · ${castState.phoneName || 'Phone'}` : 'Waiting for your phone'}
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button tabIndex={0} className="tv-btn-primary" onClick={handleNewRoomCode} style={{ width: 'fit-content' }}>
+                <RefreshCw size={16} style={{ display: 'inline', marginRight: 6 }} />
+                New Code
+              </button>
+              {castState.isPaired && (
+                <button tabIndex={0} className="tv-btn-secondary" onClick={handleForgetPairing} style={{ width: 'fit-content' }}>
+                  <Trash2 size={16} style={{ display: 'inline', marginRight: 6 }} />
+                  Disconnect Phone
+                </button>
+              )}
+            </div>
+            <p style={{ color: '#64748b', fontSize: '0.8rem', marginTop: 10, lineHeight: 1.5 }}>
+              Works on any internet — your phone and TV don't need to be on the same Wi-Fi. Just enter the same code.
+            </p>
+          </>
+        )}
+      </div>
+
       {/* App Version & OTA Update Card */}
       <div className="tv-settings-card">
         <h2 className="tv-settings-title">

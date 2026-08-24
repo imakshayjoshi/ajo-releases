@@ -191,12 +191,14 @@ export async function getLiveBroadcasts() {
   // v3.9 CURATION: the VPS broadcast catalog must pass the SAME language
   // filter as our playlists — previously it re-introduced Bangla/Telugu/
   // Tamil feeds and floated unranked channels above the priority brands.
-  const { isBlockedChannelTitle, channelPriority } = await import('./iptv.js');
+
+
+  const { isBlockedChannelTitle, channelPriority, normalizeChannelKey: normalizeTitleKey } = await import('./iptv.js');
   const seenMap = new Map();
   raw.forEach((entry) => {
     const item = normalizeMediaItem(entry, 'live');
     if (!item?.playable) return;
-    const titleKey = String(item.title_en || item.title || '').trim().toLowerCase();
+    const titleKey = normalizeTitleKey(item.title_en || item.title);
     if (!titleKey || isBlockedChannelTitle(item.title_en || item.title)) return;
     
     if (seenMap.has(titleKey)) {

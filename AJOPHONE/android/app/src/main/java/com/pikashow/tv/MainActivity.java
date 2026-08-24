@@ -30,6 +30,34 @@ import java.net.URL;
 
 public class MainActivity extends BridgeActivity {
 
+    // ---- v3.3.1 (ported from TV app 3.10.1): embed preflight ----
+    // Server-side error pages (Vercel "Application error", Cloudflare 52x,
+    // provider 502/503/504) fire iframe onLoad, so the WebView layer can't
+    // tell a dead player page from a working one. The React player preflights
+    // every embed mirror through this native fetch (no CORS limits) and skips
+    // mirrors that return a broken page.
+    private static final String[] EMBED_ERROR_MARKERS = {
+        "Application error", "server-side exception", "Digest: ",
+        "Error code 522", "Error code 520", "Error code 524",
+        "502 Bad Gateway", "503 Service Unavailable", "504 Gateway Timeout",
+        "Just a moment..."
+    };
+
+    private static boolean embedPageLooksBroken(String body) {
+        if (body == null || body.isEmpty()) return true;
+        String lower = body.toLowerCase();
+        for (String marker : EMBED_ERROR_MARKERS) {
+            if (lower.contains(marker.toLowerCase())) return true;
+        }
+        return false;
+    }
+
+    private static String base64UrlString(String raw) {
+        return android.util.Base64.encodeToString(
+                raw.getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                android.util.Base64.NO_WRAP | android.util.Base64.URL_SAFE);
+    }
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -77,6 +105,78 @@ public class MainActivity extends BridgeActivity {
                     });
                 }
             }, "AndroidOrientation");
+
+            // 1.5. Native-compatible interface (phone edition). Phones play in
+            // the WebView, so preferNative() is false; the interface exists so
+            // the shared nativePlayer.js preflight logic works on this app too.
+            webView.addJavascriptInterface(new Object() {
+                @JavascriptInterface
+                public void preflightEmbed(final String url) {
+                    if (url == null || url.isEmpty()) return;
+                    new Thread(() -> {
+                        boolean ok = true;
+                        java.net.HttpURLConnection conn = null;
+                        try {
+                            java.net.URL u = new java.net.URL(url);
+                            conn = (java.net.HttpURLConnection) u.openConnection();
+                            conn.setConnectTimeout(8000);
+                            conn.setReadTimeout(8000);
+                            conn.setInstanceFollowRedirects(true);
+                            conn.setRequestProperty("User-Agent",
+                                    "Mozilla/5.0 (Linux; Android 13; Pixel 6) AppleWebKit/537.36 "
+                                            + "(KHTML, like Gecko) Chrome/120.0.6099.210 Mobile Safari/537.36");
+                            conn.setRequestProperty("Referer", "https://ajo.co.in/");
+                            conn.setRequestProperty("Accept", "text/html,*/*");
+                            int code = conn.getResponseCode();
+                            if (code >= 400) {
+                                ok = false;
+                            } else {
+                                java.io.InputStream in = conn.getInputStream();
+                                java.io.ByteArrayOutputStream buf = new java.io.ByteArrayOutputStream();
+                                byte[] chunk = new byte[8192];
+                                int n;
+                                int total = 0;
+                                while ((n = in.read(chunk)) != -1 && total < 200 * 1024) {
+                                    buf.write(chunk, 0, n);
+                                    total += n;
+                                }
+                                in.close();
+                                ok = !embedPageLooksBroken(buf.toString("UTF-8"));
+                            }
+                        } catch (Throwable t) {
+                            ok = false;
+                        } finally {
+                            if (conn != null) { try { conn.disconnect(); } catch (Exception ignored) {} }
+                        }
+                        final boolean okFinal = ok;
+                        runOnUiThread(() -> {
+                            try {
+                                if (getBridge() != null && getBridge().getWebView() != null) {
+                                    getBridge().getWebView().evaluateJavascript(
+                                            "window.__ajoEmbedPreflightResult && window.__ajoEmbedPreflightResult('"
+                                                    + base64UrlString(url) + "'," + okFinal + ");",
+                                            null);
+                                }
+                            } catch (Exception ignored) {}
+                        });
+                    }).start();
+                }
+
+                @JavascriptInterface
+                public boolean preferNative() {
+                    return false; // phones play in the WebView (hls.js + embeds)
+                }
+
+                @JavascriptInterface
+                public boolean isFireTv() {
+                    return false;
+                }
+
+                @JavascriptInterface
+                public String getDeviceInfo() {
+                    return Build.MANUFACTURER + " " + Build.MODEL + " (Android API " + Build.VERSION.SDK_INT + ")";
+                }
+            }, "AndroidNativePlayer");
 
             // 2. Android On-Device OTA Updater Interface
             webView.addJavascriptInterface(new Object() {

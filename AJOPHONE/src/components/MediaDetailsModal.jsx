@@ -8,6 +8,7 @@ import { castEngine } from '../api/castSync';
 
 export function MediaDetailsModal({ item, onClose, onStartPlayback }) {
   const [episodes, setEpisodes] = useState([]);
+  const [castError, setCastError] = useState(null);
   const [loadingEpisodes, setLoadingEpisodes] = useState(false);
   const [selectedServer, setSelectedServer] = useState(null);
   const [isFav, setIsFav] = useState(false);
@@ -41,10 +42,19 @@ export function MediaDetailsModal({ item, onClose, onStartPlayback }) {
   }, [item, availableServers]);
 
   const handleCastToTV = () => {
+    setCastSent(true);
+    setCastError(null);
     castEngine.castMedia(item, {
       server: selectedServer
-    }).catch(() => {});
-    setCastSent(true);
+    }).catch((err) => {
+      const msg = err?.message === 'ENTER_ROOM_CODE'
+        ? 'Open TV Cast and type the code from your TV'
+        : err?.message === 'TV_NOT_READY'
+          ? 'Your TV did not answer - check the code and try again'
+          : "Can't reach your TV - check your internet";
+      setCastError(msg);
+      setTimeout(() => setCastError(null), 4000);
+    });
     setTimeout(() => setCastSent(false), 3000);
     if (navigator.vibrate) {
       try { navigator.vibrate([40, 30, 40]); } catch (e) {}
@@ -142,7 +152,7 @@ export function MediaDetailsModal({ item, onClose, onStartPlayback }) {
               onClick={handleCastToTV}
             >
               <Cast size={18} />
-              <span>{castSent ? 'Casting to TV...' : 'Play on TV'}</span>
+              <span>{castError ? castError : castSent ? 'Casting to TV...' : 'Play on TV'}</span>
             </button>
 
             <button

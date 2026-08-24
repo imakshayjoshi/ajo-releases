@@ -163,6 +163,8 @@ html, body, #root {
   /* UI-shift fix: horizontal rails scroll internally; this container must
      never drift sideways when focus moves between rail cards. */
   overscroll-behavior-x: none;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
 }
 
 .tv-main-content,
@@ -291,6 +293,8 @@ html, body, #root {
   padding: 12px 6px;
   scroll-behavior: smooth;
   margin: -12px -6px;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x pan-y;
 }
 
 .tv-rail-track::-webkit-scrollbar {
@@ -397,6 +401,8 @@ html, body, #root {
   overflow-x: auto;
   padding-bottom: 16px;
   margin-bottom: 20px;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x pan-y;
 }
 
 .tv-category-bar::-webkit-scrollbar {
@@ -766,8 +772,13 @@ html, body, #root {
 /* Settings Screen */
 .tv-settings-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: 1fr; /* v3.11.3 FIX: single column on TV — D-pad DOWN
+                                  walks card-to-card and the main scroller auto-
+                                  scrolls. The old multi-column grid put the Cast
+                                  card off-screen to the right where no D-pad
+                                  sequence could reach it. */
   gap: 20px;
+  max-width: 880px;
 }
 
 .tv-settings-card {

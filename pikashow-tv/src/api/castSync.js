@@ -82,9 +82,12 @@ export function generateShortCode(length = 6) {
   return `AJO-${result}`;
 }
 
-export function getDeviceId(prefix = 'DEV') {
+export function getDeviceId(prefix = 'DEV', force = false) {
   let id = storageGet(STORAGE_KEYS.DEVICE_ID);
-  if (!id) {
+  // v3.11.6: when a role is forced (browser TV, mis-detected Fire TV), the
+  // stored id may belong to the OTHER role (e.g. PH-...) — that breaks the
+  // pairing guard. Regenerate with the correct prefix when forced.
+  if (!id || (force && !id.startsWith(prefix + '-'))) {
     id = `${prefix}-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
     storageSet(STORAGE_KEYS.DEVICE_ID, id);
   }
@@ -325,9 +328,11 @@ export class CastSyncEngine {
 
     this.setConnectionState(this.session ? CONNECTION_STATES.CONNECTED : CONNECTION_STATES.PAIRING);
 
+    // v3.11.3 FIX: public.mqtthq.com is NXDOMAIN (DNS-dead since 2026-08) —
+    // it rotated in every ~3rd reconnect and stalled pairing. Two live brokers.
     const MQTT_BROKERS = [
+      'wss://new.ajo.co.in/mqtt',
       'wss://broker.emqx.io:8084/mqtt',
-      'wss://public.mqtthq.com:8084/mqtt',
       'wss://broker.hivemq.com:8884/mqtt'
     ];
 
@@ -337,12 +342,13 @@ export class CastSyncEngine {
       this.ws = new WebSocket(currentBroker, ['mqtt']);
       this.ws.binaryType = 'arraybuffer';
 
-      // Connection timeout fallback
+      // Connection timeout fallback (v3.11.3: 4s -> 8s — public brokers
+      // routinely take >4s to CONNACK on slower networks).
       const connTimeout = setTimeout(() => {
         if (!this.mqttConnected && this.ws) {
           try { this.ws.close(); } catch {}
         }
-      }, 4000);
+      }, 8000);
 
       this.ws.onopen = () => {
         const connectPacket = encodeMqttConnect(this.deviceId + '-' + Math.random().toString(36).slice(2, 6));
@@ -359,6 +365,11 @@ export class CastSyncEngine {
           this.reconnectAttempts = 0;
           this.ws.send(encodeMqttSubscribe(topic));
           this.setConnectionState(this.session ? CONNECTION_STATES.CONNECTED : CONNECTION_STATES.PAIRING);
+          // v3.11.3: pair requests sent before MQTT was live were lost forever.
+          // If a pairing is pending, fire it now that messages actually flow.
+          if (!this.session && this.connectionState === CONNECTION_STATES.PAIRING) {
+            try { this.requestPairing(); } catch {}
+          }
 
           // Start Heartbeat
           this.heartbeatTimer = setInterval(() => {
@@ -512,6 +523,10 @@ export class CastSyncEngine {
     clearInterval(this.pairingInterval);
 
     const sendRequest = () => {
+      // v3.11.3: don't fire into a socket that isn't MQTT-live yet — the packet
+      // would be dropped and the TV would never see the request. The CONNACK
+      // hook re-triggers requestPairing the moment the link is up.
+      if (!this.mqttConnected) return false;
       const payload = {
         type: 'PAIR_REQUEST',
         room: this.roomCode,
@@ -519,16 +534,17 @@ export class CastSyncEngine {
         phoneName: this.deviceName,
         timestamp: Date.now()
       };
-      this.broadcast(payload);
+      return this.broadcast(payload);
     };
 
-    sendRequest();
+    sendRequest(); // no-op until MQTT is live; CONNACK hook re-triggers
 
-    // Active retry loop every 1.5s for 15s until paired
+    // Active retry loop every 1.5s for 45s until paired (v3.11.3: 10 -> 30
+    // attempts — slow brokers + public Wi-Fi needed more runway).
     let attempts = 0;
     this.pairingInterval = setInterval(() => {
       attempts++;
-      if (this.session || this.connectionState === CONNECTION_STATES.CONNECTED || attempts > 10) {
+      if (this.session || attempts > 30) {
         clearInterval(this.pairingInterval);
         this.pairingInterval = null;
       } else {
@@ -596,11 +612,14 @@ export class CastSyncEngine {
       return Promise.reject(new Error('ENTER_ROOM_CODE'));
     }
 
+    // One-press casting for everyone: auto-connect to the relay, auto-pair with the TV,
+    // and only then send the media — no need to understand sessions or pairing.
     if (!this.ws || this.connectionState === CONNECTION_STATES.DISCONNECTED) {
-      this.connect();
+      try { this.connect(); } catch (_) {}
     }
 
-    const commandId = `cast-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const buildAndSend = () => {
+      const commandId = `cast-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
     const isLive = Boolean(mediaItem.is_live || mediaItem.type === 'live' || mediaItem.year === 'LIVE');
     const selectedSource = options.server || mediaItem.players?.[0] || mediaItem.player?.[0] || (mediaItem.url ? { url: mediaItem.url, source: 'hls' } : null);
 
@@ -637,8 +656,35 @@ export class CastSyncEngine {
       timestamp: Date.now()
     };
 
-    const sent = this.broadcast(payload);
-    return sent ? Promise.resolve(commandId) : Promise.reject(new Error('NETWORK_OFFLINE'));
+      const sent = this.broadcast(payload);
+      return sent ? Promise.resolve(commandId) : Promise.reject(new Error('NETWORK_OFFLINE'));
+    };
+
+    if (this.session?.sessionId) {
+      // Already connected to the TV — send straight away.
+      return buildAndSend();
+    }
+
+    // Not connected yet: pair automatically, then send when the TV answers.
+    const waitForSession = async (timeoutMs) => {
+      const deadline = Date.now() + timeoutMs;
+      while (Date.now() < deadline) {
+        if (this.session?.sessionId) return true;
+        await new Promise((r) => setTimeout(r, 500));
+      }
+      return Boolean(this.session?.sessionId);
+    };
+
+    return (async () => {
+      if (!this.session?.sessionId) {
+        try { this.requestPairing(); } catch (_) {}
+        const paired = await waitForSession(12000);
+        if (!paired) {
+          throw new Error('TV_NOT_READY');
+        }
+      }
+      return buildAndSend();
+    })();
   }
 
   reportCastStatus(commandId, status, details = {}) {
@@ -878,4 +924,28 @@ function detectCastRole() {
 }
 
 export const castEngine = new CastSyncEngine({ role: detectCastRole() });
+
+// v3.11.1: the TV app must ALWAYS act as the 'tv' role with a persisted room
+// code, or the phone can never pair (role/room guards drop every inbound
+// message). detectCastRole() usually gets this right on Fire TV, but on
+// misdetecting WebViews this forces the singleton onto the TV role.
+export function ensureTvRole(forcedRoom) {
+  if (castEngine.role !== 'tv' || !String(castEngine.deviceId || '').startsWith('TV-')) {
+    castEngine.role = 'tv';
+    castEngine.deviceName = 'AJO Smart TV';
+    castEngine.deviceId = getDeviceId('TV', true);
+  }
+  if (forcedRoom) {
+    const room = forcedRoom.toUpperCase();
+    if (room !== getStoredRoomCode()) setStoredRoomCode(room);
+    castEngine.roomCode = room;
+  } else if (!castEngine.roomCode) {
+    castEngine.roomCode = getStoredRoomCode() || generateShortCode(4);
+    setStoredRoomCode(castEngine.roomCode);
+  }
+  if (!castEngine.ws && castEngine.roomCode && typeof window !== 'undefined') {
+    castEngine.connect();
+  }
+  return castEngine;
+}
 

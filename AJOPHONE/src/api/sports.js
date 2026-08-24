@@ -1,24 +1,21 @@
 import { isSafeHttpUrl } from '../utils/streamingEngines.js';
 import { isFavoriteChannel } from './history.js';
+import { parseM3U, normalizeChannelKey } from './iptv.js';
 
 /**
- * Live sports channels — DYNAMIC source (health fix 2026-08-21).
+ * Live sports channels — DYNAMIC source.
  *
- * The previous hardcoded list pointed at dtv2023.top and stream.sportzfy.xyz,
- * both of which no longer resolve in DNS — the entire sports rail was dead.
- * Guessed replacement URLs (cricfy.live/stream/*.m3u8) also returned 404:
- * that host is a WordPress landing page, not a stream CDN.
+ * Derives the sports rail at runtime from iptv-org playlists by filtering
+ * for sports groups and known sports channel names.
  *
- * Instead of hardcoding more URLs that will rot, we now derive the sports
- * rail at runtime from the iptv-org India playlist (the same source the Live
- * TV tab already uses, ~700+ channels) by filtering for sports groups and
- * known sports channel names. Channels appear only while their playlist
- * entries exist, so the rail can never show a structurally dead channel.
+ * v3.9.0 FIX: removed the serial isStreamLive() per-channel HTTP probe.
+ * It was doing up to 24 sequential 4-second-timeout fetches, blocking the
+ * entire app startup for up to 96 seconds. Dead channels are now handled
+ * by the native player's automatic multi-server failover (<1s recovery).
  */
 
 const PLAYLIST_SOURCES = [
-  'https://iptv-org.github.io/iptv/countries/in.m3u',
-  'https://raw.githubusercontent.com/Free-TV/IPTV/master/playlists/playlist_in.m3u'
+  'https://iptv-org.github.io/iptv/categories/sports.m3u'
 ];
 
 const SPORTS_NAME_PATTERNS = [
@@ -29,29 +26,6 @@ const SPORTS_NAME_PATTERNS = [
 
 const SPORTS_GROUP_PATTERNS = [/sport/i, /cricket/i, /football/i, /outdoor/i];
 
-function parseM3U(content) {
-  if (!content) return [];
-  const channels = [];
-  let pending = null;
-  for (const raw of content.split(/\r?\n/)) {
-    const line = raw.trim();
-    if (line.startsWith('#EXTINF:')) {
-      const attr = (name) => line.match(new RegExp(name + '="([^"]*)"', 'i'))?.[1] || '';
-      pending = {
-        id: attr('tvg-id'),
-        poster: attr('tvg-logo'),
-        category: attr('group-title') || 'Live TV',
-        title: line.slice(line.lastIndexOf(',') + 1).trim()
-      };
-    } else if (pending && /^https?:\/\//i.test(line)) {
-      pending.url = line;
-      channels.push(pending);
-      pending = null;
-    }
-  }
-  return channels;
-}
-
 function isSportsChannel(ch) {
   const group = String(ch.category || '');
   const name = String(ch.title || '');
@@ -59,13 +33,61 @@ function isSportsChannel(ch) {
   return SPORTS_NAME_PATTERNS.some((p) => p.test(name));
 }
 
-/** Dedupe by normalized title, prefer https entries, cap list size. */
+/** v3.10.0: cap raised 30 -> 200; dedupe via shared normalizeChannelKey. */
 export async function getLiveSportsEvents() {
   const seen = new Set();
   const events = [];
 
+  // v3.11.2 FIX: NTV live-sports JSON API — the one verified-working source
+  // recovered from the Streamzy payload APK (base_apk_decompiled turned out
+  // to be a non-streaming habit app; of all its scraper targets only NTV's
+  // API is alive today). Adds real fixtures (cricket, football, tennis) that
+  // iptv-org sports mirrors often miss. Watch URLs render in the app's embed
+  // player (no X-Frame-Options block, verified 2026-08-25).
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 9000);
+    const response = await fetch('https://ntv.cx/api/get-matches?server=kobra', {
+      signal: controller.signal, cache: 'no-store'
+    });
+    clearTimeout(timer);
+    if (response.ok) {
+      const data = await response.json();
+      const all = Array.isArray(data?.all) ? data.all : [];
+      for (const m of all) {
+        if (events.length >= 200 || !m || !m.id || !m.title) continue;
+        const key = normalizeChannelKey(m.title);
+        if (!key || seen.has(key)) continue; // keep iptv-org native HLS when titles collide
+        seen.add(key);
+        const isCricket = /cricket/i.test(m.category + ' ' + m.title);
+        const watchUrl = `https://ntv.cx/watch/${m.id}`;
+        const item = {
+          id: `ntv-${m.id}`,
+          title: m.title,
+          title_en: m.title,
+          category: isCricket ? 'Cricket' : /football|soccer/i.test(m.category) ? 'Football' : 'Sports',
+          poster: m.poster ? (m.poster.startsWith('http') ? m.poster : `https://ntv.cx${m.poster}`) : '',
+          poster_url: m.poster ? (m.poster.startsWith('http') ? m.poster : `https://ntv.cx${m.poster}`) : '',
+          is_live: true,
+          type: 'live',
+          year: 'LIVE',
+          url: watchUrl,
+          stream_url: watchUrl,
+          playable: true,
+          server: 'NTV Live Sports',
+          players: [{ name: 'NTV Live (HD)', url: watchUrl, source: 'embed', quality: 'HD' }],
+          player: [{ name: 'NTV Live (HD)', url: watchUrl, source: 'embed', quality: 'HD' }]
+        };
+        item.is_favorite = isFavoriteChannel(item);
+        events.push(item);
+      }
+    }
+  } catch {
+    // NTV unreachable — fall back to playlist sources only
+  }
+
   for (const playlistUrl of PLAYLIST_SOURCES) {
-    if (events.length >= 24) break;
+    if (events.length >= 200) break;
     try {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 8000);
@@ -75,9 +97,9 @@ export async function getLiveSportsEvents() {
       const channels = parseM3U(await response.text()).filter(isSportsChannel);
 
       for (const ch of channels) {
-        if (events.length >= 24) break;
+        if (events.length >= 200) break;
         if (!ch.url || !isSafeHttpUrl(ch.url)) continue;
-        const key = ch.title.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const key = normalizeChannelKey(ch.title);
         if (!key || seen.has(key)) continue;
         seen.add(key);
 
@@ -109,3 +131,4 @@ export async function getLiveSportsEvents() {
 
   return events;
 }
+

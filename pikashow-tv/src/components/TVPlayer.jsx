@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
-import Hls from 'hls.js';
 import { 
   Play, 
   Pause, 
@@ -20,15 +19,24 @@ import {
   shouldPreferNativePlayer,
   isNativePlayableUrl,
   isDirectMediaUrl,
-  playInNativePlayer
+  playInNativePlayer,
+  preflightEmbedUrl
 } from '../utils/nativePlayer';
 import { saveProgress, getWatchHistory } from '../api/history';
 import { BINGE_COUNTDOWN_SECONDS } from '../utils/binge';
 import './TVPlayer.css';
 
+// v3.10.0: how long to wait for an embed iframe to signal a load before
+// auto-failing over. Dead hosts never fire onLoad; Cloudflare hang pages
+// usually do not either.
+const EMBED_LOAD_TIMEOUT_MS = 12000;
+
 export function TVPlayer({
   item,
   server,
+  // v3.9.1: accept pre-ranked allServers from App.jsx so the health-sorted,
+  // addon-enriched list isn't discarded by an in-component recompute.
+  allServers: externalAllServers,
   channels = [],
   episodes = [],
   currentEpisodeIndex = 0,
@@ -38,6 +46,9 @@ export function TVPlayer({
 }) {
   const videoRef = useRef(null);
   const hlsRef = useRef(null);
+  const iframeRef = useRef(null);
+  const embedWatchdogRef = useRef(null);
+  const showDrawerRef = useRef(null);
   const osdTimerRef = useRef(null);
   const stallWatchdogRef = useRef(null);
   const resumePositionRef = useRef(null);
@@ -73,8 +84,13 @@ export function TVPlayer({
       ? `${item.year} • ${typeof item?.category === 'string' ? item.category : 'HD'}`
       : 'HD Stream');
 
-  // Compute all playable servers
+  // Compute all playable servers.
+  // v3.9.1: prefer the pre-ranked list from App.jsx (health-checked + stremio
+  // addon streams included). Fall back to local computation only when absent.
   const allServers = useMemo(() => {
+    if (Array.isArray(externalAllServers) && externalAllServers.length > 0) {
+      return externalAllServers;
+    }
     if (isLive) {
       const p = item?.players || item?.player;
       if (Array.isArray(p) && p.length > 0) return p;
@@ -83,7 +99,7 @@ export function TVPlayer({
       return [];
     }
     return generateUniversalServers(item);
-  }, [item, server, isLive]);
+  }, [item, server, isLive, externalAllServers]);
 
   // On a TV box, an iframe embed source can never render: the native player only
   // accepts real stream URLs, and the legacy WebView cannot composite MSE video.
@@ -97,6 +113,13 @@ export function TVPlayer({
   }, [allServers]);
 
   const [currentServerIndex, setCurrentServerIndex] = useState(0);
+
+  // v3.10.0 FIX: reset to server 0 when the item changes (channel switch,
+  // next-episode). Previously the index carried over, so switching to a
+  // channel with fewer mirrors started playback on a stale server index.
+  useEffect(() => {
+    setCurrentServerIndex(0);
+  }, [item?.id, item?.title, item?.url]);
   const [videoEngine, setVideoEngine] = useState('hls'); // 'hls' | 'native'
   const [isPlaying, setIsPlaying] = useState(true);
   const [isBuffering, setIsBuffering] = useState(true);
@@ -109,19 +132,41 @@ export function TVPlayer({
   const [currentAudio, setCurrentAudio] = useState(0);
   const [errorMessage, setErrorMessage] = useState(null);
   const [nativeActive, setNativeActive] = useState(false);
+  // v3.10.1: embed mirrors are preflighted by the native bridge before the
+  // iframe mounts, so a provider's server-error page (Vercel 500 etc.) is
+  // skipped before the user ever sees it.
+  const [embedReady, setEmbedReady] = useState(false);
+  const preflightDoneRef = useRef(false);
 
   const activeServer = orderedServers[currentServerIndex] || orderedServers[0] || server;
   const streamUrl = activeServer?.url || item?.url;
 
   // Wake up OSD and reset auto-hide timer
+  // v3.10.0 FIX: read drawer state through a ref so the timer closure never
+  // captures a stale showDrawer value — previously the OSD could vanish
+  // underneath an open drawer.
   const pingOsd = useCallback(() => {
     setShowOsd(true);
     if (osdTimerRef.current) clearTimeout(osdTimerRef.current);
     osdTimerRef.current = setTimeout(() => {
-      if (!showDrawer) {
+      if (!showDrawerRef.current) {
         setShowOsd(false);
       }
     }, 4500);
+  }, []);
+
+  useEffect(() => {
+    showDrawerRef.current = showDrawer;
+  }, [showDrawer]);
+
+  // v3.10.0: let App.handleBack know the drawer is open so the global Back
+  // handler closes the drawer (via TVPlayer's own handler) instead of
+  // tearing down the whole player and losing the resume position.
+  useEffect(() => {
+    window.__ajoPlayerDrawerOpen = Boolean(showDrawer);
+    return () => {
+      if (window.__ajoPlayerDrawerOpen) window.__ajoPlayerDrawerOpen = false;
+    };
   }, [showDrawer]);
 
   // Initial OSD wake-up + resume lookup
@@ -308,6 +353,33 @@ export function TVPlayer({
     handOffToNative('▶ Opening in hardware player...');
   }, [streamUrl, handOffToNative]);
 
+  // v3.10.1: EMBED PREFLIGHT — before an embed iframe mounts, ask the native
+  // bridge whether the mirror is currently serving a server-error page. If it
+  // is (or the host is unreachable), skip straight to the next mirror —
+  // no more watching a frozen Vercel "Application error" screen.
+  useEffect(() => {
+    if (!streamUrl) return;
+    if (nativeActiveRef.current) return;
+    const isEmbed = isEmbedUrl(streamUrl) || !isDirectMediaUrl(streamUrl);
+    if (!isEmbed) { setEmbedReady(true); return; }
+
+    let cancelled = false;
+    preflightDoneRef.current = false;
+    setEmbedReady(false);
+    setErrorMessage('Checking mirror availability...');
+    preflightEmbedUrl(streamUrl).then((result) => {
+      if (cancelled) return;
+      preflightDoneRef.current = true;
+      if (result === 'error') {
+        handleFailover('Mirror server error — switching');
+      } else {
+        setEmbedReady(true);
+        if (errorMessage === 'Checking mirror availability...') setErrorMessage(null);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [streamUrl, handleFailover, errorMessage]);
+
   // Video & Hls.js Pipeline Setup
   useEffect(() => {
     if (!streamUrl) {
@@ -330,6 +402,7 @@ export function TVPlayer({
     setErrorMessage(null);
 
     let hls = null;
+    let disposed = false; // v3.11.0: guards the lazy hls.js import resolving after cleanup
     let lastProgressTime = 0;
     // v3.8.0: bounded fatal-error retries. Unbounded startLoad()/recoverMediaError()
     // loops kept the "Connecting..." state alive for minutes on dead CDNs.
@@ -337,118 +410,145 @@ export function TVPlayer({
     let mediaRetryCount = 0;
 
     const isEmbedStream = isEmbedUrl(streamUrl) || !isDirectMediaUrl(streamUrl);
-    if (!isEmbedStream && videoEngine === 'hls' && Hls.isSupported() && (streamUrl.includes('.m3u8') || streamUrl.includes('/getm3u8/') || isLive || streamUrl.endsWith('.m3u8'))) {
-      hls = new Hls({
-        enableWorker: false,
-        lowLatencyMode: isLive,
-        startLevel: -1,
-        capLevelToPlayerSize: true,
-        backBufferLength: isLive ? 0 : 30,
-        maxBufferLength: isLive ? 15 : 60,
-        maxMaxBufferLength: isLive ? 30 : 120,
-        maxBufferSize: 25 * 1024 * 1024,
-        manifestLoadingTimeOut: 15000,
-        fragLoadingTimeOut: 20000,
-        highBufferWatchdogPeriod: 2,
-        nudgeMaxRetry: 6,
-      });
-
-      hlsRef.current = hls;
-      hls.loadSource(streamUrl);
-      hls.attachMedia(video);
-
-      hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
-        setIsBuffering(false);
-        if (hls.audioTracks && hls.audioTracks.length > 0) {
-          setAudioTracks(hls.audioTracks.map((t, idx) => ({
-            id: idx,
-            label: t.name || t.lang || `Track ${idx + 1}`
-          })));
+    if (!isEmbedStream && videoEngine === 'hls' && (streamUrl.includes('.m3u8') || streamUrl.includes('/getm3u8/') || isLive || streamUrl.endsWith('.m3u8'))) {
+      (async () => {
+        // v3.11.0: hls.js (~350KB) is a lazy chunk now — fetched only when a
+        // stream actually needs it. Boot time and RAM on Fire TV drop sharply.
+        const Hls = (await import('hls.js')).default;
+        const videoNow = videoRef.current;
+        if (disposed || !videoNow || videoNow !== video) return;
+        if (!Hls.isSupported()) {
+          if (!handOffToNative('Web player unavailable, switching to hardware player...')) {
+            handleFailover('Player engine error');
+          }
+          return;
         }
-        video.play().then(() => {
-          setIsPlaying(true);
+        hls = new Hls({
+          enableWorker: false,
+          lowLatencyMode: isLive,
+          liveSyncDurationCount: isLive ? 2 : undefined,
+          startFragPrefetch: true,
+          startLevel: -1,
+          capLevelToPlayerSize: true,
+          backBufferLength: isLive ? 0 : 30,
+          maxBufferLength: isLive ? 30 : 60,
+          maxMaxBufferLength: isLive ? 30 : 120,
+          maxBufferSize: 25 * 1024 * 1024,
+          manifestLoadingTimeOut: 15000,
+          fragLoadingTimeOut: 20000,
+          highBufferWatchdogPeriod: 2,
+          nudgeMaxRetry: 6,
+        });
+  
+        hlsRef.current = hls;
+        hls.loadSource(streamUrl);
+        hls.attachMedia(video);
+  
+        hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
           setIsBuffering(false);
-          // RESUME: seek after play() resolves — seeking before play on a
-          // fresh hls.js attachment gets reset when the player initializes.
+          if (hls.audioTracks && hls.audioTracks.length > 0) {
+            setAudioTracks(hls.audioTracks.map((t, idx) => ({
+              id: idx,
+              label: t.name || t.lang || `Track ${idx + 1}`
+            })));
+          }
+          video.play().then(() => {
+            setIsPlaying(true);
+            setIsBuffering(false);
+            // RESUME: seek after play() resolves — seeking before play on a
+            // fresh hls.js attachment gets reset when the player initializes.
+            if (resumePositionRef.current) {
+              try {
+                video.currentTime = resumePositionRef.current;
+              } catch {}
+              resumePositionRef.current = null;
+            }
+          }).catch(err => {
+            console.warn('TV Autoplay notification:', err);
+          });
+        });
+  
+        hls.on(Hls.Events.FRAG_LOADED, () => {
+          // RESUME fallback: first segment delivered = playback is real. Apply
+          // saved position here too, in case play() was blocked/pending when
+          // MANIFEST_PARSED fired.
           if (resumePositionRef.current) {
             try {
-              video.currentTime = resumePositionRef.current;
+              const v = videoRef.current;
+              if (v) v.currentTime = resumePositionRef.current;
             } catch {}
             resumePositionRef.current = null;
           }
-        }).catch(err => {
-          console.warn('TV Autoplay notification:', err);
         });
-      });
-
-      hls.on(Hls.Events.FRAG_LOADED, () => {
-        // RESUME fallback: first segment delivered = playback is real. Apply
-        // saved position here too, in case play() was blocked/pending when
-        // MANIFEST_PARSED fired.
-        if (resumePositionRef.current) {
-          try {
-            const v = videoRef.current;
-            if (v) v.currentTime = resumePositionRef.current;
-          } catch {}
-          resumePositionRef.current = null;
-        }
-      });
-
-      hls.on(Hls.Events.AUDIO_TRACK_SWITCHED, (event, data) => {
-        setCurrentAudio(data.id);
-      });
-
-      hls.on(Hls.Events.ERROR, (event, data) => {
-        if (data.fatal) {
-          switch (data.type) {
-            case Hls.ErrorTypes.NETWORK_ERROR:
-              // v3.8.0: max 2 retries, then fail over. Previously retried forever.
-              if (networkRetryCount < 2) {
-                networkRetryCount += 1;
-                hls.startLoad();
-              } else if (!handOffToNative('Network stalled, switching to hardware player...')) {
-                hls.destroy();
-                hlsRef.current = null;
-                handleFailover('Stream connection failed');
-              }
-              break;
-            case Hls.ErrorTypes.MEDIA_ERROR:
-              if (mediaRetryCount < 2) {
-                mediaRetryCount += 1;
-                hls.recoverMediaError();
-                if (video && video.paused) video.play().catch(() => {});
-              } else if (!handOffToNative('Playback error, switching to hardware player...')) {
-                hls.destroy();
-                hlsRef.current = null;
-                handleFailover('Stream engine failed');
-              }
-              break;
-            default:
-              // v3.9.3: previously the default branch silently destroyed the
-              // Hls instance and called handleFailover with no message. Now
-              // we route it through the same native-handoff path used by the
-              // known error types above, which gives the user a clear toast.
-              if (!handOffToNative('Stream engine error, switching to hardware player...')) {
-                hls.destroy();
-                hlsRef.current = null;
-                handleFailover('Stream engine error');
-              }
-              break;
+  
+        hls.on(Hls.Events.AUDIO_TRACK_SWITCHED, (event, data) => {
+          setCurrentAudio(data.id);
+        });
+  
+        hls.on(Hls.Events.ERROR, (event, data) => {
+          if (data.fatal) {
+            switch (data.type) {
+              case Hls.ErrorTypes.NETWORK_ERROR:
+                // v3.8.0: max 2 retries, then fail over. Previously retried forever.
+                if (networkRetryCount < 2) {
+                  networkRetryCount += 1;
+                  hls.startLoad();
+                } else if (!handOffToNative('Network stalled, switching to hardware player...')) {
+                  hls.destroy();
+                  hlsRef.current = null;
+                  handleFailover('Stream connection failed');
+                }
+                break;
+              case Hls.ErrorTypes.MEDIA_ERROR:
+                if (mediaRetryCount < 2) {
+                  mediaRetryCount += 1;
+                  hls.recoverMediaError();
+                  if (video && video.paused) video.play().catch(() => {});
+                } else if (!handOffToNative('Playback error, switching to hardware player...')) {
+                  hls.destroy();
+                  hlsRef.current = null;
+                  handleFailover('Stream engine failed');
+                }
+                break;
+              default:
+                // v3.9.3: previously the default branch silently destroyed the
+                // Hls instance and called handleFailover with no message. Now
+                // we route it through the same native-handoff path used by the
+                // known error types above, which gives the user a clear toast.
+                if (!handOffToNative('Stream engine error, switching to hardware player...')) {
+                  hls.destroy();
+                  hlsRef.current = null;
+                  handleFailover('Stream engine error');
+                }
+                break;
+            }
           }
-        }
-      });
-
-      // 24/7 Anti-Stall watchdog timer
-      stallWatchdogRef.current = setInterval(() => {
-        if (video && !video.paused && video.readyState >= 2) {
-          if (video.currentTime === lastProgressTime && isLive) {
-            hls?.recoverMediaError();
-            video.play().catch(() => {});
+        });
+  
+        // 24/7 Anti-Stall watchdog timer
+        stallWatchdogRef.current = setInterval(() => {
+          if (video && !video.paused && video.readyState >= 2) {
+            if (video.currentTime === lastProgressTime && isLive) {
+              hls?.recoverMediaError();
+              video.play().catch(() => {});
+            }
+            lastProgressTime = video.currentTime;
           }
-          lastProgressTime = video.currentTime;
-        }
-      }, 4000);
+        }, 4000);
+      })();
 
+    } else if (isEmbedStream) {
+      // v3.10.0 FIX: embed mirrors belong to the <iframe> layer above — do
+      // NOT point the <video> element at an HTML page. Start a watchdog that
+      // fails over if the iframe never signals a load (dead mirror).
+      if (embedWatchdogRef.current) clearTimeout(embedWatchdogRef.current);
+      embedWatchdogRef.current = setTimeout(() => {
+        const iframe = iframeRef.current;
+        const loaded = iframe && (iframe.dataset && iframe.dataset.loaded === '1');
+        if (!loaded && !nativeActiveRef.current) {
+          handleFailover('Embed mirror not responding');
+        }
+      }, EMBED_LOAD_TIMEOUT_MS);
     } else {
       // Native Android HTML5 video playback
       video.src = streamUrl;
@@ -510,8 +610,10 @@ export function TVPlayer({
     }, 1500);
 
     return () => {
+      disposed = true;
       if (stallWatchdogRef.current) clearInterval(stallWatchdogRef.current);
       if (blackScreenWatchdogRef.current) clearInterval(blackScreenWatchdogRef.current);
+      if (embedWatchdogRef.current) clearTimeout(embedWatchdogRef.current);
       if (hls) {
         hls.destroy();
         hlsRef.current = null;
@@ -620,8 +722,14 @@ export function TVPlayer({
         }
       }
 
+      // v3.10.0 FIX: if spatial navigation already consumed this key
+      // (e.preventDefault was called to move focus), don't ALSO seek or
+      // open drawers — previously ArrowLeft/Right both moved focus and
+      // seeked ±10s, and ArrowDown opened the channel drawer mid-navigation.
+      const navHandled = e.defaultPrevented;
+
       // Left / Right keys for seeking
-      if (!showDrawer && !isLive) {
+      if (!showDrawer && !isLive && !navHandled) {
         if (key === 'ArrowLeft' || keyCode === 21 || keyCode === 37) {
           handleSeek(-10);
         } else if (key === 'ArrowRight' || keyCode === 22 || keyCode === 39) {
@@ -631,7 +739,7 @@ export function TVPlayer({
 
       // Up / Down key quick drawers. Only hijack when the OSD is visible,
       // otherwise let the spatial-nav system scroll the live rail.
-      if (showOsd && (key === 'ArrowDown' || keyCode === 20 || keyCode === 40)) {
+      if (showOsd && !navHandled && (key === 'ArrowDown' || keyCode === 20 || keyCode === 40)) {
         if (!showDrawer && isLive && channels.length > 0) {
           setShowDrawer('channels');
         }
@@ -693,13 +801,26 @@ export function TVPlayer({
         onTimeUpdate={handleTimeUpdate}
       />
 
-      {/* WEBVIEW EMBED FALLBACK: embed mirrors render in an iframe on web fallback */}
-      {streamUrl && !nativeActive && (isEmbedUrl(streamUrl) || !isDirectMediaUrl(streamUrl)) && (
+      {/* WEBVIEW EMBED FALLBACK: embed mirrors render in an iframe on web fallback.
+          v3.9.1 FIX: key={streamUrl} forces a full DOM remount on every server
+          switch. Without this key, React reuses the iframe element and only
+          updates src= — but most embed pages ignore src attribute changes and
+          keep playing the old stream.
+          v3.10.0 FIX: onLoad signals the mirror actually responded (dead
+          hosts never fire it), which arms/clears the failover watchdog. */}
+      {streamUrl && !nativeActive && embedReady && (isEmbedUrl(streamUrl) || !isDirectMediaUrl(streamUrl)) && (
         <iframe
+          key={streamUrl}
+          ref={iframeRef}
           src={streamUrl}
           title={title || 'Stream'}
           allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
           allowFullScreen
+          onLoad={(e) => {
+            if (embedWatchdogRef.current) clearTimeout(embedWatchdogRef.current);
+            if (e && e.currentTarget) e.currentTarget.dataset.loaded = '1';
+            setIsBuffering(false);
+          }}
           style={{
             position: 'absolute',
             inset: 0,
@@ -1010,6 +1131,13 @@ export function TVPlayer({
                 tabIndex={0}
                 className={`tv-drawer-item ${idx === currentServerIndex ? 'active' : ''}`}
                 onClick={() => {
+                  // v3.9.1 FIX: reset native-player state so the new server
+                  // actually triggers playback instead of returning early
+                  // because nativeActiveRef/nativeHandoffDoneRef is still set
+                  // from the previous server's handoff.
+                  nativeHandoffDoneRef.current = null;
+                  nativeActiveRef.current = false;
+                  setNativeActive(false);
                   setCurrentServerIndex(idx);
                   setShowDrawer(null);
                   pingOsd();

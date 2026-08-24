@@ -6,8 +6,8 @@ android {
         applicationId "com.ajo.phone"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 49
-        versionName "3.3.0"
+        versionCode 59
+        versionName "3.3.10"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions { ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~' }
     }
@@ -15,6 +15,9 @@ android {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            // Same debug cert as production AJO_PHONE.apk so OTA updates
+            // install in place on every device (release keystore unknown).
+            signingConfig signingConfigs.debug
         }
     }
 }

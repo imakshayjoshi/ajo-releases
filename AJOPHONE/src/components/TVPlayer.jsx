@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import Hls from 'hls.js';
 import { 
   ArrowLeft, 
   Check, 
@@ -302,70 +301,82 @@ export function TVPlayer({ item, server, channels = [], onSelectChannel, onClose
 
     const type = detectStreamType(activeSource.url, activeSource.type || activeSource.source);
 
-    if (type === 'hls' && Hls.isSupported()) {
-      const hls = new Hls({
-        enableWorker: false,
-        startLevel: -1,
-        capLevelToPlayerSize: true,
-        testBandwidth: true,
-        abrEwmaDefaultEstimate: isLive ? 1200000 : 2000000,
-        abrBandWidthFactor: 0.85,
-        abrBandWidthUpFactor: 0.7,
-        maxBufferLength: isLive ? 8 : 24,
-        maxMaxBufferLength: isLive ? 15 : 45,
-        backBufferLength: isLive ? 0 : 15,
-        maxBufferHole: 0.3,
-        lowLatencyMode: false,
-        manifestLoadingTimeOut: 10000,
-        manifestLoadingMaxRetry: 2,
-        levelLoadingMaxRetry: 2,
-        fragLoadingTimeOut: 15000,
-        fragLoadingMaxRetry: 3,
-        xhrSetup: xhr => {
-          for (const [name, value] of Object.entries(activeSource.headers || {})) {
-            try { xhr.setRequestHeader(name, value); } catch {}
+    if (type === 'hls' && (activeSource.url.includes('.m3u8') || activeSource.url.includes('.m3u') || activeSource.type === 'hls' || activeSource.source === 'hls')) {
+      (async () => {
+        // v3.3.1: hls.js is a lazy chunk — fetched only when a stream needs it.
+        const Hls = (await import('hls.js')).default;
+        const videoNow = videoRef.current;
+        if (disposed || !videoNow || videoNow !== video) return;
+        if (!Hls.isSupported()) {
+          onError(new Error('HLS unsupported'));
+          return;
+        }
+        const hls = new Hls({
+          enableWorker: false,
+          startLevel: -1,
+          capLevelToPlayerSize: true,
+          testBandwidth: true,
+          abrEwmaDefaultEstimate: isLive ? 1200000 : 2000000,
+          abrBandWidthFactor: 0.85,
+          abrBandWidthUpFactor: 0.7,
+          maxBufferLength: isLive ? 20 : 30,
+          liveSyncDurationCount: isLive ? 2 : undefined,
+          startFragPrefetch: true,
+          maxMaxBufferLength: isLive ? 15 : 45,
+          backBufferLength: isLive ? 0 : 15,
+          maxBufferHole: 0.3,
+          lowLatencyMode: isLive,
+          manifestLoadingTimeOut: 10000,
+          manifestLoadingMaxRetry: 2,
+          levelLoadingMaxRetry: 2,
+          fragLoadingTimeOut: 15000,
+          fragLoadingMaxRetry: 3,
+          xhrSetup: xhr => {
+            for (const [name, value] of Object.entries(activeSource.headers || {})) {
+              try { xhr.setRequestHeader(name, value); } catch {}
+            }
           }
-        }
-      });
-      hlsRef.current = hls;
-      hls.loadSource(activeSource.url);
-      hls.attachMedia(video);
-      hls.on(Hls.Events.MANIFEST_PARSED, (_e, data) => {
-        if (disposed) return;
-        setLevels(data.levels.map((lvl, index) => ({ index, label: `${lvl.height || 720}p` })));
-        // Manifest arrived = mirror is alive. Cancel the startup failover so
-        // slow segment loads don't trigger a false "took too long" switch.
-        clearFailureTimer();
-        // RESUME: jump to last watched position before starting playback
-        if (resumePositionRef.current && Number.isFinite(resumePositionRef.current)) {
-          try { video.currentTime = resumePositionRef.current; } catch {}
-          resumePositionRef.current = null;
-        }
-        startPlayback();
-      });
-      hls.on(Hls.Events.ERROR, (_e, data) => {
-        if (!data?.fatal || disposed) return;
-        if (data.type === Hls.ErrorTypes.NETWORK_ERROR && retriesRef.current < 2) {
-          retriesRef.current += 1;
-          hls.startLoad();
-          return;
-        }
-        if (data.type === Hls.ErrorTypes.MEDIA_ERROR && retriesRef.current < 2) {
-          retriesRef.current += 1;
-          hls.recoverMediaError();
-          return;
-        }
-        // Fallback to Native Player
-        try {
-          hls.destroy();
-          hlsRef.current = null;
-          video.src = activeSource.url;
-          video.load();
+        });
+        hlsRef.current = hls;
+        hls.loadSource(activeSource.url);
+        hls.attachMedia(video);
+        hls.on(Hls.Events.MANIFEST_PARSED, (_e, data) => {
+          if (disposed) return;
+          setLevels(data.levels.map((lvl, index) => ({ index, label: `${lvl.height || 720}p` })));
+          // Manifest arrived = mirror is alive. Cancel the startup failover so
+          // slow segment loads don't trigger a false "took too long" switch.
+          clearFailureTimer();
+          // RESUME: jump to last watched position before starting playback
+          if (resumePositionRef.current && Number.isFinite(resumePositionRef.current)) {
+            try { video.currentTime = resumePositionRef.current; } catch {}
+            resumePositionRef.current = null;
+          }
           startPlayback();
-        } catch {
-          failover('Stream playback error encountered.');
-        }
-      });
+        });
+        hls.on(Hls.Events.ERROR, (_e, data) => {
+          if (!data?.fatal || disposed) return;
+          if (data.type === Hls.ErrorTypes.NETWORK_ERROR && retriesRef.current < 2) {
+            retriesRef.current += 1;
+            hls.startLoad();
+            return;
+          }
+          if (data.type === Hls.ErrorTypes.MEDIA_ERROR && retriesRef.current < 2) {
+            retriesRef.current += 1;
+            hls.recoverMediaError();
+            return;
+          }
+          // Fallback to Native Player
+          try {
+            hls.destroy();
+            hlsRef.current = null;
+            video.src = activeSource.url;
+            video.load();
+            startPlayback();
+          } catch {
+            failover('Stream playback error encountered.');
+          }
+        });
+      })();
     } else {
       video.src = activeSource.url;
       video.load();

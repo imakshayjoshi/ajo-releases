@@ -115,18 +115,18 @@ export function TVRemoteControlView({ onTuneChannelLocally }) {
     const clean = castEngine.joinRoom(roomInput.trim());
     setRoomInput(clean);
     setIsEditingRoom(false);
-    triggerToast(`🔗 Connecting & Pairing with ${clean}...`);
+    triggerToast(`🔗 Connecting to ${clean}...`);
     castEngine.requestPairing().then(() => {
-      triggerToast(`📡 Pairing handshake sent to ${clean}`);
+      triggerToast(`📡 Connecting to ${clean}...`);
     }).catch(() => {
-      triggerToast(`📡 Pairing handshake sent to ${clean}`);
+      triggerToast(`📡 Connecting to ${clean}...`);
     });
   };
 
   const handlePairAgain = () => {
     try {
       castEngine.requestPairing();
-      triggerToast(`Requesting handshake with TV...`);
+      triggerToast(`Connecting to your TV...`);
     } catch (e) {
       triggerToast(e.message);
     }
@@ -271,7 +271,7 @@ export function TVRemoteControlView({ onTuneChannelLocally }) {
             </div>
             <div>
               <h2 style={{ fontSize: '17px', fontWeight: 900, margin: 0, letterSpacing: '-0.3px' }}>
-                {isConnected ? (castState.session?.tvName || 'AJO Smart TV') : 'AJO TV Remote & Cast'}
+                {isConnected ? (castState.session?.tvName || 'Your TV') : 'TV Remote'}
               </h2>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '3px' }}>
                 <span style={{ 
@@ -283,11 +283,11 @@ export function TVRemoteControlView({ onTuneChannelLocally }) {
                 }} />
                 <span style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 700 }}>
                   {isConnected ? (
-                    <>Connected • Room <b style={{ color: '#38bdf8' }}>{castState.roomCode}</b></>
+                    <>Connected to your TV • Room <b style={{ color: '#38bdf8' }}>{castState.roomCode}</b></>
                   ) : isConnecting ? (
-                    <>Connecting to <b style={{ color: '#f59e0b' }}>{castState.roomCode}</b>...</>
+                    <>Connecting…</>
                   ) : (
-                    <>Not Paired • Enter TV Code</>
+                    <>Not connected yet</>
                   )}
                 </span>
               </div>
@@ -312,29 +312,12 @@ export function TVRemoteControlView({ onTuneChannelLocally }) {
                   alignItems: 'center',
                   gap: '4px'
                 }}
-                title="Unpair Device"
+                title="Disconnect from TV"
               >
                 <Unplug size={14} />
-                <span>Forget</span>
+                <span>Disconnect</span>
               </button>
-            ) : (
-              <button
-                onClick={() => setIsEditingRoom(!isEditingRoom)}
-                style={{
-                  background: 'rgba(56, 189, 248, 0.15)',
-                  border: '1px solid rgba(56, 189, 248, 0.4)',
-                  color: '#38bdf8',
-                  minHeight: '36px',
-                  padding: '0 12px',
-                  borderRadius: '10px',
-                  fontSize: '12px',
-                  fontWeight: 800,
-                  cursor: 'pointer'
-                }}
-              >
-                {isEditingRoom ? 'Cancel' : 'Pair TV'}
-              </button>
-            )}
+            ) : null}
           </div>
         </div>
 
@@ -345,7 +328,7 @@ export function TVRemoteControlView({ onTuneChannelLocally }) {
               type="text"
               value={roomInput}
               onChange={(e) => setRoomInput(e.target.value.toUpperCase())}
-              placeholder="e.g. AJO-7492 (shown on TV)"
+              placeholder="Type the code from your TV (e.g. AJO-7492)"
               style={{
                 flex: 1,
                 background: 'rgba(0, 0, 0, 0.5)',
@@ -379,9 +362,14 @@ export function TVRemoteControlView({ onTuneChannelLocally }) {
               }}
             >
               <Cast size={16} />
-              <span>Connect</span>
+              <span>Connect to TV</span>
             </button>
           </form>
+        )}
+        {!isConnected && (
+          <div style={{ marginTop: '10px', fontSize: '13px', color: '#94a3b8', lineHeight: 1.6, background: 'rgba(56,189,248,0.07)', border: '1px solid rgba(56,189,248,0.15)', borderRadius: '10px', padding: '10px 12px' }}>
+            <b style={{ color: '#e2e8f0' }}>How to connect:</b> On your TV, open <b style={{ color: '#38bdf8' }}>Settings</b> — the first card shows a code like <b style={{ color: '#38bdf8' }}>AJO-7492</b>. Type that code here and press <b style={{ color: '#38bdf8' }}>Connect to TV</b>.
+          </div>
         )}
       </div>
 
@@ -449,7 +437,7 @@ export function TVRemoteControlView({ onTuneChannelLocally }) {
         </div>
 
         {/* Category Pills */}
-        <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '6px', marginBottom: '8px' }}>
+        <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', WebkitOverflowScrolling: 'touch', touchAction: 'pan-x pan-y', paddingBottom: '6px', marginBottom: '8px' }}>
           {categories.map(cat => (
             <button
               key={cat}

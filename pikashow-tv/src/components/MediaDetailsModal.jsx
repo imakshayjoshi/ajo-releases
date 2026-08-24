@@ -139,7 +139,7 @@ export function MediaDetailsModal({ item, onClose, onStartPlayback }) {
               <span style={{ fontSize: '0.8rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', display: 'block', marginBottom: 8 }}>
                 Episodes ({episodes.length}):
               </span>
-              <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 6 }}>
+              <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 6 }} data-horizontal-scroll="true">
                 {episodes.map((ep, idx) => (
                   <button
                     key={ep.id || idx}

@@ -123,7 +123,7 @@ export function YouTubeView({ onPlayMedia, onFocusItem }) {
       </div>
 
       {/* Category Navigation Pills */}
-      <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '12px', marginBottom: '16px' }}>
+      <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', WebkitOverflowScrolling: 'touch', touchAction: 'pan-x pan-y', paddingBottom: '12px', marginBottom: '16px' }}>
         {YOUTUBE_CATEGORIES.map(cat => (
           <button
             key={cat.id}

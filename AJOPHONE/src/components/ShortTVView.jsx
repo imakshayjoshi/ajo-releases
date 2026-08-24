@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import Hls from 'hls.js';
 import { 
   Play, 
   Pause, 
@@ -48,7 +47,16 @@ export function ShortTVView({ onPlayFullscreen }) {
 
     const streamUrl = currentEpisode.url;
 
-    if (Hls.isSupported()) {
+    const initHls = async () => {
+      // v3.3.1: lazy hls.js chunk (shared with TVPlayer)
+      const Hls = (await import('hls.js')).default;
+      if (!Hls.isSupported()) {
+        if (video.canPlayType('application/vnd.apple.mpegurl')) {
+          video.src = streamUrl;
+          video.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
+        }
+        return;
+      }
       const hls = new Hls({
         enableWorker: true,
         startLevel: -1,
@@ -69,10 +77,8 @@ export function ShortTVView({ onPlayFullscreen }) {
           else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) hls.recoverMediaError();
         }
       });
-    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      video.src = streamUrl;
-      video.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
-    }
+    };
+    initHls();
 
     return () => {
       if (hlsRef.current) {

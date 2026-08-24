@@ -138,7 +138,7 @@ export function SearchView({
         zIndex: 25,
         display: 'flex',
         gap: '8px',
-        overflowX: 'auto',
+        overflowX: 'auto', WebkitOverflowScrolling: 'touch', touchAction: 'pan-x pan-y',
         padding: '12px 0',
         scrollbarWidth: 'none'
       }}>

@@ -93,9 +93,64 @@ public class PlayerActivity extends AppCompatActivity {
 
     private static final String TAG = "AJOPlayer";
 
+    // v3.11.1: remote command bridge. The phone's cast remote drives the
+    // native ExoPlayer via MainActivity (JS -> Java interface); during native
+    // playback the WebView <video> element isn't playing, so the JS remote
+    // handler routes commands here when the native player is active.
+    private static volatile PlayerActivity activeInstance = null;
+
+    public static void dispatchRemoteCommand(String cmd, double arg) {
+        PlayerActivity act = activeInstance;
+        if (act == null) return;
+        act.runOnUiThread(() -> act.executeRemoteCommand(cmd, arg));
+    }
+
+    private void executeRemoteCommand(String cmd, double arg) {
+        if (player == null) return;
+        String c = cmd == null ? "" : cmd.toUpperCase();
+        switch (c) {
+            case "PLAY":
+                player.setPlayWhenReady(true);
+                showOsd();
+                break;
+            case "PAUSE":
+                player.setPlayWhenReady(false);
+                showOsd();
+                break;
+            case "PLAY_PAUSE":
+                player.setPlayWhenReady(!player.getPlayWhenReady());
+                showOsd();
+                break;
+            case "SEEK_FORWARD":
+                seekBy(SEEK_STEP_MS);
+                break;
+            case "SEEK_BACK":
+                seekBy(-SEEK_STEP_MS);
+                break;
+            case "SEEK":
+                if (!isLive) player.seekTo(Math.max(0L, (long) arg));
+                break;
+            case "STOP":
+                finish();
+                break;
+            default:
+                break;
+        }
+    }
+
+    private void seekBy(long deltaMs) {
+        if (isLive || player.getDuration() <= 0) return;
+        long target = Math.max(0L, Math.min(player.getDuration(), player.getCurrentPosition() + deltaMs));
+        player.seekTo(target);
+    }
+
     private static final String USER_AGENT =
-            "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 (KHTML, like Gecko) "
-                    + "Chrome/120.0.0.0 Safari/537.36 AJO-TV";
+            // v3.9.1 FIX: removed 'AJO-TV' suffix. Cloudflare Bot Management and
+            // Turnstile detect non-standard UA suffixes in ~50ms and immediately
+            // serve a captcha challenge. Use a vanilla Chrome Mobile UA that passes
+            // as a real Android phone.
+            "Mozilla/5.0 (Linux; Android 13; Pixel 6) AppleWebKit/537.36 "
+                    + "(KHTML, like Gecko) Chrome/120.0.6099.210 Mobile Safari/537.36";
 
     // v3.8.2 buffering: generous read windows. A short read timeout on a slow
     // origin (not the user's pipe — 40mbps is plenty) aborts segment reads
@@ -152,6 +207,20 @@ public class PlayerActivity extends AppCompatActivity {
 
     private boolean useTextureViewFallback = false;
     private boolean softwareDecoderRetryDone = false;
+    // v3.10.0: web-engine (iframe/embed) load watchdog. A dead mirror or a
+    // hung Cloudflare interstitial never finishes loading, so the spinner
+    // used to spin forever. After WEB_LOAD_TIMEOUT_MS we fail over.
+    private static final long WEB_LOAD_TIMEOUT_MS = 15000L;
+    private final Runnable webLoadWatchdog = new Runnable() {
+        @Override
+        public void run() {
+            if (!isWebEmbedMode) return;
+            Log.w(TAG, "WEB_EMBED_TIMEOUT: embed never finished loading, failing over.");
+            Toast.makeText(PlayerActivity.this,
+                    "Mirror not responding, switching...", Toast.LENGTH_SHORT).show();
+            failoverToNextServer();
+        }
+    };
     private long resumePositionMs = C.TIME_UNSET;
 
     // ---- FREEZE DETECTION (fix): audio-plays-but-picture-frozen on Fire OS.
@@ -306,6 +375,7 @@ public class PlayerActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        activeInstance = this;
 
         getWindow().setFlags(
                 WindowManager.LayoutParams.FLAG_FULLSCREEN | WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON,
@@ -428,8 +498,10 @@ public class PlayerActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        if (activeInstance == this) activeInstance = null;
         uiHandler.removeCallbacksAndMessages(null);
         releasePlayer();
+        uiHandler.removeCallbacks(webLoadWatchdog);
         if (webVideoView != null) {
             try {
                 webVideoView.stopLoading();
@@ -466,6 +538,17 @@ public class PlayerActivity extends AppCompatActivity {
         ws.setUseWideViewPort(true);
         ws.setMediaPlaybackRequiresUserGesture(false);
         ws.setUserAgentString(USER_AGENT);
+        // v3.9.1 FIX: enable cookies so Cloudflare clearance tokens
+        // (cf_clearance cookie) can persist across page loads within the
+        // same embed session.  Without this every page was cookie-less and
+        // triggered a fresh Cloudflare challenge every time.
+        try {
+            android.webkit.CookieManager cm = android.webkit.CookieManager.getInstance();
+            cm.setAcceptCookie(true);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                cm.setAcceptThirdPartyCookies(webVideoView, true);
+            }
+        } catch (Exception ignored) {}
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             ws.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
         }
@@ -478,12 +561,14 @@ public class PlayerActivity extends AppCompatActivity {
 
             @Override
             public void onReceivedError(WebView view, int errorCode, String description, String failingUrl) {
+                uiHandler.removeCallbacks(webLoadWatchdog);
                 Log.w(TAG, "Web video onReceivedError (" + errorCode + "): " + description);
                 failoverToNextServer();
             }
 
             @Override
             public void onPageFinished(WebView view, String url) {
+                uiHandler.removeCallbacks(webLoadWatchdog);
                 bufferSpinner.setVisibility(View.GONE);
                 view.evaluateJavascript(
                         "(function(){"
@@ -665,10 +750,13 @@ public class PlayerActivity extends AppCompatActivity {
                 || lower.contains("/getm3u8/") || lower.contains("/playlist") || lower.contains("master.m3u8")) {
             return false;
         }
+        // v3.9.1: added vidsrc.xyz and superembed.stream; kept in sync with
+        // EMBED_HOST_PATTERNS in nativePlayer.js and EMBED_PATTERNS in streamingEngines.js.
         return lower.contains("/embed/") || lower.contains("apiplayer.ru")
                 || lower.contains("vidlink.pro") || lower.contains("vidsrc") || lower.contains("autoembed.co")
                 || lower.contains("smashy.stream") || lower.contains("multiembed.mov") || lower.contains("rasta428jem.com")
-                || lower.contains("2embed.cc") || lower.contains("embed.su") || lower.contains("v2.vidsrc.me")
+                || lower.contains("2embed.cc") || lower.contains("2embed.skin") || lower.contains("embed.su")
+                || lower.contains("v2.vidsrc.me") || lower.contains("superembed.stream")
                 || lower.contains("moviesapi.club");
     }
 
@@ -720,22 +808,28 @@ public class PlayerActivity extends AppCompatActivity {
             } else if (lower.contains("autoembed.co")) {
                 headers.put("Referer", "https://autoembed.co/");
                 headers.put("Origin", "https://autoembed.co");
-            } else if (lower.contains("2embed.cc")) {
+            } else if (lower.contains("2embed.cc") || lower.contains("2embed.skin")) {
                 headers.put("Referer", "https://www.2embed.cc/");
                 headers.put("Origin", "https://www.2embed.cc");
-            } else if (lower.contains("vidsrc")) {
-                headers.put("Referer", "https://vidsrc.cc/");
-                headers.put("Origin", "https://vidsrc.cc");
+            } else if (lower.contains("moviesapi.club")) {
+                headers.put("Referer", "https://moviesapi.club/");
+                headers.put("Origin", "https://moviesapi.club");
             } else if (lower.contains("multiembed.mov")) {
                 headers.put("Referer", "https://multiembed.mov/");
                 headers.put("Origin", "https://multiembed.mov");
+            } else if (lower.contains("superembed.stream")) {
+                headers.put("Referer", "https://superembed.stream/");
+                headers.put("Origin", "https://superembed.stream");
             } else if (lower.contains("smashy.stream")) {
                 headers.put("Referer", "https://smashy.stream/");
                 headers.put("Origin", "https://smashy.stream");
             } else if (lower.contains("apiplayer.ru")) {
                 headers.put("Referer", "https://apiplayer.ru/");
                 headers.put("Origin", "https://apiplayer.ru");
-            } else if (lower.contains("v2.vidsrc.me") || lower.contains("vidsrc.me") || lower.contains("vidsrc.cc") || lower.contains("vidsrc.to")) {
+            } else if (lower.contains("vidsrc.xyz")) {
+                headers.put("Referer", "https://vidsrc.xyz/");
+                headers.put("Origin", "https://vidsrc.xyz");
+            } else if (lower.contains("vidsrc")) {
                 headers.put("Referer", "https://vidsrc.cc/");
                 headers.put("Origin", "https://vidsrc.cc");
             } else {
@@ -762,12 +856,15 @@ public class PlayerActivity extends AppCompatActivity {
         }
 
         bufferSpinner.setVisibility(View.VISIBLE);
+        uiHandler.removeCallbacks(webLoadWatchdog);
+        uiHandler.postDelayed(webLoadWatchdog, WEB_LOAD_TIMEOUT_MS);
         // Hide spinner on page-finished, not after a fixed delay — embed pages
         // regularly take >3.5s to resolve the Cloudflare interstitial.
     }
 
     private void playInNativeExoPlayer(String url) {
         isWebEmbedMode = false;
+        uiHandler.removeCallbacks(webLoadWatchdog);
         if (webVideoView != null) {
             webVideoView.stopLoading();
             webVideoView.loadUrl("about:blank");
@@ -888,7 +985,7 @@ public class PlayerActivity extends AppCompatActivity {
         DefaultLoadControl loadControl = new DefaultLoadControl.Builder()
                 .setAllocator(new androidx.media3.exoplayer.upstream.DefaultAllocator(true, 256 * 1024))
                 .setBufferDurationsMs(
-                        /* minBufferMs= */ isLive ? 6000 : 30000,
+                        /* minBufferMs= */ isLive ? 3500 : 30000,
                         /* maxBufferMs= */ isLive ? 25000 : 90000,
                         /* bufferForPlaybackMs= */ isLive ? 1000 : 2500,
                         /* bufferForPlaybackAfterRebufferMs= */ isLive ? 2500 : 5000)
@@ -1077,9 +1174,11 @@ public class PlayerActivity extends AppCompatActivity {
                         ConnectionSpec.CLEARTEXT))
                 .connectTimeout(CONNECT_TIMEOUT_MS, TimeUnit.MILLISECONDS)
                 .readTimeout(READ_TIMEOUT_MS, TimeUnit.MILLISECONDS)
-                // v3.9.0: reduced from 120s — a dead segment was hanging the
-                // player for 2 full minutes before failover could trigger.
-                .callTimeout(15, TimeUnit.SECONDS)
+                // v3.9.0: reduced from 120s; v3.10.0: 15s was aborting
+                // legitimately large 4K segments mid-read on slower pipes
+                // (callTimeout covers the whole body read, not just connect),
+                // causing repeated rebuffers. 30s still fails over briskly.
+                .callTimeout(30, TimeUnit.SECONDS)
                 .followRedirects(true)
                 .followSslRedirects(true)
                 .retryOnConnectionFailure(true)

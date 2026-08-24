@@ -1,14 +1,9 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { 
-  getBollywoodCatalog, 
-  getHollywoodCatalog, 
-  getSerialsCatalog, 
-  getLiveBroadcasts 
-} from './api/pikashow';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { getBollywoodCatalog, getHollywoodCatalog, getSerialsCatalog, getLiveBroadcasts } from './api/pikashow';
 import { getLiveSportsEvents } from './api/sports';
 import { getWatchHistory, saveProgress } from './api/history';
 import { checkForAppUpdates } from './api/otaUpdate';
-import { getTmdbTrending, getTmdbCatalog, getBecauseYouWatched } from './api/tmdb';
+import { getTmdbTrending, getTmdbCatalog, getTmdbNowPlaying, getBecauseYouWatched } from './api/tmdb';
 import { getRankedServers } from './api/mirrorHealth';
 import { getAddonCatalogs, getAddonStreams } from './api/stremio';
 import { GoogleTVHeader } from './components/GoogleTVHeader';
@@ -19,26 +14,30 @@ import { SearchView } from './components/SearchView';
 import { SettingsView } from './components/SettingsView';
 import { TVPlayer } from './components/TVPlayer';
 import { useSpatialNavigation } from './hooks/useSpatialNavigation';
-import { shouldPreferNativePlayer, playInNativePlayer } from './utils/nativePlayer';
+import { shouldPreferNativePlayer, playInNativePlayer, isNativePlaybackActive, nativePlayerControl, setNativePlaybackActive } from './utils/nativePlayer';
 import { generateUniversalServers } from './utils/streamingEngines';
 // v3.9.0 PERF: castSync lazy-loaded — the 27KB module was parsed eagerly on
 // every startup even though cast is only used when a phone is actually paired.
 import { Play, Sparkles } from 'lucide-react';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('home');
+  const [activeTab, setActiveTab] = useState(() => new URLSearchParams(window.location.search).get('tab') || 'home');
   const [loading, setLoading] = useState(true);
 
   // Catalogs
   const [bollywoodItems, setBollywoodItems] = useState([]);
   const [hollywoodItems, setHollywoodItems] = useState([]);
   const [seriesItems, setSeriesItems] = useState([]);
-  const [liveItems, setLiveItems] = useState([]);
   const [sportsItems, setSportsItems] = useState([]);
   const [continueWatching, setContinueWatching] = useState([]);
   const [tmdbTrending, setTmdbTrending] = useState([]);
   const [tmdbMovies, setTmdbMovies] = useState([]);
   const [tmdbSeries, setTmdbSeries] = useState([]);
+  const [nowPlaying, setNowPlaying] = useState([]);
+  // v3.11.0: IPTV (9+ playlists) is heavy — load it AFTER first paint so the
+  // app opens fast on low-RAM Fire TV sticks instead of blocking on playlists.
+  const [liveItems, setLiveItems] = useState([]);
+  const [liveLoaded, setLiveLoaded] = useState(false);
   const [addonCatalogItems, setAddonCatalogItems] = useState([]);
   const [becauseYouWatched, setBecauseYouWatched] = useState([]);
   const [watchlist, setWatchlist] = useState(() => {
@@ -51,26 +50,54 @@ export default function App() {
   const [otaPrompt, setOtaPrompt] = useState(null);
   const [downloadProgress, setDownloadProgress] = useState(null);
 
+  // v3.10.0: remember which card had focus before a modal/player opened so
+  // closing it returns the user to the exact same spot instead of dumping
+  // focus on the Home pill or the first card in the DOM.
+  const lastFocusedBeforeOverlayRef = useRef(null);
+  const prevTabRef = useRef('home');
+
+  const rememberFocus = useCallback(() => {
+    try {
+      const el = document.activeElement;
+      if (el && el !== document.body && el.focus) {
+        lastFocusedBeforeOverlayRef.current = el;
+      }
+    } catch {}
+  }, []);
+
+  const restoreFocus = useCallback(() => {
+    const target = lastFocusedBeforeOverlayRef.current;
+    lastFocusedBeforeOverlayRef.current = null;
+    setTimeout(() => {
+      const el = target && document.contains(target) ? target : null;
+      if (el) {
+        try { el.focus({ preventScroll: true }); el.scrollIntoView({ block: 'nearest', inline: 'nearest' }); return; } catch {}
+      }
+      const fallback = document.querySelector('.tv-card, .tv-nav-pill.active, .tv-hero');
+      if (fallback) { try { fallback.focus(); } catch {} }
+    }, 60);
+  }, []);
+
   // Load all catalogs on startup
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [bolly, holly, serials, live, sports, trending, popMovies, popTv] = await Promise.allSettled([
+      const [bolly, holly, serials, sports, trending, popMovies, popTv, newReleases] = await Promise.allSettled([
         getBollywoodCatalog(),
         getHollywoodCatalog(),
         getSerialsCatalog(),
-        getLiveBroadcasts(),
         getLiveSportsEvents(),
         getTmdbTrending('all', 'week'),
         getTmdbCatalog('movie', 'popular'),
-        getTmdbCatalog('tv', 'popular')
+        getTmdbCatalog('tv', 'popular'),
+        getTmdbNowPlaying(20)
       ]);
 
       if (bolly.status === 'fulfilled') setBollywoodItems(bolly.value || []);
       if (holly.status === 'fulfilled') setHollywoodItems(holly.value || []);
       if (serials.status === 'fulfilled') setSeriesItems(serials.value || []);
-      if (live.status === 'fulfilled') setLiveItems(live.value || []);
       if (sports.status === 'fulfilled') setSportsItems(sports.value || []);
+      if (newReleases.status === 'fulfilled') setNowPlaying(newReleases.value || []);
       if (trending.status === 'fulfilled') setTmdbTrending(trending.value || []);
       if (popMovies.status === 'fulfilled') setTmdbMovies(popMovies.value || []);
       if (popTv.status === 'fulfilled') setTmdbSeries(popTv.value || []);
@@ -90,6 +117,36 @@ export default function App() {
       setLoading(false);
     }
   }, []);
+
+  // v3.11.1: native player finished — clear the routing flag so the next
+  // REMOTE_COMMAND targets the WebView player again.
+  useEffect(() => {
+    const clearNative = () => { setNativePlaybackActive(false); };
+    window.addEventListener('ajo-native-player-closed', clearNative);
+    return () => window.removeEventListener('ajo-native-player-closed', clearNative);
+  }, []);
+
+  // v3.11.0 PERF: IPTV (16 playlists) no longer blocks startup. Kick it off
+  // 1.2s after first paint so the Home tab renders instantly on low-RAM Fire
+  // TV sticks; the Live TV tab forces an immediate load when opened.
+  const loadLiveTV = useCallback(async () => {
+    try {
+      const items = await getLiveBroadcasts();
+      setLiveItems(items || []);
+    } catch (e) {
+      console.error('Error loading live TV:', e);
+    } finally {
+      setLiveLoaded(true);
+    }
+  }, []);
+  useEffect(() => {
+    const t = setTimeout(() => { if (!liveLoaded) loadLiveTV(); }, 1200);
+    return () => clearTimeout(t);
+  }, [liveLoaded, loadLiveTV]);
+  // User opened the Live TV tab before the lazy tick fired — load immediately.
+  useEffect(() => {
+    if (activeTab === 'live' && !liveLoaded) loadLiveTV();
+  }, [activeTab, liveLoaded, loadLiveTV]);
 
   useEffect(() => {
     loadData();
@@ -133,6 +190,7 @@ export default function App() {
 
   // Handle item click (Live TV plays directly, Movies open details)
   const handleItemClick = useCallback((item) => {
+    rememberFocus();
     if (item.is_live || item.type === 'live' || item.year === 'LIVE') {
       const allServers = Array.isArray(item.players) && item.players.length > 0
         ? item.players
@@ -152,10 +210,11 @@ export default function App() {
     } else {
       setSelectedItem(item);
     }
-  }, []);
+  }, [rememberFocus]);
 
   // Start playback from modal or details
   const handleStartPlayback = useCallback(async (item, server = null, episodes = [], episodeIndex = 0) => {
+    rememberFocus();
     setSelectedItem(null);
 
     // AUTO-ID-RESOLUTION (unlock): if the item has a TMDB id but no IMDb id,
@@ -195,8 +254,8 @@ export default function App() {
       if (playInNativePlayer(url, title, isLiveItem, allServers)) return;
     }
 
-    setActivePlayback({ item: resolvedItem, server: selectedSrv, episodes, episodeIndex });
-  }, []);
+    setActivePlayback({ item: resolvedItem, server: selectedSrv, allServers, episodes, episodeIndex });
+  }, [rememberFocus]);
 
   // Close player and save progress
   const handleClosePlayer = useCallback((lastTime, duration) => {
@@ -206,30 +265,40 @@ export default function App() {
     }
     setActivePlayback(null);
 
-    // Re-focus active cards smoothly
-    setTimeout(() => {
-      const target = document.querySelector('.tv-card, .tv-nav-pill.active, .tv-hero');
-      if (target) {
-        try { target.focus(); } catch (_) {}
-      }
-    }, 60);
-  }, [activePlayback]);
+    // Re-focus the card the user launched from (v3.10.0), falling back to
+    // the old first-card behavior when the element is gone.
+    restoreFocus();
+  }, [activePlayback, restoreFocus]);
 
   // Global Remote Back Handler
   const handleBack = useCallback(() => {
+    // v3.10.0 FIX: with the player's channels/servers/audio drawer open, Back
+    // must close the drawer first — not kill playback and lose the resume
+    // position. TVPlayer's own keydown handler performs the close.
+    if (activePlayback && window.__ajoPlayerDrawerOpen) return;
     if (activePlayback) {
       handleClosePlayer(0, 0);
       return;
     }
     if (selectedItem) {
       setSelectedItem(null);
+      restoreFocus();
       return;
+    }
+    if (activeTab === 'search') {
+      // First Back in Search releases the input focus (for the on-screen
+      // keyboard), second Back leaves the tab. Prevents accidental ejection.
+      const ae = document.activeElement;
+      if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA')) {
+        try { ae.blur(); } catch {}
+        return;
+      }
     }
     if (activeTab !== 'home') {
       setActiveTab('home');
       return;
     }
-  }, [activePlayback, selectedItem, activeTab, handleClosePlayer]);
+  }, [activePlayback, selectedItem, activeTab, handleClosePlayer, restoreFocus]);
 
   // ---- CAST RECEIVER (bug fix): the TV app previously never listened for
   // cast messages, so the phone's "Play on TV" button did nothing. Handle
@@ -238,7 +307,13 @@ export default function App() {
   // v3.9.0 PERF: lazy-load castSync only when needed
   useEffect(() => {
     let unsubscribe = null;
-    import('./api/castSync').then(({ castEngine }) => {
+    import('./api/castSync').then(({ castEngine, ensureTvRole }) => {
+      // v3.11.1: ALWAYS run as the TV-side cast peer with a persisted room
+      // code (regardless of UA/display-mode detection) or phones can never
+      // pair — the engine drops every inbound message if the room/role is
+      // wrong, and this used to fail silently on some Fire TV WebViews.
+      const bootRoom = new URLSearchParams(window.location.search).get('room');
+      ensureTvRole(bootRoom || undefined);
       unsubscribe = castEngine.subscribe((msg) => {
         try {
           if (msg.type === 'PLAY_MEDIA' && msg.item) {
@@ -257,6 +332,22 @@ export default function App() {
             setActivePlayback({ item: castItem, server: chosen });
           } else if (msg.type === 'REMOTE_COMMAND') {
             const cmd = String(msg.command || '');
+            // v3.11.1: when the native ExoPlayer owns playback, the WebView
+            // <video> element isn't playing — route commands to the hardware
+            // player through the Java bridge instead.
+            if (isNativePlaybackActive()) {
+              switch (cmd) {
+                case 'PLAY': nativePlayerControl('PLAY'); break;
+                case 'PAUSE': nativePlayerControl('PAUSE'); break;
+                case 'PLAY_PAUSE': nativePlayerControl('PLAY_PAUSE'); break;
+                case 'SEEK_FORWARD': nativePlayerControl('SEEK_FORWARD', 10); break;
+                case 'SEEK_BACK': nativePlayerControl('SEEK_BACK', 10); break;
+                case 'STOP': nativePlayerControl('STOP'); break;
+                case 'BACK': nativePlayerControl('STOP'); break;
+                default: break;
+              }
+              return;
+            }
             const video = document.querySelector('video');
             switch (cmd) {
               case 'PLAY': if (video) video.play().catch(() => {}); break;
@@ -292,8 +383,12 @@ export default function App() {
     modalSelector: selectedItem ? '.tv-modal-card' : activePlayback ? '.tv-player-fullscreen' : null,
   });
 
-  // Focus initial element when changing tabs
+  // Focus initial element ONLY when the tab actually changed (v3.10.0).
+  // Previously this fired whenever any modal/player closed too, yanking
+  // focus away from the card being restored and onto the Home pill.
   useEffect(() => {
+    if (prevTabRef.current === activeTab) return;
+    prevTabRef.current = activeTab;
     if (!selectedItem && !activePlayback) {
       focusInitial('.tv-nav-pill.active, .tv-hero, .tv-card');
     }
@@ -343,7 +438,7 @@ export default function App() {
 
       {/* OTA Update Toast Banner */}
       {otaPrompt && (
-        <div style={{
+        <div className="tv-ota-rail tv-rail" style={{
           background: otaPrompt.needsReinstall
             ? 'linear-gradient(90deg, #b45309, #f59e0b)'
             : 'linear-gradient(90deg, #2563eb, #38bdf8)',
@@ -465,6 +560,15 @@ export default function App() {
                   />
                 )}
 
+                {/* v3.11.0: Recently released movies (TMDB now_playing, India region) */}
+                {nowPlaying.length > 0 && (
+                  <MediaRail
+                    title="🆕 Recently Released Movies (In Theatres Now)"
+                    items={nowPlaying}
+                    onSelectItem={handleItemClick}
+                  />
+                )}
+
                 {/* Stremio Addon catalogs rail (appears once an addon is installed) */}
                 {addonCatalogItems.length > 0 && (
                   <MediaRail
@@ -554,12 +658,32 @@ export default function App() {
 
             {/* 🔴 LIVE TV TAB */}
             {activeTab === 'live' && (
-              <MediaGridView
-                title="🔴 Live Television Channels"
-                items={liveItems}
-                isLive={true}
-                onSelectItem={handleItemClick}
-              />
+              <>
+                {liveLoaded && liveItems.length === 0 ? (
+                  <div className="tv-empty-state" style={{ textAlign: 'center', marginTop: 80 }}>
+                    <p style={{ color: '#9aa3b2', fontSize: 19, marginBottom: 20 }}>
+                      Couldn't load channels right now. Check your internet and try again.
+                    </p>
+                    <button
+                      className="tv-retry-btn"
+                      style={{
+                        padding: '12px 34px', fontSize: 18, fontWeight: 700,
+                        background: '#e50914', color: '#fff', borderRadius: 8, border: 'none', cursor: 'pointer'
+                      }}
+                      onClick={() => { setLiveLoaded(false); loadLiveTV(); }}
+                    >
+                      ↻ Retry Loading Channels
+                    </button>
+                  </div>
+                ) : (
+                  <MediaGridView
+                    title="🔴 Live Television Channels"
+                    items={liveItems}
+                    isLive={true}
+                    onSelectItem={handleItemClick}
+                  />
+                )}
+              </>
             )}
 
             {/* 🔍 SEARCH TAB */}
@@ -589,6 +713,7 @@ export default function App() {
         <TVPlayer
           item={activePlayback.item}
           server={activePlayback.server}
+          allServers={activePlayback.allServers}
           channels={liveItems}
           episodes={activePlayback.episodes}
           currentEpisodeIndex={activePlayback.episodeIndex}

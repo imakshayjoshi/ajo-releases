@@ -1,37 +1,34 @@
 {
   "schemaVersion": 2,
-  "version": "3.12.1",
-  "versionCode": 88,
+  "version": "3.12.2",
+  "versionCode": 89,
   "releaseDate": "2026-08-25",
   "phone": {
-    "version": "3.3.9",
-    "versionCode": 58,
+    "version": "3.3.10",
+    "versionCode": 59,
     "packageId": "com.ajo.phone",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "📱 FIXED: horizontal swiping in categories & filter bars now works on phone (chips and rails scroll with your finger)",
+      "📱 FIXED (again): horizontal swiping in categories & filter bars now fully works on phone",
       "⚡ Smoother scrolling everywhere"
     ],
     "size_mb": "3.3 MB",
     "sha256": "b522073bc3b5c5df94bd2979b1b75d2cb3870c7d27048836fbe70573b4b62a6a"
   },
   "tv": {
-    "version": "3.12.1",
-    "versionCode": 88,
+    "version": "3.12.2",
+    "versionCode": 89,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "📺 LIVE TV REWORK: channels now come from a checked server list — only channels that actually stream, only Marathi / Hindi / English + sports & news (no regional languages, no dead channels)",
-      "🧹 Duplicate channels removed — every channel appears once",
-      "🖼️ Logos for popular channels + smart initials badge for the rest",
-      "⚡ Faster channel start: quicker buffering & smoother switching",
-      "🚫 No ads — playback is direct and clean"
+      "📺 FIXED: CSS scrolling issues and UI alignment across grids",
+      "⚡ Faster UI responses"
     ],
     "size_mb": "6.8 MB",
     "sha256": "2ed816fbd388d96a9377876bfe25f562aecf27774735ddd50b72c3c1eff5ab8d"

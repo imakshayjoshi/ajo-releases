@@ -42,6 +42,40 @@ public class MainActivity extends BridgeActivity {
      * second request either fails or gets a surface it cannot draw to. The result
      * is the exact symptom users report: audio plays, picture stays black.
      */
+
+    // v3.10.1: embed preflight — server-side error pages (Vercel "Application
+    // error", Cloudflare 52x, provider 502/503/504) load fine as far as the
+    // iframe is concerned (onLoad fires), so the WebView layer can't tell a
+    // dead player page from a working one. The React player preflights every
+    // embed URL here BEFORE mounting the iframe; an error page is skipped
+    // instantly and failover moves to the next mirror.
+    private static final String[] EMBED_ERROR_MARKERS = {
+        "Application error",          // Vercel 500 page (screenshot: "Digest: ...")
+        "server-side exception",      // Vercel body text
+        "Digest: ",                   // Vercel error digest id
+        "Error code 522",
+        "Error code 520",
+        "Error code 524",
+        "502 Bad Gateway",
+        "503 Service Unavailable",
+        "504 Gateway Timeout",
+        "Just a moment..."           // Cloudflare interstitial = bot-check loop
+    };
+
+    private static boolean embedPageLooksBroken(String body) {
+        if (body == null) return false;
+        for (String marker : EMBED_ERROR_MARKERS) {
+            if (body.contains(marker)) return true;
+        }
+        return false;
+    }
+
+    private static String base64UrlString(String raw) {
+        return android.util.Base64.encodeToString(
+                raw.getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                android.util.Base64.NO_WRAP | android.util.Base64.URL_SAFE);
+    }
+
     private void releaseWebVideoDecoder() {
         if (getBridge() == null || getBridge().getWebView() == null) return;
         WebView webView = getBridge().getWebView();
@@ -225,6 +259,66 @@ public class MainActivity extends BridgeActivity {
                     return true;
                 }
 
+                /**
+                 * v3.10.1: fetch an embed page's HTML (native side, no CORS
+                 * limits) and report whether it is a broken server-error page.
+                 * Result is delivered to window.__ajoEmbedPreflightResult(urlB64,
+                 * ok). React skips mirrors that come back broken and the next
+                 * server is tried instantly — no more frozen Vercel error
+                 * screens during movie streaming.
+                 */
+                @JavascriptInterface
+                public void preflightEmbed(final String url) {
+                    if (url == null || url.isEmpty()) return;
+                    new Thread(() -> {
+                        boolean ok = true;
+                        java.net.HttpURLConnection conn = null;
+                        try {
+                            java.net.URL u = new java.net.URL(url);
+                            conn = (java.net.HttpURLConnection) u.openConnection();
+                            conn.setConnectTimeout(8000);
+                            conn.setReadTimeout(8000);
+                            conn.setInstanceFollowRedirects(true);
+                            conn.setRequestProperty("User-Agent",
+                                    "Mozilla/5.0 (Linux; Android 13; Pixel 6) AppleWebKit/537.36 "
+                                            + "(KHTML, like Gecko) Chrome/120.0.6099.210 Mobile Safari/537.36");
+                            conn.setRequestProperty("Referer", "https://ajo.co.in/");
+                            conn.setRequestProperty("Accept", "text/html,*/*");
+                            int code = conn.getResponseCode();
+                            if (code >= 400) {
+                                ok = false;
+                            } else {
+                                java.io.InputStream in = conn.getInputStream();
+                                java.io.ByteArrayOutputStream buf = new java.io.ByteArrayOutputStream();
+                                byte[] chunk = new byte[8192];
+                                int n;
+                                int total = 0;
+                                while ((n = in.read(chunk)) != -1 && total < 200 * 1024) {
+                                    buf.write(chunk, 0, n);
+                                    total += n;
+                                }
+                                in.close();
+                                ok = !embedPageLooksBroken(buf.toString("UTF-8"));
+                            }
+                        } catch (Throwable t) {
+                            ok = false; // unreachable host = broken mirror
+                        } finally {
+                            if (conn != null) { try { conn.disconnect(); } catch (Exception ignored) {} }
+                        }
+                        final boolean okFinal = ok;
+                        runOnUiThread(() -> {
+                            try {
+                                if (getBridge() != null && getBridge().getWebView() != null) {
+                                    getBridge().getWebView().evaluateJavascript(
+                                            "window.__ajoEmbedPreflightResult && window.__ajoEmbedPreflightResult('"
+                                                    + base64UrlString(url) + "'," + okFinal + ");",
+                                            null);
+                                }
+                            } catch (Exception ignored) {}
+                        });
+                    }).start();
+                }
+
                 /** True on Fire TV / Fire OS devices, where WebView video is unreliable. */
                 @JavascriptInterface
                 public boolean isFireTv() {
@@ -249,6 +343,13 @@ public class MainActivity extends BridgeActivity {
                 @JavascriptInterface
                 public boolean preferNative() {
                     return true;
+                }
+
+                // v3.11.1: cast remote control — forwards play/pause/seek/stop
+                // from the phone to the active native ExoPlayer surface.
+                @JavascriptInterface
+                public void nativePlayerCommand(final String cmd, final double arg) {
+                    PlayerActivity.dispatchRemoteCommand(cmd, arg);
                 }
 
                 @JavascriptInterface

@@ -99,6 +99,17 @@ export function normalizeTmdb(item, mediaType) {
 
 // ------------------------------------------------------------------ catalogs
 
+/** v3.11.0: recently released movies (TMDB now_playing) for the New Releases rail. */
+export async function getTmdbNowPlaying(limit = 20) {
+  try {
+    const data = await tmdb('/movie/now_playing', { region: 'IN', language: 'en-US' });
+    const list = Array.isArray(data?.results) ? data.results.slice(0, limit) : [];
+    return list.map(toTmdbItem).filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
 export async function getTmdbTrending(mediaType = 'all', window = 'week') {
   const key = `trend_${mediaType}_${window}`;
   let cached = cacheGet(key);

@@ -117,10 +117,12 @@ export function WorldwideFilterBar({ filters, onFilterChange, totalResults = nul
         display: 'flex',
         alignItems: 'center',
         gap: '8px',
-        overflowX: 'auto',
+        overflowX: 'auto', WebkitOverflowScrolling: 'touch', touchAction: 'pan-x pan-y',
         padding: '4px 2px',
         scrollbarWidth: 'none',
-        msOverflowStyle: 'none'
+        msOverflowStyle: 'none',
+        WebkitOverflowScrolling: 'touch',
+        touchAction: 'pan-x pan-y'
       }}>
         {/* Full Filter Modal Trigger Button */}
         <button
