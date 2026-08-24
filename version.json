@@ -1,38 +1,40 @@
 {
   "schemaVersion": 2,
-  "version": "3.11.0",
-  "versionCode": 80,
-  "releaseDate": "2026-08-24",
+  "version": "3.11.1",
+  "versionCode": 81,
+  "releaseDate": "2026-08-25",
   "phone": {
-    "version": "2.5.5",
-    "versionCode": 26,
+    "version": "3.3.1",
+    "versionCode": 50,
     "packageId": "com.ajo.phone",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "✨ Streamlined Clean Phone UI: Instant access to content rows",
-      "🔥 Direct HLS Stream Engine: Restored high-speed multi-audio Hindi/English/South streams for all movies & series",
-      "⚡ Fixed OTA Update: Direct zero-redirect updater"
+      "📺 All-Indian live TV: 3655 channels (Telugu, Tamil, Kannada, Malayalam, Bengali, Punjabi, Gujarati added — Star Sports regional, Sun TV, Zee regional + more)",
+      "🆕 Recently Released Movies rail (new theatrical titles)",
+      "⚡ Lighter & faster: hls.js loads on demand; main bundle 993KB → 401KB",
+      "🛡️ Embed preflight: broken provider pages auto-skipped during movie streaming (same fix as TV)",
+      "📡 Cast & Remote pairing with TV app"
     ],
-    "size_mb": "4.3 MB"
+    "size_mb": "3.3 MB",
+    "sha256": "ffae842a6c41f99705feedffac4bce84220b1bca4ec1eda4eefc2ccdd9626978"
   },
   "tv": {
-    "version": "3.11.0",
-    "versionCode": 80,
+    "version": "3.11.1",
+    "versionCode": 81,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "📺 All Indian TV: 3655 channels — added Telugu, Tamil, Kannada, Malayalam, Bengali, Punjabi & Gujarati playlists (Star Sports regional, Sun TV, Zee regional, Colors regional + more)",
-      "🆕 Recently Released Movies rail — fresh theatrical titles (Batwara 1947, Awarapan 2, ...) via TMDB now_playing",
-      "⚡ 35% lighter & faster boot: IPTV playlists no longer block startup; hls.js loads only when needed; app dropped 12.3MB → 7.1MB (stale bundles purged)",
-      "🛡️ Same OTA signature — installs in place over 3.10.1"
+      "📡 Cast & Remote FIXED: TV now always generates & displays a pairing room code in Settings → Cast & Remote (previously the TV never showed a code, so phones could not pair at all)",
+      "📱 Phone remote now controls the hardware player: play/pause/seek/stop forwarded to ExoPlayer via native bridge",
+      "🔒 Role & room hardening: TV always boots as the cast host regardless of device detection"
     ],
     "size_mb": "6.8 MB",
-    "sha256": "6408deb17614624412eca29a9a662eafd8395c021d81fdbddbbf0af6f96533bd"
+    "sha256": "45f00c32799c61bcbd5ced383ca7f10571b5a8f086f45131cc183cb12b3833b5"
   }
 }
