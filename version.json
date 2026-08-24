@@ -1,34 +1,38 @@
 {
   "schemaVersion": 2,
-  "version": "3.11.6",
-  "versionCode": 86,
+  "version": "3.12.0",
+  "versionCode": 87,
   "releaseDate": "2026-08-25",
   "phone": {
-    "version": "3.3.6",
-    "versionCode": 55,
+    "version": "3.3.7",
+    "versionCode": 56,
     "packageId": "com.ajo.phone",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "🔧 Cast engine identity hardening (same fix as TV app)"
+      "📺 Same Live TV rework as the TV app: verified channels only, Marathi / Hindi / English + sports, no duplicates, logos, faster buffering"
     ],
     "size_mb": "3.3 MB",
-    "sha256": "e86dca3274c51188b1b549163021bf17cbda973366a09cbee01ad55396d9e672"
+    "sha256": "df32a2fcce2d302d0eb82106e214df836a0e5e90a47a4c0b30d43638723d7669"
   },
   "tv": {
-    "version": "3.11.6",
-    "versionCode": 86,
+    "version": "3.12.0",
+    "versionCode": 87,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "🔧 FIXED: TV device identity — the TV now always registers itself as the TV, so your phone connects instantly (also fixes browser/test TVs)"
+      "📺 LIVE TV REWORK: channels now come from a checked server list — only channels that actually stream, only Marathi / Hindi / English + sports + news (no more regional languages or dead channels)",
+      "🧹 Duplicate channels removed — every channel appears once",
+      "🖼️ Logos for popular channels + smart initials badge for the rest",
+      "⚡ Faster channel start: quicker buffering & smoother switching",
+      "🚫 No ads — playback is direct and clean"
     ],
     "size_mb": "6.8 MB",
-    "sha256": "016ff6fca4b730be510ea94b693f8448c84ec380d9feb29af161db9ec922bb5f"
+    "sha256": "afa10b97e6e274ee7da8e4592cd4d1178d0e70c1ebff22f2e9fc4dafb9bb5dab"
   }
 }
