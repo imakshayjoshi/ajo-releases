@@ -1,11 +1,11 @@
 {
   "schemaVersion": 2,
-  "version": "3.12.0",
-  "versionCode": 87,
+  "version": "3.12.1",
+  "versionCode": 88,
   "releaseDate": "2026-08-25",
   "phone": {
-    "version": "3.3.7",
-    "versionCode": 56,
+    "version": "3.3.8",
+    "versionCode": 57,
     "packageId": "com.ajo.phone",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
@@ -15,24 +15,24 @@
       "📺 Same Live TV rework as the TV app: verified channels only, Marathi / Hindi / English + sports, no duplicates, logos, faster buffering"
     ],
     "size_mb": "3.3 MB",
-    "sha256": "df32a2fcce2d302d0eb82106e214df836a0e5e90a47a4c0b30d43638723d7669"
+    "sha256": "1db60c600a008ea17d61e6af65625454037e7319623e48b65f41423d6e20b907"
   },
   "tv": {
-    "version": "3.12.0",
-    "versionCode": 87,
+    "version": "3.12.1",
+    "versionCode": 88,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "📺 LIVE TV REWORK: channels now come from a checked server list — only channels that actually stream, only Marathi / Hindi / English + sports + news (no more regional languages or dead channels)",
+      "📺 LIVE TV REWORK: channels now come from a checked server list — only channels that actually stream, only Marathi / Hindi / English + sports & news (no regional languages, no dead channels)",
       "🧹 Duplicate channels removed — every channel appears once",
       "🖼️ Logos for popular channels + smart initials badge for the rest",
       "⚡ Faster channel start: quicker buffering & smoother switching",
       "🚫 No ads — playback is direct and clean"
     ],
     "size_mb": "6.8 MB",
-    "sha256": "afa10b97e6e274ee7da8e4592cd4d1178d0e70c1ebff22f2e9fc4dafb9bb5dab"
+    "sha256": "2ed816fbd388d96a9377876bfe25f562aecf27774735ddd50b72c3c1eff5ab8d"
   }
 }
