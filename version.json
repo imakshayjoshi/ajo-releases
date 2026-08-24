@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "version": "3.10.0",
-  "versionCode": 78,
+  "version": "3.10.1",
+  "versionCode": 79,
   "releaseDate": "2026-08-24",
   "phone": {
     "version": "2.5.5",
@@ -19,23 +19,19 @@
     "size_mb": "4.3 MB"
   },
   "tv": {
-    "version": "3.10.0",
-    "versionCode": 78,
+    "version": "3.10.1",
+    "versionCode": 79,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "\u26a1 Streaming Overhaul: removed 6 dead mirror providers (moviesapi, vidsrc.xyz/icu/cc, smashy, embed.su) \u2014 verified-alive mirrors (VidLink, AutoEmbed, 2Embed, VidSrc ME) now rank first",
-      "\ud83d\udee1\ufe0f Auto-Failover for Embeds: dead/blank mirrors now auto-skip after 12s instead of freezing forever",
-      "\ud83d\udcfa Fixed channel merging: 'Star Sports 2' no longer collapses into 'Star Sports' \u2014 all channels visible again",
-      "\ud83c\udfc6 Sports section expanded from 30 to 200 channels with live HD badges",
-      "\ud83c\udfaf Fixed Live TV: pruned dead IP mirrors, reordered verified-working primaries (Star Sports 2, Sony Max, SAB, SET)",
-      "\ud83c\udfae TV UX: Back closes the channel/server drawer first (no more losing your stream), search no longer traps focus, Backspace won't exit search",
-      "\ud83d\uddc2\ufe0f Playback position & focus restored exactly where you left off"
+      "\ud83d\udee1\ufe0f Fixed movie error page: embed mirrors are preflight-checked before playing \u2014 provider server-error pages (Vercel 'Application error') are auto-skipped, no more frozen white error screen",
+      "\ud83d\udcc0 Reordered mirrors: AutoEmbed & 2Embed first (VidLink Pro demoted after per-title 500 errors)",
+      "\u26a1 Same OTA signature \u2014 updates install in place"
     ],
-    "size_mb": "10.6 MB",
-    "sha256": "8f0a9bae3285ad8e01932a7fc3bb813c8c70c9a82e7de54da9fd2bf3bf4d4bf9"
+    "size_mb": "11.1 MB",
+    "sha256": "e3e72647199f98b376186c4a4609c88bae66fc63a3642c97c84c517e97b9b418"
   }
 }
