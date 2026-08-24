@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "version": "3.9.4",
-  "versionCode": 75,
+  "version": "3.9.5",
+  "versionCode": 76,
   "releaseDate": "2026-08-24",
   "phone": {
     "version": "2.5.5",
@@ -19,21 +19,21 @@
     "size_mb": "4.3 MB"
   },
   "tv": {
-    "version": "3.9.4",
-    "versionCode": 75,
+    "version": "3.9.5",
+    "versionCode": 76,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "📺 Added Sony SAB HD with multi-server high-speed backup streams",
-      "🏏 Added Sony Sports Ten 1, Ten 2, Ten 3 (Hindi), Ten 5, and Star Sports HD",
-      "🇮🇳 Added Complete All-India Channel Lineup (Hindi, Marathi, South, News, Entertainment, Movies)",
-      "⚡ Upgraded IPTV Cache Engine (v4) for instant live loading",
-      "🛠 Fixed player lifecycle: onPause/onResume prevents decoder thrashing on Fire TV remote events"
+      "🎯 Fixed Horizontal Scrolling: Smooth Fire TV D-Pad rail navigation without jumping or focus loss",
+      "🎬 Fixed Playback on All Servers: Seamless web embed & HLS streaming with zero TV not supported errors",
+      "📺 Strictly Organized Web Series vs Movies: Dedicated tabs with zero cross-contamination",
+      "⚡ Upgraded Streaming Engine: Integrated fast 1080p multi-server streaming resolvers (MoviesAPI, VidSrc ICU, Castle mirrors)",
+      "🇮🇳 Complete All-India Live Channels & Sports (Sony SAB HD, Sony Sports, Star Sports, Zee, Colors)"
     ],
-    "size_mb": "7.3 MB",
-    "sha256": "b32dd51786b3f520a2c8a4700e4d215f73855fcea0e571c5293727d8a9b06024"
+    "size_mb": "8.9 MB",
+    "sha256": "312322d91f00c184369245cab7f0e29f4c0e76087209d0952b46f72f779e5131"
   }
 }

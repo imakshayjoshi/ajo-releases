@@ -1,7 +1,28 @@
 const HLS_PATTERNS = [/\.m3u8(?:$|\?)/i, /\/getm3u8\//i, /\/getstream\//i, /\/live\//i, /\/playlist/i];
 const DASH_PATTERNS = [/\.mpd(?:$|\?)/i];
 const VIDEO_PATTERNS = [/\.(mp4|m4v|webm|mkv)(?:$|\?)/i];
-const EMBED_PATTERNS = [/apiplayer\.ru/i, /vidlink\.pro/i, /vidsrc\.to/i, /autoembed\.co/i, /\/embed\//i, /rasta428jem\.com/i, /\/play\//i, /vidsrc\.me/i];
+// v3.8.2: removed /\/play\//i — it misclassified direct playable streams
+// like https://host/play/stream.m3u8 as iframe embeds, which is what made
+// every movie show "Not supported on TV". Keep this list in sync with
+// nativePlayer.js EMBED_HOST_PATTERNS.
+const EMBED_PATTERNS = [
+  /apiplayer\.ru/i,
+  /vidlink\.pro/i,
+  /vidsrc\.to/i,
+  /vidsrc\.me/i,
+  /vidsrc\.cc/i,
+  /vidsrc\.icu/i,
+  /v2\.vidsrc\.me/i,
+  /autoembed\.co/i,
+  /\/embed\/?(\?|$)/i,
+  /rasta428jem\.com/i,
+  /humma429gix\.com/i,
+  /smashy\.stream/i,
+  /multiembed\.mov/i,
+  /2embed\.cc/i,
+  /embed\.su/i,
+  /moviesapi\.club/i
+];
 
 export function isSafeHttpUrl(value) {
   if (!value || typeof value !== 'string') return false;
@@ -110,6 +131,17 @@ export function generateUniversalServers(item, episodeInfo = null) {
   if (item.url) raw.push({ url: item.url, source: 'm3u8', quality: item.quality, name: item.server_name || 'Direct Stream' });
 
   const imdbId = extractImdbId(item);
+  let tmdbId = item.tmdb_id || (typeof item.id === 'number' && item.id > 0 ? item.id : null);
+  if (!tmdbId && typeof item.id === 'string') {
+    if (/^\d+$/.test(item.id)) {
+      tmdbId = Number(item.id);
+    } else if (item.id.startsWith('tmdb-')) {
+      const parts = item.id.split('-');
+      const candidate = parts[parts.length - 1];
+      if (/^\d+$/.test(candidate)) tmdbId = Number(candidate);
+    }
+  }
+
   const isSeries = item.category === 'serials'
     || item.type === 'series'
     || item.type === 'serial'
@@ -119,54 +151,131 @@ export function generateUniversalServers(item, episodeInfo = null) {
   const season = episodeInfo?.season_num || episodeInfo?.season || 1;
   const episode = episodeInfo?.episode_num || episodeInfo?.episode || 1;
 
-  if (imdbId) {
+  const targetId = tmdbId || imdbId;
+  if (targetId) {
     if (isSeries) {
       raw.push({
-        url: `https://vidlink.pro/tv/${imdbId}/${season}/${episode}`,
-        name: 'Server 1: VidLink Pro (Multi)',
+        url: `https://vidlink.pro/tv/${targetId}/${season}/${episode}`,
+        name: 'Server 1: VidLink Pro (Multi/Fast)',
         source: 'embed',
         quality: '1080p'
       });
       raw.push({
-        url: `https://autoembed.co/tv/imdb/${imdbId}?s=${season}&e=${episode}`,
-        name: 'Server 2: AutoEmbed Ultra (Hindi/Eng)',
+        url: tmdbId
+          ? `https://autoembed.co/tv/tmdb/${tmdbId}-${season}-${episode}`
+          : `https://autoembed.co/tv/imdb/${imdbId}?s=${season}&e=${episode}`,
+        name: 'Server 2: AutoEmbed Ultra (Multi-Audio)',
         source: 'embed',
         quality: '1080p'
       });
       raw.push({
-        url: `https://www.2embed.cc/embedtv/${imdbId}?s=${season}&e=${episode}`,
-        name: 'Server 3: 2Embed Cinema HD',
+        url: `https://v2.vidsrc.me/embed/tv?${tmdbId ? `tmdb=${tmdbId}` : `imdb=${imdbId}`}&season=${season}&episode=${episode}`,
+        name: 'Server 3: VidSrc ME (Reliable)',
         source: 'embed',
         quality: '1080p'
       });
       raw.push({
-        url: `https://v2.vidsrc.me/embed/tv?imdb=${imdbId}&season=${season}&episode=${episode}`,
-        name: 'Server 4: VidSrc Me (Backup)',
+        url: `https://vidsrc.cc/v2/embed/tv/${targetId}/${season}/${episode}`,
+        name: 'Server 4: VidSrc CC (HD)',
+        source: 'embed',
+        quality: '1080p'
+      });
+      raw.push({
+        url: `https://player.smashy.stream/tv/${targetId}?s=${season}&e=${episode}`,
+        name: 'Server 5: Smashy Stream (Fast)',
+        source: 'embed',
+        quality: '1080p'
+      });
+      raw.push({
+        url: `https://www.2embed.cc/embedtv/${targetId}?s=${season}&e=${episode}`,
+        name: 'Server 6: 2Embed Cinema HD',
+        source: 'embed',
+        quality: '1080p'
+      });
+      raw.push({
+        url: `https://multiembed.mov/?video_id=${targetId}&tmdb=${tmdbId ? 1 : 0}&s=${season}&e=${episode}`,
+        name: 'Server 7: MultiEmbed SuperStream',
+        source: 'embed',
+        quality: '1080p'
+      });
+      raw.push({
+        url: `https://embed.su/embed/tv/${targetId}/${season}/${episode}`,
+        name: 'Server 8: EmbedSU VIP',
+        source: 'embed',
+        quality: '1080p'
+      });
+      raw.push({
+        url: `https://moviesapi.club/tv/${targetId}-${season}-${episode}`,
+        name: 'Server 9: MoviesAPI Club (Hindi/Multi)',
+        source: 'embed',
+        quality: '1080p'
+      });
+      raw.push({
+        url: `https://vidsrc.icu/embed/tv/${targetId}/${season}/${episode}`,
+        name: 'Server 10: VidSrc ICU (HD Fast)',
         source: 'embed',
         quality: '1080p'
       });
     } else {
       raw.push({
-        url: `https://vidlink.pro/movie/${imdbId}`,
-        name: 'Server 1: VidLink Pro (Multi)',
+        url: `https://vidlink.pro/movie/${targetId}`,
+        name: 'Server 1: VidLink Pro (Multi/Fast)',
         source: 'embed',
         quality: '1080p'
       });
       raw.push({
-        url: `https://autoembed.co/movie/imdb/${imdbId}`,
-        name: 'Server 2: AutoEmbed Ultra (Hindi/Eng)',
+        url: tmdbId
+          ? `https://autoembed.co/movie/tmdb/${tmdbId}`
+          : `https://autoembed.co/movie/imdb/${imdbId}`,
+        name: 'Server 2: AutoEmbed Ultra (Multi-Audio)',
         source: 'embed',
         quality: '1080p'
       });
       raw.push({
-        url: `https://www.2embed.cc/embed/${imdbId}`,
-        name: 'Server 3: 2Embed Cinema HD',
+        url: `https://v2.vidsrc.me/embed/movie?${tmdbId ? `tmdb=${tmdbId}` : `imdb=${imdbId}`}`,
+        name: 'Server 3: VidSrc ME (Reliable)',
         source: 'embed',
         quality: '1080p'
       });
       raw.push({
-        url: `https://v2.vidsrc.me/embed/movie?imdb=${imdbId}`,
-        name: 'Server 4: VidSrc Me (Backup)',
+        url: `https://vidsrc.cc/v2/embed/movie/${targetId}`,
+        name: 'Server 4: VidSrc CC (HD)',
+        source: 'embed',
+        quality: '1080p'
+      });
+      raw.push({
+        url: `https://player.smashy.stream/movie/${targetId}`,
+        name: 'Server 5: Smashy Stream (Fast)',
+        source: 'embed',
+        quality: '1080p'
+      });
+      raw.push({
+        url: `https://www.2embed.cc/embed/${targetId}`,
+        name: 'Server 6: 2Embed Cinema HD',
+        source: 'embed',
+        quality: '1080p'
+      });
+      raw.push({
+        url: `https://multiembed.mov/?video_id=${targetId}&tmdb=${tmdbId ? 1 : 0}`,
+        name: 'Server 7: MultiEmbed SuperStream',
+        source: 'embed',
+        quality: '1080p'
+      });
+      raw.push({
+        url: `https://embed.su/embed/movie/${targetId}`,
+        name: 'Server 8: EmbedSU VIP',
+        source: 'embed',
+        quality: '1080p'
+      });
+      raw.push({
+        url: `https://moviesapi.club/movie/${targetId}`,
+        name: 'Server 9: MoviesAPI Club (Hindi/Multi)',
+        source: 'embed',
+        quality: '1080p'
+      });
+      raw.push({
+        url: `https://vidsrc.icu/embed/movie/${targetId}`,
+        name: 'Server 10: VidSrc ICU (HD Fast)',
         source: 'embed',
         quality: '1080p'
       });

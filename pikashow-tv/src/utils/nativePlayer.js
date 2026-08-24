@@ -29,7 +29,8 @@ const EMBED_HOST_PATTERNS = [
   /multiembed\.mov/i,
   /\/embed(\/|\?|$)/i,
   /2embed\.cc/i,
-  /embed\.su/i
+  /embed\.su/i,
+  /moviesapi\.club/i
 ];
 
 const DEAD_HOST_PATTERNS = [

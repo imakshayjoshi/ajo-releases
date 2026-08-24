@@ -308,11 +308,12 @@ export default function App() {
   // On Fire TV Stick 4K (1.5GB RAM) the iframe consumed ~150MB (Chromium
   // sub-renderer), competed for GPU with the WebView, and broke D-pad focus.
 
-  // All Movies combined (upstream catalog + TMDB popular, deduped by title)
+  // All Movies combined (upstream catalog + TMDB popular, strictly movies only)
   const allMovies = useMemo(() => {
     const seen = new Set();
     const merged = [];
     for (const item of [...bollywoodItems, ...hollywoodItems, ...tmdbMovies]) {
+      if (item.type === 'series' || item.type === 'serial' || item.category === 'serials' || item.category === 'Web Series') continue;
       const key = String(item.title_en || item.title || '').toLowerCase().trim();
       if (!key || seen.has(key)) continue;
       seen.add(key);
@@ -321,11 +322,12 @@ export default function App() {
     return merged;
   }, [bollywoodItems, hollywoodItems, tmdbMovies]);
 
-  // Series: upstream + TMDB, deduped
+  // Series: upstream + TMDB, strictly episodic/series only
   const allSeries = useMemo(() => {
     const seen = new Set();
     const merged = [];
     for (const item of [...seriesItems, ...tmdbSeries]) {
+      if (item.type === 'movie' && !item.episodes?.length) continue;
       const key = String(item.title_en || item.title || '').toLowerCase().trim();
       if (!key || seen.has(key)) continue;
       seen.add(key);

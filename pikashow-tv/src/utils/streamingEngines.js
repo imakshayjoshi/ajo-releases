@@ -5,7 +5,24 @@ const VIDEO_PATTERNS = [/\.(mp4|m4v|webm|mkv)(?:$|\?)/i];
 // like https://host/play/stream.m3u8 as iframe embeds, which is what made
 // every movie show "Not supported on TV". Keep this list in sync with
 // nativePlayer.js EMBED_HOST_PATTERNS.
-const EMBED_PATTERNS = [/apiplayer\.ru/i, /vidlink\.pro/i, /vidsrc\.to/i, /vidsrc\.me/i, /vidsrc\.cc/i, /v2\.vidsrc\.me/i, /autoembed\.co/i, /\/embed\/?(\?|$)/i, /rasta428jem\.com/i, /humma429gix\.com/i, /smashy\.stream/i, /multiembed\.mov/i, /2embed\.cc/i, /embed\.su/i];
+const EMBED_PATTERNS = [
+  /apiplayer\.ru/i,
+  /vidlink\.pro/i,
+  /vidsrc\.to/i,
+  /vidsrc\.me/i,
+  /vidsrc\.cc/i,
+  /vidsrc\.icu/i,
+  /v2\.vidsrc\.me/i,
+  /autoembed\.co/i,
+  /\/embed\/?(\?|$)/i,
+  /rasta428jem\.com/i,
+  /humma429gix\.com/i,
+  /smashy\.stream/i,
+  /multiembed\.mov/i,
+  /2embed\.cc/i,
+  /embed\.su/i,
+  /moviesapi\.club/i
+];
 
 export function isSafeHttpUrl(value) {
   if (!value || typeof value !== 'string') return false;
@@ -187,6 +204,18 @@ export function generateUniversalServers(item, episodeInfo = null) {
         source: 'embed',
         quality: '1080p'
       });
+      raw.push({
+        url: `https://moviesapi.club/tv/${targetId}-${season}-${episode}`,
+        name: 'Server 9: MoviesAPI Club (Hindi/Multi)',
+        source: 'embed',
+        quality: '1080p'
+      });
+      raw.push({
+        url: `https://vidsrc.icu/embed/tv/${targetId}/${season}/${episode}`,
+        name: 'Server 10: VidSrc ICU (HD Fast)',
+        source: 'embed',
+        quality: '1080p'
+      });
     } else {
       raw.push({
         url: `https://vidlink.pro/movie/${targetId}`,
@@ -235,6 +264,18 @@ export function generateUniversalServers(item, episodeInfo = null) {
       raw.push({
         url: `https://embed.su/embed/movie/${targetId}`,
         name: 'Server 8: EmbedSU VIP',
+        source: 'embed',
+        quality: '1080p'
+      });
+      raw.push({
+        url: `https://moviesapi.club/movie/${targetId}`,
+        name: 'Server 9: MoviesAPI Club (Hindi/Multi)',
+        source: 'embed',
+        quality: '1080p'
+      });
+      raw.push({
+        url: `https://vidsrc.icu/embed/movie/${targetId}`,
+        name: 'Server 10: VidSrc ICU (HD Fast)',
         source: 'embed',
         quality: '1080p'
       });

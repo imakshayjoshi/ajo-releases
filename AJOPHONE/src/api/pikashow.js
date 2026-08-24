@@ -1,8 +1,8 @@
 import { getIPTVChannels } from './iptv.js';
-import { generateUniversalServers } from '../utils/streamingEngines.js';
+import { isSafeHttpUrl } from '../utils/streamingEngines.js';
 
 const BASE_URL = 'https://mapi.elochkaigolochla.com/api/v1';
-const CACHE_KEY = 'ajo_catalog_v3';
+const CACHE_KEY = 'ajo_catalog_v5';
 const CACHE_TTL = 30 * 60 * 1000;
 let memoryCatalog = null;
 
@@ -32,27 +32,31 @@ export function normalizeMediaItem(item, category = 'movie') {
   title = String(title || '').trim();
   if (!title) return null;
 
-  const sources = generateUniversalServers(item);
-  let poster = item.poster_url || item.poster || item.logo || item.image || item.thumbnail || '';
+  const rawPlayers = Array.isArray(item.players) ? item.players
+    : Array.isArray(item.player) ? item.player : [];
+  
+  const firstUrl = rawPlayers[0]?.url || (typeof item.url === 'string' ? item.url : '') || (typeof item.stream_url === 'string' ? item.stream_url : '');
+  const hasPlayableSource = isSafeHttpUrl(firstUrl) || Boolean(item.tmdb_id || item.movie_id || item.imdb_id);
+
+  let poster = item.poster_url || item.poster || item.logo || '';
   if (typeof poster === 'object' && poster !== null) {
-    poster = poster.url || poster.src || '';
+    poster = poster.url || poster.src || poster.poster || '';
   }
-  poster = String(poster || '');
+  poster = String(poster || '').trim();
 
   let desc = item.description || item.overview || item.plot || '';
   if (typeof desc === 'object' && desc !== null) {
-    desc = desc.en || desc.text || '';
+    desc = desc.en || desc.ru || desc.text || '';
   }
-  desc = String(desc || '');
+  desc = String(desc || '').trim();
 
-  let yearStr = item.year || (live ? 'LIVE' : '');
-  if (typeof yearStr === 'object' && yearStr !== null) {
-    yearStr = yearStr.year || '';
+  let yearStr = null;
+  if (item.year && item.year !== 'LIVE') {
+    yearStr = String(item.year).trim();
   }
-  yearStr = String(yearStr || '');
 
   let ratingStr = '';
-  if (typeof item.ratings === 'object' && item.ratings !== null) {
+  if (item.ratings) {
     const rawR = item.ratings.imdb || item.ratings.kinopoisk || item.ratings.rating || '';
     if (typeof rawR === 'object' && rawR !== null) {
       ratingStr = String(rawR.rating || rawR.score || rawR.imdb || '');
@@ -64,6 +68,9 @@ export function normalizeMediaItem(item, category = 'movie') {
   }
   if (ratingStr === '[object Object]') ratingStr = '';
 
+  const rawType = String(item.type || '').toLowerCase();
+  const isSeries = rawType === 'serial' || rawType === 'series' || rawType === 'tv' || category === 'serials' || (Array.isArray(item.episodes) && item.episodes.length > 0);
+
   return {
     ...item,
     id: String(item.id || item.tmdb_id || item.kinopoisk_id || item.movie_id || `${category}:${title}`),
@@ -72,11 +79,11 @@ export function normalizeMediaItem(item, category = 'movie') {
     poster,
     poster_url: poster,
     backdrop_url: typeof item.backdrop_url === 'string' ? item.backdrop_url : poster,
-    url: sources[0]?.url || '',
-    stream_url: sources[0]?.url || '',
-    playable: sources.length > 0,
+    url: firstUrl,
+    stream_url: firstUrl,
+    playable: hasPlayableSource,
     is_live: live,
-    type: live ? 'live' : String(item.type || category),
+    type: live ? 'live' : isSeries ? 'series' : 'movie',
     category: (() => {
       let c = item.category || category;
       if (typeof c === 'object' && c !== null) {
@@ -92,8 +99,8 @@ export function normalizeMediaItem(item, category = 'movie') {
       }
       return c;
     })(),
-    players: sources,
-    player: sources,
+    players: rawPlayers.length > 0 ? rawPlayers : (firstUrl ? [{ name: 'Stream', url: firstUrl, source: 'hls', quality: 'Auto' }] : []),
+    player: rawPlayers.length > 0 ? rawPlayers : (firstUrl ? [{ name: 'Stream', url: firstUrl, source: 'hls', quality: 'Auto' }] : []),
     ratings: ratingStr ? { imdb: ratingStr } : null,
     rating: ratingStr,
     genres: Array.isArray(item.genres) ? item.genres.map(g => typeof g === 'object' ? g?.name || '' : String(g)) : [],
@@ -129,11 +136,22 @@ async function loadCatalog() {
     // Content filter: skip adult sections entirely (user-facing family app)
     if (/erotic|adult|porn|18\+|xxx/.test(name)) continue;
     for (const raw of section.movies || section.items || []) {
-      const category = name.includes('hollywood')
-        ? 'hollywood'
-        : name.includes('series') || name.includes('serial')
-        ? 'serials'
-        : 'bollywood';
+      const rawType = String(raw.type || '').toLowerCase();
+      const isRawSerial = rawType === 'serial' || rawType === 'series' || rawType === 'tv' || raw.is_serial || Array.isArray(raw.episodes);
+      const isRawMovie = rawType === 'movie' || raw.is_movie;
+
+      let category;
+      if (isRawSerial) {
+        category = 'serials';
+      } else if (isRawMovie) {
+        category = name.includes('hollywood') ? 'hollywood' : 'bollywood';
+      } else if (name.includes('hollywood')) {
+        category = 'hollywood';
+      } else if ((name.includes('series') || name.includes('serial') || name.includes('tv show')) && !name.includes('movie')) {
+        category = 'serials';
+      } else {
+        category = 'bollywood';
+      }
 
       const item = normalizeMediaItem(raw, category);
       const key = item ? String(item.id) + ':' + item.url : '';
@@ -166,18 +184,41 @@ export async function getLiveBroadcasts() {
     raw.push(...groups[1].value);
   }
 
-  // v3.9 CURATION: every source passes the same Marathi/Hindi/Sports filter —
-  // the VPS catalog previously re-introduced other-language feeds.
-  const { isBlockedChannelTitle } = await import('./iptv.js');
-  const seen = new Set();
-  return raw.flatMap((entry) => {
+  // v3.8.2: dedupe by URL, not by title. iptv-org carries many distinct
+  // channels whose display titles collide after lowercase ("Sony TV" etc),
+  // so title-keyed dedup silently dropped hundreds of real channels.
+  // URL is the identity of a channel; same URL = same channel.
+  // v3.9 CURATION: the VPS broadcast catalog must pass the SAME language
+  // filter as our playlists — previously it re-introduced Bangla/Telugu/
+  // Tamil feeds and floated unranked channels above the priority brands.
+  const { isBlockedChannelTitle, channelPriority } = await import('./iptv.js');
+  const seenMap = new Map();
+  raw.forEach((entry) => {
     const item = normalizeMediaItem(entry, 'live');
-    if (!item?.playable) return [];
-    if (isBlockedChannelTitle(item.title_en || item.title)) return [];
-    const key = (item?.id || item?.title || '').toString().toLowerCase();
-    if (!key || seen.has(key)) return [];
-    seen.add(key);
-    return [item];
+    if (!item?.playable) return;
+    const titleKey = String(item.title_en || item.title || '').trim().toLowerCase();
+    if (!titleKey || isBlockedChannelTitle(item.title_en || item.title)) return;
+    
+    if (seenMap.has(titleKey)) {
+      const existing = seenMap.get(titleKey);
+      if (item.players && item.players.length > 0) {
+        const newUrl = item.players[0].url;
+        // only add if this URL isn't already in the existing players list
+        if (!existing.players.some(p => p.url === newUrl)) {
+          existing.players.push(item.players[0]);
+          existing.player = existing.players;
+        }
+      }
+    } else {
+      seenMap.set(titleKey, item);
+    }
+  });
+  const merged = Array.from(seenMap.values());
+  return merged.sort((a, b) => {
+    const pa = channelPriority(a.title_en || a.title);
+    const pb = channelPriority(b.title_en || b.title);
+    if (pa !== pb) return pa - pb;
+    return String(a.title_en || a.title).localeCompare(String(b.title_en || b.title));
   });
 }
 
@@ -239,5 +280,6 @@ export async function getSeriesEpisodes(movieId) {
   }
 }
 
-export function getFallbackLiveChannels() { return []; }
+// Dead PikaShow vestiges removed in v3.9.0
 export function getFallbackCatalog() { return []; }
+export function getFallbackLiveChannels() { return []; }

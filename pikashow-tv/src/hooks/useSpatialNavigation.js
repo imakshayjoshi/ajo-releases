@@ -209,37 +209,46 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
   }, [getFocusableElements]);
 
   /**
-   * Focus + VERTICAL-ONLY scrolling.
-   * BUG FIX: scrollIntoView(inline:'nearest') was scrolling the whole
-   * .tv-main-content / body horizontally when a rail card received focus,
-   * shoving the entire UI off to the left where it stayed. Horizontal rails
-   * handle their own internal scrolling via CSS; we only ever correct the
-   * vertical position here, and force-reset any stray horizontal scroll.
+   * Focus + Smart Rail Horizontal & Vertical Scrolling.
+   * FIX: Never reset scrollLeft on horizontal scroll containers (.tv-rail-track),
+   * but smoothly scroll the rail so focused cards are always visible.
+   * Only enforce scrollLeft = 0 on the viewport/main scroll container.
    */
   const focusAndScroll = useCallback((el) => {
     try { el.focus({ preventScroll: true }); } catch { try { el.focus(); } catch (_) {} }
 
-    // Vertical alignment within the main scroll area
-    const scroller = el.closest('.tv-main-content') || document.querySelector('.tv-main-content');
-    try {
-      if (scroller) {
+    // 1. Horizontal alignment for rail containers (.tv-rail-track, .tv-filter-bar, etc.)
+    const horizontalContainer = el.closest('.tv-rail-track, .tv-filter-bar, .tv-header-nav, [data-horizontal-scroll="true"]');
+    if (horizontalContainer) {
+      try {
+        const er = el.getBoundingClientRect();
+        const hr = horizontalContainer.getBoundingClientRect();
+        const margin = 72; // Comfortable breathing room from rail edge
+        if (er.left < hr.left + margin) {
+          horizontalContainer.scrollLeft -= (hr.left + margin - er.left);
+        } else if (er.right > hr.right - margin) {
+          horizontalContainer.scrollLeft += (er.right - hr.right + margin);
+        }
+      } catch (_) {}
+    }
+
+    // 2. Vertical alignment within the main scroll area
+    const scroller = el.closest('.tv-main-content, .tv-modal-scroll') || document.querySelector('.tv-main-content');
+    if (scroller) {
+      try {
         const er = el.getBoundingClientRect();
         const sr = scroller.getBoundingClientRect();
-        if (er.top < sr.top + 8) {
-          scroller.scrollTop -= (sr.top + 8 - er.top);
-        } else if (er.bottom > sr.bottom - 8) {
-          scroller.scrollTop += (er.bottom - sr.bottom + 8);
+        if (er.top < sr.top + 24) {
+          scroller.scrollTop -= (sr.top + 24 - er.top);
+        } else if (er.bottom > sr.bottom - 24) {
+          scroller.scrollTop += (er.bottom - sr.bottom + 24);
         }
-      }
-    } catch (_) {}
+      } catch (_) {}
+    }
 
-    // Kill any horizontal drift on every ancestor (the actual bug)
+    // 3. Keep main layout body from horizontal drift (viewport-level only)
     try {
-      let node = el.parentElement;
-      while (node) {
-        if (node.scrollLeft !== 0) node.scrollLeft = 0;
-        node = node.parentElement;
-      }
+      if (scroller && scroller.scrollLeft !== 0) scroller.scrollLeft = 0;
       if (document.documentElement.scrollLeft !== 0) document.documentElement.scrollLeft = 0;
       if (document.body && document.body.scrollLeft !== 0) document.body.scrollLeft = 0;
     } catch (_) {}

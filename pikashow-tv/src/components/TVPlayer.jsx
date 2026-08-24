@@ -524,35 +524,13 @@ export function TVPlayer({
     };
   }, [streamUrl, isLive, videoEngine, nativeActive, handOffToNative, handleFailover]);
 
-  // Embed guard. Declared after the pipeline effect on purpose, so this message
-  // survives the setErrorMessage(null) that the pipeline does on start.
-  // v3.8.2: embed mirrors now render in the WebView iframe fallback (like the
-  // phone app) instead of erroring. The hard "not supported" error only fires
-  // when the CURRENT server is unusable AND no other server in the queue is
-  // either native-playable or an embed we can iframe.
+  // Auto-clear transient error messages after 3.5s
   useEffect(() => {
-    if (!streamUrl) return;
-    if (!shouldPreferNativePlayer()) return;
-    if (isNativePlayableUrl(streamUrl)) return;
-
-    const nextPlayable = orderedServers.findIndex(
-      (srv, idx) => idx > currentServerIndex && isNativePlayableUrl(srv?.url)
-    );
-
-    if (nextPlayable !== -1) {
-      setErrorMessage('This source cannot play on TV. Switching server...');
-      setCurrentServerIndex(nextPlayable);
-      setTimeout(() => setErrorMessage(null), 3000);
-      return;
+    if (errorMessage && !errorMessage.includes('Failed') && !errorMessage.includes('Error')) {
+      const t = setTimeout(() => setErrorMessage(null), 3500);
+      return () => clearTimeout(t);
     }
-
-    // Current source is an embed and no native-playable mirror remains.
-    // The WebView iframe fallback below renders it — don't kill playback.
-    setIsBuffering(false);
-    setErrorMessage('▶ Opening in web player...');
-    const t = setTimeout(() => setErrorMessage(null), 2500);
-    return () => clearTimeout(t);
-  }, [streamUrl, orderedServers, currentServerIndex]);
+  }, [errorMessage]);
 
   // Video Time Update & Progress
   const handleTimeUpdate = useCallback(() => {
@@ -1025,7 +1003,7 @@ export function TVPlayer({
 
           {/* Servers List */}
           {showDrawer === 'servers' && orderedServers.map((srv, idx) => {
-            const tvUnsupported = shouldPreferNativePlayer() && !isNativePlayableUrl(srv?.url);
+            const badgeText = srv.quality || (srv.source === 'embed' ? '1080p HD' : (srv.source?.toUpperCase() || 'HLS'));
             return (
               <button
                 key={srv.id || idx}
@@ -1038,8 +1016,8 @@ export function TVPlayer({
                 }}
               >
                 <span>{srv.name || `Server ${idx + 1}`}</span>
-                <span style={{ fontSize: '0.75rem', color: tvUnsupported ? '#f59e0b' : '#38bdf8' }}>
-                  {tvUnsupported ? 'Not supported on TV' : (srv.source?.toUpperCase() || 'HLS')}
+                <span style={{ fontSize: '0.75rem', color: '#38bdf8' }}>
+                  {badgeText}
                 </span>
               </button>
             );

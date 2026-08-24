@@ -2,7 +2,7 @@ import { getIPTVChannels } from './iptv.js';
 import { isSafeHttpUrl } from '../utils/streamingEngines.js';
 
 const BASE_URL = 'https://mapi.elochkaigolochla.com/api/v1';
-const CACHE_KEY = 'ajo_catalog_v3';
+const CACHE_KEY = 'ajo_catalog_v5';
 const CACHE_TTL = 30 * 60 * 1000;
 let memoryCatalog = null;
 
@@ -32,35 +32,31 @@ export function normalizeMediaItem(item, category = 'movie') {
   title = String(title || '').trim();
   if (!title) return null;
 
-  // v3.9.0 PERF FIX: don't compute full server mirrors at catalog load time.
-  // generateUniversalServers() was running regex + URL construction for every
-  // item in every catalog (hundreds of titles) on startup. Servers are now
-  // computed lazily at play time in App.jsx handleStartPlayback().
   const rawPlayers = Array.isArray(item.players) ? item.players
     : Array.isArray(item.player) ? item.player : [];
-  const firstUrl = rawPlayers[0]?.url || item.stream_url || item.url || '';
-  const hasPlayableSource = Boolean(firstUrl && isSafeHttpUrl(firstUrl)) ||
-    Boolean(item.imdb_id || item.tmdb_id || (typeof item.id === 'string' && (/^tt\d+/i.test(item.id) || item.id.startsWith('tmdb-'))));
-  let poster = item.poster_url || item.poster || item.logo || item.image || item.thumbnail || '';
+  
+  const firstUrl = rawPlayers[0]?.url || (typeof item.url === 'string' ? item.url : '') || (typeof item.stream_url === 'string' ? item.stream_url : '');
+  const hasPlayableSource = isSafeHttpUrl(firstUrl) || Boolean(item.tmdb_id || item.movie_id || item.imdb_id);
+
+  let poster = item.poster_url || item.poster || item.logo || '';
   if (typeof poster === 'object' && poster !== null) {
-    poster = poster.url || poster.src || '';
+    poster = poster.url || poster.src || poster.poster || '';
   }
-  poster = String(poster || '');
+  poster = String(poster || '').trim();
 
   let desc = item.description || item.overview || item.plot || '';
   if (typeof desc === 'object' && desc !== null) {
-    desc = desc.en || desc.text || '';
+    desc = desc.en || desc.ru || desc.text || '';
   }
-  desc = String(desc || '');
+  desc = String(desc || '').trim();
 
-  let yearStr = item.year || (live ? 'LIVE' : '');
-  if (typeof yearStr === 'object' && yearStr !== null) {
-    yearStr = yearStr.year || '';
+  let yearStr = null;
+  if (item.year && item.year !== 'LIVE') {
+    yearStr = String(item.year).trim();
   }
-  yearStr = String(yearStr || '');
 
   let ratingStr = '';
-  if (typeof item.ratings === 'object' && item.ratings !== null) {
+  if (item.ratings) {
     const rawR = item.ratings.imdb || item.ratings.kinopoisk || item.ratings.rating || '';
     if (typeof rawR === 'object' && rawR !== null) {
       ratingStr = String(rawR.rating || rawR.score || rawR.imdb || '');
@@ -71,6 +67,9 @@ export function normalizeMediaItem(item, category = 'movie') {
     ratingStr = String(item.rating);
   }
   if (ratingStr === '[object Object]') ratingStr = '';
+
+  const rawType = String(item.type || '').toLowerCase();
+  const isSeries = rawType === 'serial' || rawType === 'series' || rawType === 'tv' || category === 'serials' || (Array.isArray(item.episodes) && item.episodes.length > 0);
 
   return {
     ...item,
@@ -84,7 +83,7 @@ export function normalizeMediaItem(item, category = 'movie') {
     stream_url: firstUrl,
     playable: hasPlayableSource,
     is_live: live,
-    type: live ? 'live' : String(item.type || category),
+    type: live ? 'live' : isSeries ? 'series' : 'movie',
     category: (() => {
       let c = item.category || category;
       if (typeof c === 'object' && c !== null) {
@@ -137,11 +136,22 @@ async function loadCatalog() {
     // Content filter: skip adult sections entirely (user-facing family app)
     if (/erotic|adult|porn|18\+|xxx/.test(name)) continue;
     for (const raw of section.movies || section.items || []) {
-      const category = name.includes('hollywood')
-        ? 'hollywood'
-        : name.includes('series') || name.includes('serial')
-        ? 'serials'
-        : 'bollywood';
+      const rawType = String(raw.type || '').toLowerCase();
+      const isRawSerial = rawType === 'serial' || rawType === 'series' || rawType === 'tv' || raw.is_serial || Array.isArray(raw.episodes);
+      const isRawMovie = rawType === 'movie' || raw.is_movie;
+
+      let category;
+      if (isRawSerial) {
+        category = 'serials';
+      } else if (isRawMovie) {
+        category = name.includes('hollywood') ? 'hollywood' : 'bollywood';
+      } else if (name.includes('hollywood')) {
+        category = 'hollywood';
+      } else if ((name.includes('series') || name.includes('serial') || name.includes('tv show')) && !name.includes('movie')) {
+        category = 'serials';
+      } else {
+        category = 'bollywood';
+      }
 
       const item = normalizeMediaItem(raw, category);
       const key = item ? String(item.id) + ':' + item.url : '';
