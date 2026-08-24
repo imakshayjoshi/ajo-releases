@@ -1,36 +1,34 @@
 {
   "schemaVersion": 2,
-  "version": "3.11.5",
-  "versionCode": 85,
+  "version": "3.11.6",
+  "versionCode": 86,
   "releaseDate": "2026-08-25",
   "phone": {
-    "version": "3.3.5",
-    "versionCode": 54,
+    "version": "3.3.6",
+    "versionCode": 55,
     "packageId": "com.ajo.phone",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "🎬 One-press cast: press Play on TV anywhere — the app connects to your TV by itself",
-      "🧓 Removed the word \"Pair\" completely — one button: \"Connect to TV\". If you press Play on TV before connecting, it tells you exactly what to do"
+      "🔧 Cast engine identity hardening (same fix as TV app)"
     ],
     "size_mb": "3.3 MB",
-    "sha256": "e2a6d5ebdc220a77035ec9f258d57af7079759a852030ca42af5431cb689b0c7"
+    "sha256": "e86dca3274c51188b1b549163021bf17cbda973366a09cbee01ad55396d9e672"
   },
   "tv": {
-    "version": "3.11.5",
-    "versionCode": 85,
+    "version": "3.11.6",
+    "versionCode": 86,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "🎬 One-press casting: phone now auto-connects and auto-pairs — press Play on TV and it plays",
-      "🧓 Simple words everywhere: no more \"Pairing\" language — just \"Waiting for your phone\" / \"CONNECTED\""
+      "🔧 FIXED: TV device identity — the TV now always registers itself as the TV, so your phone connects instantly (also fixes browser/test TVs)"
     ],
     "size_mb": "6.8 MB",
-    "sha256": "4934585a2d40d83f7f3b1f8c25f1186235c863388aca4f0094f75e3cd6586481"
+    "sha256": "016ff6fca4b730be510ea94b693f8448c84ec380d9feb29af161db9ec922bb5f"
   }
 }
