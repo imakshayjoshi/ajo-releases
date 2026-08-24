@@ -1,7 +1,7 @@
 import { isFavoriteChannel } from './history.js';
 import { isSafeHttpUrl } from '../utils/streamingEngines.js';
 
-const CACHE_KEY = 'ajo_iptv_cache_v4'; // v4: Full India Lineup + Sony SAB, Sony Sports Ten, Star Sports & all regional feeds
+const CACHE_KEY = 'ajo_iptv_cache_v6';
 const CUSTOM_KEY = 'ajo_custom_m3u_v2';
 const JIOTV_KEY = 'ajo_jiotv_host_v2';
 const CACHE_TTL = 30 * 60 * 1000;

@@ -330,8 +330,8 @@ html, body, #root {
 
 .tv-card-live-poster {
   height: 120px;
-  object-fit: contain;
-  padding: 12px;
+  object-fit: cover;
+  padding: 0;
   background-color: #121824;
 }
 

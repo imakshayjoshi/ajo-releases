@@ -281,16 +281,17 @@ public class PlayerActivity extends AppCompatActivity {
     private final Runnable firstFrameWatchdog = new Runnable() {
         @Override
         public void run() {
-            if (firstFrameRendered || player == null || isWebEmbedMode) return;
-            if (!hasVideoTrack) return;
+            if (firstFrameRendered || isWebEmbedMode) return;
 
             Log.w(TAG, "NO_FIRST_FRAME after " + FIRST_FRAME_TIMEOUT_MS
-                    + "ms with a video track present. Retrying with software decoder/texture.");
+                    + "ms on server " + (currentServerIdx + 1) + "/" + serverQueue.size());
 
-            if (!softwareDecoderRetryDone) {
+            if (currentServerIdx + 1 < serverQueue.size()) {
+                failoverToNextServer();
+            } else if (!softwareDecoderRetryDone && hasVideoTrack) {
                 softwareDecoderRetryDone = true;
                 useTextureViewFallback = true;
-                resumePositionMs = isLive ? C.TIME_UNSET : player.getCurrentPosition();
+                resumePositionMs = isLive ? C.TIME_UNSET : (player != null ? player.getCurrentPosition() : C.TIME_UNSET);
                 Toast.makeText(PlayerActivity.this,
                         "Optimizing live video stream...",
                         Toast.LENGTH_SHORT).show();
@@ -659,10 +660,16 @@ public class PlayerActivity extends AppCompatActivity {
     private boolean isWebEmbedUrl(String url) {
         if (TextUtils.isEmpty(url)) return false;
         String lower = url.toLowerCase(java.util.Locale.US);
-        return lower.contains("/embed/") || lower.contains("/play/") || lower.contains("apiplayer.ru")
+        // Direct media streams must always be decoded by ExoPlayer
+        if (lower.contains(".m3u8") || lower.contains(".mp4") || lower.contains(".mpd")
+                || lower.contains("/getm3u8/") || lower.contains("/playlist") || lower.contains("master.m3u8")) {
+            return false;
+        }
+        return lower.contains("/embed/") || lower.contains("apiplayer.ru")
                 || lower.contains("vidlink.pro") || lower.contains("vidsrc") || lower.contains("autoembed.co")
                 || lower.contains("smashy.stream") || lower.contains("multiembed.mov") || lower.contains("rasta428jem.com")
-                || lower.contains("2embed.cc") || lower.contains("embed.su") || lower.contains("v2.vidsrc.me");
+                || lower.contains("2embed.cc") || lower.contains("embed.su") || lower.contains("v2.vidsrc.me")
+                || lower.contains("moviesapi.club");
     }
 
     private void playCurrentStream() {
