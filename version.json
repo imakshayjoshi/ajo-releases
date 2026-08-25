@@ -1,34 +1,38 @@
 {
   "schemaVersion": 2,
-  "version": "3.12.2",
-  "versionCode": 89,
+  "version": "3.12.3",
+  "versionCode": 90,
   "releaseDate": "2026-08-25",
   "phone": {
-    "version": "3.3.10",
-    "versionCode": 59,
+    "version": "3.3.11",
+    "versionCode": 60,
     "packageId": "com.ajo.phone",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "📱 FIXED (again): horizontal swiping in categories & filter bars now fully works on phone",
-      "⚡ Smoother scrolling everywhere"
+      "📱 FIXED: Update loop resolved",
+      "📱 FIXED: Sony and Star live sports channels restored",
+      "📱 FIXED: Web series playback errors resolved",
+      "⚡ Faster loading speeds"
     ],
     "size_mb": "3.3 MB",
     "sha256": "b522073bc3b5c5df94bd2979b1b75d2cb3870c7d27048836fbe70573b4b62a6a"
   },
   "tv": {
-    "version": "3.12.2",
-    "versionCode": 89,
+    "version": "3.12.3",
+    "versionCode": 90,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "📺 FIXED: CSS scrolling issues and UI alignment across grids",
-      "⚡ Faster UI responses"
+      "📺 FIXED: Update loop resolved",
+      "📺 FIXED: Sony and Star live sports channels restored",
+      "📺 FIXED: Web series playback errors resolved",
+      "⚡ Faster channel loading and failovers"
     ],
     "size_mb": "6.8 MB",
     "sha256": "2ed816fbd388d96a9377876bfe25f562aecf27774735ddd50b72c3c1eff5ab8d"
