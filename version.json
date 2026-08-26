@@ -1,42 +1,41 @@
 {
   "schemaVersion": 2,
-  "version": "3.12.3",
-  "versionCode": 90,
-  "releaseDate": "2026-08-25",
+  "version": "3.12.5",
+  "versionCode": 92,
+  "releaseDate": "2026-08-27",
   "phone": {
-    "version": "3.3.12",
-    "versionCode": 61,
+    "version": "3.3.13",
+    "versionCode": 62,
     "packageId": "com.ajo.phone",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "🖼️ Channel logos fixed (own-server delivery, no more CORS-blank logos)",
-      "📡 Same verified 2,409-channel list — regional/FM/radio junk removed",
-      "⚡ Dead channels auto-hidden for 6h after failure",
-      "📱 Horizontal swiping fix (previous release) included"
+      "🚀 Added new streaming providers (MultiEmbed, SuperEmbed, VidSrc ICU)",
+      "⚡ Performance optimizations: Virtual scrolling & image lazy loading",
+      "🔍 Search debouncing and smoother pagination",
+      "🛡️ Buffer and memory stability improvements"
     ],
     "size_mb": "3.3 MB",
-    "sha256": "3623478351fc03c14a5714dccb4bfbc9061df2ff7880ade676e23726779ae52e"
+    "sha256": "7c49b6cc520163ab66e7307c3d5d93b0b77d9934feb5711d02f40eec07a92736"
   },
   "tv": {
-    "version": "3.12.4",
-    "versionCode": 91,
+    "version": "3.12.5",
+    "versionCode": 92,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "🖼️ Channel logos now load via our own server — fixed the CORS block that kept many logos blank",
-      "📡 Refreshed channel list: 2,409 verified-live channels (222 dead logos removed, dead streams purged)",
-      "🧹 No more Tamil/Telugu/FM/radio channels — only Marathi/Hindi/English + sports/news",
-      "⚡ Channels that fail get remembered and hidden for 6h instead of showing dead tiles",
-      "📺 Clean Fit Mode + Resume Playback UI improvements",
-      "🎬 Movies catalog routed through our proxy (Recovered when upstream API recovers)"
+      "🎯 D-Pad Navigation fix: Resolved crash when searching with virtual keyboard",
+      "🚀 Multi-server auto-failovers added (AutoEmbed, 2Embed, VidSrc mirrors)",
+      "📺 Android 11+ / Fire OS 8+ Immersive Mode: Fixed navigation bars staying hidden",
+      "⚡ Memory optimization: 8MB HLS buffer limit to prevent OOM on 1.5GB Fire TV sticks",
+      "🕒 Resume playback UI & Continue Watching enhancements"
     ],
     "size_mb": "6.8 MB",
-    "sha256": "1492e88c8ef5a2b0d5db793f696a7e498d26cdfc157e79008d1880639ffac197"
+    "sha256": "b45e7b4a1821f47d1fb6fb8ebdd0330c97b316bc40501c21f168123f26bac83e"
   }
 }
