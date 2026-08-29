@@ -1,42 +1,44 @@
 {
   "schemaVersion": 2,
-  "version": "3.12.6",
-  "versionCode": 93,
+  "version": "3.12.7",
+  "versionCode": 94,
   "releaseDate": "2026-08-29",
   "phone": {
-    "version": "3.3.14",
-    "versionCode": 63,
+    "version": "3.3.15",
+    "versionCode": 64,
     "packageId": "com.ajo.phone",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
+      "🕒 Continue Watching & Resuming: Fixed progress saving on Back button, pause & unmount",
+      "📊 Visual Progress Bar: Continue Watching cards now display exact progress indicator",
       "📱 QR Code Pairing: Scan QR on TV screen with phone camera to connect instantly",
       "🔗 Deep link support: ajoapp://pair opens and auto-connects to your TV",
-      "🔄 Casting stability: Fixed drops after a few minutes of TV casting",
-      "⚡ Extended message guard from 60s to 300s for slow network reliability"
+      "🔄 Casting stability: Fixed drops after a few minutes of TV casting"
     ],
     "size_mb": "3.3 MB",
-    "sha256": "cb31b76fe8954c8b34684754c14809bea5f38cfaca2124132977ef38613d29a8"
+    "sha256": "a7ae02611fb72d6f314129cdd5bdfce4bae22291f9c7d9fe8c480f505f159ff5"
   },
   "tv": {
-    "version": "3.12.6",
-    "versionCode": 93,
+    "version": "3.12.7",
+    "versionCode": 94,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
+      "🕒 Continue Watching & Resuming: Fixed resume position saving on remote Back button, native hardware player and web player",
+      "📊 Visual Progress Bar: Continue Watching rail cards display sleek progress indicators",
       "📺 Sony Sports 1/2/3 now appear in Sports tab (fixed missing category)",
       "📺 Sony SAB, Sony Pix TV, Sony TV added with guaranteed stream fallbacks",
       "📡 Sony Ten 1/2/3, Star Sports 1/2, DD Sports added to Sports tab",
-      "📱 QR Code: TV Settings shows scannable QR code for instant phone pairing",
-      "🔄 Casting stability: Fixed drops after a few minutes (Fire TV fullscreen bug)",
-      "⚡ Extended message guard from 60s to 300s for slow network reliability"
+      "📱 QR Code: TV Settings displays scannable QR code for instant phone pairing",
+      "🔄 Casting stability: Fixed drops after a few minutes (Fire TV fullscreen bug)"
     ],
     "size_mb": "6.8 MB",
-    "sha256": "b84dec27d5c73aa59b960b99bb778ea9ff2508725ca49fe2c33d458e30ccb4bf"
+    "sha256": "7c6419e8948ac55337fce15878a4974cae16ddd966e3595adb37033726e47d95"
   }
 }
