@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "version": "3.12.10",
-  "versionCode": 97,
+  "version": "3.12.11",
+  "versionCode": 98,
   "releaseDate": "2026-08-30",
   "phone": {
     "version": "3.3.16",
@@ -22,19 +22,20 @@
     "sha256": "47d86eba095b0187b93ee1c7cc23542b98393a4818d7561a0e139b85d35c55d5"
   },
   "tv": {
-    "version": "3.12.10",
-    "versionCode": 97,
+    "version": "3.12.11",
+    "versionCode": 98,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
+      "🚀 Primary Stream Engines Updated: Promoted active VidSrc PM & VidSrc IO mirrors to Server 1 & Server 2",
       "📺 Fixed Mirror Banner: Completely removed persistent 'Checking mirror availability...' text state banner",
       "📺 Sub TV & SAB TV Added: Sub TV added explicitly to built-in Indian channel lineup alongside Sony SAB and SAB HD",
       "📻 Remote OK/Enter EPG Drawer: Pressing OK during live channel streaming opens the Live EPG Now/Next Guide overlay"
     ],
     "size_mb": "6.8 MB",
-    "sha256": "cc54cc0e9ba4fffb70cefe7818ebbb41454fd9562a3d899a0027564637cb0407"
+    "sha256": "2dd533d35ed46615f6961a0c447cf867174e8deca09dcbb6921ec2c6c41209b8"
   }
 }
