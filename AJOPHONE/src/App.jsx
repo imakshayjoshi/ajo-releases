@@ -57,6 +57,39 @@ export default function App() {
       clearInterval(updateInterval);
     };
   }, []);
+
+  // QR Code deep-link handler: ajoapp://pair?code=AJO-XXXX
+  // When the user scans the TV QR code with their phone camera, Android opens
+  // this app via the custom scheme intent. We read the code and auto-connect.
+  useEffect(() => {
+    function handleDeepLink(url) {
+      if (!url) return;
+      try {
+        const u = new URL(url);
+        const code = u.searchParams.get('code');
+        if (code && code.startsWith('AJO-')) {
+          import('./api/castSync').then(({ castEngine, setPairingRoom }) => {
+            const room = setPairingRoom(code);
+            castEngine.updateRoom(room);
+            setActiveTab('remote');
+          }).catch(() => {});
+        }
+      } catch {}
+    }
+
+    // Capacitor/Android WebView injects the intent URI into window.location
+    // when the Activity is started fresh via a custom-scheme link.
+    handleDeepLink(window.location.href);
+
+    // Handle resume via window.postMessage (Capacitor runtime fires this for
+    // singleTask activities receiving a new intent while already running).
+    const onMessage = (e) => {
+      if (e?.data?.type === 'appUrlOpen') handleDeepLink(e.data.url);
+    };
+    window.addEventListener('message', onMessage);
+    return () => window.removeEventListener('message', onMessage);
+  }, []);
+
   
   // Catalogs & Favorites
   const [continueWatching, setContinueWatching] = useState([]);
@@ -100,10 +133,27 @@ export default function App() {
     }
   }, [activeTab]);
 
+  // Keep Continue Watching reactive to history updates from anywhere in the app
+  useEffect(() => {
+    const handleHistoryUpdate = () => {
+      const history = getWatchHistory() || [];
+      setContinueWatching(history);
+      getBecauseYouWatched(history).then(recs => {
+        setBecauseYouWatched(recs || []);
+      }).catch(() => {});
+    };
+    window.addEventListener('ajo-watch-history-updated', handleHistoryUpdate);
+    return () => window.removeEventListener('ajo-watch-history-updated', handleHistoryUpdate);
+  }, []);
+
   // Handle hardware Android back button
   useEffect(() => {
     const handlePopState = (e) => {
       if (activePlayback) {
+        const video = document.querySelector('video');
+        if (video && video.currentTime > 5 && video.duration > 0) {
+          saveProgress(activePlayback.item, video.currentTime, video.duration);
+        }
         setActivePlayback(null);
         setContinueWatching(getWatchHistory());
       } else if (selectedItem) {
@@ -114,7 +164,7 @@ export default function App() {
     };
 
     const handleKeyDown = (e) => {
-      if (e.key === 'Escape' || e.key === 'GoBack' || e.key === 'Backspace' && e.target === document.body) {
+      if (e.key === 'Escape' || e.key === 'GoBack' || (e.key === 'Backspace' && e.target === document.body)) {
         handlePopState();
       }
     };
@@ -331,10 +381,13 @@ export default function App() {
     }
   }, [handleStartPlayback]);
 
-  const handleClosePlayer = useCallback(() => {
+  const handleClosePlayer = useCallback((lastTime, duration) => {
+    if (activePlayback && typeof lastTime === 'number' && lastTime > 5 && duration > 0) {
+      saveProgress(activePlayback.item, lastTime, duration);
+    }
     setActivePlayback(null);
     setContinueWatching(getWatchHistory());
-  }, []);
+  }, [activePlayback]);
 
   // Zero-Duplication Slices for Home Feed
   const topPicksItems = useMemo(() => {

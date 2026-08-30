@@ -105,6 +105,26 @@ export const LandscapeMediaCard = React.memo(function LandscapeMediaCard({ item,
         >
           <span>{provider.icon}</span>
         </div>
+
+        {/* Continue Watching Progress Bar */}
+        {typeof item.percentage === 'number' && item.percentage > 0 && !isLive && (
+          <div style={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: '4px',
+            background: 'rgba(0, 0, 0, 0.75)',
+            zIndex: 6
+          }}>
+            <div style={{
+              width: `${Math.min(100, Math.max(2, item.percentage))}%`,
+              height: '100%',
+              background: '#38bdf8',
+              boxShadow: '0 0 6px #38bdf8'
+            }} />
+          </div>
+        )}
       </div>
 
       <div className="mobile-landscape-info" style={{ marginTop: '6px', padding: '0 2px' }}>

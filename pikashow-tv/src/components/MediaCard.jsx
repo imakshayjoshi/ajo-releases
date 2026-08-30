@@ -100,26 +100,48 @@ export function MediaCard({ item, onClick, isLive = false }) {
       className="tv-card"
       onClick={() => onClick && onClick(item)}
     >
-      <img
-        src={poster || fallbackPoster}
-        alt={title}
-        className={isLive ? 'tv-card-poster tv-card-live-poster' : 'tv-card-poster'}
-        loading="lazy"
-        onError={(e) => {
-          e.target.src = fallbackPoster;
-        }}
-      />
+      <div style={{ position: 'relative', width: '100%', overflow: 'hidden', borderRadius: '8px' }}>
+        <img
+          src={poster || fallbackPoster}
+          alt={title}
+          className={isLive ? 'tv-card-poster tv-card-live-poster' : 'tv-card-poster'}
+          loading="lazy"
+          onError={(e) => {
+            e.target.src = fallbackPoster;
+          }}
+        />
+        {typeof item.percentage === 'number' && item.percentage > 0 && !isLive && (
+          <div style={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: '4px',
+            background: 'rgba(0, 0, 0, 0.75)',
+            zIndex: 2
+          }}>
+            <div style={{
+              width: `${Math.min(100, Math.max(2, item.percentage))}%`,
+              height: '100%',
+              background: '#e50914',
+              boxShadow: '0 0 6px #e50914'
+            }} />
+          </div>
+        )}
+      </div>
 
       <div className="tv-card-info">
         <span className="tv-card-title">{title}</span>
         <div className="tv-card-meta">
           {isLive ? (
             <span className="tv-badge-live">LIVE</span>
+          ) : typeof item.percentage === 'number' && item.percentage > 0 ? (
+            <span style={{ color: '#38bdf8', fontWeight: 700 }}>Resume {item.percentage}%</span>
           ) : (
             <span style={{ color: '#94a3b8' }}>{category}</span>
           )}
 
-          {Boolean(rating) && (
+          {Boolean(rating) && !item.percentage && (
             <span className="tv-badge-rating">
               <Star size={11} fill="#f59e0b" color="#f59e0b" />
               <span>{rating}</span>

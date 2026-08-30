@@ -1,8 +1,21 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { Play, Star, Calendar, Clock, X, Server, Tv } from 'lucide-react';
+import { Play, Star, Calendar, Clock, X, Server, Tv, RotateCcw } from 'lucide-react';
 import { getSeriesEpisodes } from '../api/pikashow';
 import { generateUniversalServers } from '../utils/streamingEngines';
 import { hasNativePlayer, playInNativePlayer } from '../utils/nativePlayer';
+import { getWatchHistory, deleteHistoryItem, getWatchProgress } from '../api/history';
+
+function formatTime(seconds) {
+  if (!seconds || isNaN(seconds) || !isFinite(seconds)) return '00:00';
+  const total = Math.floor(seconds);
+  const hrs = Math.floor(total / 3600);
+  const mins = Math.floor((total % 3600) / 60);
+  const secs = total % 60;
+  if (hrs > 0) {
+    return `${hrs}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  }
+  return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+}
 
 export function MediaDetailsModal({ item, onClose, onStartPlayback }) {
   if (!item) return null;
@@ -40,6 +53,11 @@ export function MediaDetailsModal({ item, onClose, onStartPlayback }) {
     : 'Enjoy streaming in crystal clear High Definition with multi-language audio support.';
 
   const isSeries = item.category === 'serials' || item.type === 'series' || item.type === 'serial';
+  const isLive = item?.is_live || item?.type === 'live' || item?.year === 'LIVE';
+
+  const watchProgress = useMemo(() => {
+    return getWatchProgress(item);
+  }, [item]);
 
   // Compute available servers
   const servers = useMemo(() => {
@@ -104,11 +122,24 @@ export function MediaDetailsModal({ item, onClose, onStartPlayback }) {
               <Clock size={14} /> {duration}
             </span>
             <span style={{ background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', padding: '2px 8px', borderRadius: 4, fontWeight: 700 }}>
-              {isSeries ? 'TV SERIES' : 'MOVIE'}
+              {isSeries ? 'TV SERIES' : isLive ? 'LIVE TV' : 'MOVIE'}
             </span>
           </div>
 
           <p className="tv-modal-desc">{description}</p>
+
+          {/* Resume Progress Bar */}
+          {watchProgress && (
+            <div style={{ marginBottom: 16, background: 'rgba(56, 189, 248, 0.08)', border: '1px solid rgba(56, 189, 248, 0.25)', borderRadius: 8, padding: '10px 14px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#94a3b8', marginBottom: 6 }}>
+                <span style={{ color: '#38bdf8', fontWeight: 700 }}>Resume Playback</span>
+                <span>{formatTime(watchProgress.currentTime)} / {formatTime(watchProgress.duration)} ({watchProgress.percentage}%)</span>
+              </div>
+              <div style={{ height: 4, background: 'rgba(255, 255, 255, 0.1)', borderRadius: 2, overflow: 'hidden' }}>
+                <div style={{ width: `${watchProgress.percentage}%`, height: '100%', background: '#38bdf8', borderRadius: 2 }} />
+              </div>
+            </div>
+          )}
 
           {/* Available Servers Selector */}
           {servers.length > 1 && (
@@ -157,10 +188,31 @@ export function MediaDetailsModal({ item, onClose, onStartPlayback }) {
 
           {/* Action Buttons */}
           <div className="tv-modal-actions">
-            <button className="tv-btn-primary" tabIndex={0} onClick={() => handlePlay()}>
-              <Play size={18} fill="#07090e" />
-              <span>Watch Now</span>
-            </button>
+            {watchProgress ? (
+              <>
+                <button className="tv-btn-primary" tabIndex={0} onClick={() => handlePlay()}>
+                  <Play size={18} fill="#07090e" />
+                  <span>Resume ({formatTime(watchProgress.currentTime)})</span>
+                </button>
+                <button
+                  className="tv-btn-secondary"
+                  tabIndex={0}
+                  onClick={() => {
+                    deleteHistoryItem(item);
+                    handlePlay();
+                  }}
+                  style={{ borderColor: 'rgba(255, 255, 255, 0.2)' }}
+                >
+                  <RotateCcw size={18} />
+                  <span>Restart</span>
+                </button>
+              </>
+            ) : (
+              <button className="tv-btn-primary" tabIndex={0} onClick={() => handlePlay()}>
+                <Play size={18} fill="#07090e" />
+                <span>{isLive ? 'Watch Live' : 'Watch Now'}</span>
+              </button>
+            )}
 
             <button
               className="tv-btn-secondary"
@@ -169,9 +221,6 @@ export function MediaDetailsModal({ item, onClose, onStartPlayback }) {
                 const srv = servers[selectedServer] || servers[0];
                 const streamUrl = srv?.url || srv?.src || '';
                 if (!streamUrl) return;
-                // Direct native handoff — skips the WebView video pipeline entirely.
-                // Pass the full server queue so the native activity can fail over
-                // automatically when the first mirror is dead.
                 const fallbacks = servers
                   .filter((_, i) => i !== selectedServer)
                   .map((s) => s?.url)

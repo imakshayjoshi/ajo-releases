@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { getBollywoodCatalog, getHollywoodCatalog, getSerialsCatalog, getLiveBroadcasts } from './api/pikashow';
 import { getLiveSportsEvents } from './api/sports';
-import { getWatchHistory, saveProgress } from './api/history';
+import { getWatchHistory, saveProgress, getWatchProgress } from './api/history';
 import { checkForAppUpdates } from './api/otaUpdate';
 import { getTmdbTrending, getTmdbCatalog, getTmdbNowPlaying, getBecauseYouWatched } from './api/tmdb';
 import { getRankedServers } from './api/mirrorHealth';
@@ -46,6 +46,8 @@ export default function App() {
 
   // Active Modals / Player
   const [selectedItem, setSelectedItem] = useState(null);
+  const selectedItemRef = useRef(null);
+  useEffect(() => { selectedItemRef.current = selectedItem; }, [selectedItem]);
   const [activePlayback, setActivePlayback] = useState(null); // { item, server, episodes, episodeIndex }
   const [otaPrompt, setOtaPrompt] = useState(null);
   const [downloadProgress, setDownloadProgress] = useState(null);
@@ -251,7 +253,9 @@ export default function App() {
     const isLiveItem = Boolean(item?.is_live || item?.type === 'live' || item?.year === 'LIVE');
     if (url && shouldPreferNativePlayer()) {
       const title = item?.title_en || item?.title || item?.name || 'Video Stream';
-      if (playInNativePlayer(url, title, isLiveItem, allServers)) return;
+      const progress = getWatchProgress(resolvedItem);
+      const startMs = progress && progress.currentTime ? progress.currentTime * 1000 : 0;
+      if (playInNativePlayer(url, title, isLiveItem, allServers, startMs)) return;
     }
 
     setActivePlayback({ item: resolvedItem, server: selectedSrv, allServers, episodes, episodeIndex });
@@ -259,7 +263,7 @@ export default function App() {
 
   // Close player and save progress
   const handleClosePlayer = useCallback((lastTime, duration) => {
-    if (activePlayback && lastTime > 10) {
+    if (activePlayback && typeof lastTime === 'number' && lastTime > 5 && duration > 0) {
       saveProgress(activePlayback.item, lastTime, duration);
       setContinueWatching(getWatchHistory() || []);
     }
@@ -277,7 +281,10 @@ export default function App() {
     // position. TVPlayer's own keydown handler performs the close.
     if (activePlayback && window.__ajoPlayerDrawerOpen) return;
     if (activePlayback) {
-      handleClosePlayer(0, 0);
+      const video = document.querySelector('video');
+      const curTime = video ? (video.currentTime || 0) : 0;
+      const dur = video ? (video.duration || 0) : 0;
+      handleClosePlayer(curTime, dur);
       return;
     }
     if (selectedItem) {

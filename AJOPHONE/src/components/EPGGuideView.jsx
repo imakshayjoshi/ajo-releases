@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Tv, 
   Play, 
@@ -23,6 +23,14 @@ export function EPGGuideView({ channels = [], onSelectChannel }) {
   const [channelData, setChannelData] = useState([]);
   const [favRefreshCount, setFavRefreshCount] = useState(0);
   const [castAlert, setCastAlert] = useState(null);
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const clockRef = useRef(null);
+
+  // Refresh clock every 30s to keep NOW/NEXT labels accurate
+  useEffect(() => {
+    clockRef.current = setInterval(() => setCurrentTime(new Date()), 30000);
+    return () => clearInterval(clockRef.current);
+  }, []);
 
   const categories = [
     '⭐ Favorites',
@@ -220,11 +228,12 @@ export function EPGGuideView({ channels = [], onSelectChannel }) {
         zIndex: 25,
         display: 'flex',
         gap: '8px',
-        overflowX: 'auto', WebkitOverflowScrolling: 'touch', touchAction: 'pan-x pan-y',
+        overflowX: 'auto',
+        WebkitOverflowScrolling: 'touch',
+        touchAction: 'pan-x pan-y',
         paddingBottom: '12px',
         marginBottom: '12px',
-        scrollbarWidth: 'none',
-        WebkitOverflowScrolling: 'touch'
+        scrollbarWidth: 'none'
       }}>
         {categories.map(cat => {
           const isSelected = selectedCategory === cat;
@@ -362,16 +371,29 @@ export function EPGGuideView({ channels = [], onSelectChannel }) {
                     <span style={{ color: '#4ade80' }}>24/7 LIVE HD</span>
                   </div>
 
-                  <span style={{
-                    fontSize: '12px',
-                    color: '#cbd5e1',
-                    fontWeight: 600,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap'
-                  }}>
-                    {currentProg?.title || 'Live Satellite Broadcast Stream'}
-                  </span>
+                  {/* Now Playing */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <span style={{ fontSize: '9px', fontWeight: 900, color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.5px', flexShrink: 0 }}>NOW</span>
+                    <span style={{
+                      fontSize: '12px',
+                      color: '#cbd5e1',
+                      fontWeight: 600,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap'
+                    }}>
+                      {currentProg?.title || 'Live Broadcast'}
+                    </span>
+                  </div>
+                  {/* Next Program */}
+                  {ch.epg?.next && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <span style={{ fontSize: '9px', fontWeight: 900, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', flexShrink: 0 }}>NEXT</span>
+                      <span style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {ch.epg.next.startTimeFormatted} · {ch.epg.next.title}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Favorite Heart + Cast to TV + Play Icon */}

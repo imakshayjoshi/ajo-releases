@@ -158,67 +158,89 @@ export function generateUniversalServers(item, episodeInfo = null) {
   const targetId = tmdbId || imdbId;
   if (targetId) {
     if (isSeries) {
-      // v3.10.0 FIX: removed DEAD providers (moviesapi.club, vidsrc.xyz,
-      // vidsrc.icu, smashy.stream, embed.su, vidsrc.cc, multiembed.mov all
-      // NXDOMAIN / DNS-poisoned / TLS-blocked as of 2026-08-24) and ranked
-      // the verified-alive mirrors first. VPS mirror-health ranking in
-      // App.jsx re-sorts these further by live latency.
       raw.push({
         url: tmdbId
-          ? `https://autoembed.co/tv/tmdb/${tmdbId}-${season}-${episode}`
-          : `https://autoembed.co/tv/imdb/${imdbId}?s=${season}&e=${episode}`,
-        name: 'Server 1: AutoEmbed Ultra (Multi-Audio)',
+          ? `https://vidsrc.net/embed/tv?tmdb=${tmdbId}&season=${season}&episode=${episode}`
+          : `https://vidsrc.net/embed/tv?imdb=${imdbId}&season=${season}&episode=${episode}`,
+        name: 'Server 1: VidSrc Net (Reliable)',
         source: 'embed',
         quality: '1080p'
       });
       raw.push({
-        url: `https://www.2embed.cc/embedtv/${targetId}?s=${season}&e=${episode}`,
-        name: 'Server 2: 2Embed Cinema HD',
+        url: `https://embed.su/embed/tv/${targetId}/${season}/${episode}`,
+        name: 'Server 2: Embed SU (Fast)',
         source: 'embed',
         quality: '1080p'
       });
       raw.push({
-        url: `https://vidlink.pro/tv/${targetId}/${season}/${episode}`,
-        name: 'Server 3: VidLink Pro (Multi/Fast)',
+        url: `https://vidsrc.in/embed/tv?${tmdbId ? `tmdb=${tmdbId}` : `imdb=${imdbId}`}&season=${season}&episode=${episode}`,
+        name: 'Server 3: VidSrc IN (Backup)',
         source: 'embed',
         quality: '1080p'
       });
       raw.push({
         url: `https://v2.vidsrc.me/embed/tv?${tmdbId ? `tmdb=${tmdbId}` : `imdb=${imdbId}`}&season=${season}&episode=${episode}`,
-        name: 'Server 4: VidSrc ME (Reliable)',
+        name: 'Server 4: VidSrc ME (Fallback)',
         source: 'embed',
         quality: '1080p'
       });
+      // v3.12.4: H2/H3 fix — autoembed.co and 2embed.cc use query-string
+      // format for series (not dash-delimited paths, which return 404).
+      if (imdbId) {
+        raw.push({
+          url: `https://autoembed.co/tv/imdb/${imdbId}?s=${season}&e=${episode}`,
+          name: 'Server 5: AutoEmbed (No CF)',
+          source: 'embed',
+          quality: '1080p'
+        });
+        raw.push({
+          url: `https://www.2embed.cc/embedtv/${imdbId}?s=${season}&e=${episode}`,
+          name: 'Server 6: 2Embed (No CF)',
+          source: 'embed',
+          quality: '1080p'
+        });
+      }
     } else {
-      // v3.10.1: AutoEmbed/2Embed first — VidLink's TMDB movie route has
-      // been throwing Vercel 500 "Application error" pages on some titles
-      // (per-title backend failure), so it is demoted to Server 3.
       raw.push({
         url: tmdbId
-          ? `https://autoembed.co/movie/tmdb/${tmdbId}`
-          : `https://autoembed.co/movie/imdb/${imdbId}`,
-        name: 'Server 1: AutoEmbed Ultra (Multi-Audio)',
+          ? `https://vidsrc.net/embed/movie?tmdb=${tmdbId}`
+          : `https://vidsrc.net/embed/movie?imdb=${imdbId}`,
+        name: 'Server 1: VidSrc Net (Reliable)',
         source: 'embed',
         quality: '1080p'
       });
       raw.push({
-        url: `https://www.2embed.cc/embed/${targetId}`,
-        name: 'Server 2: 2Embed Cinema HD',
+        url: `https://embed.su/embed/movie/${targetId}`,
+        name: 'Server 2: Embed SU (Fast)',
         source: 'embed',
         quality: '1080p'
       });
       raw.push({
-        url: `https://vidlink.pro/movie/${targetId}`,
-        name: 'Server 3: VidLink Pro (Multi/Fast)',
+        url: `https://vidsrc.in/embed/movie?${tmdbId ? `tmdb=${tmdbId}` : `imdb=${imdbId}`}`,
+        name: 'Server 3: VidSrc IN (Backup)',
         source: 'embed',
         quality: '1080p'
       });
       raw.push({
         url: `https://v2.vidsrc.me/embed/movie?${tmdbId ? `tmdb=${tmdbId}` : `imdb=${imdbId}`}`,
-        name: 'Server 4: VidSrc ME (Reliable)',
+        name: 'Server 4: VidSrc ME (Fallback)',
         source: 'embed',
         quality: '1080p'
       });
+      if (imdbId) {
+        raw.push({
+          url: `https://autoembed.co/movie/imdb/${imdbId}`,
+          name: 'Server 5: AutoEmbed (No CF)',
+          source: 'embed',
+          quality: '1080p'
+        });
+        raw.push({
+          url: `https://www.2embed.cc/embedmovie/${imdbId}`,
+          name: 'Server 6: 2Embed (No CF)',
+          source: 'embed',
+          quality: '1080p'
+        });
+      }
     }
   }
 

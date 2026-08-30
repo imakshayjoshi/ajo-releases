@@ -2,17 +2,8 @@ import { isSafeHttpUrl } from '../utils/streamingEngines.js';
 import { isFavoriteChannel } from './history.js';
 import { parseM3U, normalizeChannelKey } from './iptv.js';
 
-/**
- * Live sports channels — DYNAMIC source.
- *
- * Derives the sports rail at runtime from iptv-org playlists by filtering
- * for sports groups and known sports channel names.
- *
- * v3.9.0 FIX: removed the serial isStreamLive() per-channel HTTP probe.
- * It was doing up to 24 sequential 4-second-timeout fetches, blocking the
- * entire app startup for up to 96 seconds. Dead channels are now handled
- * by the native player's automatic multi-server failover (<1s recovery).
- */
+const SPORTS_CACHE_KEY = 'ajo_sports_cache_v2';
+const SPORTS_CACHE_TTL = 15 * 60 * 1000; // 15 minutes
 
 const PLAYLIST_SOURCES = [
   'https://iptv-org.github.io/iptv/categories/sports.m3u'
@@ -33,102 +24,139 @@ function isSportsChannel(ch) {
   return SPORTS_NAME_PATTERNS.some((p) => p.test(name));
 }
 
-/** v3.10.0: cap raised 30 -> 200; dedupe via shared normalizeChannelKey. */
-export async function getLiveSportsEvents() {
+function readSportsCache() {
+  try {
+    const raw = localStorage.getItem(SPORTS_CACHE_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    if (data && Date.now() - data.savedAt < SPORTS_CACHE_TTL && Array.isArray(data.items)) {
+      return data.items;
+    }
+  } catch (err) {
+    console.warn("Error reading sports cache:", err);
+  }
+  return null;
+}
+
+async function fetchLiveSportsInternal() {
   const seen = new Set();
   const events = [];
 
-  // v3.11.2 FIX: NTV live-sports JSON API — the one verified-working source
-  // recovered from the Streamzy payload APK (base_apk_decompiled turned out
-  // to be a non-streaming habit app; of all its scraper targets only NTV's
-  // API is alive today). Adds real fixtures (cricket, football, tennis) that
-  // iptv-org sports mirrors often miss. Watch URLs render in the app's embed
-  // player (no X-Frame-Options block, verified 2026-08-25).
-  try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 9000);
-    const response = await fetch('https://ntv.cx/api/get-matches?server=kobra', {
-      signal: controller.signal, cache: 'no-store'
-    });
-    clearTimeout(timer);
-    if (response.ok) {
-      const data = await response.json();
-      const all = Array.isArray(data?.all) ? data.all : [];
-      for (const m of all) {
-        if (events.length >= 200 || !m || !m.id || !m.title) continue;
-        const key = normalizeChannelKey(m.title);
-        if (!key || seen.has(key)) continue; // keep iptv-org native HLS when titles collide
-        seen.add(key);
-        const isCricket = /cricket/i.test(m.category + ' ' + m.title);
-        const watchUrl = `https://ntv.cx/watch/${m.id}`;
-        const item = {
-          id: `ntv-${m.id}`,
-          title: m.title,
-          title_en: m.title,
-          category: isCricket ? 'Cricket' : /football|soccer/i.test(m.category) ? 'Football' : 'Sports',
-          poster: m.poster ? (m.poster.startsWith('http') ? m.poster : `https://ntv.cx${m.poster}`) : '',
-          poster_url: m.poster ? (m.poster.startsWith('http') ? m.poster : `https://ntv.cx${m.poster}`) : '',
-          is_live: true,
-          type: 'live',
-          year: 'LIVE',
-          url: watchUrl,
-          stream_url: watchUrl,
-          playable: true,
-          server: 'NTV Live Sports',
-          players: [{ name: 'NTV Live (HD)', url: watchUrl, source: 'embed', quality: 'HD' }],
-          player: [{ name: 'NTV Live (HD)', url: watchUrl, source: 'embed', quality: 'HD' }]
-        };
-        item.is_favorite = isFavoriteChannel(item);
-        events.push(item);
+  // Run NTV API and M3U playlist fetches concurrently in parallel
+  const [ntvResult, playlistResults] = await Promise.allSettled([
+    (async () => {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 3500); // Fast 3.5s max
+      try {
+        const response = await fetch('https://ntv.cx/api/get-matches?server=kobra', {
+          signal: controller.signal,
+          cache: 'no-store'
+        });
+        if (!response.ok) return [];
+        const data = await response.json();
+        return Array.isArray(data?.all) ? data.all : [];
+      } catch (err) {
+        console.warn("NTV sports API skipped or timed out:", err.message);
+        return [];
+      } finally {
+        clearTimeout(timer);
       }
+    })(),
+    Promise.allSettled(PLAYLIST_SOURCES.map(async (url) => {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 5000);
+      try {
+        const response = await fetch(url, { signal: controller.signal, cache: 'no-store' });
+        if (!response.ok) return [];
+        return parseM3U(await response.text()).filter(isSportsChannel);
+      } catch (err) {
+        console.warn(`Sports playlist fetch error (${url}):`, err.message);
+        return [];
+      } finally {
+        clearTimeout(timer);
+      }
+    }))
+  ]);
+
+  // 1. Process NTV Live Fixtures
+  if (ntvResult.status === 'fulfilled' && Array.isArray(ntvResult.value)) {
+    for (const m of ntvResult.value) {
+      if (events.length >= 200 || !m || !m.id || !m.title) continue;
+      const key = normalizeChannelKey(m.title);
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+
+      const isCricket = /cricket/i.test(m.category + ' ' + m.title);
+      const watchUrl = `https://ntv.cx/watch/${m.id}`;
+      const item = {
+        id: `ntv-${m.id}`,
+        title: m.title,
+        title_en: m.title,
+        category: isCricket ? 'Cricket' : /football|soccer/i.test(m.category) ? 'Football' : 'Sports',
+        poster: m.poster ? (m.poster.startsWith('http') ? m.poster : `https://ntv.cx${m.poster}`) : '',
+        poster_url: m.poster ? (m.poster.startsWith('http') ? m.poster : `https://ntv.cx${m.poster}`) : '',
+        is_live: true,
+        type: 'live',
+        year: 'LIVE',
+        url: watchUrl,
+        stream_url: watchUrl,
+        playable: true,
+        server: 'NTV Live Sports',
+        players: [{ name: 'NTV Live (HD)', url: watchUrl, source: 'embed', quality: 'HD' }],
+        player: [{ name: 'NTV Live (HD)', url: watchUrl, source: 'embed', quality: 'HD' }]
+      };
+      item.is_favorite = isFavoriteChannel(item);
+      events.push(item);
     }
-  } catch {
-    // NTV unreachable — fall back to playlist sources only
   }
 
-  for (const playlistUrl of PLAYLIST_SOURCES) {
-    if (events.length >= 200) break;
-    try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 8000);
-      const response = await fetch(playlistUrl, { signal: controller.signal, cache: 'no-store' });
-      clearTimeout(timer);
-      if (!response.ok) continue;
-      const channels = parseM3U(await response.text()).filter(isSportsChannel);
-
-      for (const ch of channels) {
+  // 2. Process M3U sports channels
+  if (playlistResults.status === 'fulfilled' && Array.isArray(playlistResults.value)) {
+    for (const res of playlistResults.value) {
+      if (res.status !== 'fulfilled' || !Array.isArray(res.value)) continue;
+      for (const ch of res.value) {
         if (events.length >= 200) break;
-        if (!ch.url || !isSafeHttpUrl(ch.url)) continue;
+        if (!ch?.url || !isSafeHttpUrl(ch.url)) continue;
         const key = normalizeChannelKey(ch.title);
         if (!key || seen.has(key)) continue;
         seen.add(key);
 
         const item = {
-          id: `sports-${key}`,
+          id: ch.id || `sports-${events.length + 1}`,
           title: ch.title,
           title_en: ch.title,
-          category: /cricket/i.test(ch.title) || /cricket/i.test(ch.category) ? 'Cricket'
-            : /football|soccer/i.test(ch.title + ch.category) ? 'Football'
-            : 'Sports',
-          poster: ch.poster,
-          poster_url: ch.poster,
+          category: 'Live Sports',
+          poster: ch.poster || '',
+          poster_url: ch.poster || '',
+          url: ch.url,
+          stream_url: ch.url,
           is_live: true,
           type: 'live',
           year: 'LIVE',
-          url: ch.url,
-          stream_url: ch.url,
-          playable: true,
-          players: [{ name: 'Live Stream', url: ch.url, source: 'hls', quality: 'Auto' }],
-          player: [{ name: 'Live Stream', url: ch.url, source: 'hls', quality: 'Auto' }]
+          players: [{ name: 'Server 1 (Live)', url: ch.url, source: 'hls', quality: 'HD' }],
+          player: [{ name: 'Server 1 (Live)', url: ch.url, source: 'hls', quality: 'HD' }]
         };
         item.is_favorite = isFavoriteChannel(item);
         events.push(item);
       }
-    } catch {
-      // Try next playlist source
     }
+  }
+
+  if (events.length > 0) {
+    try {
+      localStorage.setItem(SPORTS_CACHE_KEY, JSON.stringify({ savedAt: Date.now(), items: events }));
+    } catch {}
   }
 
   return events;
 }
 
+export async function getLiveSportsEvents() {
+  const cached = readSportsCache();
+  if (cached && cached.length > 0) {
+    // Refresh in background
+    fetchLiveSportsInternal().catch(() => {});
+    return cached;
+  }
+  return await fetchLiveSportsInternal();
+}

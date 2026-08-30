@@ -92,15 +92,30 @@ public class MainActivity extends BridgeActivity {
         webView.onPause();
     }
 
+    private static volatile long lastNativePositionSeconds = 0;
+    private static volatile long lastNativeDurationSeconds = 0;
+
+    public static void setLastNativePlayback(long posSec, long durSec) {
+        lastNativePositionSeconds = posSec;
+        lastNativeDurationSeconds = durSec;
+    }
+
     /** Brings the WebView back after the native player closes. */
     private void resumeWebView(boolean notifyPlayerClosed) {
         if (getBridge() == null || getBridge().getWebView() == null) return;
         WebView webView = getBridge().getWebView();
         webView.onResume();
         if (notifyPlayerClosed) {
-            webView.evaluateJavascript(
-                    "(function(){try{window.dispatchEvent(new Event('ajo-native-player-closed'));}catch(e){}})();",
-                    null);
+            final long pos = lastNativePositionSeconds;
+            final long dur = lastNativeDurationSeconds;
+            lastNativePositionSeconds = 0;
+            lastNativeDurationSeconds = 0;
+            String js = String.format(
+                java.util.Locale.US,
+                "(function(){try{window.dispatchEvent(new CustomEvent('ajo-native-player-closed',{detail:{currentTime:%d,duration:%d}}));}catch(e){}})();",
+                pos, dur
+            );
+            webView.evaluateJavascript(js, null);
         }
         webView.requestFocus();
     }
@@ -230,6 +245,11 @@ public class MainActivity extends BridgeActivity {
 
                 @JavascriptInterface
                 public void playStreamWithFallbacks(final String url, final String title, final boolean isLive, final String fallbacksJson) {
+                    playStreamWithFallbacksAndPosition(url, title, isLive, fallbacksJson, 0L);
+                }
+
+                @JavascriptInterface
+                public void playStreamWithFallbacksAndPosition(final String url, final String title, final boolean isLive, final String fallbacksJson, final long startPositionMs) {
                     if (url == null || url.isEmpty()) return;
                     runOnUiThread(() -> {
                         try {
@@ -239,6 +259,9 @@ public class MainActivity extends BridgeActivity {
                             intent.putExtra("isLive", isLive);
                             if (fallbacksJson != null && !fallbacksJson.isEmpty()) {
                                 intent.putExtra("fallbacks", fallbacksJson);
+                            }
+                            if (startPositionMs > 0) {
+                                intent.putExtra("startPositionMs", startPositionMs);
                             }
                             startActivity(intent);
                             releaseWebVideoDecoder();

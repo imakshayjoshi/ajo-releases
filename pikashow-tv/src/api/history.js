@@ -7,25 +7,49 @@ const FAVORITES_KEY = 'ajo_favorites_v1';
 const FAV_CHANNELS_KEY = 'ajo_fav_channels_v1';
 const SLEEP_TIMER_KEY = 'ajo_sleep_timer_state';
 
+function normalizeTitle(t) {
+  return String(t || '').toLowerCase().trim().replace(/[^a-z0-9]/g, '');
+}
+
+export function matchMediaItem(a, b) {
+  if (!a || !b) return false;
+  const idA = a.id || a.tmdb_id || a.imdb_id || a.kinopoisk_id || a.movie_id;
+  const idB = b.id || b.tmdb_id || b.imdb_id || b.kinopoisk_id || b.movie_id;
+  if (idA && idB && String(idA) === String(idB)) return true;
+
+  const titleA = normalizeTitle(a.title_en || a.title || a.name);
+  const titleB = normalizeTitle(b.title_en || b.title || b.name);
+  if (titleA && titleB && titleA === titleB) return true;
+  return false;
+}
+
 // ==========================================
 // WATCH PROGRESS & CONTINUE WATCHING
 // ==========================================
 export function saveProgress(item, currentTime, duration) {
   if (!item || !duration || duration <= 0) return;
+  const isLive = Boolean(item.is_live || item.type === 'live' || item.year === 'LIVE' || item.category === 'Live TV' || item.category === 'Sports' || item.category === 'News');
+  if (isLive) return;
 
   const percentage = Math.min(100, Math.max(0, Math.round((currentTime / duration) * 100)));
-  
-  if (percentage > 95) return;
-  if (currentTime < 30) return; // skip accidental taps; any real watch counts
+
+  // If content is finished (>92%), remove from Continue Watching
+  if (percentage >= 92) {
+    deleteHistoryItem(item);
+    return;
+  }
+
+  // Any real playback > 5 seconds counts
+  if (currentTime < 5) return;
 
   try {
     const history = getWatchHistory();
-    const existingIndex = history.findIndex(h => (h.id && h.id === item.id) || h.title === item.title);
+    const existingIndex = history.findIndex(h => matchMediaItem(h, item));
 
     const historyEntry = {
       ...item,
-      currentTime,
-      duration,
+      currentTime: Math.floor(currentTime),
+      duration: Math.floor(duration),
       percentage,
       lastWatched: Date.now()
     };
@@ -36,6 +60,9 @@ export function saveProgress(item, currentTime, duration) {
     history.unshift(historyEntry);
 
     localStorage.setItem(HISTORY_KEY, JSON.stringify(history.slice(0, 30)));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('ajo-watch-history-updated', { detail: historyEntry }));
+    }
   } catch (err) {
     console.warn("Failed to save progress:", err);
   }
@@ -50,19 +77,38 @@ export function getWatchHistory() {
   }
 }
 
+export function getWatchProgress(item) {
+  if (!item) return null;
+  const isLive = Boolean(item.is_live || item.type === 'live' || item.year === 'LIVE');
+  if (isLive) return null;
+  try {
+    const history = getWatchHistory();
+    const entry = history.find(h => matchMediaItem(h, item));
+    if (entry && entry.currentTime >= 5 && entry.percentage < 92) {
+      return entry;
+    }
+  } catch {}
+  return null;
+}
+
 export function deleteHistoryItem(item) {
   if (!item) return;
   try {
     const history = getWatchHistory();
-    const itemId = item.id || item.kinopoisk_id || item.movie_id || item.title;
-    const filtered = history.filter(h => (h.id || h.kinopoisk_id || h.movie_id || h.title) !== itemId);
+    const filtered = history.filter(h => !matchMediaItem(h, item));
     localStorage.setItem(HISTORY_KEY, JSON.stringify(filtered));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('ajo-watch-history-updated'));
+    }
   } catch (err) {}
 }
 
 export function clearWatchHistory() {
   try {
     localStorage.removeItem(HISTORY_KEY);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('ajo-watch-history-updated'));
+    }
   } catch (err) {}
 }
 
@@ -81,16 +127,14 @@ export function getFavorites() {
 export function isFavorite(item) {
   if (!item) return false;
   const favs = getFavorites();
-  const itemId = item.id || item.tmdb_id || item.kinopoisk_id || item.movie_id || item.title;
-  return favs.some(f => (f.id || f.tmdb_id || f.kinopoisk_id || f.movie_id || f.title) === itemId);
+  return favs.some(f => matchMediaItem(f, item));
 }
 
 export function toggleFavorite(item) {
   if (!item) return false;
   try {
     const favs = getFavorites();
-    const itemId = item.id || item.tmdb_id || item.kinopoisk_id || item.movie_id || item.title;
-    const index = favs.findIndex(f => (f.id || f.tmdb_id || f.kinopoisk_id || f.movie_id || f.title) === itemId);
+    const index = favs.findIndex(f => matchMediaItem(f, item));
 
     let isNowFav = false;
     if (index !== -1) {

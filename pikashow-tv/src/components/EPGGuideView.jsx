@@ -1,10 +1,12 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Radio, 
   Star, 
   Search, 
   X, 
-  Play
+  Play,
+  Clock,
+  ChevronRight
 } from 'lucide-react';
 import { getCurrentAndNextProgram } from '../api/epg';
 import { getIPTVChannels } from '../api/iptv';
@@ -15,6 +17,8 @@ export function EPGGuideView({ channels = [], onSelectChannel, onFocusItem }) {
   const [searchFilter, setSearchFilter] = useState('');
   const [channelData, setChannelData] = useState([]);
   const [favRefreshCount, setFavRefreshCount] = useState(0);
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const clockRef = useRef(null);
 
   const categories = [
     '⭐ Favorites',
@@ -28,6 +32,12 @@ export function EPGGuideView({ channels = [], onSelectChannel, onFocusItem }) {
     'Documentary', 
     'Regional'
   ];
+
+  // Update clock every 30 seconds to keep Now/Next fresh
+  useEffect(() => {
+    clockRef.current = setInterval(() => setCurrentTime(new Date()), 30000);
+    return () => clearInterval(clockRef.current);
+  }, []);
 
   useEffect(() => {
     getIPTVChannels().then(chs => {
@@ -80,90 +90,63 @@ export function EPGGuideView({ channels = [], onSelectChannel, onFocusItem }) {
     });
   }, [channelData, selectedCategory, searchFilter, favRefreshCount]);
 
+  const formatClock = (d) => {
+    let h = d.getHours();
+    const m = d.getMinutes();
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12 || 12;
+    return `${h}:${String(m).padStart(2, '0')} ${ampm}`;
+  };
+
   return (
     <div className="mobile-epg-container" style={{ position: 'relative', zIndex: 20, padding: '16px 24px 80px 24px', width: '100%', boxSizing: 'border-box' }}>
       {/* Top Header Banner */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        marginBottom: '16px'
-      }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <div style={{
-            width: '36px',
-            height: '36px',
-            borderRadius: '10px',
+            width: '36px', height: '36px', borderRadius: '10px',
             background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: '0 4px 14px rgba(239, 68, 68, 0.5)'
+            display: 'flex', alignItems: 'center', justifyContent: 'center'
           }}>
-            <Radio size={20} color="#ffffff" />
+            <Radio size={18} color="#fff" />
           </div>
           <div>
-            <h2 style={{ fontSize: '20px', fontWeight: 900, color: '#ffffff', margin: 0, letterSpacing: '-0.3px' }}>
-              Live Satellite TV & EPG Guide
-            </h2>
-            <span style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 600 }}>
-              {filteredChannels.length} Live Channels Available
-            </span>
+            <div style={{ fontSize: '18px', fontWeight: 900, color: '#ffffff', letterSpacing: '-0.3px' }}>
+              Live TV Guide
+            </div>
+            <div style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 600 }}>
+              {filteredChannels.length} channels · {formatClock(currentTime)}
+            </div>
           </div>
-        </div>
-
-        {/* Search Bar */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          background: 'rgba(15, 23, 42, 0.8)',
-          border: '1px solid rgba(255, 255, 255, 0.15)',
-          borderRadius: '20px',
-          padding: '8px 16px',
-          width: '260px'
-        }}>
-          <Search size={16} color="#38bdf8" />
-          <input
-            type="text"
-            className="search-bar-input tv-focusable-card"
-            data-focusable="true"
-            tabIndex={0}
-            placeholder="Search channels..."
-            value={searchFilter}
-            onChange={(e) => setSearchFilter(e.target.value)}
-            style={{
-              flex: 1,
-              background: 'transparent',
-              border: 'none',
-              color: '#ffffff',
-              fontSize: '13px',
-              fontWeight: 700,
-              outline: 'none'
-            }}
-          />
-          {searchFilter && (
-            <button 
-              onClick={() => setSearchFilter('')}
-              style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 0 }}
-            >
-              <X size={16} />
-            </button>
-          )}
         </div>
       </div>
 
-      {/* Category Pills Bar */}
+      {/* Search bar */}
       <div style={{
-        position: 'relative',
-        zIndex: 25,
-        display: 'flex',
-        gap: '10px',
-        overflowX: 'auto',
-        paddingBottom: '12px',
-        marginBottom: '16px',
-        scrollbarWidth: 'none'
+        display: 'flex', alignItems: 'center', gap: '10px',
+        background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
+        borderRadius: '14px', padding: '10px 16px', marginBottom: '14px'
       }}>
+        <Search size={16} color="#64748b" />
+        <input
+          type="text"
+          placeholder="Search channels..."
+          value={searchFilter}
+          onChange={e => setSearchFilter(e.target.value)}
+          style={{
+            flex: 1, background: 'none', border: 'none', outline: 'none',
+            color: '#ffffff', fontSize: '14px', fontWeight: 600
+          }}
+        />
+        {searchFilter && (
+          <button onClick={() => setSearchFilter('')} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 0 }}>
+            <X size={16} />
+          </button>
+        )}
+      </div>
+
+      {/* Category Pills */}
+      <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '12px', marginBottom: '14px', scrollbarWidth: 'none' }}>
         {categories.map(cat => {
           const isSelected = selectedCategory === cat;
           return (
@@ -174,43 +157,37 @@ export function EPGGuideView({ channels = [], onSelectChannel, onFocusItem }) {
               tabIndex={0}
               onClick={() => setSelectedCategory(cat)}
               style={{
-                padding: '9px 18px',
-                borderRadius: '20px',
-                fontSize: '13px',
-                fontWeight: 800,
-                whiteSpace: 'nowrap',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '7px',
-                border: isSelected ? '2px solid #38bdf8' : '1px solid rgba(255, 255, 255, 0.18)',
-                background: isSelected ? 'linear-gradient(135deg, #38bdf8 0%, #3b82f6 100%)' : 'rgba(15, 23, 42, 0.85)',
-                color: isSelected ? '#06090e' : '#ffffff',
-                cursor: 'pointer',
-                flexShrink: 0
+                padding: '8px 16px', borderRadius: '20px', fontSize: '12px', fontWeight: 800,
+                whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '6px',
+                border: isSelected ? '2px solid #38bdf8' : '1px solid rgba(255,255,255,0.15)',
+                background: isSelected ? 'linear-gradient(135deg, #38bdf8 0%, #3b82f6 100%)' : 'rgba(15,23,42,0.85)',
+                color: isSelected ? '#06090e' : '#ffffff', cursor: 'pointer', flexShrink: 0
               }}
             >
-              <span>{cat}</span>
+              {cat}
             </button>
           );
         })}
       </div>
 
-      {/* Vertical Channels List */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%' }}>
+      {/* Channel List */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
         {filteredChannels.length === 0 ? (
           <div style={{ padding: '50px 20px', textAlign: 'center', color: '#94a3b8' }}>
             <Radio size={44} color="#64748b" style={{ margin: '0 auto 12px auto' }} />
             <p style={{ fontWeight: 700, fontSize: '15px' }}>
-              {selectedCategory === '⭐ Favorites' 
-                ? 'No favorite channels pinned yet. Click the ⭐ star on any channel to pin it!' 
-                : 'No live channels found matching your filter.'}
+              {selectedCategory === '⭐ Favorites'
+                ? 'No favorite channels pinned yet. Tap ⭐ on any channel to add it!'
+                : 'No channels found matching your filter.'}
             </p>
           </div>
         ) : (
           filteredChannels.map((ch, idx) => {
             const isFav = isFavoriteChannel(ch);
             const currentProg = ch.epg?.current;
+            const nextProg = ch.epg?.next;
             const logo = ch.logo || ch.poster_url || ch.poster;
+            const progress = currentProg?.progressPercent || 0;
 
             return (
               <div
@@ -221,128 +198,138 @@ export function EPGGuideView({ channels = [], onSelectChannel, onFocusItem }) {
                 onClick={() => onSelectChannel && onSelectChannel(ch)}
                 onFocus={() => onFocusItem && onFocusItem(ch)}
                 style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '16px',
-                  padding: '14px 18px',
-                  borderRadius: '16px',
-                  background: 'rgba(17, 24, 39, 0.9)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  cursor: 'pointer',
-                  width: '100%',
-                  boxSizing: 'border-box'
+                  display: 'flex', flexDirection: 'column',
+                  borderRadius: '16px', overflow: 'hidden',
+                  background: 'rgba(17,24,39,0.92)',
+                  border: '1px solid rgba(255,255,255,0.09)',
+                  cursor: 'pointer', width: '100%', boxSizing: 'border-box'
                 }}
               >
-                {/* Channel Logo & Number */}
-                <div style={{
-                  position: 'relative',
-                  width: '56px',
-                  height: '56px',
-                  borderRadius: '12px',
-                  background: '#0a0e17',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0,
-                  overflow: 'hidden',
-                  border: '1px solid rgba(255,255,255,0.15)'
-                }}>
-                  {logo ? (
-                    <img 
-                      src={logo} 
-                      alt={ch.title} 
-                      style={{ width: '100%', height: '100%', objectFit: 'contain', padding: '4px' }}
-                      loading="lazy"
-                      referrerPolicy="no-referrer"
-                    />
-                  ) : (
-                    <Radio size={26} color="#38bdf8" />
-                  )}
-                  <span style={{
-                    position: 'absolute',
-                    bottom: '2px',
-                    right: '2px',
-                    fontSize: '9px',
-                    fontWeight: 900,
-                    background: 'rgba(0,0,0,0.85)',
-                    color: '#38bdf8',
-                    padding: '1px 4px',
-                    borderRadius: '3px'
+                {/* Main Row */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '14px 16px' }}>
+                  {/* Logo */}
+                  <div style={{
+                    position: 'relative', width: '60px', height: '60px', borderRadius: '12px',
+                    background: '#0a0e17', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    flexShrink: 0, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.12)'
                   }}>
-                    #{ch.channelNumber}
-                  </span>
-                </div>
-
-                {/* Channel Title & Program Details */}
-                <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                    {logo ? (
+                      <img
+                        src={logo} alt={ch.title}
+                        style={{ width: '100%', height: '100%', objectFit: 'contain', padding: '5px' }}
+                        loading="lazy"
+                        referrerPolicy="no-referrer"
+                        onError={e => { e.target.style.display = 'none'; }}
+                      />
+                    ) : (
+                      <Radio size={26} color="#38bdf8" />
+                    )}
                     <span style={{
-                      fontSize: '16px',
-                      fontWeight: 800,
-                      color: '#ffffff',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap'
+                      position: 'absolute', bottom: '2px', right: '2px', fontSize: '8px', fontWeight: 900,
+                      background: 'rgba(0,0,0,0.85)', color: '#38bdf8', padding: '1px 4px', borderRadius: '3px'
                     }}>
-                      {ch.title}
+                      #{ch.channelNumber}
                     </span>
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#38bdf8', fontWeight: 700 }}>
-                    <span>{ch.category || 'Live TV'}</span>
-                    <span>•</span>
-                    <span style={{ color: '#4ade80' }}>24/7 LIVE HD</span>
+                  {/* Info */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                      <span style={{
+                        fontSize: '15px', fontWeight: 800, color: '#ffffff',
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+                      }}>
+                        {ch.title}
+                      </span>
+                      <span style={{
+                        fontSize: '10px', fontWeight: 800, color: '#4ade80',
+                        background: 'rgba(74,222,128,0.12)', padding: '2px 7px',
+                        borderRadius: '20px', border: '1px solid rgba(74,222,128,0.3)', flexShrink: 0
+                      }}>
+                        ● LIVE
+                      </span>
+                    </div>
+
+                    {/* Now Playing */}
+                    <div style={{ marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ fontSize: '10px', fontWeight: 800, color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        NOW
+                      </span>
+                      <span style={{
+                        fontSize: '12px', color: '#e2e8f0', fontWeight: 600,
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1
+                      }}>
+                        {currentProg?.title || 'Live Broadcast'}
+                      </span>
+                    </div>
+
+                    {/* Next Program */}
+                    {nextProg && (
+                      <div style={{ marginTop: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontSize: '10px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                          NEXT
+                        </span>
+                        <span style={{
+                          fontSize: '11px', color: '#94a3b8', fontWeight: 600,
+                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1
+                        }}>
+                          {nextProg.startTimeFormatted} · {nextProg.title}
+                        </span>
+                      </div>
+                    )}
                   </div>
 
-                  <span style={{
-                    fontSize: '12px',
-                    color: '#94a3b8',
-                    fontWeight: 600,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap'
-                  }}>
-                    {currentProg?.title || 'Live Satellite Broadcast Stream'}
-                  </span>
-                </div>
-
-                {/* Direct Play Pill + Favorite Star */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
-                  <button
-                    onClick={(e) => handleToggleFav(e, ch)}
-                    style={{
-                      background: isFav ? 'rgba(234, 179, 8, 0.2)' : 'rgba(255, 255, 255, 0.08)',
-                      border: isFav ? '1px solid #eab308' : '1px solid rgba(255, 255, 255, 0.1)',
-                      borderRadius: '50%',
-                      width: '36px',
-                      height: '36px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: isFav ? '#eab308' : '#94a3b8',
-                      cursor: 'pointer'
-                    }}
-                    title={isFav ? "Remove from Favorites" : "Add to Favorites"}
-                  >
-                    <Star size={16} fill={isFav ? "#eab308" : "none"} />
-                  </button>
-
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                    color: '#ffffff',
-                    padding: '8px 16px',
-                    borderRadius: '20px',
-                    fontSize: '13px',
-                    fontWeight: 900,
-                    boxShadow: '0 4px 14px rgba(239, 68, 68, 0.4)'
-                  }}>
-                    <Play size={14} fill="#fff" />
-                    <span>PLAY</span>
+                  {/* Actions */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                    <button
+                      onClick={(e) => handleToggleFav(e, ch)}
+                      style={{
+                        background: isFav ? 'rgba(234,179,8,0.2)' : 'rgba(255,255,255,0.07)',
+                        border: isFav ? '1px solid #eab308' : '1px solid rgba(255,255,255,0.1)',
+                        borderRadius: '50%', width: '34px', height: '34px',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        color: isFav ? '#eab308' : '#94a3b8', cursor: 'pointer'
+                      }}
+                    >
+                      <Star size={15} fill={isFav ? '#eab308' : 'none'} />
+                    </button>
+                    <div style={{
+                      display: 'flex', alignItems: 'center', gap: '5px',
+                      background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                      color: '#ffffff', padding: '7px 14px', borderRadius: '20px',
+                      fontSize: '12px', fontWeight: 900,
+                      boxShadow: '0 4px 12px rgba(239,68,68,0.35)'
+                    }}>
+                      <Play size={12} fill="#fff" />
+                      PLAY
+                    </div>
                   </div>
                 </div>
+
+                {/* Progress Bar for Current Show */}
+                {currentProg && progress > 0 && (
+                  <div style={{ padding: '0 16px 10px 16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                      <span style={{ fontSize: '10px', color: '#64748b', fontWeight: 600 }}>
+                        <Clock size={9} style={{ marginRight: '3px', verticalAlign: 'middle' }} />
+                        {currentProg.startTimeFormatted} – {currentProg.endTimeFormatted}
+                      </span>
+                      <span style={{ fontSize: '10px', color: '#38bdf8', fontWeight: 700 }}>
+                        {progress}% aired
+                      </span>
+                    </div>
+                    <div style={{
+                      height: '3px', borderRadius: '2px',
+                      background: 'rgba(255,255,255,0.1)', overflow: 'hidden'
+                    }}>
+                      <div style={{
+                        height: '100%', width: `${progress}%`,
+                        background: 'linear-gradient(90deg, #ef4444, #f97316)',
+                        borderRadius: '2px', transition: 'width 0.3s ease'
+                      }} />
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })
@@ -351,3 +338,4 @@ export function EPGGuideView({ channels = [], onSelectChannel, onFocusItem }) {
     </div>
   );
 }
+

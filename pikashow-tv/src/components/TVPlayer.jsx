@@ -11,7 +11,8 @@ import {
   Layers,
   X,
   AlertCircle,
-  RefreshCw
+  RefreshCw,
+  Maximize
 } from 'lucide-react';
 import { generateUniversalServers, isEmbedUrl } from '../utils/streamingEngines';
 import {
@@ -22,14 +23,15 @@ import {
   playInNativePlayer,
   preflightEmbedUrl
 } from '../utils/nativePlayer';
-import { saveProgress, getWatchHistory } from '../api/history';
+import { saveProgress, getWatchHistory, getWatchProgress } from '../api/history';
+import { markChannelDead } from '../api/iptv';
 import { BINGE_COUNTDOWN_SECONDS } from '../utils/binge';
 import './TVPlayer.css';
 
 // v3.10.0: how long to wait for an embed iframe to signal a load before
 // auto-failing over. Dead hosts never fire onLoad; Cloudflare hang pages
 // usually do not either.
-const EMBED_LOAD_TIMEOUT_MS = 12000;
+const EMBED_LOAD_TIMEOUT_MS = 6000;
 
 export function TVPlayer({
   item,
@@ -99,7 +101,7 @@ export function TVPlayer({
       return [];
     }
     return generateUniversalServers(item);
-  }, [item, server, isLive, externalAllServers]);
+  }, [externalAllServers, isLive, item, server]);
 
   // On a TV box, an iframe embed source can never render: the native player only
   // accepts real stream URLs, and the legacy WebView cannot composite MSE video.
@@ -121,6 +123,7 @@ export function TVPlayer({
     setCurrentServerIndex(0);
   }, [item?.id, item?.title, item?.url]);
   const [videoEngine, setVideoEngine] = useState('hls'); // 'hls' | 'native'
+  const [fitMode, setFitMode] = useState('clean'); // 'clean' (default VBI crop) | 'zoom' | 'stretch' | 'original'
   const [isPlaying, setIsPlaying] = useState(true);
   const [isBuffering, setIsBuffering] = useState(true);
   const [currentTime, setCurrentTime] = useState(0);
@@ -140,6 +143,69 @@ export function TVPlayer({
 
   const activeServer = orderedServers[currentServerIndex] || orderedServers[0] || server;
   const streamUrl = activeServer?.url || item?.url;
+
+  const cycleFitMode = useCallback(() => {
+    setFitMode(prev => {
+      const next = prev === 'clean' ? 'zoom' : prev === 'zoom' ? 'stretch' : prev === 'stretch' ? 'original' : 'clean';
+      setErrorMessage(`Aspect Fit: ${next === 'clean' ? 'Clean (No Lines)' : next === 'zoom' ? '16:9 Zoom' : next === 'stretch' ? 'Stretch Full' : 'Original 1:1'}`);
+      setTimeout(() => setErrorMessage(null), 2500);
+      return next;
+    });
+  }, []);
+
+  const videoStyle = useMemo(() => {
+    if (fitMode === 'zoom') {
+      return {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        display: 'block',
+        width: '100%',
+        height: '100%',
+        objectFit: 'cover',
+        backgroundColor: 'transparent',
+        background: 'transparent'
+      };
+    }
+    if (fitMode === 'stretch') {
+      return {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        display: 'block',
+        width: '100%',
+        height: '100%',
+        objectFit: 'fill',
+        backgroundColor: 'transparent',
+        background: 'transparent'
+      };
+    }
+    if (fitMode === 'original') {
+      return {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        display: 'block',
+        width: '100%',
+        height: '100%',
+        objectFit: 'contain',
+        backgroundColor: 'transparent',
+        background: 'transparent'
+      };
+    }
+    return {
+      position: 'absolute',
+      top: '-1%',
+      left: '-1%',
+      display: 'block',
+      width: '102%',
+      height: '102%',
+      objectFit: 'contain',
+      clipPath: 'inset(3px 0 0 0)',
+      backgroundColor: 'transparent',
+      background: 'transparent'
+    };
+  }, [fitMode]);
 
   // Wake up OSD and reset auto-hide timer
   // v3.10.0 FIX: read drawer state through a ref so the timer closure never
@@ -172,22 +238,16 @@ export function TVPlayer({
   // Initial OSD wake-up + resume lookup
   useEffect(() => {
     pingOsd();
-    // RESUME FIX: look up last watched position for this title. The web
-    // player seeks to it once the HLS manifest is parsed.
     try {
-      const history = getWatchHistory() || [];
-      const entry = history.find(h =>
-        (item?.id && h.id === item.id) ||
-        (h.title && item?.title && h.title === item.title)
-      );
-      if (entry && entry.currentTime > 15) {
-        resumePositionRef.current = entry.currentTime;
+      const progress = getWatchProgress(item);
+      if (progress && progress.currentTime > 5) {
+        resumePositionRef.current = progress.currentTime;
       }
     } catch {}
     return () => {
       if (osdTimerRef.current) clearTimeout(osdTimerRef.current);
     };
-  }, [pingOsd]);
+  }, [item, pingOsd]);
 
   // BINGE: countdown ticker — fires next episode at 0
   useEffect(() => {
@@ -226,6 +286,10 @@ export function TVPlayer({
       setCurrentServerIndex(nextIdx);
       setTimeout(() => setErrorMessage(null), 3000);
     } else {
+      if (item && (item.is_live || item.type === 'live' || item.year === 'LIVE')) {
+        const failedUrl = orderedServers[currentServerIndex]?.url || item.url;
+        if (failedUrl) markChannelDead(failedUrl);
+      }
       setErrorMessage('Stream offline. Please select another server or channel.');
       setIsBuffering(false);
     }
@@ -424,30 +488,32 @@ export function TVPlayer({
           return;
         }
         hls = new Hls({
-          enableWorker: false,
+          enableWorker: true,
           lowLatencyMode: isLive,
           liveSyncDurationCount: isLive ? 2 : undefined,
           startFragPrefetch: true,
           startLevel: -1,
           capLevelToPlayerSize: true,
-          backBufferLength: isLive ? 0 : 30,
-          maxBufferLength: isLive ? 30 : 60,
-          maxMaxBufferLength: isLive ? 30 : 120,
-          maxBufferSize: 25 * 1024 * 1024,
-          manifestLoadingTimeOut: 15000,
-          fragLoadingTimeOut: 20000,
+          backBufferLength: isLive ? 30 : 60,
+          maxBufferLength: 30,
+          maxMaxBufferLength: 60,
+          maxBufferSize: 8 * 1024 * 1024,
+          maxBufferHole: 0.5,
           highBufferWatchdogPeriod: 2,
-          nudgeMaxRetry: 6,
+          nudgeOffset: 0.2,
+          nudgeMaxRetry: 5,
+          fragLoadingTimeOut: 12000,
+          manifestLoadingTimeOut: 12000,
+          levelLoadingTimeOut: 12000,
         });
-  
         hlsRef.current = hls;
+  
         hls.loadSource(streamUrl);
         hls.attachMedia(video);
   
         hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
-          setIsBuffering(false);
-          if (hls.audioTracks && hls.audioTracks.length > 0) {
-            setAudioTracks(hls.audioTracks.map((t, idx) => ({
+          if (data.audioTracks && data.audioTracks.length > 0) {
+            setAvailableAudioTracks(data.audioTracks.map((t, idx) => ({
               id: idx,
               label: t.name || t.lang || `Track ${idx + 1}`
             })));
@@ -455,8 +521,6 @@ export function TVPlayer({
           video.play().then(() => {
             setIsPlaying(true);
             setIsBuffering(false);
-            // RESUME: seek after play() resolves — seeking before play on a
-            // fresh hls.js attachment gets reset when the player initializes.
             if (resumePositionRef.current) {
               try {
                 video.currentTime = resumePositionRef.current;
@@ -469,9 +533,7 @@ export function TVPlayer({
         });
   
         hls.on(Hls.Events.FRAG_LOADED, () => {
-          // RESUME fallback: first segment delivered = playback is real. Apply
-          // saved position here too, in case play() was blocked/pending when
-          // MANIFEST_PARSED fired.
+          setIsBuffering(false);
           if (resumePositionRef.current) {
             try {
               const v = videoRef.current;
@@ -489,32 +551,16 @@ export function TVPlayer({
           if (data.fatal) {
             switch (data.type) {
               case Hls.ErrorTypes.NETWORK_ERROR:
-                // v3.8.0: max 2 retries, then fail over. Previously retried forever.
-                if (networkRetryCount < 2) {
-                  networkRetryCount += 1;
+                if (!handOffToNative('Network error, switching to hardware player...')) {
                   hls.startLoad();
-                } else if (!handOffToNative('Network stalled, switching to hardware player...')) {
-                  hls.destroy();
-                  hlsRef.current = null;
-                  handleFailover('Stream connection failed');
                 }
                 break;
               case Hls.ErrorTypes.MEDIA_ERROR:
-                if (mediaRetryCount < 2) {
-                  mediaRetryCount += 1;
+                if (!handOffToNative('Media decode error, switching to hardware player...')) {
                   hls.recoverMediaError();
-                  if (video && video.paused) video.play().catch(() => {});
-                } else if (!handOffToNative('Playback error, switching to hardware player...')) {
-                  hls.destroy();
-                  hlsRef.current = null;
-                  handleFailover('Stream engine failed');
                 }
                 break;
               default:
-                // v3.9.3: previously the default branch silently destroyed the
-                // Hls instance and called handleFailover with no message. Now
-                // we route it through the same native-handoff path used by the
-                // known error types above, which gives the user a clear toast.
                 if (!handOffToNative('Stream engine error, switching to hardware player...')) {
                   hls.destroy();
                   hlsRef.current = null;
@@ -525,22 +571,32 @@ export function TVPlayer({
           }
         });
   
-        // 24/7 Anti-Stall watchdog timer
+        // 24/7 Anti-Stall and Anti-Buffering watchdog timer
+        let bufferingDuration = 0;
+        let lastProgressTime = 0;
         stallWatchdogRef.current = setInterval(() => {
-          if (video && !video.paused && video.readyState >= 2) {
-            if (video.currentTime === lastProgressTime && isLive) {
-              hls?.recoverMediaError();
-              video.play().catch(() => {});
+          if (video) {
+            if (video.paused && isBuffering) {
+              bufferingDuration += 2;
+              if (bufferingDuration >= 8) {
+                bufferingDuration = 0;
+                if (!handOffToNative('Buffering timeout, switching to hardware player...')) {
+                  handleFailover('Stream buffering timed out');
+                }
+              }
+            } else if (!video.paused && video.readyState >= 2) {
+              bufferingDuration = 0;
+              if (video.currentTime === lastProgressTime && isLive) {
+                hls?.recoverMediaError();
+                video.play().catch(() => {});
+              }
+              lastProgressTime = video.currentTime;
             }
-            lastProgressTime = video.currentTime;
           }
-        }, 4000);
+        }, 2000);
       })();
 
     } else if (isEmbedStream) {
-      // v3.10.0 FIX: embed mirrors belong to the <iframe> layer above — do
-      // NOT point the <video> element at an HTML page. Start a watchdog that
-      // fails over if the iframe never signals a load (dead mirror).
       if (embedWatchdogRef.current) clearTimeout(embedWatchdogRef.current);
       embedWatchdogRef.current = setTimeout(() => {
         const iframe = iframeRef.current;
@@ -552,23 +608,32 @@ export function TVPlayer({
     } else {
       // Native Android HTML5 video playback
       video.src = streamUrl;
+      const onLoadedMeta = () => {
+        if (resumePositionRef.current) {
+          try { video.currentTime = resumePositionRef.current; } catch {}
+          resumePositionRef.current = null;
+        }
+      };
+      video.addEventListener('loadedmetadata', onLoadedMeta, { once: true });
       video.play().then(() => {
         setIsPlaying(true);
         setIsBuffering(false);
+        if (resumePositionRef.current) {
+          try { video.currentTime = resumePositionRef.current; } catch {}
+          resumePositionRef.current = null;
+        }
       }).catch(err => console.warn(err));
     }
 
-    // Periodic progress save (every 10s) so Continue Watching is accurate
+    // Periodic progress save (every 5s) so Continue Watching is accurate
     // even if the app crashes or power dies mid-watch.
     progressSaverRef.current = setInterval(() => {
       try {
-        // Save even when paused — user pauses then closes the app; that's
-        // exactly the position Continue Watching must restore.
-        if (video.currentTime > 5 && video.duration > 0) {
+        if (video.currentTime > 5 && video.duration > 0 && !isLive) {
           saveProgress(item, video.currentTime, video.duration);
         }
       } catch {}
-    }, 10000);
+    }, 5000);
 
     // Black Screen Detection & Auto-Recovery Watchdog:
     // If audio is progressing (currentTime advancing) but the video plane never
@@ -761,7 +826,6 @@ export function TVPlayer({
   return (
     <div
       className="tv-player-fullscreen"
-      onClick={pingOsd}
       style={{
         position: 'fixed',
         top: 0,
@@ -781,17 +845,8 @@ export function TVPlayer({
         playsInline
         autoPlay
         controls={false}
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          display: 'block',
-          width: '100%',
-          height: '100%',
-          objectFit: 'contain',
-          backgroundColor: 'transparent',
-          background: 'transparent'
-        }}
+        style={videoStyle}
+        onClick={pingOsd}
         onWaiting={() => setIsBuffering(true)}
         onPlaying={() => {
           setIsBuffering(false);
@@ -1044,6 +1099,16 @@ export function TVPlayer({
                 >
                   <RefreshCw size={18} />
                   <span>Engine: {videoEngine === 'hls' ? 'HLS' : 'Native'}</span>
+                </button>
+
+                <button 
+                  className="tv-player-btn" 
+                  tabIndex={0}
+                  onClick={cycleFitMode}
+                  title="Screen Aspect Ratio & Line Cropping"
+                >
+                  <Maximize size={18} />
+                  <span>Fit: {fitMode === 'clean' ? 'Clean' : fitMode === 'zoom' ? 'Zoom 16:9' : fitMode === 'stretch' ? 'Stretch' : 'Original'}</span>
                 </button>
 
                 {audioTracks.length > 1 && (

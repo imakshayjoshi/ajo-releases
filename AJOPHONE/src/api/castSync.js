@@ -394,11 +394,9 @@ export class CastSyncEngine {
         clearTimeout(connTimeout);
         this.ws = null;
         this.mqttConnected = false;
-        if (this.isAppVisible) {
-          this.scheduleReconnect();
-        } else {
-          this.setConnectionState(CONNECTION_STATES.DISCONNECTED);
-        }
+        // Always reconnect — Fire TV WebView reports visibilityState='hidden'
+        // during fullscreen playback which incorrectly prevents reconnects.
+        this.scheduleReconnect();
       };
 
       this.ws.onerror = () => {
@@ -753,7 +751,7 @@ export class CastSyncEngine {
     if (msg.room !== this.roomCode) return;
 
     if (msg.msgId && this.seenMsgIds.has(msg.msgId)) return;
-    if (msg.timestamp && Math.abs(Date.now() - Number(msg.timestamp)) > 60000) return;
+    if (msg.timestamp && Math.abs(Date.now() - Number(msg.timestamp)) > 300000) return; // 5 min stale guard
 
     if (msg.msgId) {
       this.seenMsgIds.add(msg.msgId);

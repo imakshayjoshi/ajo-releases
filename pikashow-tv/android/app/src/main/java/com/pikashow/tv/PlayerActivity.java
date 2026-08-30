@@ -444,6 +444,11 @@ public class PlayerActivity extends AppCompatActivity {
             }
         }
 
+        long startPos = intent.getLongExtra("startPositionMs", 0L);
+        if (startPos > 0 && !isLive) {
+            resumePositionMs = startPos;
+        }
+
         if (!serverQueue.isEmpty()) {
             streamUrl = serverQueue.get(0);
         }
@@ -456,7 +461,12 @@ public class PlayerActivity extends AppCompatActivity {
         // overlays (volume panel, remote menu, Fire TV settings popup) without
         // the expensive codec teardown+rebuild cycle that onStop/onStart does.
         if (player != null && !isWebEmbedMode) {
-            resumePositionMs = isLive ? C.TIME_UNSET : player.getCurrentPosition();
+            long curPos = player.getCurrentPosition();
+            long dur = player.getDuration();
+            if (curPos > 5000 && dur > 0 && !isLive) {
+                MainActivity.setLastNativePlayback(curPos / 1000, dur / 1000);
+            }
+            resumePositionMs = isLive ? C.TIME_UNSET : curPos;
             player.setPlayWhenReady(false);
         }
     }
@@ -465,7 +475,9 @@ public class PlayerActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         // Resume playback if the player is still alive (onStop wasn't called).
-        if (player != null && !isWebEmbedMode) {
+        // If onStop DID run, onStart rebuilt the player and set playWhenReady.
+        if (player != null && !isWebEmbedMode && !player.isPlaying()
+                && player.getPlaybackState() != Player.STATE_ENDED) {
             player.setPlayWhenReady(true);
         }
     }
@@ -475,8 +487,13 @@ public class PlayerActivity extends AppCompatActivity {
         super.onStop();
         // Fully release the decoder — app is now truly invisible (Home pressed,
         // task switched, etc.). Free the hardware codec for other apps.
-        if (player != null) {
-            resumePositionMs = isLive ? C.TIME_UNSET : player.getCurrentPosition();
+        if (player != null && !isLive) {
+            long curPos = player.getCurrentPosition();
+            long dur = player.getDuration();
+            if (curPos > 5000 && dur > 0) {
+                MainActivity.setLastNativePlayback(curPos / 1000, dur / 1000);
+            }
+            resumePositionMs = curPos;
         }
         uiHandler.removeCallbacks(progressRunnable);
         uiHandler.removeCallbacks(firstFrameWatchdog);
@@ -499,6 +516,13 @@ public class PlayerActivity extends AppCompatActivity {
     protected void onDestroy() {
         super.onDestroy();
         if (activeInstance == this) activeInstance = null;
+        if (player != null && !isLive) {
+            long curPos = player.getCurrentPosition();
+            long dur = player.getDuration();
+            if (curPos > 5000 && dur > 0) {
+                MainActivity.setLastNativePlayback(curPos / 1000, dur / 1000);
+            }
+        }
         uiHandler.removeCallbacksAndMessages(null);
         releasePlayer();
         uiHandler.removeCallbacks(webLoadWatchdog);
@@ -1476,14 +1500,28 @@ public class PlayerActivity extends AppCompatActivity {
     }
 
     private void enableImmersiveMode() {
-        View decorView = getWindow().getDecorView();
-        decorView.setSystemUiVisibility(
-                View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-                        | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                        | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                        | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                        | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                        | View.SYSTEM_UI_FLAG_FULLSCREEN);
+        // v3.12.4 H7 FIX: modern WindowInsetsController on Android 11+ / Fire OS 8+.
+        // The deprecated SYSTEM_UI_FLAG_* flags no longer fully hide nav/status bars
+        // on newer Fire TV firmware updates, causing them to pop back mid-playback.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            getWindow().setDecorFitsSystemWindows(false);
+            android.view.WindowInsetsController controller =
+                    getWindow().getInsetsController();
+            if (controller != null) {
+                controller.hide(android.view.WindowInsets.Type.systemBars());
+                controller.setSystemBarsBehavior(
+                        android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+            }
+        } else {
+            View decorView = getWindow().getDecorView();
+            decorView.setSystemUiVisibility(
+                    View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                            | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                            | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                            | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                            | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                            | View.SYSTEM_UI_FLAG_FULLSCREEN);
+        }
     }
 
     @Override

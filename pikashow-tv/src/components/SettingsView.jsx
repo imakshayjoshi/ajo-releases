@@ -147,25 +147,38 @@ export function SettingsView() {
         {castState === null ? (
           <p style={{ color: '#94a3b8', fontSize: '0.9rem' }}>Starting cast engine…</p>
         ) : (
-          <>
+        <>
             <div style={{
               display: 'flex', alignItems: 'center', gap: 14, margin: '12px 0',
               background: 'rgba(229,9,20,0.12)', border: '1px solid #e50914',
               borderRadius: 10, padding: '14px 18px'
             }}>
-              <span style={{ fontSize: 15, color: '#e2e8f0', fontWeight: 600 }}>Room Code</span>
-              <span style={{
-                fontSize: 26, fontWeight: 800, letterSpacing: 3, color: '#fff',
-                fontVariantNumeric: 'tabular-nums'
-              }}>
-                {castState.roomCode || '—'}
-              </span>
-              <span style={{
-                marginLeft: 'auto', fontSize: 12, padding: '4px 10px', borderRadius: 999,
-                background: castState.isPaired ? '#16a34a' : '#475569', color: '#fff', fontWeight: 700
-              }}>
-                {castState.isPaired ? `CONNECTED · ${castState.phoneName || 'Phone'}` : 'Waiting for your phone'}
-              </span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1 }}>
+                <span style={{ fontSize: 15, color: '#e2e8f0', fontWeight: 600 }}>Room Code</span>
+                <span style={{
+                  fontSize: 26, fontWeight: 800, letterSpacing: 3, color: '#fff',
+                  fontVariantNumeric: 'tabular-nums'
+                }}>
+                  {castState.roomCode || '—'}
+                </span>
+                <span style={{
+                  fontSize: 12, padding: '4px 10px', borderRadius: 999, width: 'fit-content',
+                  background: castState.isPaired ? '#16a34a' : '#475569', color: '#fff', fontWeight: 700
+                }}>
+                  {castState.isPaired ? `CONNECTED · ${castState.phoneName || 'Phone'}` : 'Waiting for your phone'}
+                </span>
+              </div>
+              {castState.roomCode && !castState.isPaired && (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                  <img
+                    src={`https://chart.googleapis.com/chart?cht=qr&chs=120x120&chl=${encodeURIComponent('ajoapp://pair?code=' + castState.roomCode)}&choe=UTF-8`}
+                    alt={`QR: ${castState.roomCode}`}
+                    style={{ width: 110, height: 110, borderRadius: 8, background: '#fff', padding: 4 }}
+                    onError={(e) => { e.target.style.display = 'none'; }}
+                  />
+                  <span style={{ fontSize: 11, color: '#94a3b8', textAlign: 'center', maxWidth: 110 }}>Scan with phone camera</span>
+                </div>
+              )}
             </div>
 
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -181,7 +194,7 @@ export function SettingsView() {
               )}
             </div>
             <p style={{ color: '#64748b', fontSize: '0.8rem', marginTop: 10, lineHeight: 1.5 }}>
-              Works on any internet — your phone and TV don't need to be on the same Wi-Fi. Just enter the same code.
+              Works on any internet — your phone and TV don't need to be on the same Wi-Fi. Just enter the same code or scan the QR.
             </p>
           </>
         )}

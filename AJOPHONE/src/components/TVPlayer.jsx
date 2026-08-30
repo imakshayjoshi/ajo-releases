@@ -17,13 +17,15 @@ import {
   FastForward, 
   Rewind 
 } from 'lucide-react';
-import { saveProgress, getWatchHistory } from '../api/history';
+import { saveProgress, getWatchHistory, getWatchProgress } from '../api/history';
+import { markChannelDead } from '../api/iptv';
 import { CatchupDrawer } from './CatchupDrawer';
 import { detectStreamType, generateUniversalServers } from '../utils/streamingEngines';
 import { castEngine } from '../api/castSync';
+import { getLiveConfig, getVodConfig, createErrorHandler } from '../utils/hlsConfig';
 
-const STARTUP_TIMEOUT_MS = 15000;
-const REBUFFER_TIMEOUT_MS = 10000;
+const STARTUP_TIMEOUT_MS = 6500;
+const REBUFFER_TIMEOUT_MS = 6000;
 const AUTO_DISMISS_DELAY_MS = 3000;
 
 function formatTime(seconds) {
@@ -67,13 +69,13 @@ export function TVPlayer({ item, server, channels = [], onSelectChannel, onClose
   const rotateFlippedRef = useRef(false);
   const resumePositionRef = useRef(null);
 
-  // ---- ZOOM / FIT MODES (new): cycle Contain → Fill → Stretch.
+  // ---- ZOOM / FIT MODES: cycle Clean (VBI crop) → Fit → Zoom → Stretch.
   // Pinch on the video adjusts free-form zoom (phone); double-tap cycles.
   // NOTE: cycleFit references resetControlsTimer which is defined below —
   // use a ref indirection so hoisting is never an issue.
   const resetControlsTimerRef = useRef(() => {});
-  const FIT_MODES = ['contain', 'cover', 'fill'];
-  const [fitMode, setFitMode] = useState('contain');
+  const FIT_MODES = ['clean', 'contain', 'cover', 'fill'];
+  const [fitMode, setFitMode] = useState('clean');
   const [pinchScale, setPinchScale] = useState(1);
   const pinchStartRef = useRef(null);
   const pinchDistRef = useRef(0);
@@ -190,6 +192,10 @@ export function TVPlayer({ item, server, channels = [], onSelectChannel, onClose
       setTimeout(() => setAutoFailoverMsg(null), 3500);
       setSourceIndex(nextIdx);
     } else {
+      if (item && (item.is_live || item.type === 'live' || item.year === 'LIVE')) {
+        const failedUrl = sources[sourceIndex]?.url || item.url;
+        if (failedUrl) markChannelDead(failedUrl);
+      }
       setBuffering(false);
       setError('Primary streams are currently busy. Select a backup mirror below:');
     }
@@ -206,20 +212,16 @@ export function TVPlayer({ item, server, channels = [], onSelectChannel, onClose
     // RESUME FIX: restore last watched position for this title (Continue
     // Watching). Saved by saveProgress on close; looked up by id/title.
     try {
-      const history = getWatchHistory() || [];
-      const entry = history.find(h =>
-        (item?.id && h.id === item.id) ||
-        (h.title && item?.title && h.title === item.title)
-      );
-      if (entry && entry.currentTime > 15) {
-        resumePositionRef.current = entry.currentTime;
+      const progress = getWatchProgress(item);
+      if (progress && progress.currentTime > 15) {
+        resumePositionRef.current = progress.currentTime;
       } else {
         resumePositionRef.current = null;
       }
     } catch {
       resumePositionRef.current = null;
     }
-  }, [item?.id, item?.title]);
+  }, [item]);
 
   // ---- ORIENTATION (fix): auto-rotate to landscape when playback starts,
   // restore sensor/auto when the player closes. Uses the AndroidOrientation
@@ -311,32 +313,13 @@ export function TVPlayer({ item, server, channels = [], onSelectChannel, onClose
           onError(new Error('HLS unsupported'));
           return;
         }
-        const hls = new Hls({
-          enableWorker: false,
-          startLevel: -1,
-          capLevelToPlayerSize: true,
-          testBandwidth: true,
-          abrEwmaDefaultEstimate: isLive ? 1200000 : 2000000,
-          abrBandWidthFactor: 0.85,
-          abrBandWidthUpFactor: 0.7,
-          maxBufferLength: isLive ? 20 : 30,
-          liveSyncDurationCount: isLive ? 2 : undefined,
-          startFragPrefetch: true,
-          maxMaxBufferLength: isLive ? 15 : 45,
-          backBufferLength: isLive ? 0 : 15,
-          maxBufferHole: 0.3,
-          lowLatencyMode: isLive,
-          manifestLoadingTimeOut: 10000,
-          manifestLoadingMaxRetry: 2,
-          levelLoadingMaxRetry: 2,
-          fragLoadingTimeOut: 15000,
-          fragLoadingMaxRetry: 3,
-          xhrSetup: xhr => {
-            for (const [name, value] of Object.entries(activeSource.headers || {})) {
-              try { xhr.setRequestHeader(name, value); } catch {}
-            }
-          }
-        });
+
+        // Use optimized HLS config based on content type
+        const hlsConfig = isLive
+          ? getLiveConfig(activeSource.headers || {})
+          : getVodConfig(activeSource.headers || {});
+
+        const hls = new Hls(hlsConfig);
         hlsRef.current = hls;
         hls.loadSource(activeSource.url);
         hls.attachMedia(video);
@@ -353,19 +336,10 @@ export function TVPlayer({ item, server, channels = [], onSelectChannel, onClose
           }
           startPlayback();
         });
-        hls.on(Hls.Events.ERROR, (_e, data) => {
-          if (!data?.fatal || disposed) return;
-          if (data.type === Hls.ErrorTypes.NETWORK_ERROR && retriesRef.current < 2) {
-            retriesRef.current += 1;
-            hls.startLoad();
-            return;
-          }
-          if (data.type === Hls.ErrorTypes.MEDIA_ERROR && retriesRef.current < 2) {
-            retriesRef.current += 1;
-            hls.recoverMediaError();
-            return;
-          }
-          // Fallback to Native Player
+        // Enhanced error handler with auto-failover on 403/404
+        hls.on(Hls.Events.ERROR, createErrorHandler(hls, (msg) => {
+          if (disposed) return;
+          // Fallback to Native Player first
           try {
             hls.destroy();
             hlsRef.current = null;
@@ -373,9 +347,9 @@ export function TVPlayer({ item, server, channels = [], onSelectChannel, onClose
             video.load();
             startPlayback();
           } catch {
-            failover('Stream playback error encountered.');
+            failover(msg || 'Stream playback error encountered.');
           }
-        });
+        }, retriesRef));
       })();
     } else {
       video.src = activeSource.url;
@@ -408,6 +382,9 @@ export function TVPlayer({ item, server, channels = [], onSelectChannel, onClose
     const onPause = () => {
       setPlaying(false);
       setShowControls(true);
+      if (!isLive && video.currentTime > 5 && video.duration > 0) {
+        saveProgress(item, video.currentTime, video.duration);
+      }
     };
     const onError = () => failover('The device could not play this source.');
     const onTime = () => {
@@ -458,7 +435,7 @@ export function TVPlayer({ item, server, channels = [], onSelectChannel, onClose
         }
       }
 
-      if (!isLive && video.duration > 0 && Math.floor(video.currentTime) % 10 === 0) {
+      if (!isLive && video.duration > 0 && Math.floor(video.currentTime) % 5 === 0) {
         saveProgress(item, video.currentTime, video.duration);
       }
     };
@@ -472,6 +449,9 @@ export function TVPlayer({ item, server, channels = [], onSelectChannel, onClose
     return () => {
       disposed = true;
       clearFailureTimer();
+      if (!isLive && video.currentTime > 5 && video.duration > 0) {
+        saveProgress(item, video.currentTime, video.duration);
+      }
       if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current);
       video.removeEventListener('waiting', onWaiting);
       video.removeEventListener('playing', onPlaying);
@@ -485,7 +465,7 @@ export function TVPlayer({ item, server, channels = [], onSelectChannel, onClose
       video.removeAttribute('src');
       video.load();
     };
-  }, [activeSource?.url]);
+  }, [activeSource?.url, isLive, item]);
 
   const close = useCallback(() => {
     if (!isLive && duration > 0) saveProgress(item, time, duration);
@@ -625,8 +605,9 @@ export function TVPlayer({ item, server, channels = [], onSelectChannel, onClose
           style={{
             width: '100%',
             height: '100%',
-            objectFit: pinchScale > 1 ? 'cover' : fitMode,
-            transform: videoTransform,
+            objectFit: pinchScale > 1 ? 'cover' : fitMode === 'clean' ? 'contain' : fitMode,
+            transform: pinchScale > 1 ? videoTransform : fitMode === 'clean' ? 'scale(1.02)' : 'none',
+            clipPath: fitMode === 'clean' && pinchScale === 1 ? 'inset(3px 0 0 0)' : 'none',
             transition: 'transform 0.15s ease-out',
             backgroundColor: '#000000',
             touchAction: 'none'
@@ -655,7 +636,7 @@ export function TVPlayer({ item, server, channels = [], onSelectChannel, onClose
           fontWeight: 800,
           pointerEvents: 'none'
         }}>
-          {fitMode === 'cover' ? '🔍 Zoom to Fill' : '📐 Stretch'}
+          {fitMode === 'clean' ? '✨ Clean (No Lines)' : fitMode === 'cover' ? '🔍 Zoom to Fill' : '📐 Stretch'}
         </div>
       )}
       {pinchScale > 1 && (
@@ -1135,7 +1116,7 @@ export function TVPlayer({ item, server, channels = [], onSelectChannel, onClose
                       cursor: 'pointer'
                     }}
                   >
-                    {mode === 'contain' ? 'Fit' : mode === 'cover' ? 'Zoom to Fill' : 'Stretch'}
+                    {mode === 'clean' ? 'Clean' : mode === 'contain' ? 'Fit' : mode === 'cover' ? 'Zoom' : 'Stretch'}
                   </button>
                 ))}
               </div>

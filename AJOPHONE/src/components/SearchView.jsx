@@ -3,6 +3,7 @@ import { Search as SearchIcon, X, Film, Tv, Radio, Sparkles, Loader2 } from 'luc
 import { searchAllMedia } from '../api/pikashow';
 import { MediaCard } from './MediaCard';
 import { LandscapeMediaCard } from './LandscapeMediaCard';
+import { useDebounce } from '../hooks/useDebounce';
 
 export function SearchView({ 
   onSelectItem, 
@@ -16,9 +17,12 @@ export function SearchView({
   const inputRef = useRef(null);
 
   const quickKeywords = [
-    'Cricket', 'Star Sports', 'Sony Sports', 'Bollywood', 'Hollywood', 
+    'Cricket', 'Star Sports', 'Sony Sports', 'Bollywood', 'Hollywood',
     'Action', 'Panchayat', 'Farzi', 'Sony Max', 'Aaj Tak', 'Hotstar'
   ];
+
+  // Debounced query for 300ms fast search
+  const debouncedQuery = useDebounce(query, 300);
 
   // Perform search across local items and remote API
   const performSearch = useCallback(async (searchQuery) => {
@@ -63,17 +67,13 @@ export function SearchView({
   }, [preloadedItems]);
 
   useEffect(() => {
-    if (!query) {
+    if (!debouncedQuery) {
       setResults([]);
       return;
     }
 
-    const timer = setTimeout(() => {
-      performSearch(query);
-    }, 200);
-
-    return () => clearTimeout(timer);
-  }, [query, performSearch]);
+    performSearch(debouncedQuery);
+  }, [debouncedQuery, performSearch]);
 
   const filteredResults = results.filter(item => {
     if (filterType === 'all') return true;

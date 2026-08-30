@@ -219,7 +219,7 @@ export function setNativePlaybackActive(active) {
   nativePlaybackActive = Boolean(active);
 }
 
-export function playInNativePlayer(url, title, isLive, fallbackUrls = []) {
+export function playInNativePlayer(url, title, isLive, fallbackUrls = [], startPositionMs = 0) {
   const api = bridge();
   if (!api || !url) return false;
   if (!isNativePlayableUrl(url)) return false;
@@ -236,6 +236,17 @@ export function playInNativePlayer(url, title, isLive, fallbackUrls = []) {
       ? JSON.stringify(nativeFallbacks)
       : '';
 
+    if (typeof api.playStreamWithFallbacksAndPosition === 'function') {
+      api.playStreamWithFallbacksAndPosition(
+        String(url),
+        String(title || (isLive ? 'Live Channel' : 'Video Stream')),
+        Boolean(isLive),
+        urlsJson,
+        Number(startPositionMs) || 0
+      );
+      nativePlaybackActive = true;
+      return true;
+    }
     if (typeof api.playStreamWithFallbacks === 'function') {
       api.playStreamWithFallbacks(
         String(url),

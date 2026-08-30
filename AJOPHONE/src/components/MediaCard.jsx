@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Star, Film, Play, Tv } from 'lucide-react';
 import { getSourceProvider } from '../utils/sourceProvider';
 import { castEngine } from '../api/castSync';
+import { LazyImage } from './LazyImage';
 
 export const MediaCard = React.memo(function MediaCard({ item, onClick, onFocus }) {
   const [imgError, setImgError] = useState(false);
@@ -47,13 +48,11 @@ export const MediaCard = React.memo(function MediaCard({ item, onClick, onFocus 
         }}
       >
         {!imgError && poster ? (
-          <img
+          <LazyImage
             src={poster}
             alt={title}
             className="mobile-card-img"
             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-            loading="lazy"
-            referrerPolicy="no-referrer"
             onError={() => setImgError(true)}
           />
         ) : (

@@ -40,11 +40,12 @@ export function Top10Rail({ title = "🔥 Top 10 in India Today", items = [], on
         zIndex: 20,
         display: 'flex',
         gap: '12px',
-        overflowX: 'auto', WebkitOverflowScrolling: 'touch', touchAction: 'pan-x pan-y',
+        overflowX: 'auto',
+        WebkitOverflowScrolling: 'touch',
+        touchAction: 'pan-x pan-y',
         padding: '0 16px 10px 16px',
         scrollSnapType: 'x mandatory',
-        scrollbarWidth: 'none',
-        WebkitOverflowScrolling: 'touch'
+        scrollbarWidth: 'none'
       }}>
         {top10.map((item, index) => {
           const rank = index + 1;

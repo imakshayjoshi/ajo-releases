@@ -1,4 +1,4 @@
-import { getIPTVChannels } from './iptv.js';
+import { getIPTVChannels, LOGO_OVERRIDES, normalizeChannelKey } from './iptv.js';
 import { isSafeHttpUrl } from '../utils/streamingEngines.js';
 
 const BASE_URL = 'https://mapi.elochkaigolochla.com/api/v1';
@@ -6,11 +6,17 @@ const CACHE_KEY = 'ajo_catalog_v5';
 const CACHE_TTL = 30 * 60 * 1000;
 let memoryCatalog = null;
 
+// mapi.elochkaigolochla.com sends no CORS headers -> WebView/browser fetch is
+// blocked outright. Route mapi through our VPS proxy (adds CORS + cache).
+const MAPI_PROXY = 'https://new.ajo.co.in/channels/fetch?u=';
 async function fetchJson(url, timeout = 8000) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeout);
   try {
-    const response = await fetch(url, {
+    const proxied = url && url.startsWith('https://mapi.elochkaigolochla.com')
+      ? MAPI_PROXY + encodeURIComponent(url)
+      : url;
+    const response = await fetch(proxied, {
       signal: controller.signal,
       headers: { Accept: 'application/json' }
     });
@@ -43,6 +49,13 @@ export function normalizeMediaItem(item, category = 'movie') {
     poster = poster.url || poster.src || poster.poster || '';
   }
   poster = String(poster || '').trim();
+
+  if (live) {
+    const key = normalizeChannelKey(title);
+    if (LOGO_OVERRIDES[key]) {
+      poster = LOGO_OVERRIDES[key];
+    }
+  }
 
   let desc = item.description || item.overview || item.plot || '';
   if (typeof desc === 'object' && desc !== null) {

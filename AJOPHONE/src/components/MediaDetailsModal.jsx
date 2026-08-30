@@ -1,10 +1,23 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Play, X, Star, Radio, Film, Tv, Sparkles, Bookmark, Check, Layers, Cast } from 'lucide-react';
+import { Play, X, Star, Radio, Film, Tv, Sparkles, Bookmark, Check, Layers, Cast, RotateCcw } from 'lucide-react';
 import { getSeriesEpisodes } from '../api/pikashow';
 import { getSourceProvider } from '../utils/sourceProvider';
 import { generateUniversalServers } from '../utils/streamingEngines';
-import { isFavorite, toggleFavorite } from '../api/history';
+import { isFavorite, toggleFavorite, getWatchHistory, deleteHistoryItem, getWatchProgress } from '../api/history';
 import { castEngine } from '../api/castSync';
+import { generateAdditionalMovieSources, generateAdditionalSeriesSources, mergeStreamingSources } from '../api/additionalSources';
+
+function formatTime(seconds) {
+  if (!seconds || isNaN(seconds) || !isFinite(seconds)) return '00:00';
+  const total = Math.floor(seconds);
+  const hrs = Math.floor(total / 3600);
+  const mins = Math.floor((total % 3600) / 60);
+  const secs = total % 60;
+  if (hrs > 0) {
+    return `${hrs}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  }
+  return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+}
 
 export function MediaDetailsModal({ item, onClose, onStartPlayback }) {
   const [episodes, setEpisodes] = useState([]);
@@ -17,13 +30,26 @@ export function MediaDetailsModal({ item, onClose, onStartPlayback }) {
   const isLive = item?.is_live || item?.type === 'live' || item?.year === 'LIVE';
   const provider = getSourceProvider(item);
 
-  // Generate complete set of direct + 1Flex servers
+  const watchProgress = useMemo(() => {
+    return getWatchProgress(item);
+  }, [item]);
+
+  // Generate complete set of direct + 1Flex + additional embed servers
   const availableServers = useMemo(() => {
     if (!item) return [];
     if (isLive) {
       return item.players || item.player || [{ url: item.url, source: 'm3u8', name: 'Server 1 (Direct 1080p)' }];
     }
-    return generateUniversalServers(item);
+    // For movies: merge pikashow sources + additional embed sources (VidSrc, SuperEmbed, etc.)
+    const universalServers = generateUniversalServers(item);
+
+    // Series episodes are handled per-episode in TVPlayer, so skip merge here
+    if (item.type === 'series' || item.type === 'serial' || item.category === 'serials') {
+      return universalServers;
+    }
+
+    // Movies: merge additional sources
+    return mergeStreamingSources(item, universalServers);
   }, [item, isLive]);
 
   useEffect(() => {
@@ -126,16 +152,53 @@ export function MediaDetailsModal({ item, onClose, onStartPlayback }) {
             </div>
           </div>
 
+          {/* Resume Progress Bar */}
+          {watchProgress && (
+            <div style={{ margin: '12px 0', background: 'rgba(56, 189, 248, 0.08)', border: '1px solid rgba(56, 189, 248, 0.25)', borderRadius: 8, padding: '10px 14px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#94a3b8', marginBottom: 6 }}>
+                <span style={{ color: '#38bdf8', fontWeight: 700 }}>Resume Playback</span>
+                <span>{formatTime(watchProgress.currentTime)} / {formatTime(watchProgress.duration)} ({watchProgress.percentage}%)</span>
+              </div>
+              <div style={{ height: 4, background: 'rgba(255, 255, 255, 0.1)', borderRadius: 2, overflow: 'hidden' }}>
+                <div style={{ width: `${watchProgress.percentage}%`, height: '100%', background: '#38bdf8', borderRadius: 2 }} />
+              </div>
+            </div>
+          )}
+
           {/* Primary Touch Actions */}
           <div className="mobile-sheet-actions" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-            <button
-              className="mobile-sheet-primary-btn"
-              style={{ flex: 1, minWidth: '130px', minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
-              onClick={() => onStartPlayback(item, selectedServer)}
-            >
-              <Play size={18} fill="#06090e" />
-              <span>{isLive ? 'Watch Live' : 'Play Now'}</span>
-            </button>
+            {watchProgress ? (
+              <>
+                <button
+                  className="mobile-sheet-primary-btn"
+                  style={{ flex: 1, minWidth: '130px', minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                  onClick={() => onStartPlayback(item, selectedServer)}
+                >
+                  <Play size={18} fill="#06090e" />
+                  <span>Resume ({formatTime(watchProgress.currentTime)})</span>
+                </button>
+                <button
+                  className="mobile-sheet-watchlist-btn"
+                  style={{ minHeight: '44px', padding: '0 14px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                  onClick={() => {
+                    deleteHistoryItem(item);
+                    onStartPlayback(item, selectedServer);
+                  }}
+                >
+                  <RotateCcw size={18} />
+                  <span>Restart</span>
+                </button>
+              </>
+            ) : (
+              <button
+                className="mobile-sheet-primary-btn"
+                style={{ flex: 1, minWidth: '130px', minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                onClick={() => onStartPlayback(item, selectedServer)}
+              >
+                <Play size={18} fill="#06090e" />
+                <span>{isLive ? 'Watch Live' : 'Play Now'}</span>
+              </button>
+            )}
 
             <button
               className="mobile-sheet-watchlist-btn"

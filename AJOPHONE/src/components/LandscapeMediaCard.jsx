@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Star, Radio, Play, Tv } from 'lucide-react';
 import { getSourceProvider } from '../utils/sourceProvider';
 import { castEngine } from '../api/castSync';
+import { LazyImage } from './LazyImage';
 
 export const LandscapeMediaCard = React.memo(function LandscapeMediaCard({ item, onClick, onFocus }) {
   const [imgError, setImgError] = useState(false);
@@ -44,13 +45,11 @@ export const LandscapeMediaCard = React.memo(function LandscapeMediaCard({ item,
         boxShadow: '0 4px 14px rgba(0, 0, 0, 0.6)'
       }}>
         {!imgError && logo ? (
-          <img
+          <LazyImage
             src={logo}
             alt={title}
             className="mobile-landscape-img"
             style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#0a0f18', padding: '6px' }}
-            loading="lazy"
-            referrerPolicy="no-referrer"
             onError={() => setImgError(true)}
           />
         ) : (

@@ -1,15 +1,16 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { MediaCard } from './MediaCard';
 import { LandscapeMediaCard } from './LandscapeMediaCard';
-import { Film, Tv, Radio, Sparkles, Loader2 } from 'lucide-react';
+import { Film, Tv, Radio, Sparkles, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { WorldwideFilterBar } from './WorldwideFilterBar';
+import { usePagination } from '../hooks/usePagination';
 
-export function MediaGridView({ 
-  title, 
-  icon: Icon = Film, 
-  items = [], 
+export function MediaGridView({
+  title,
+  icon: Icon = Film,
+  items = [],
   type = 'movies', // 'movies' | 'shows' | 'channels' | 'shorts'
-  onSelectItem, 
+  onSelectItem,
   onFocusItem,
   onLoadMore,
   hasMore = false,
@@ -146,6 +147,17 @@ export function MediaGridView({
     return result;
   }, [items, filters]);
 
+  // Pagination: 20 items initially, load more on demand
+  const {
+    items: paginatedItems,
+    currentPage,
+    totalPages,
+    hasNext,
+    nextPage,
+    hasPrev,
+    prevPage
+  } = usePagination(filteredItems, 20);
+
   // Infinite Scroll Trigger
   useEffect(() => {
     if (!onLoadMore || !hasMore || isLoadingMore) return;
@@ -214,7 +226,7 @@ export function MediaGridView({
       />
 
       {/* Grid Layout */}
-      <div 
+      <div
         className={isChannels ? "mobile-landscape-grid" : "mobile-portrait-grid"}
         style={{
           position: 'relative',
@@ -225,7 +237,7 @@ export function MediaGridView({
           width: '100%'
         }}
       >
-        {filteredItems.map((item, idx) => {
+        {paginatedItems.map((item, idx) => {
           const key = item.id || item.kinopoisk_id || `${item.title}-${idx}`;
           return isChannels ? (
             <LandscapeMediaCard
@@ -243,7 +255,56 @@ export function MediaGridView({
         })}
       </div>
 
-      {/* Infinite Scroll Anchor & Loader */}
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', marginTop: '20px', paddingBottom: '40px' }}>
+          <button
+            onClick={prevPage}
+            disabled={!hasPrev}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '10px',
+              background: hasPrev ? 'rgba(56, 189, 248, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+              border: hasPrev ? '1px solid #38bdf8' : '1px solid rgba(255, 255, 255, 0.1)',
+              color: hasPrev ? '#38bdf8' : '#64748b',
+              fontWeight: 800,
+              fontSize: '13px',
+              cursor: hasPrev ? 'pointer' : 'not-allowed',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+          >
+            <ChevronLeft size={16} />
+            <span>Prev</span>
+          </button>
+          <span style={{ color: '#cbd5e1', fontWeight: 800, fontSize: '14px' }}>
+            Page {currentPage} of {totalPages}
+          </span>
+          <button
+            onClick={nextPage}
+            disabled={!hasNext}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '10px',
+              background: hasNext ? 'rgba(56, 189, 248, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+              border: hasNext ? '1px solid #38bdf8' : '1px solid rgba(255, 255, 255, 0.1)',
+              color: hasNext ? '#38bdf8' : '#64748b',
+              fontWeight: 800,
+              fontSize: '13px',
+              cursor: hasNext ? 'pointer' : 'not-allowed',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+          >
+            <span>Next</span>
+            <ChevronRight size={16} />
+          </button>
+        </div>
+      )}
+
+      {/* Infinite Scroll Anchor & Loader (for remote load more) */}
       {hasMore && (
         <div ref={bottomObserverRef} style={{ position: 'relative', zIndex: 20, padding: '24px 0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           {isLoadingMore ? (
@@ -252,7 +313,7 @@ export function MediaGridView({
               <span>Loading more titles...</span>
             </div>
           ) : (
-            <button 
+            <button
               onClick={onLoadMore}
               style={{
                 padding: '10px 22px',

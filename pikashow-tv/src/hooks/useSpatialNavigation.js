@@ -297,6 +297,14 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
 
       // 2. D-Pad Directional Navigation
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(key) || [19, 20, 21, 22, 37, 38, 39, 40].includes(keyCode)) {
+        // Normalize keyCode to direction string FIRST so `dir` is available
+        // for the INPUT/TEXTAREA guard below (v3.12.4 TDZ fix).
+        let dir = key;
+        if (keyCode === 19 || keyCode === 38) dir = 'ArrowUp';
+        if (keyCode === 20 || keyCode === 40) dir = 'ArrowDown';
+        if (keyCode === 21 || keyCode === 37) dir = 'ArrowLeft';
+        if (keyCode === 22 || keyCode === 39) dir = 'ArrowRight';
+
         // v3.8.2 base rule; v3.10.0 refinement: while typing in a text field,
         // LEFT/RIGHT move the caret (swallow them), but UP/DOWN fall through
         // to spatial navigation so the user can actually leave the search
@@ -307,11 +315,6 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
           if (dir === 'ArrowLeft' || dir === 'ArrowRight') return;
           // Up/Down: fall through to spatial nav below
         }
-        let dir = key;
-        if (keyCode === 19 || keyCode === 38) dir = 'ArrowUp';
-        if (keyCode === 20 || keyCode === 40) dir = 'ArrowDown';
-        if (keyCode === 21 || keyCode === 37) dir = 'ArrowLeft';
-        if (keyCode === 22 || keyCode === 39) dir = 'ArrowRight';
 
         const activeContainer = isModalOpen && modalSelector
           ? document.querySelector(modalSelector) || document
