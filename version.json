@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "version": "3.12.12",
-  "versionCode": 99,
+  "version": "3.12.13",
+  "versionCode": 100,
   "releaseDate": "2026-08-30",
   "phone": {
     "version": "3.3.16",
@@ -22,20 +22,21 @@
     "sha256": "47d86eba095b0187b93ee1c7cc23542b98393a4818d7561a0e139b85d35c55d5"
   },
   "tv": {
-    "version": "3.12.12",
-    "versionCode": 99,
+    "version": "3.12.13",
+    "versionCode": 100,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "📺 Active Preflight Registry Fix: Force-imported nativePlayer to bind the global __ajoEmbedPreflightResult receiver before first play hook",
-      "📺 Cache Eviction update (v18): Invalidated stale localstorage keys to refresh live channel count to 2,400+ listings",
-      "🚀 Primary Stream Engines Updated: Promoted active VidSrc PM & VidSrc IO mirrors to Server 1 & Server 2",
+      "⚡ Live Channels Load Order Fix: Made server-verified working stream URLs primary (Server 1) instead of dead builtin URLs",
+      "📺 Embed Mirrors Timeout optimization: Bumped embed loader timeout from 6s to 24s to let slow Android/Fire TV sticks preload",
+      "📺 Fixed Mirror Banner: Completely removed persistent 'Checking mirror availability...' text state banner",
+      "📺 Sub TV & SAB TV Added: Sub TV added explicitly to built-in Indian channel lineup alongside Sony SAB and SAB HD",
       "📻 Remote OK/Enter EPG Drawer: Pressing OK during live channel streaming opens the Live EPG Now/Next Guide overlay"
     ],
     "size_mb": "6.8 MB",
-    "sha256": "01a5ff479e03970c8982ed59c8e1a579d6ffb50d1c2411e18e149ed681d5c9e7"
+    "sha256": "28f31f932c90129d162bccdb4ccfa1ba1f637ca8de3fa83554d2571b8a19d07b"
   }
 }
