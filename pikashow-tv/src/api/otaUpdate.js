@@ -1,8 +1,9 @@
 export const CURRENT_APP_VERSION = '3.12.20';
 export const CURRENT_VERSION_CODE = 107;
 const MANIFEST_SOURCES = [
-  'https://api.github.com/repos/imakshayjoshi/ajo-releases/releases/latest',
   'https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/version.json',
+  'https://raw.githack.com/imakshayjoshi/ajo-releases/main/version.json',
+  'https://api.github.com/repos/imakshayjoshi/ajo-releases/releases/latest',
   'https://cdn.jsdelivr.net/gh/imakshayjoshi/ajo-releases@main/version.json'
 ];
 const RELEASE_PREFIX = 'https://github.com/imakshayjoshi/ajo-releases/releases/download/';
@@ -24,6 +25,7 @@ export function isAllowedApkUrl(url) {
   const isAjoApk = /\/AJO_(PHONE|TV)\.apk(\?.*)?$/i.test(url) || url.endsWith('.apk');
   const isTrustedHost = url.includes('github.com') || 
                         url.includes('raw.githubusercontent.com') || 
+                        url.includes('githack.com') ||
                         url.includes('jsdelivr.net') || 
                         url.includes('tinyurl.com');
   return isAjoApk && isTrustedHost;
