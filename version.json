@@ -1,34 +1,37 @@
 {
   "schemaVersion": 2,
-  "version": "3.12.15",
-  "versionCode": 102,
+  "version": "3.12.16",
+  "versionCode": 103,
   "releaseDate": "2026-08-31",
   "phone": {
-    "version": "3.3.18",
-    "versionCode": 67,
+    "version": "3.3.19",
+    "versionCode": 68,
     "packageId": "com.ajo.phone",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "🍿 Movies Fix: Restored direct high-speed movie streams (MoviesAPI & MultiEmbed) and bypassed Cloudflare captcha loops"
+      "🍿 10 Working Movie Mirrors: Added VidLink (1080p fast direct stream), VidSrc PM, AutoEmbed, VidJoy, RiveStream, and 2Embed",
+      "⚡ Instant Playback: Bypassed WebView blockades and enabled zero-buffering fast load"
     ],
     "size_mb": "3.3 MB",
-    "sha256": "bc22e517c74c1e321ce5d17f45c4b64d68260ae2f6d15a1d6916304497baf05c"
+    "sha256": "c8434a0ac48ee1d62fadcd89f631c4bccb722649c29bcb864139f05099ad2961"
   },
   "tv": {
-    "version": "3.12.15",
-    "versionCode": 102,
+    "version": "3.12.16",
+    "versionCode": 103,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "🍿 Movies Fix: Restored direct high-speed movie streams (MoviesAPI & MultiEmbed) and bypassed Cloudflare captcha loops"
+      "🍿 10 Working Movie Mirrors: Added VidLink (1080p fast direct stream), VidSrc PM, AutoEmbed, VidJoy, RiveStream, and 2Embed",
+      "📺 Fixed TV WebViewClient: Removed iframe sub-request blocking so embedded video players start instantly on Smart TVs",
+      "⚡ Instant Playback: Fixed preflight watchdog so movies like Mutiny stream directly without errors"
     ],
     "size_mb": "6.8 MB",
-    "sha256": "c093b7da584481023739ff3b2fd9293d7ed74e900021625b2b006d485143cdb8"
+    "sha256": "026eceddbcbadbd40d590b85afa63b047c37c5630fccbe54142e01a5334734f0"
   }
 }
