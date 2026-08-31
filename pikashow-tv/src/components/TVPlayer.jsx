@@ -890,7 +890,7 @@ export function TVPlayer({
       )}
 
       {/* Buffering Spinner */}
-      {isBuffering && (
+      {isBuffering && !isEmbedStream && (
         <div
           className="tv-center-state"
           style={{

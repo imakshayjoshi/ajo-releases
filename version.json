@@ -1,36 +1,37 @@
 {
   "schemaVersion": 2,
-  "version": "3.12.18",
-  "versionCode": 105,
+  "version": "3.12.19",
+  "versionCode": 106,
   "releaseDate": "2026-08-31",
   "phone": {
-    "version": "3.3.21",
-    "versionCode": 70,
+    "version": "3.3.22",
+    "versionCode": 71,
     "packageId": "com.ajo.phone",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "📺 Sony Marathi Fixed: Added verified Sony Marathi 1080p live stream from SonyLIV",
-      "🎬 Movie & TV Embed Playback: Dedicated non-blocking remote navigation for embed video streams"
+      "📺 NDTV Marathi Logo Fixed: Updated official high-res logo",
+      "🎬 Movie & TV Embed Streaming: Fixed CookieManager and WebView UserAgent for seamless embed playback"
     ],
     "size_mb": "3.3 MB",
-    "sha256": "80e5c7564d7f6637ef932d4dc0b53e3944a9877484c8bfd25aea1e92f217feeb"
+    "sha256": "4eaaa6ca264f1584f2357d82117382e4d37340149fd5bfec1a0262dc93f095f0"
   },
   "tv": {
-    "version": "3.12.18",
-    "versionCode": 105,
+    "version": "3.12.19",
+    "versionCode": 106,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "📺 Sony Marathi Fixed: Added verified Sony Marathi 1080p live stream from SonyLIV",
-      "🎬 Movie & TV Embed Playback: Remote control D-pad and OK button now navigate and click embed players directly"
+      "📺 NDTV Marathi Logo Fixed: Replaced incorrect logo with official NDTV Marathi emblem",
+      "🎬 Movie & TV Embed Streaming: Added full 3rd-party cookie acceptance and standard UserAgent to bypass provider blocks on Fire TV / Android TV",
+      "🎯 TV Remote Direct Control: Unblocked native remote D-Pad and OK button on embedded video engines"
     ],
     "size_mb": "6.8 MB",
-    "sha256": "7399efd26ed060c1489978610f9fb0add4fa922f1e247c6f8d2aa89425261b97"
+    "sha256": "0a2dc7b2f0d3eb18ea25c2f1dab8e0f5aef5db387685bf7ed0f1993a5bf007ac"
   }
 }

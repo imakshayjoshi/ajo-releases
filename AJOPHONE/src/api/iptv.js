@@ -62,7 +62,7 @@ export const LOGO_OVERRIDES = {
   'ndtv247': 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/ndtv-24x7-in.png',
   'ndtv24x7': 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/ndtv-24x7-in.png',
   'ndtvindia': 'https://xstreamcp-assets-msp.streamready.in/assets/LIVETV/LIVECHANNEL/LIVETV_LIVETVCHANNEL_NDTV_INDIA/images/LOGO_HD/image.png',
-  'ndtvmarathi': 'https://dtil.tmsimg.com/assets/s157970_ld_h15_aa.png?lock=720x540',
+  'ndtvmarathi': 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/ndtv-marathi-in.png',
   'news18marathi': 'https://dtil.tmsimg.com/assets/s142522_ld_h15_aa.png?lock=720x540',
   'republicbharat': 'https://dtil.tmsimg.com/assets/s158137_ld_h15_aa.png?lock=720x540',
   'republictv': 'https://dtil.tmsimg.com/assets/s158136_ld_h15_aa.png?lock=720x540',
@@ -192,7 +192,7 @@ const BUILTIN_INDIAN_CHANNELS = [
     id: 'builtin-ndtvmarathi',
     title: 'NDTV Marathi',
     category: 'News',
-    poster: 'https://dtil.tmsimg.com/assets/s157970_ld_h15_aa.png?lock=720x540',
+    poster: 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/ndtv-marathi-in.png',
     url: 'https://web-ndtv-marathi.akamaized.net/hls/live/2110470/ndtvmarathi/master_1.m3u8',
     players: [
       { name: 'Server 1 (Official HD)', url: 'https://web-ndtv-marathi.akamaized.net/hls/live/2110470/ndtvmarathi/master_1.m3u8', source: 'hls', quality: '1080p' }
