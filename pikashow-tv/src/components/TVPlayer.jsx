@@ -145,6 +145,7 @@ export function TVPlayer({
 
   const activeServer = orderedServers[currentServerIndex] || orderedServers[0] || server;
   const streamUrl = activeServer?.url || item?.url;
+  const isEmbedStream = Boolean(streamUrl && (isEmbedUrl(streamUrl) || !isDirectMediaUrl(streamUrl)));
 
   const cycleFitMode = useCallback(() => {
     setFitMode(prev => {
@@ -768,6 +769,11 @@ export function TVPlayer({
         return;
       }
 
+      // For embed video players, let Enter / D-pad arrows interact directly with the embedded player
+      if (isEmbedStream) {
+        return;
+      }
+
       // Enter/OK key handling
       if ((key === 'Enter' || keyCode === 13 || keyCode === 23)) {
         if (!showDrawer) {
@@ -968,10 +974,61 @@ export function TVPlayer({
         </div>
       )}
 
+      {/* If embed stream, render clean top floating header rather than blocking OSD */}
+      {isEmbedStream && (
+        <div style={{
+          position: 'absolute',
+          top: 24,
+          left: 32,
+          right: 32,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          zIndex: 30,
+          pointerEvents: 'none'
+        }}>
+          <div style={{
+            background: 'rgba(0, 0, 0, 0.75)',
+            backdropFilter: 'blur(8px)',
+            padding: '10px 20px',
+            borderRadius: 10,
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            color: '#fff',
+            fontSize: '15px',
+            fontWeight: 800
+          }}>
+            {title} • {activeServer?.name || 'Server 1'}
+          </div>
+          <button
+            className="tv-player-btn"
+            style={{
+              pointerEvents: 'auto',
+              background: 'rgba(239, 68, 68, 0.9)',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 10,
+              padding: '10px 20px',
+              fontWeight: 800,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8
+            }}
+            onClick={() => {
+              teardownWebPlayback();
+              if (onClose) onClose(0, 0);
+            }}
+          >
+            <ArrowLeft size={16} />
+            <span>Exit Player</span>
+          </button>
+        </div>
+      )}
+
       {/* On-Screen Display (OSD) Overlay.
           Geometry is inline on purpose: this must never become a full-screen dark
           layer over the picture, and it must not depend on a CSS class existing. */}
-      {showOsd && (
+      {!isEmbedStream && showOsd && (
         <div
           className="tv-player-osd"
           style={{

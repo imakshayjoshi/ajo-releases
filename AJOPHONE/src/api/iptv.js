@@ -1,7 +1,7 @@
 import { isFavoriteChannel } from './history.js';
 import { isSafeHttpUrl } from '../utils/streamingEngines.js';
 
-const CACHE_KEY = 'ajo_iptv_cache_v19';
+const CACHE_KEY = 'ajo_iptv_cache_v20';
 const CUSTOM_KEY = 'ajo_custom_m3u_v2';
 const JIOTV_KEY = 'ajo_jiotv_host_v2';
 const FAILED_CHANNELS_KEY = 'ajo_failed_channels_v1';
@@ -408,6 +408,26 @@ const BUILTIN_INDIAN_CHANNELS = [
     players: [
       { name: 'Server 1 (HD)', url: 'https://cloudplay-sonyliv.pages.dev/sabhd.m3u8', source: 'hls', quality: '1080p' },
       { name: 'Server 2 (Backup)', url: 'http://202.70.146.135:8000/play/a025/index.m3u8', source: 'hls', quality: '720p' }
+    ]
+  },
+  {
+    id: 'builtin-sonymarathi',
+    title: 'Sony Marathi',
+    category: 'Entertainment',
+    poster: 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/sony-marathi-in.png',
+    url: 'https://cloudplay-sonyliv.pages.dev/marathi.m3u8',
+    players: [
+      { name: 'Server 1 (Live HD)', url: 'https://cloudplay-sonyliv.pages.dev/marathi.m3u8', source: 'hls', quality: '1080p' }
+    ]
+  },
+  {
+    id: 'builtin-sonymarathihd',
+    title: 'Sony Marathi HD',
+    category: 'Entertainment',
+    poster: 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/sony-marathi-in.png',
+    url: 'https://cloudplay-sonyliv.pages.dev/marathi.m3u8',
+    players: [
+      { name: 'Server 1 (Live HD)', url: 'https://cloudplay-sonyliv.pages.dev/marathi.m3u8', source: 'hls', quality: '1080p' }
     ]
   },
   {

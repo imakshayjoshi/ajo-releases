@@ -1,25 +1,16 @@
 import { isFavoriteChannel } from './history.js';
 import { isSafeHttpUrl } from '../utils/streamingEngines.js';
 
-const CACHE_KEY = 'ajo_iptv_cache_v19';
+const CACHE_KEY = 'ajo_iptv_cache_v20';
 const CUSTOM_KEY = 'ajo_custom_m3u_v2';
 const JIOTV_KEY = 'ajo_jiotv_host_v2';
 const FAILED_CHANNELS_KEY = 'ajo_failed_channels_v1';
 const CACHE_TTL = 30 * 60 * 1000;
 const MANIFEST_TTL = 2 * 60 * 60 * 1000; // 2 hours
 
-// Indian & global sports/entertainment playlists
+// 24/7 Production M3U Playlists curated for AJO TV & Mobile
 const PLAYLISTS = [
   'https://raw.githubusercontent.com/amazeyourself/m3u/main/sliv.m3u',
-  'https://iptv-org.github.io/iptv/countries/in.m3u',
-  'https://raw.githubusercontent.com/iptv-org/iptv/master/streams/in.m3u',
-  'https://iptv-org.github.io/iptv/languages/hin.m3u',
-  'https://iptv-org.github.io/iptv/languages/mar.m3u',
-  'https://iptv-org.github.io/iptv/languages/eng.m3u',
-  'https://iptv-org.github.io/iptv/categories/sports.m3u',
-  'https://iptv-org.github.io/iptv/categories/news.m3u',
-  'https://iptv-org.github.io/iptv/categories/movies.m3u',
-  'https://iptv-org.github.io/iptv/categories/music.m3u',
   'https://iptv-org.github.io/iptv/categories/entertainment.m3u'
 ];
 
@@ -31,7 +22,7 @@ const KEEP_LANG = new Set([
 ]);
 
 const MANIFEST_URL = 'https://new.ajo.co.in/channels/channels.json';
-const MANIFEST_CACHE_KEY = 'ajo_channels_manifest_v4';
+const MANIFEST_CACHE_KEY = 'ajo_channels_manifest_v5';
 
 // 100% Verified HTTP 200 Logos without CORS/ORB conflicts
 export const LOGO_OVERRIDES = {
@@ -420,6 +411,26 @@ const BUILTIN_INDIAN_CHANNELS = [
     players: [
       { name: 'Server 1 (HD)', url: 'https://cloudplay-sonyliv.pages.dev/sabhd.m3u8', source: 'hls', quality: '1080p' },
       { name: 'Server 2 (Backup)', url: 'http://202.70.146.135:8000/play/a025/index.m3u8', source: 'hls', quality: '720p' }
+    ]
+  },
+  {
+    id: 'builtin-sonymarathi',
+    title: 'Sony Marathi',
+    category: 'Entertainment',
+    poster: 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/sony-marathi-in.png',
+    url: 'https://cloudplay-sonyliv.pages.dev/marathi.m3u8',
+    players: [
+      { name: 'Server 1 (Live HD)', url: 'https://cloudplay-sonyliv.pages.dev/marathi.m3u8', source: 'hls', quality: '1080p' }
+    ]
+  },
+  {
+    id: 'builtin-sonymarathihd',
+    title: 'Sony Marathi HD',
+    category: 'Entertainment',
+    poster: 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/sony-marathi-in.png',
+    url: 'https://cloudplay-sonyliv.pages.dev/marathi.m3u8',
+    players: [
+      { name: 'Server 1 (Live HD)', url: 'https://cloudplay-sonyliv.pages.dev/marathi.m3u8', source: 'hls', quality: '1080p' }
     ]
   },
   {

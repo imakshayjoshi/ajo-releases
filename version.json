@@ -1,36 +1,36 @@
 {
   "schemaVersion": 2,
-  "version": "3.12.17",
-  "versionCode": 104,
+  "version": "3.12.18",
+  "versionCode": 105,
   "releaseDate": "2026-08-31",
   "phone": {
-    "version": "3.3.20",
-    "versionCode": 69,
+    "version": "3.3.21",
+    "versionCode": 70,
     "packageId": "com.ajo.phone",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "📺 Sony SAB & Sony Channels Fixed: Updated Sony SAB HD, Sony MAX HD, Sony TV, Sony Pal, Sony Pix, and Sony Sports with verified 1080p live streams",
-      "⚡ Instant Playback: Fresh cache invalidation ensures instant load of updated streams"
+      "📺 Sony Marathi Fixed: Added verified Sony Marathi 1080p live stream from SonyLIV",
+      "🎬 Movie & TV Embed Playback: Dedicated non-blocking remote navigation for embed video streams"
     ],
     "size_mb": "3.3 MB",
-    "sha256": "95d4e14dc57ff7228c5e2787c557ddb64fd65638b4aac43750e8d4c71e58ff53"
+    "sha256": "5d566bade9afd13249297c92a74cd87f0cd44bcc475824fa0d4f465f1cc4d88a"
   },
   "tv": {
-    "version": "3.12.17",
-    "versionCode": 104,
+    "version": "3.12.18",
+    "versionCode": 105,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "📺 Sony SAB & Sony Channels Fixed: Updated Sony SAB HD, Sony MAX HD, Sony TV, Sony Pal, Sony Pix, and Sony Sports with verified 1080p live streams",
-      "⚡ Instant Playback: Fresh cache invalidation ensures instant load of updated streams"
+      "📺 Sony Marathi Fixed: Added verified Sony Marathi 1080p live stream from SonyLIV",
+      "🎬 Movie & TV Embed Playback: Remote control D-pad and OK button now navigate and click embed players directly"
     ],
     "size_mb": "6.8 MB",
-    "sha256": "db26edf77f7f25054174d9d4dc3bea83425855c66cf6a7b9ce8bad6131a486c3"
+    "sha256": "f3c31ac51b48a090c31fa4cc68630294e055dd2d24aff9c4de6e9ae1ccad8029"
   }
 }
