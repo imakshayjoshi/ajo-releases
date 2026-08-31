@@ -119,24 +119,23 @@ public class MainActivity extends BridgeActivity {
                         try {
                             java.net.URL u = new java.net.URL(url);
                             conn = (java.net.HttpURLConnection) u.openConnection();
-                            conn.setConnectTimeout(8000);
-                            conn.setReadTimeout(8000);
+                            conn.setConnectTimeout(6000);
+                            conn.setReadTimeout(6000);
                             conn.setInstanceFollowRedirects(true);
                             conn.setRequestProperty("User-Agent",
-                                    "Mozilla/5.0 (Linux; Android 13; Pixel 6) AppleWebKit/537.36 "
-                                            + "(KHTML, like Gecko) Chrome/120.0.6099.210 Mobile Safari/537.36");
-                            conn.setRequestProperty("Referer", "https://ajo.co.in/");
-                            conn.setRequestProperty("Accept", "text/html,*/*");
+                                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                                            + "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36");
+                            conn.setRequestProperty("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
                             int code = conn.getResponseCode();
-                            if (code >= 400) {
+                            if (code >= 500) {
                                 ok = false;
-                            } else {
+                            } else if (code < 400) {
                                 java.io.InputStream in = conn.getInputStream();
                                 java.io.ByteArrayOutputStream buf = new java.io.ByteArrayOutputStream();
                                 byte[] chunk = new byte[8192];
                                 int n;
                                 int total = 0;
-                                while ((n = in.read(chunk)) != -1 && total < 200 * 1024) {
+                                while ((n = in.read(chunk)) != -1 && total < 100 * 1024) {
                                     buf.write(chunk, 0, n);
                                     total += n;
                                 }
@@ -144,7 +143,7 @@ public class MainActivity extends BridgeActivity {
                                 ok = !embedPageLooksBroken(buf.toString("UTF-8"));
                             }
                         } catch (Throwable t) {
-                            ok = false;
+                            ok = true;
                         } finally {
                             if (conn != null) { try { conn.disconnect(); } catch (Exception ignored) {} }
                         }

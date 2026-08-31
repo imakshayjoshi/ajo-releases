@@ -16,7 +16,7 @@
       "🎬 Movie & TV Embed Playback: Dedicated non-blocking remote navigation for embed video streams"
     ],
     "size_mb": "3.3 MB",
-    "sha256": "5d566bade9afd13249297c92a74cd87f0cd44bcc475824fa0d4f465f1cc4d88a"
+    "sha256": "80e5c7564d7f6637ef932d4dc0b53e3944a9877484c8bfd25aea1e92f217feeb"
   },
   "tv": {
     "version": "3.12.18",
@@ -31,6 +31,6 @@
       "🎬 Movie & TV Embed Playback: Remote control D-pad and OK button now navigate and click embed players directly"
     ],
     "size_mb": "6.8 MB",
-    "sha256": "f3c31ac51b48a090c31fa4cc68630294e055dd2d24aff9c4de6e9ae1ccad8029"
+    "sha256": "7399efd26ed060c1489978610f9fb0add4fa922f1e247c6f8d2aa89425261b97"
   }
 }

@@ -215,10 +215,8 @@ public class PlayerActivity extends AppCompatActivity {
         @Override
         public void run() {
             if (!isWebEmbedMode) return;
-            Log.w(TAG, "WEB_EMBED_TIMEOUT: embed never finished loading, failing over.");
-            Toast.makeText(PlayerActivity.this,
-                    "Mirror not responding, switching...", Toast.LENGTH_SHORT).show();
-            failoverToNextServer();
+            Log.w(TAG, "WEB_EMBED_TIMEOUT: embed taking long to load, dismissing spinner.");
+            bufferSpinner.setVisibility(View.GONE);
         }
     };
     private long resumePositionMs = C.TIME_UNSET;

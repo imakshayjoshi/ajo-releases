@@ -1,9 +1,9 @@
 export const CURRENT_APP_VERSION = '3.3.21';
 export const CURRENT_VERSION_CODE = 70;
 const MANIFEST_SOURCES = [
+  'https://api.github.com/repos/imakshayjoshi/ajo-releases/releases/latest',
   'https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/version.json',
-  'https://cdn.jsdelivr.net/gh/imakshayjoshi/ajo-releases@main/version.json',
-  'https://api.github.com/repos/imakshayjoshi/ajo-releases/releases/latest'
+  'https://cdn.jsdelivr.net/gh/imakshayjoshi/ajo-releases@main/version.json'
 ];
 const RELEASE_PREFIX = 'https://github.com/imakshayjoshi/ajo-releases/releases/download/';
 

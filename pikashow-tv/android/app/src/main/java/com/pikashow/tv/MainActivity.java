@@ -151,7 +151,11 @@ public class MainActivity extends BridgeActivity {
                 @Override
                 public boolean shouldOverrideUrlLoading(WebView view, android.webkit.WebResourceRequest request) {
                     if (request == null || request.getUrl() == null)
-                        return true;
+                        return false;
+                    // IFRAME SUB-REQUESTS (Embed video players, CDNs, media streams) must NEVER be blocked
+                    if (!request.isForMainFrame()) {
+                        return false;
+                    }
                     android.net.Uri uri = request.getUrl();
                     String scheme = uri.getScheme();
                     String host = uri.getHost();
@@ -178,7 +182,7 @@ public class MainActivity extends BridgeActivity {
                             path.startsWith("/repos/imakshayjoshi/ajo-releases/")) {
                         return false;
                     }
-                    // Drop everything else (ads, popups, third-party navigations).
+                    // Drop top-level popup navigations
                     return true;
                 }
             });
@@ -299,24 +303,23 @@ public class MainActivity extends BridgeActivity {
                         try {
                             java.net.URL u = new java.net.URL(url);
                             conn = (java.net.HttpURLConnection) u.openConnection();
-                            conn.setConnectTimeout(8000);
-                            conn.setReadTimeout(8000);
+                            conn.setConnectTimeout(6000);
+                            conn.setReadTimeout(6000);
                             conn.setInstanceFollowRedirects(true);
                             conn.setRequestProperty("User-Agent",
-                                    "Mozilla/5.0 (Linux; Android 13; Pixel 6) AppleWebKit/537.36 "
-                                            + "(KHTML, like Gecko) Chrome/120.0.6099.210 Mobile Safari/537.36");
-                            conn.setRequestProperty("Referer", "https://ajo.co.in/");
-                            conn.setRequestProperty("Accept", "text/html,*/*");
+                                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                                            + "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36");
+                            conn.setRequestProperty("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
                             int code = conn.getResponseCode();
-                            if (code >= 400) {
+                            if (code >= 500) {
                                 ok = false;
-                            } else {
+                            } else if (code < 400) {
                                 java.io.InputStream in = conn.getInputStream();
                                 java.io.ByteArrayOutputStream buf = new java.io.ByteArrayOutputStream();
                                 byte[] chunk = new byte[8192];
                                 int n;
                                 int total = 0;
-                                while ((n = in.read(chunk)) != -1 && total < 200 * 1024) {
+                                while ((n = in.read(chunk)) != -1 && total < 100 * 1024) {
                                     buf.write(chunk, 0, n);
                                     total += n;
                                 }
@@ -324,7 +327,8 @@ public class MainActivity extends BridgeActivity {
                                 ok = !embedPageLooksBroken(buf.toString("UTF-8"));
                             }
                         } catch (Throwable t) {
-                            ok = false; // unreachable host = broken mirror
+                            // On network error or timeout, proceed optimistically so the WebView iframe can try
+                            ok = true;
                         } finally {
                             if (conn != null) { try { conn.disconnect(); } catch (Exception ignored) {} }
                         }
@@ -727,47 +731,6 @@ public class MainActivity extends BridgeActivity {
                             null);
                     return true;
                 }
-            }
-
-            // Direct 0ms D-Pad & Selection keys for Fire TV Mobile Remote App & Physical Remotes
-            String jsKey = null;
-            int jsCode = 0;
-            switch (keyCode) {
-                case KeyEvent.KEYCODE_DPAD_UP:
-                    jsKey = "ArrowUp";
-                    jsCode = 38;
-                    break;
-                case KeyEvent.KEYCODE_DPAD_DOWN:
-                    jsKey = "ArrowDown";
-                    jsCode = 40;
-                    break;
-                case KeyEvent.KEYCODE_DPAD_LEFT:
-                    jsKey = "ArrowLeft";
-                    jsCode = 37;
-                    break;
-                case KeyEvent.KEYCODE_DPAD_RIGHT:
-                    jsKey = "ArrowRight";
-                    jsCode = 39;
-                    break;
-                case KeyEvent.KEYCODE_DPAD_CENTER:
-                case KeyEvent.KEYCODE_ENTER:
-                case KeyEvent.KEYCODE_NUMPAD_ENTER:
-                    jsKey = "Enter";
-                    jsCode = 13;
-                    break;
-            }
-
-            if (jsKey != null && getBridge() != null && getBridge().getWebView() != null) {
-                final String key = jsKey;
-                final int code = jsCode;
-                getBridge().getWebView().evaluateJavascript(
-                        "(function(){" +
-                        "var e = new KeyboardEvent('keydown', {key: '" + key + "', code: '" + key + "', keyCode: " + code + ", which: " + code + ", bubbles: true, cancelable: true});" +
-                        "window.dispatchEvent(e);" +
-                        "if(document.activeElement && '" + key + "' === 'Enter'){try{document.activeElement.click();}catch(err){}}" +
-                        "})();",
-                        null);
-                return true;
             }
         }
         return super.dispatchKeyEvent(event);
