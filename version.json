@@ -1,37 +1,34 @@
 {
   "schemaVersion": 2,
-  "version": "3.12.14",
-  "versionCode": 101,
+  "version": "3.12.15",
+  "versionCode": 102,
   "releaseDate": "2026-08-31",
   "phone": {
-    "version": "3.3.17",
-    "versionCode": 66,
+    "version": "3.3.18",
+    "versionCode": 67,
     "packageId": "com.ajo.phone",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "⚡ QR Code TV Pairing: Scan the QR code on TV screen with phone camera for 1-second instant pairing using deep links",
-      "📱 Movie Casting: Improved casting stability to push direct video streams to TV for movies"
+      "🍿 Movies Fix: Restored direct high-speed movie streams (MoviesAPI & MultiEmbed) and bypassed Cloudflare captcha loops"
     ],
     "size_mb": "3.3 MB",
-    "sha256": "03a1c85db11ebf5bf0d9183ef68c4cf9959ca0e9f303cc59551519474494439e"
+    "sha256": "bc22e517c74c1e321ce5d17f45c4b64d68260ae2f6d15a1d6916304497baf05c"
   },
   "tv": {
-    "version": "3.12.14",
-    "versionCode": 101,
+    "version": "3.12.15",
+    "versionCode": 102,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "📺 Live TV Channels Fix: Fixed strict language filters that blocked many regional channels (Gujarati, Marathi, Punjabi, Bengali)",
-      "⚡ Movie Failover: Doubled the speed of fallback server detection for failed or broken movie embeds",
-      "📱 QR Code URL Fix: Updated TV Cast QR code URL to universally scan on all phone camera apps without issues"
+      "🍿 Movies Fix: Restored direct high-speed movie streams (MoviesAPI & MultiEmbed) and bypassed Cloudflare captcha loops"
     ],
     "size_mb": "6.8 MB",
-    "sha256": "a9fe03fd0ba85ea1301c44abf31155a64d786a63cdd364ec4840ad2dc60ca73c"
+    "sha256": "c093b7da584481023739ff3b2fd9293d7ed74e900021625b2b006d485143cdb8"
   }
 }
