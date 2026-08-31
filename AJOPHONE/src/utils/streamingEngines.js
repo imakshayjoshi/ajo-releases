@@ -8,24 +8,25 @@ const VIDEO_PATTERNS = [/\.(mp4|m4v|webm|mkv)(?:$|\?)/i];
 // fallbacks only.  Added vidsrc.xyz (simpler domain, usually captcha-free).
 // Keep EMBED_PATTERNS in sync with nativePlayer.js EMBED_HOST_PATTERNS.
 const EMBED_PATTERNS = [
-  /moviesapi\.club/i,
-  /multiembed\.mov/i,
-  /vidsrc\.icu/i,
-  /vidsrc\.xyz/i,
-  /superembed\.stream/i,
-  /2embed\.(cc|skin)/i,
-  /apiplayer\.ru/i,
   /vidlink\.pro/i,
+  /vidsrc\.pm/i,
+  /autoembed\.co/i,
+  /autoembed\.cc/i,
+  /2embed\.(cc|skin)/i,
+  /vidjoy\.pro/i,
+  /vidsrc\.pro/i,
+  /rivestream\.live/i,
+  /vidsrc\.cc/i,
+  /vidsrc\.xyz/i,
+  /vidsrc\.io/i,
+  /vidsrc\.net/i,
+  /vidsrc\.in/i,
   /vidsrc\.to/i,
   /vidsrc\.me/i,
-  /vidsrc\.cc/i,
   /v2\.vidsrc\.me/i,
-  /autoembed\.co/i,
+  /smashystream\.com/i,
+  /apiplayer\.ru/i,
   /\/embed\/?(\?|$)/i,
-  /rasta428jem\.com/i,
-  /humma429gix\.com/i,
-  /smashy\.stream/i,
-  /embed\.su/i,
 ];
 
 export function isSafeHttpUrl(value) {
@@ -66,9 +67,7 @@ function tmdbIdOf(item) {
 
 /**
  * APIPlayer.ru embed mirror — a web-backup source used when every direct
- * HLS/MP4 server is down. Requires a TMDB id, so items without one get no
- * mirror. Always ranked after direct streams: an iframe cannot be handed to
- * the native ExoPlayer activity, so on Fire TV it is a last resort.
+ * HLS/MP4 server is down.
  */
 function buildApiPlayerMirror(item) {
   const tmdbId = tmdbIdOf(item);
@@ -82,7 +81,7 @@ function buildApiPlayerMirror(item) {
 
   return {
     id: 'apiplayer-mirror',
-    name: 'Web Backup Mirror (APIPlayer)',
+    name: 'Backup Mirror (APIPlayer)',
     url: `https://apiplayer.ru/embed/${kind}/${tmdbId}?color=38bdf8&auto=1`,
     source: 'embed',
     provider: 'apiplayer',
@@ -90,7 +89,7 @@ function buildApiPlayerMirror(item) {
   };
 }
 
-const DEAD_HOSTS = [/mainsstreaming\.info/i, /localhost/i, /127\.0\.0\.1/i, /0\.0\.0\.0/i];
+const DEAD_HOSTS = [/mainsstreaming\.info/i, /localhost/i, /127\.0\.0\.1/i, /0\.0\.0\.0/i, /moviesapi\.club/i, /embed\.su/i];
 
 export function isDeadHost(url) {
   if (!url || typeof url !== 'string') return true;
@@ -158,56 +157,132 @@ export function generateUniversalServers(item, episodeInfo = null) {
   const targetId = tmdbId || imdbId;
   if (targetId) {
     if (isSeries) {
+      if (tmdbId) {
+        raw.push({
+          url: `https://vidlink.pro/tv/${tmdbId}/${season}/${episode}`,
+          name: 'Server 1: VidLink (Fast 1080p)',
+          source: 'embed',
+          quality: '1080p'
+        });
+        raw.push({
+          url: `https://vidsrc.pm/embed/tv/${tmdbId}/${season}/${episode}`,
+          name: 'Server 2: VidSrc PM (Fast)',
+          source: 'embed',
+          quality: '1080p'
+        });
+        raw.push({
+          url: `https://autoembed.co/tv/tmdb/${tmdbId}?s=${season}&e=${episode}`,
+          name: 'Server 3: AutoEmbed TMDB (Reliable)',
+          source: 'embed',
+          quality: '1080p'
+        });
+        raw.push({
+          url: `https://vidjoy.pro/embed/tv/${tmdbId}/${season}/${episode}`,
+          name: 'Server 4: VidJoy Pro (HD)',
+          source: 'embed',
+          quality: '1080p'
+        });
+        raw.push({
+          url: `https://vidsrc.pro/embed/tv/${tmdbId}/${season}/${episode}`,
+          name: 'Server 5: VidSrc Pro (Full HD)',
+          source: 'embed',
+          quality: '1080p'
+        });
+        raw.push({
+          url: `https://rivestream.live/embed?type=serie&id=${tmdbId}&season=${season}&episode=${episode}`,
+          name: 'Server 6: RiveStream (Direct)',
+          source: 'embed',
+          quality: '1080p'
+        });
+      }
+      if (imdbId) {
+        raw.push({
+          url: `https://autoembed.co/tv/imdb/${imdbId}?s=${season}&e=${episode}`,
+          name: 'Server 7: AutoEmbed IMDb (No CF)',
+          source: 'embed',
+          quality: '1080p'
+        });
+        raw.push({
+          url: `https://www.2embed.cc/embedtv/${imdbId}?s=${season}&e=${episode}`,
+          name: 'Server 8: 2Embed (Backup)',
+          source: 'embed',
+          quality: '1080p'
+        });
+      }
       raw.push({
-        url: tmdbId
-          ? `https://vidsrc.net/embed/tv?tmdb=${tmdbId}&season=${season}&episode=${episode}`
-          : `https://vidsrc.net/embed/tv?imdb=${imdbId}&season=${season}&episode=${episode}`,
-        name: 'Server 1: VidSrc Net (Reliable)',
+        url: `https://vidsrc.cc/v2/embed/tv/${targetId}/${season}/${episode}`,
+        name: 'Server 9: VidSrc CC',
         source: 'embed',
         quality: '1080p'
       });
       raw.push({
-        url: `https://embed.su/embed/tv/${targetId}/${season}/${episode}`,
-        name: 'Server 2: Embed SU (Fast)',
-        source: 'embed',
-        quality: '1080p'
-      });
-      raw.push({
-        url: `https://vidsrc.in/embed/tv?${tmdbId ? `tmdb=${tmdbId}` : `imdb=${imdbId}`}&season=${season}&episode=${episode}`,
-        name: 'Server 3: VidSrc IN (Backup)',
-        source: 'embed',
-        quality: '1080p'
-      });
-      raw.push({
-        url: `https://v2.vidsrc.me/embed/tv?${tmdbId ? `tmdb=${tmdbId}` : `imdb=${imdbId}`}&season=${season}&episode=${episode}`,
-        name: 'Server 4: VidSrc ME (Fallback)',
+        url: `https://vidsrc.xyz/embed/tv/${targetId}/${season}/${episode}`,
+        name: 'Server 10: VidSrc XYZ',
         source: 'embed',
         quality: '1080p'
       });
     } else {
+      if (tmdbId) {
+        raw.push({
+          url: `https://vidlink.pro/movie/${tmdbId}`,
+          name: 'Server 1: VidLink (Fast 1080p)',
+          source: 'embed',
+          quality: '1080p'
+        });
+        raw.push({
+          url: `https://vidsrc.pm/embed/movie/${tmdbId}`,
+          name: 'Server 2: VidSrc PM (Fast)',
+          source: 'embed',
+          quality: '1080p'
+        });
+        raw.push({
+          url: `https://autoembed.co/movie/tmdb/${tmdbId}`,
+          name: 'Server 3: AutoEmbed TMDB (Reliable)',
+          source: 'embed',
+          quality: '1080p'
+        });
+        raw.push({
+          url: `https://vidjoy.pro/embed/movie/${tmdbId}`,
+          name: 'Server 4: VidJoy Pro (HD)',
+          source: 'embed',
+          quality: '1080p'
+        });
+        raw.push({
+          url: `https://vidsrc.pro/embed/movie/${tmdbId}`,
+          name: 'Server 5: VidSrc Pro (Full HD)',
+          source: 'embed',
+          quality: '1080p'
+        });
+        raw.push({
+          url: `https://rivestream.live/embed?type=movie&id=${tmdbId}`,
+          name: 'Server 6: RiveStream (Direct)',
+          source: 'embed',
+          quality: '1080p'
+        });
+      }
+      if (imdbId) {
+        raw.push({
+          url: `https://autoembed.co/movie/imdb/${imdbId}`,
+          name: 'Server 7: AutoEmbed IMDb (No CF)',
+          source: 'embed',
+          quality: '1080p'
+        });
+        raw.push({
+          url: `https://www.2embed.cc/embedmovie/${imdbId}`,
+          name: 'Server 8: 2Embed (Backup)',
+          source: 'embed',
+          quality: '1080p'
+        });
+      }
       raw.push({
-        url: tmdbId
-          ? `https://vidsrc.net/embed/movie?tmdb=${tmdbId}`
-          : `https://vidsrc.net/embed/movie?imdb=${imdbId}`,
-        name: 'Server 1: VidSrc Net (Reliable)',
+        url: `https://vidsrc.cc/v2/embed/movie/${targetId}`,
+        name: 'Server 9: VidSrc CC',
         source: 'embed',
         quality: '1080p'
       });
       raw.push({
-        url: `https://embed.su/embed/movie/${targetId}`,
-        name: 'Server 2: Embed SU (Fast)',
-        source: 'embed',
-        quality: '1080p'
-      });
-      raw.push({
-        url: `https://vidsrc.in/embed/movie?${tmdbId ? `tmdb=${tmdbId}` : `imdb=${imdbId}`}`,
-        name: 'Server 3: VidSrc IN (Backup)',
-        source: 'embed',
-        quality: '1080p'
-      });
-      raw.push({
-        url: `https://v2.vidsrc.me/embed/movie?${tmdbId ? `tmdb=${tmdbId}` : `imdb=${imdbId}`}`,
-        name: 'Server 4: VidSrc ME (Fallback)',
+        url: `https://vidsrc.xyz/embed/movie/${targetId}`,
+        name: 'Server 10: VidSrc XYZ',
         source: 'embed',
         quality: '1080p'
       });

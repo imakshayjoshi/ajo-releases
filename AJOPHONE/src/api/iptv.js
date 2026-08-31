@@ -1,7 +1,7 @@
 import { isFavoriteChannel } from './history.js';
 import { isSafeHttpUrl } from '../utils/streamingEngines.js';
 
-const CACHE_KEY = 'ajo_iptv_cache_v16';
+const CACHE_KEY = 'ajo_iptv_cache_v19';
 const CUSTOM_KEY = 'ajo_custom_m3u_v2';
 const JIOTV_KEY = 'ajo_jiotv_host_v2';
 const FAILED_CHANNELS_KEY = 'ajo_failed_channels_v1';
@@ -10,6 +10,7 @@ const MANIFEST_TTL = 2 * 60 * 60 * 1000; // 2 hours
 
 // Indian & global sports/entertainment playlists
 const PLAYLISTS = [
+  'https://raw.githubusercontent.com/amazeyourself/m3u/main/sliv.m3u',
   'https://iptv-org.github.io/iptv/countries/in.m3u',
   'https://raw.githubusercontent.com/iptv-org/iptv/master/streams/in.m3u',
   'https://iptv-org.github.io/iptv/languages/hin.m3u',
@@ -30,7 +31,7 @@ const KEEP_LANG = new Set([
 ]);
 
 const MANIFEST_URL = 'https://new.ajo.co.in/channels/channels.json';
-const MANIFEST_CACHE_KEY = 'ajo_channels_manifest_v2';
+const MANIFEST_CACHE_KEY = 'ajo_channels_manifest_v4';
 
 // 100% Verified HTTP 200 Logos without CORS/ORB conflicts
 export const LOGO_OVERRIDES = {
@@ -392,10 +393,10 @@ const BUILTIN_INDIAN_CHANNELS = [
     title: 'Sony SAB',
     category: 'Entertainment',
     poster: 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/sony-sab-in.png',
-    url: 'https://raw.githubusercontent.com/amazeyourself/adaptive-streams/refs/heads/main/streams/in/YuppTV/SonySab.m3u8',
+    url: 'https://cloudplay-sonyliv.pages.dev/sabhd.m3u8',
     players: [
-      { name: 'Server 1 (YuppTV)', url: 'https://raw.githubusercontent.com/amazeyourself/adaptive-streams/refs/heads/main/streams/in/YuppTV/SonySab.m3u8', source: 'hls', quality: '720p' },
-      { name: 'Server 2 (Backup)', url: 'https://d3souat.sonyliv.com/Content/3009399/master.m3u8', source: 'hls', quality: '576p' }
+      { name: 'Server 1 (Live HD)', url: 'https://cloudplay-sonyliv.pages.dev/sabhd.m3u8', source: 'hls', quality: '1080p' },
+      { name: 'Server 2 (Backup)', url: 'http://202.70.146.135:8000/play/a025/index.m3u8', source: 'hls', quality: '720p' }
     ]
   },
   {
@@ -403,9 +404,10 @@ const BUILTIN_INDIAN_CHANNELS = [
     title: 'Sony SAB HD',
     category: 'Entertainment',
     poster: 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/sony-sab-in.png',
-    url: 'https://raw.githubusercontent.com/amazeyourself/adaptive-streams/refs/heads/main/streams/in/YuppTV/SonySabHD.m3u8',
+    url: 'https://cloudplay-sonyliv.pages.dev/sabhd.m3u8',
     players: [
-      { name: 'Server 1 (HD)', url: 'https://raw.githubusercontent.com/amazeyourself/adaptive-streams/refs/heads/main/streams/in/YuppTV/SonySabHD.m3u8', source: 'hls', quality: '1080p' }
+      { name: 'Server 1 (HD)', url: 'https://cloudplay-sonyliv.pages.dev/sabhd.m3u8', source: 'hls', quality: '1080p' },
+      { name: 'Server 2 (Backup)', url: 'http://202.70.146.135:8000/play/a025/index.m3u8', source: 'hls', quality: '720p' }
     ]
   },
   {
@@ -413,9 +415,9 @@ const BUILTIN_INDIAN_CHANNELS = [
     title: 'Sony Pix TV',
     category: 'Entertainment',
     poster: 'https://i.postimg.cc/Z5G8j67L/PIX-HD-WHITE.png',
-    url: 'https://raw.githubusercontent.com/amazeyourself/adaptive-streams/refs/heads/main/streams/in/YuppTV/SonyPix.m3u8',
+    url: 'https://cloudplay-sonyliv.pages.dev/pixhd.m3u8',
     players: [
-      { name: 'Server 1 (YuppTV)', url: 'https://raw.githubusercontent.com/amazeyourself/adaptive-streams/refs/heads/main/streams/in/YuppTV/SonyPix.m3u8', source: 'hls', quality: '720p' }
+      { name: 'Server 1 (Live HD)', url: 'https://cloudplay-sonyliv.pages.dev/pixhd.m3u8', source: 'hls', quality: '1080p' }
     ]
   },
   {
@@ -423,9 +425,9 @@ const BUILTIN_INDIAN_CHANNELS = [
     title: 'Sony TV',
     category: 'Entertainment',
     poster: 'https://dtil.tmsimg.com/assets/s159096_ld_h15_aa.png?lock=720x540',
-    url: 'https://raw.githubusercontent.com/amazeyourself/adaptive-streams/refs/heads/main/streams/in/YuppTV/SonyEntertainmentTelevision.m3u8',
+    url: 'https://cloudplay-sonyliv.pages.dev/sethd.m3u8',
     players: [
-      { name: 'Server 1 (YuppTV)', url: 'https://raw.githubusercontent.com/amazeyourself/adaptive-streams/refs/heads/main/streams/in/YuppTV/SonyEntertainmentTelevision.m3u8', source: 'hls', quality: '720p' }
+      { name: 'Server 1 (Live HD)', url: 'https://cloudplay-sonyliv.pages.dev/sethd.m3u8', source: 'hls', quality: '1080p' }
     ]
   },
   {
@@ -433,39 +435,73 @@ const BUILTIN_INDIAN_CHANNELS = [
     title: 'Sony Entertainment Television',
     category: 'Entertainment',
     poster: 'https://dtil.tmsimg.com/assets/s159096_ld_h15_aa.png?lock=720x540',
-    url: 'https://raw.githubusercontent.com/amazeyourself/adaptive-streams/refs/heads/main/streams/in/YuppTV/SonyEntertainmentTelevision.m3u8',
+    url: 'https://cloudplay-sonyliv.pages.dev/sethd.m3u8',
     players: [
-      { name: 'Server 1 (YuppTV)', url: 'https://raw.githubusercontent.com/amazeyourself/adaptive-streams/refs/heads/main/streams/in/YuppTV/SonyEntertainmentTelevision.m3u8', source: 'hls', quality: '720p' }
+      { name: 'Server 1 (Live HD)', url: 'https://cloudplay-sonyliv.pages.dev/sethd.m3u8', source: 'hls', quality: '1080p' }
+    ]
+  },
+  {
+    id: 'builtin-sonymax',
+    title: 'Sony MAX HD',
+    category: 'Movies',
+    poster: 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/sony-max-in.png',
+    url: 'https://cloudplay-sonyliv.pages.dev/maxhd.m3u8',
+    players: [
+      { name: 'Server 1 (HD)', url: 'https://cloudplay-sonyliv.pages.dev/maxhd.m3u8', source: 'hls', quality: '1080p' },
+      { name: 'Server 2 (SD)', url: 'https://cloudplay-sonyliv.pages.dev/max.m3u8', source: 'hls', quality: '720p' }
+    ]
+  },
+  {
+    id: 'builtin-sonypal',
+    title: 'Sony Pal',
+    category: 'Entertainment',
+    poster: 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/sony-pal-in.png',
+    url: 'https://cloudplay-sonyliv.pages.dev/pal.m3u8',
+    players: [
+      { name: 'Server 1 (Live)', url: 'https://cloudplay-sonyliv.pages.dev/pal.m3u8', source: 'hls', quality: '720p' }
     ]
   },
   {
     id: 'builtin-sonysports1',
-    title: 'Sony Sports 1',
+    title: 'Sony Sports Ten 1 HD',
     category: 'Sports',
     poster: 'https://dtil.tmsimg.com/assets/s176764_ld_h15_aa.png?lock=720x540',
-    url: 'https://raw.githubusercontent.com/amazeyourself/adaptive-streams/refs/heads/main/streams/in/YuppTV/SonySports1.m3u8',
+    url: 'https://cloudplay-sonyliv.pages.dev/ten1hd.m3u8',
     players: [
-      { name: 'Server 1 (YuppTV HD)', url: 'https://raw.githubusercontent.com/amazeyourself/adaptive-streams/refs/heads/main/streams/in/YuppTV/SonySports1.m3u8', source: 'hls', quality: 'HD' }
+      { name: 'Server 1 (Live HD)', url: 'https://cloudplay-sonyliv.pages.dev/ten1hd.m3u8', source: 'hls', quality: '1080p' },
+      { name: 'Server 2 (SD)', url: 'https://cloudplay-sonyliv.pages.dev/ten1.m3u8', source: 'hls', quality: '720p' }
     ]
   },
   {
     id: 'builtin-sonysports2',
-    title: 'Sony Sports 2',
+    title: 'Sony Sports Ten 2 HD',
     category: 'Sports',
     poster: 'https://dtil.tmsimg.com/assets/s176764_ld_h15_aa.png?lock=720x540',
-    url: 'https://raw.githubusercontent.com/amazeyourself/adaptive-streams/refs/heads/main/streams/in/YuppTV/SonySports2.m3u8',
+    url: 'https://cloudplay-sonyliv.pages.dev/ten2hd.m3u8',
     players: [
-      { name: 'Server 1 (YuppTV HD)', url: 'https://raw.githubusercontent.com/amazeyourself/adaptive-streams/refs/heads/main/streams/in/YuppTV/SonySports2.m3u8', source: 'hls', quality: 'HD' }
+      { name: 'Server 1 (Live HD)', url: 'https://cloudplay-sonyliv.pages.dev/ten2hd.m3u8', source: 'hls', quality: '1080p' },
+      { name: 'Server 2 (SD)', url: 'https://cloudplay-sonyliv.pages.dev/ten2.m3u8', source: 'hls', quality: '720p' }
     ]
   },
   {
     id: 'builtin-sonysports3',
-    title: 'Sony Sports 3',
+    title: 'Sony Sports Ten 3 Hindi HD',
     category: 'Sports',
     poster: 'https://dtil.tmsimg.com/assets/s176764_ld_h15_aa.png?lock=720x540',
-    url: 'https://raw.githubusercontent.com/amazeyourself/adaptive-streams/refs/heads/main/streams/in/YuppTV/SonySports3.m3u8',
+    url: 'https://cloudplay-sonyliv.pages.dev/ten3hd.m3u8',
     players: [
-      { name: 'Server 1 (YuppTV HD)', url: 'https://raw.githubusercontent.com/amazeyourself/adaptive-streams/refs/heads/main/streams/in/YuppTV/SonySports3.m3u8', source: 'hls', quality: 'HD' }
+      { name: 'Server 1 (Live HD)', url: 'https://cloudplay-sonyliv.pages.dev/ten3hd.m3u8', source: 'hls', quality: '1080p' },
+      { name: 'Server 2 (SD)', url: 'https://cloudplay-sonyliv.pages.dev/ten3.m3u8', source: 'hls', quality: '720p' }
+    ]
+  },
+  {
+    id: 'builtin-sonysports5',
+    title: 'Sony Sports Ten 5 HD',
+    category: 'Sports',
+    poster: 'https://dtil.tmsimg.com/assets/s176764_ld_h15_aa.png?lock=720x540',
+    url: 'https://cloudplay-sonyliv.pages.dev/ten5hd.m3u8',
+    players: [
+      { name: 'Server 1 (Live HD)', url: 'https://cloudplay-sonyliv.pages.dev/ten5hd.m3u8', source: 'hls', quality: '1080p' }
     ]
   }
 ];

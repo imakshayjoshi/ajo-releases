@@ -621,7 +621,16 @@ export class CastSyncEngine {
     const buildAndSend = () => {
       const commandId = `cast-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
     const isLive = Boolean(mediaItem.is_live || mediaItem.type === 'live' || mediaItem.year === 'LIVE');
-    const selectedSource = options.server || mediaItem.players?.[0] || mediaItem.player?.[0] || (mediaItem.url ? { url: mediaItem.url, source: 'hls' } : null);
+    
+    // For casting, prioritize direct streams (hls/video) because TVs cannot easily render iframe embeds.
+    const playerList = mediaItem.players || mediaItem.player || [];
+    let selectedSource = options.server;
+    if (!selectedSource) {
+      selectedSource = playerList.find(p => p.source === 'hls' || p.source === 'video') || playerList[0];
+    }
+    if (!selectedSource && mediaItem.url) {
+      selectedSource = { url: mediaItem.url, source: 'hls' };
+    }
 
     const payload = {
       type: 'PLAY_MEDIA',

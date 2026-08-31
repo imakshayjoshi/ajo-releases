@@ -1,37 +1,36 @@
 {
   "schemaVersion": 2,
-  "version": "3.12.16",
-  "versionCode": 103,
+  "version": "3.12.17",
+  "versionCode": 104,
   "releaseDate": "2026-08-31",
   "phone": {
-    "version": "3.3.19",
-    "versionCode": 68,
+    "version": "3.3.20",
+    "versionCode": 69,
     "packageId": "com.ajo.phone",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "🍿 10 Working Movie Mirrors: Added VidLink (1080p fast direct stream), VidSrc PM, AutoEmbed, VidJoy, RiveStream, and 2Embed",
-      "⚡ Instant Playback: Bypassed WebView blockades and enabled zero-buffering fast load"
+      "📺 Sony SAB & Sony Channels Fixed: Updated Sony SAB HD, Sony MAX HD, Sony TV, Sony Pal, Sony Pix, and Sony Sports with verified 1080p live streams",
+      "⚡ Instant Playback: Fresh cache invalidation ensures instant load of updated streams"
     ],
     "size_mb": "3.3 MB",
-    "sha256": "c8434a0ac48ee1d62fadcd89f631c4bccb722649c29bcb864139f05099ad2961"
+    "sha256": "95d4e14dc57ff7228c5e2787c557ddb64fd65638b4aac43750e8d4c71e58ff53"
   },
   "tv": {
-    "version": "3.12.16",
-    "versionCode": 103,
+    "version": "3.12.17",
+    "versionCode": 104,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "🍿 10 Working Movie Mirrors: Added VidLink (1080p fast direct stream), VidSrc PM, AutoEmbed, VidJoy, RiveStream, and 2Embed",
-      "📺 Fixed TV WebViewClient: Removed iframe sub-request blocking so embedded video players start instantly on Smart TVs",
-      "⚡ Instant Playback: Fixed preflight watchdog so movies like Mutiny stream directly without errors"
+      "📺 Sony SAB & Sony Channels Fixed: Updated Sony SAB HD, Sony MAX HD, Sony TV, Sony Pal, Sony Pix, and Sony Sports with verified 1080p live streams",
+      "⚡ Instant Playback: Fresh cache invalidation ensures instant load of updated streams"
     ],
     "size_mb": "6.8 MB",
-    "sha256": "026eceddbcbadbd40d590b85afa63b047c37c5630fccbe54142e01a5334734f0"
+    "sha256": "db26edf77f7f25054174d9d4dc3bea83425855c66cf6a7b9ce8bad6131a486c3"
   }
 }

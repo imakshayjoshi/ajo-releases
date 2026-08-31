@@ -2,7 +2,7 @@ import { getIPTVChannels, LOGO_OVERRIDES, normalizeChannelKey } from './iptv.js'
 import { isSafeHttpUrl } from '../utils/streamingEngines.js';
 
 const BASE_URL = 'https://mapi.elochkaigolochla.com/api/v1';
-const CACHE_KEY = 'ajo_catalog_v5';
+const CACHE_KEY = 'ajo_catalog_v6';
 const CACHE_TTL = 30 * 60 * 1000;
 let memoryCatalog = null;
 

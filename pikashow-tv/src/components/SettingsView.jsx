@@ -171,7 +171,7 @@ export function SettingsView() {
               {castState.roomCode && !castState.isPaired && (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
                   <img
-                    src={`https://chart.googleapis.com/chart?cht=qr&chs=120x120&chl=${encodeURIComponent('ajoapp://pair?code=' + castState.roomCode)}&choe=UTF-8`}
+                    src={`https://chart.googleapis.com/chart?cht=qr&chs=120x120&chl=${encodeURIComponent('https://new.ajo.co.in/pair?code=' + castState.roomCode)}&choe=UTF-8`}
                     alt={`QR: ${castState.roomCode}`}
                     style={{ width: 110, height: 110, borderRadius: 8, background: '#fff', padding: 4 }}
                     onError={(e) => { e.target.style.display = 'none'; }}

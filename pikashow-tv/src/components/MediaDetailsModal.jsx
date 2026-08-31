@@ -90,7 +90,7 @@ export function MediaDetailsModal({ item, onClose, onStartPlayback }) {
 
   const handlePlay = (episodeItem = null, episodeIndex = 0) => {
     const targetItem = episodeItem || item;
-    const srv = servers[selectedServer] || servers[0];
+    const srv = selectedServer > 0 ? (servers[selectedServer] || null) : null;
     if (onStartPlayback) {
       onStartPlayback(targetItem, srv, episodes, episodeIndex);
     }

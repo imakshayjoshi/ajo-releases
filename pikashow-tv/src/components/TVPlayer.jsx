@@ -12,9 +12,11 @@ import {
   X,
   AlertCircle,
   RefreshCw,
-  Maximize
+  Maximize,
+  Radio
 } from 'lucide-react';
 import { generateUniversalServers, isEmbedUrl } from '../utils/streamingEngines';
+import { getCurrentAndNextProgram } from '../api/epg';
 import {
   hasNativePlayer,
   shouldPreferNativePlayer,
@@ -30,8 +32,8 @@ import './TVPlayer.css';
 
 // v3.10.0: how long to wait for an embed iframe to signal a load before
 // auto-failing over. Dead hosts never fire onLoad; Cloudflare hang pages
-// usually do not either.
-const EMBED_LOAD_TIMEOUT_MS = 6000;
+// usually do not either. Reduced from 24000 to speed up fallback.
+const EMBED_LOAD_TIMEOUT_MS = 12000;
 
 export function TVPlayer({
   item,
@@ -130,7 +132,7 @@ export function TVPlayer({
   const [duration, setDuration] = useState(0);
   const [bingeCountdown, setBingeCountdown] = useState(null);
   const [showOsd, setShowOsd] = useState(true);
-  const [showDrawer, setShowDrawer] = useState(null); // 'channels' | 'servers' | 'audio' | null
+  const [showDrawer, setShowDrawer] = useState(null); // 'channels' | 'servers' | 'audio' | 'epg' | null
   const [audioTracks, setAudioTracks] = useState([]);
   const [currentAudio, setCurrentAudio] = useState(0);
   const [errorMessage, setErrorMessage] = useState(null);
@@ -138,7 +140,7 @@ export function TVPlayer({
   // v3.10.1: embed mirrors are preflighted by the native bridge before the
   // iframe mounts, so a provider's server-error page (Vercel 500 etc.) is
   // skipped before the user ever sees it.
-  const [embedReady, setEmbedReady] = useState(false);
+  const [embedReady, setEmbedReady] = useState(true);
   const preflightDoneRef = useRef(false);
 
   const activeServer = orderedServers[currentServerIndex] || orderedServers[0] || server;
@@ -417,32 +419,13 @@ export function TVPlayer({
     handOffToNative('▶ Opening in hardware player...');
   }, [streamUrl, handOffToNative]);
 
-  // v3.10.1: EMBED PREFLIGHT — before an embed iframe mounts, ask the native
-  // bridge whether the mirror is currently serving a server-error page. If it
-  // is (or the host is unreachable), skip straight to the next mirror —
-  // no more watching a frozen Vercel "Application error" screen.
+  // v3.12.16: Embed mirrors mount immediately so video player starts right away
   useEffect(() => {
     if (!streamUrl) return;
     if (nativeActiveRef.current) return;
-    const isEmbed = isEmbedUrl(streamUrl) || !isDirectMediaUrl(streamUrl);
-    if (!isEmbed) { setEmbedReady(true); return; }
-
-    let cancelled = false;
-    preflightDoneRef.current = false;
-    setEmbedReady(false);
-    setErrorMessage('Checking mirror availability...');
-    preflightEmbedUrl(streamUrl).then((result) => {
-      if (cancelled) return;
-      preflightDoneRef.current = true;
-      if (result === 'error') {
-        handleFailover('Mirror server error — switching');
-      } else {
-        setEmbedReady(true);
-        if (errorMessage === 'Checking mirror availability...') setErrorMessage(null);
-      }
-    });
-    return () => { cancelled = true; };
-  }, [streamUrl, handleFailover, errorMessage]);
+    setEmbedReady(true);
+    setErrorMessage(null);
+  }, [streamUrl]);
 
   // Video & Hls.js Pipeline Setup
   useEffect(() => {
@@ -470,11 +453,16 @@ export function TVPlayer({
     let lastProgressTime = 0;
     // v3.8.0: bounded fatal-error retries. Unbounded startLoad()/recoverMediaError()
     // loops kept the "Connecting..." state alive for minutes on dead CDNs.
-    let networkRetryCount = 0;
-    let mediaRetryCount = 0;
-
     const isEmbedStream = isEmbedUrl(streamUrl) || !isDirectMediaUrl(streamUrl);
-    if (!isEmbedStream && videoEngine === 'hls' && (streamUrl.includes('.m3u8') || streamUrl.includes('/getm3u8/') || isLive || streamUrl.endsWith('.m3u8'))) {
+    if (isEmbedStream) {
+      setIsBuffering(false);
+      setErrorMessage(null);
+      return () => {
+        disposed = true;
+      };
+    }
+
+    if (videoEngine === 'hls' && (streamUrl.includes('.m3u8') || streamUrl.includes('/getm3u8/') || isLive || streamUrl.endsWith('.m3u8'))) {
       (async () => {
         // v3.11.0: hls.js (~350KB) is a lazy chunk now — fetched only when a
         // stream actually needs it. Boot time and RAM on Fire TV drop sharply.
@@ -780,10 +768,18 @@ export function TVPlayer({
         return;
       }
 
-      // Enter/OK key: if drawer is closed, toggle play/pause or focus controls
-      if ((key === 'Enter' || keyCode === 13 || keyCode === 23) && !showDrawer) {
-        if (!document.activeElement || document.activeElement === document.body) {
-          togglePlayPause();
+      // Enter/OK key handling
+      if ((key === 'Enter' || keyCode === 13 || keyCode === 23)) {
+        if (!showDrawer) {
+          if (isLive) {
+            setShowDrawer('epg');
+            e.preventDefault();
+            e.stopPropagation();
+            return;
+          }
+          if (!document.activeElement || document.activeElement === document.body) {
+            togglePlayPause();
+          }
         }
       }
 
@@ -864,28 +860,27 @@ export function TVPlayer({
           v3.10.0 FIX: onLoad signals the mirror actually responded (dead
           hosts never fire it), which arms/clears the failover watchdog. */}
       {streamUrl && !nativeActive && embedReady && (isEmbedUrl(streamUrl) || !isDirectMediaUrl(streamUrl)) && (
-        <iframe
-          key={streamUrl}
-          ref={iframeRef}
-          src={streamUrl}
-          title={title || 'Stream'}
-          allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
-          allowFullScreen
-          onLoad={(e) => {
-            if (embedWatchdogRef.current) clearTimeout(embedWatchdogRef.current);
-            if (e && e.currentTarget) e.currentTarget.dataset.loaded = '1';
-            setIsBuffering(false);
-          }}
-          style={{
-            position: 'absolute',
-            inset: 0,
-            width: '100%',
-            height: '100%',
-            border: 'none',
-            background: '#000',
-            zIndex: 10
-          }}
-        />
+        <div style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', background: '#000', zIndex: 10 }}>
+          <iframe
+            key={streamUrl}
+            ref={iframeRef}
+            src={streamUrl}
+            title={title || 'Stream'}
+            allow="autoplay; fullscreen; encrypted-media; picture-in-picture; accelerometer; gyroscope"
+            allowFullScreen
+            onLoad={() => {
+              setIsBuffering(false);
+            }}
+            style={{
+              position: 'absolute',
+              inset: 0,
+              width: '100%',
+              height: '100%',
+              border: 'none',
+              background: '#000'
+            }}
+          />
+        </div>
       )}
 
       {/* Buffering Spinner */}
@@ -1069,6 +1064,18 @@ export function TVPlayer({
                   </>
                 )}
 
+                {isLive && (
+                  <button 
+                    className="tv-player-btn" 
+                    tabIndex={0}
+                    onClick={() => setShowDrawer(showDrawer === 'epg' ? null : 'epg')}
+                    style={{ background: 'rgba(239, 68, 68, 0.2)', color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.4)' }}
+                  >
+                    <Radio size={18} />
+                    <span>EPG Guide (OK)</span>
+                  </button>
+                )}
+
                 {orderedServers.length > 1 && (
                   <button 
                     className="tv-player-btn" 
@@ -1158,6 +1165,7 @@ export function TVPlayer({
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
             <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#fff' }}>
               {showDrawer === 'channels' && '📺 Live Channels'}
+              {showDrawer === 'epg' && '📅 Live Channel EPG Guide'}
               {showDrawer === 'servers' && '⚡ Select Server'}
               {showDrawer === 'audio' && '🔊 Audio Tracks'}
             </h3>
@@ -1171,7 +1179,81 @@ export function TVPlayer({
             </button>
           </div>
 
-          {/* Channels List */}
+          {/* EPG Now / Next Guide for current channel & all channels */}
+          {showDrawer === 'epg' && (() => {
+            const currentEpg = getCurrentAndNextProgram(item);
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                {/* Active Channel Now/Next Banner */}
+                <div style={{ padding: 14, background: 'rgba(30, 41, 59, 0.8)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.1)' }}>
+                  <div style={{ fontSize: '0.85rem', color: '#ef4444', fontWeight: 800, textTransform: 'uppercase', marginBottom: 4 }}>
+                    🔴 NOW AIRING ON {item?.title || 'THIS CHANNEL'}
+                  </div>
+                  <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#fff', marginBottom: 4 }}>
+                    {currentEpg?.current?.title || 'Live Broadcast'}
+                  </div>
+                  <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginBottom: 8 }}>
+                    {currentEpg?.current?.startTimeFormatted} - {currentEpg?.current?.endTimeFormatted} ({currentEpg?.current?.durationMin} min)
+                  </div>
+                  {currentEpg?.current?.description && (
+                    <div style={{ fontSize: '0.8rem', color: '#cbd5e1', lineHeight: 1.4, marginBottom: 8 }}>
+                      {currentEpg?.current?.description}
+                    </div>
+                  )}
+                  {currentEpg?.current?.progressPercent != null && (
+                    <div style={{ width: '100%', height: 4, background: 'rgba(255,255,255,0.15)', borderRadius: 2, overflow: 'hidden' }}>
+                      <div style={{ width: `${currentEpg.current.progressPercent}%`, height: '100%', background: '#ef4444' }} />
+                    </div>
+                  )}
+
+                  {currentEpg?.next && (
+                    <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px dashed rgba(255,255,255,0.15)' }}>
+                      <div style={{ fontSize: '0.75rem', color: '#38bdf8', fontWeight: 800, textTransform: 'uppercase', marginBottom: 2 }}>
+                        NEXT SHOW ({currentEpg.next.startTimeFormatted})
+                      </div>
+                      <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#e2e8f0' }}>
+                        {currentEpg.next.title}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* All Channels Quick Switch with EPG */}
+                {channels.length > 0 && (
+                  <div>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#94a3b8', marginBottom: 8 }}>
+                      All Live Channels & Current Shows
+                    </div>
+                    {channels.map((ch, idx) => {
+                      const chEpg = getCurrentAndNextProgram(ch);
+                      return (
+                        <button
+                          key={ch.id || idx}
+                          tabIndex={0}
+                          className={`tv-drawer-item ${ch.id === item?.id ? 'active' : ''}`}
+                          style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', padding: 10, marginBottom: 6 }}
+                          onClick={() => {
+                            if (onSelectChannel) onSelectChannel(ch);
+                            setShowDrawer(null);
+                          }}
+                        >
+                          <div style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontWeight: 800, color: '#fff' }}>{ch.title || ch.name}</span>
+                            <span style={{ fontSize: '0.7rem', color: '#94a3b8', background: 'rgba(255,255,255,0.1)', padding: '2px 6px', borderRadius: 4 }}>{ch.category || 'Live'}</span>
+                          </div>
+                          {chEpg?.current && (
+                            <div style={{ fontSize: '0.75rem', color: '#cbd5e1', marginTop: 4 }}>
+                              NOW: <span style={{ color: '#ef4444' }}>{chEpg.current.title}</span>
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
           {showDrawer === 'channels' && channels.map((ch, idx) => (
             <button
               key={ch.id || idx}

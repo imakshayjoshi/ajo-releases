@@ -21,26 +21,27 @@
 //
 // v3.9.1: Added vidsrc.xyz and superembed.stream; aligned with updated EMBED_PATTERNS.
 const EMBED_HOST_PATTERNS = [
-  /apiplayer\.ru/i,
   /vidlink\.pro/i,
-  /vidsrc/i,
+  /vidsrc\.pm/i,
   /autoembed\.co/i,
-  /rasta428jem\.com/i,
-  /humma429gix\.com/i,
-  /smashy\.stream/i,
-  /multiembed\.mov/i,
-  /\/embed(\/|\?|$)/i,
+  /autoembed\.cc/i,
   /2embed\.(cc|skin)/i,
-  /embed\.su/i,
-  /moviesapi\.club/i,
-  /superembed\.stream/i,
+  /vidjoy\.pro/i,
+  /vidsrc\.pro/i,
+  /rivestream\.live/i,
+  /vidsrc/i,
+  /apiplayer\.ru/i,
+  /smashystream/i,
+  /\/embed(\/|\?|$)/i,
 ];
 
 const DEAD_HOST_PATTERNS = [
   /mainsstreaming\.info/i,
   /localhost/i,
   /127\.0\.0\.1/i,
-  /0\.0\.0\.0/i
+  /0\.0\.0\.0/i,
+  /moviesapi\.club/i,
+  /embed\.su/i
 ];
 
 function bridge() {
