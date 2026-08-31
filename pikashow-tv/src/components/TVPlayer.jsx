@@ -30,10 +30,10 @@ import { markChannelDead } from '../api/iptv';
 import { BINGE_COUNTDOWN_SECONDS } from '../utils/binge';
 import './TVPlayer.css';
 
-// v3.10.0: how long to wait for an embed iframe to signal a load before
+// v3.12.20: how long to wait for an embed iframe to signal a load before
 // auto-failing over. Dead hosts never fire onLoad; Cloudflare hang pages
-// usually do not either. Reduced from 24000 to speed up fallback.
-const EMBED_LOAD_TIMEOUT_MS = 12000;
+// usually do not either. Reduced from 12000 to speed up fallback further.
+const EMBED_LOAD_TIMEOUT_MS = 8000;
 
 export function TVPlayer({
   item,
@@ -458,8 +458,26 @@ export function TVPlayer({
     if (isEmbedStream) {
       setIsBuffering(false);
       setErrorMessage(null);
+
+      // v3.12.20 FIX: embed watchdog was previously dead code after this
+      // early return. Now it's registered HERE so it actually fires. When the
+      // iframe's onLoad sets dataset.loaded='1', the watchdog is a no-op.
+      // If the embed times out (dead host / Cloudflare block), we failover.
+      if (embedWatchdogRef.current) clearTimeout(embedWatchdogRef.current);
+      embedWatchdogRef.current = setTimeout(() => {
+        const iframe = iframeRef.current;
+        const loaded = iframe && iframe.dataset && iframe.dataset.loaded === '1';
+        if (!loaded && !nativeActiveRef.current) {
+          handleFailover('Embed mirror not responding');
+        }
+      }, EMBED_LOAD_TIMEOUT_MS);
+
       return () => {
         disposed = true;
+        if (embedWatchdogRef.current) {
+          clearTimeout(embedWatchdogRef.current);
+          embedWatchdogRef.current = null;
+        }
       };
     }
 
@@ -585,15 +603,7 @@ export function TVPlayer({
         }, 2000);
       })();
 
-    } else if (isEmbedStream) {
-      if (embedWatchdogRef.current) clearTimeout(embedWatchdogRef.current);
-      embedWatchdogRef.current = setTimeout(() => {
-        const iframe = iframeRef.current;
-        const loaded = iframe && (iframe.dataset && iframe.dataset.loaded === '1');
-        if (!loaded && !nativeActiveRef.current) {
-          handleFailover('Embed mirror not responding');
-        }
-      }, EMBED_LOAD_TIMEOUT_MS);
+    // v3.12.20: embed watchdog moved to the early-return block above (line ~460)
     } else {
       // Native Android HTML5 video playback
       video.src = streamUrl;
@@ -863,8 +873,8 @@ export function TVPlayer({
           switch. Without this key, React reuses the iframe element and only
           updates src= — but most embed pages ignore src attribute changes and
           keep playing the old stream.
-          v3.10.0 FIX: onLoad signals the mirror actually responded (dead
-          hosts never fire it), which arms/clears the failover watchdog. */}
+          v3.12.20 FIX: onLoad sets dataset.loaded='1' to arm the embed watchdog.
+          onError triggers immediate failover for broken embeds. */}
       {streamUrl && !nativeActive && embedReady && (isEmbedUrl(streamUrl) || !isDirectMediaUrl(streamUrl)) && (
         <div style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', background: '#000', zIndex: 10 }}>
           <iframe
@@ -874,8 +884,19 @@ export function TVPlayer({
             title={title || 'Stream'}
             allow="autoplay; fullscreen; encrypted-media; picture-in-picture; accelerometer; gyroscope"
             allowFullScreen
-            onLoad={() => {
+            onLoad={(e) => {
               setIsBuffering(false);
+              // Signal the embed watchdog that the iframe loaded successfully
+              if (e.target) e.target.dataset.loaded = '1';
+              // Clear the embed watchdog since the page loaded
+              if (embedWatchdogRef.current) {
+                clearTimeout(embedWatchdogRef.current);
+                embedWatchdogRef.current = null;
+              }
+            }}
+            onError={() => {
+              // Immediate failover on iframe load error
+              handleFailover('Embed source failed to load');
             }}
             style={{
               position: 'absolute',

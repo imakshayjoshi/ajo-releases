@@ -2,10 +2,9 @@ const HLS_PATTERNS = [/\.m3u8(?:$|\?)/i, /\/getm3u8\//i, /\/getstream\//i, /\/li
 const DASH_PATTERNS = [/\.mpd(?:$|\?)/i];
 const VIDEO_PATTERNS = [/\.(mp4|m4v|webm|mkv)(?:$|\?)/i];
 
-// v3.9.1 FIX: reordered — moviesapi.club and multiembed.mov have no Cloudflare
-// so they are now the *first* servers a user hits.  Heavy Cloudflare providers
-// (vidlink, autoembed, vidsrc.me, vidsrc.cc, embed.su) are now last-resort
-// fallbacks only.  Added vidsrc.xyz (simpler domain, usually captcha-free).
+// v3.12.20 FIX: purged dead providers, reordered by reliability.
+// Confirmed alive (Aug 2026): VidLink, VidSrc PM, AutoEmbed, VidJoy,
+// NontonGo, VidSrc IN, 2embed.skin, VidSrc Pro (301 redirect but works).
 // Keep EMBED_PATTERNS in sync with nativePlayer.js EMBED_HOST_PATTERNS.
 const EMBED_PATTERNS = [
   /vidlink\.pro/i,
@@ -15,17 +14,19 @@ const EMBED_PATTERNS = [
   /2embed\.(cc|skin)/i,
   /vidjoy\.pro/i,
   /vidsrc\.pro/i,
-  /rivestream\.live/i,
+  /nontongo\.win/i,
+  /vidsrc\.in/i,
+  /vidsrc\.net/i,
   /vidsrc\.cc/i,
   /vidsrc\.xyz/i,
   /vidsrc\.io/i,
-  /vidsrc\.net/i,
-  /vidsrc\.in/i,
   /vidsrc\.to/i,
   /vidsrc\.me/i,
   /v2\.vidsrc\.me/i,
+  /rivestream\.live/i,
   /smashystream\.com/i,
   /apiplayer\.ru/i,
+  /multiembed\.mov/i,
   /\/embed\/?(\?|$)/i,
 ];
 
@@ -89,7 +90,23 @@ function buildApiPlayerMirror(item) {
   };
 }
 
-const DEAD_HOSTS = [/mainsstreaming\.info/i, /localhost/i, /127\.0\.0\.1/i, /0\.0\.0\.0/i, /moviesapi\.club/i, /embed\.su/i];
+// v3.12.20: expanded dead host list based on live testing Aug 2026
+const DEAD_HOSTS = [
+  /mainsstreaming\.info/i, /localhost/i, /127\.0\.0\.1/i, /0\.0\.0\.0/i,
+  /moviesapi\.club/i, /embed\.su/i, /moviesapi\.online/i,
+  /rivestream\.live/i,        // ECONNRESET
+  /vidsrc\.cc/i,              // timeout / ECONNRESET
+  /vidsrc\.xyz/i,             // timeout / ECONNRESET
+  /vidsrc\.to/i,              // ECONNRESET
+  /vidsrc\.io/i,              // ECONNRESET
+  /v2\.vidsrc\.me/i,          // ECONNRESET
+  /smashystream\.com/i,       // TLS cert error
+  /apiplayer\.ru/i,           // 502 Bad Gateway
+  /multiembed\.mov/i,         // 403
+  /vidbinge\.dev/i,           // TLS cert error
+  /sus\.stream/i,             // ENOTFOUND
+  /filmxy\.wafflehacker/i,    // ENOTFOUND
+];
 
 export function isDeadHost(url) {
   if (!url || typeof url !== 'string') return true;
@@ -157,6 +174,7 @@ export function generateUniversalServers(item, episodeInfo = null) {
   const targetId = tmdbId || imdbId;
   if (targetId) {
     if (isSeries) {
+      // v3.12.20: reordered series servers — confirmed-alive first, dead removed.
       if (tmdbId) {
         raw.push({
           url: `https://vidlink.pro/tv/${tmdbId}/${season}/${episode}`,
@@ -172,7 +190,7 @@ export function generateUniversalServers(item, episodeInfo = null) {
         });
         raw.push({
           url: `https://autoembed.co/tv/tmdb/${tmdbId}?s=${season}&e=${episode}`,
-          name: 'Server 3: AutoEmbed TMDB (Reliable)',
+          name: 'Server 3: AutoEmbed (Reliable)',
           source: 'embed',
           quality: '1080p'
         });
@@ -183,14 +201,26 @@ export function generateUniversalServers(item, episodeInfo = null) {
           quality: '1080p'
         });
         raw.push({
-          url: `https://vidsrc.pro/embed/tv/${tmdbId}/${season}/${episode}`,
-          name: 'Server 5: VidSrc Pro (Full HD)',
+          url: `https://www.nontongo.win/embed/tv/${tmdbId}/${season}/${episode}`,
+          name: 'Server 5: NontonGo (Direct)',
           source: 'embed',
           quality: '1080p'
         });
         raw.push({
-          url: `https://rivestream.live/embed?type=serie&id=${tmdbId}&season=${season}&episode=${episode}`,
-          name: 'Server 6: RiveStream (Direct)',
+          url: `https://vidsrc.in/embed/tv/${tmdbId}/${season}/${episode}`,
+          name: 'Server 6: VidSrc IN (HD)',
+          source: 'embed',
+          quality: '1080p'
+        });
+        raw.push({
+          url: `https://2embed.skin/embed/tv/${tmdbId}/${season}/${episode}`,
+          name: 'Server 7: 2Embed Skin (Backup)',
+          source: 'embed',
+          quality: '1080p'
+        });
+        raw.push({
+          url: `https://vidsrc.pro/embed/tv/${tmdbId}/${season}/${episode}`,
+          name: 'Server 8: VidSrc Pro (Full HD)',
           source: 'embed',
           quality: '1080p'
         });
@@ -198,30 +228,19 @@ export function generateUniversalServers(item, episodeInfo = null) {
       if (imdbId) {
         raw.push({
           url: `https://autoembed.co/tv/imdb/${imdbId}?s=${season}&e=${episode}`,
-          name: 'Server 7: AutoEmbed IMDb (No CF)',
+          name: 'Server 9: AutoEmbed IMDb (No CF)',
           source: 'embed',
           quality: '1080p'
         });
         raw.push({
           url: `https://www.2embed.cc/embedtv/${imdbId}?s=${season}&e=${episode}`,
-          name: 'Server 8: 2Embed (Backup)',
+          name: 'Server 10: 2Embed CC (Backup)',
           source: 'embed',
           quality: '1080p'
         });
       }
-      raw.push({
-        url: `https://vidsrc.cc/v2/embed/tv/${targetId}/${season}/${episode}`,
-        name: 'Server 9: VidSrc CC',
-        source: 'embed',
-        quality: '1080p'
-      });
-      raw.push({
-        url: `https://vidsrc.xyz/embed/tv/${targetId}/${season}/${episode}`,
-        name: 'Server 10: VidSrc XYZ',
-        source: 'embed',
-        quality: '1080p'
-      });
     } else {
+      // v3.12.20: reordered movie servers — confirmed-alive first, dead removed.
       if (tmdbId) {
         raw.push({
           url: `https://vidlink.pro/movie/${tmdbId}`,
@@ -237,7 +256,7 @@ export function generateUniversalServers(item, episodeInfo = null) {
         });
         raw.push({
           url: `https://autoembed.co/movie/tmdb/${tmdbId}`,
-          name: 'Server 3: AutoEmbed TMDB (Reliable)',
+          name: 'Server 3: AutoEmbed (Reliable)',
           source: 'embed',
           quality: '1080p'
         });
@@ -248,14 +267,26 @@ export function generateUniversalServers(item, episodeInfo = null) {
           quality: '1080p'
         });
         raw.push({
-          url: `https://vidsrc.pro/embed/movie/${tmdbId}`,
-          name: 'Server 5: VidSrc Pro (Full HD)',
+          url: `https://www.nontongo.win/embed/movie/${tmdbId}`,
+          name: 'Server 5: NontonGo (Direct)',
           source: 'embed',
           quality: '1080p'
         });
         raw.push({
-          url: `https://rivestream.live/embed?type=movie&id=${tmdbId}`,
-          name: 'Server 6: RiveStream (Direct)',
+          url: `https://vidsrc.in/embed/movie/${tmdbId}`,
+          name: 'Server 6: VidSrc IN (HD)',
+          source: 'embed',
+          quality: '1080p'
+        });
+        raw.push({
+          url: `https://2embed.skin/embed/movie/${tmdbId}`,
+          name: 'Server 7: 2Embed Skin (Backup)',
+          source: 'embed',
+          quality: '1080p'
+        });
+        raw.push({
+          url: `https://vidsrc.pro/embed/movie/${tmdbId}`,
+          name: 'Server 8: VidSrc Pro (Full HD)',
           source: 'embed',
           quality: '1080p'
         });
@@ -263,29 +294,17 @@ export function generateUniversalServers(item, episodeInfo = null) {
       if (imdbId) {
         raw.push({
           url: `https://autoembed.co/movie/imdb/${imdbId}`,
-          name: 'Server 7: AutoEmbed IMDb (No CF)',
+          name: 'Server 9: AutoEmbed IMDb (No CF)',
           source: 'embed',
           quality: '1080p'
         });
         raw.push({
           url: `https://www.2embed.cc/embedmovie/${imdbId}`,
-          name: 'Server 8: 2Embed (Backup)',
+          name: 'Server 10: 2Embed CC (Backup)',
           source: 'embed',
           quality: '1080p'
         });
       }
-      raw.push({
-        url: `https://vidsrc.cc/v2/embed/movie/${targetId}`,
-        name: 'Server 9: VidSrc CC',
-        source: 'embed',
-        quality: '1080p'
-      });
-      raw.push({
-        url: `https://vidsrc.xyz/embed/movie/${targetId}`,
-        name: 'Server 10: VidSrc XYZ',
-        source: 'embed',
-        quality: '1080p'
-      });
     }
   }
 
