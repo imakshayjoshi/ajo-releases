@@ -4,19 +4,20 @@
   "versionCode": 107,
   "releaseDate": "2026-08-31",
   "phone": {
-    "version": "3.3.22",
-    "versionCode": 71,
+    "version": "3.3.23",
+    "versionCode": 72,
     "packageId": "com.ajo.phone",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "📺 NDTV Marathi Logo Fixed: Updated official high-res logo",
-      "🎬 Movie & TV Embed Streaming: Fixed CookieManager and WebView UserAgent for seamless embed playback"
+      "📥 Offline Downloads Engine: Download movies & TV series directly to device storage and watch anywhere without internet",
+      "⚡ Fast Offline Playback: 1-tap playback from local storage with hardware video acceleration",
+      "🛡️ OTA Updater Fix: Multi-mirror fallback with direct static CDN downloads"
     ],
     "size_mb": "3.3 MB",
-    "sha256": "4eaaa6ca264f1584f2357d82117382e4d37340149fd5bfec1a0262dc93f095f0"
+    "sha256": "aa692c8b9eccb7312cf37e8b4f610fe1ec2ee44bca572b0593ce707c66c1f9e7"
   },
   "tv": {
     "version": "3.12.20",
@@ -29,9 +30,9 @@
     "changelog": [
       "⚡ Movie & Series Streaming Overhaul: Purged dead/unresponsive providers and reordered servers with confirmed-alive high-speed mirrors first",
       "🛡️ Embed Failover Engine: Fixed watchdog timeout to auto-switch unresponsive/blocked mirrors within 8 seconds",
-      "📺 Mirror Availability Fix: Eliminated false stall/mirror availability errors on movies like Mutiny"
+      "🚀 Hardened OTA In-App Updater: Fixed download redirect errors with direct multi-mirror fallback"
     ],
     "size_mb": "6.9 MB",
-    "sha256": "d4f1139948e6fc7759340526ede978da0d270831055dcd724c0e45db5a6d40f4"
+    "sha256": "4dcd1f44ac3e20bed43993a9bce61dedaf20a211611b5a05d637dda778c3ac90"
   }
 }

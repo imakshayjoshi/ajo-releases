@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Play, X, Star, Radio, Film, Tv, Sparkles, Bookmark, Check, Layers, Cast, RotateCcw } from 'lucide-react';
+import { Play, X, Star, Radio, Film, Tv, Sparkles, Bookmark, Check, Layers, Cast, RotateCcw, Download, CheckCircle2, Loader2 } from 'lucide-react';
 import { getSeriesEpisodes } from '../api/pikashow';
 import { getSourceProvider } from '../utils/sourceProvider';
 import { generateUniversalServers } from '../utils/streamingEngines';
 import { isFavorite, toggleFavorite, getWatchHistory, deleteHistoryItem, getWatchProgress } from '../api/history';
 import { castEngine } from '../api/castSync';
 import { generateAdditionalMovieSources, generateAdditionalSeriesSources, mergeStreamingSources } from '../api/additionalSources';
+import { startOfflineDownload, getItemDownloadStatus, subscribeDownloads } from '../api/offlineDownloads';
 
 function formatTime(seconds) {
   if (!seconds || isNaN(seconds) || !isFinite(seconds)) return '00:00';
@@ -26,6 +27,16 @@ export function MediaDetailsModal({ item, onClose, onStartPlayback }) {
   const [selectedServer, setSelectedServer] = useState(null);
   const [isFav, setIsFav] = useState(false);
   const [castSent, setCastSent] = useState(false);
+  const [downloadState, setDownloadState] = useState(null);
+
+  useEffect(() => {
+    if (!item) return;
+    const updateDl = () => {
+      setDownloadState(getItemDownloadStatus(item.id || item.movie_id || item.tmdb_id));
+    };
+    updateDl();
+    return subscribeDownloads(updateDl);
+  }, [item]);
 
   const isLive = item?.is_live || item?.type === 'live' || item?.year === 'LIVE';
   const provider = getSourceProvider(item);
@@ -217,6 +228,55 @@ export function MediaDetailsModal({ item, onClose, onStartPlayback }) {
               <Cast size={18} />
               <span>{castError ? castError : castSent ? 'Casting to TV...' : 'Play on TV'}</span>
             </button>
+
+            {!isLive && (
+              <button
+                className="mobile-sheet-watchlist-btn"
+                style={{
+                  minHeight: '44px',
+                  padding: '0 14px',
+                  background: downloadState?.status === 'completed' 
+                    ? 'rgba(16, 185, 129, 0.15)' 
+                    : downloadState?.status === 'downloading'
+                      ? 'rgba(56, 189, 248, 0.2)'
+                      : 'rgba(255, 255, 255, 0.05)',
+                  border: downloadState?.status === 'completed'
+                    ? '1px solid #10b981'
+                    : downloadState?.status === 'downloading'
+                      ? '1px solid #38bdf8'
+                      : '1px solid rgba(255, 255, 255, 0.15)',
+                  color: downloadState?.status === 'completed' ? '#10b981' : '#38bdf8',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+                onClick={() => {
+                  if (downloadState?.status === 'completed') {
+                    // Already downloaded - notify user
+                    alert('Movie is already downloaded to your device! Go to the Downloads tab to watch offline.');
+                  } else if (downloadState?.status !== 'downloading') {
+                    startOfflineDownload(item, selectedServer);
+                  }
+                }}
+              >
+                {downloadState?.status === 'completed' ? (
+                  <>
+                    <CheckCircle2 size={18} color="#10b981" />
+                    <span>Downloaded</span>
+                  </>
+                ) : downloadState?.status === 'downloading' || downloadState?.status === 'starting' ? (
+                  <>
+                    <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} color="#38bdf8" />
+                    <span>{downloadState.progress >= 0 ? `${downloadState.progress}%` : 'Downloading...'}</span>
+                  </>
+                ) : (
+                  <>
+                    <Download size={18} />
+                    <span>Download</span>
+                  </>
+                )}
+              </button>
+            )}
 
             <button
               className={`mobile-sheet-watchlist-btn ${isFav ? 'is-active' : ''}`}

@@ -1,8 +1,9 @@
-export const CURRENT_APP_VERSION = '3.3.22';
-export const CURRENT_VERSION_CODE = 71;
+export const CURRENT_APP_VERSION = '3.3.23';
+export const CURRENT_VERSION_CODE = 72;
 const MANIFEST_SOURCES = [
-  'https://api.github.com/repos/imakshayjoshi/ajo-releases/releases/latest',
   'https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/version.json',
+  'https://raw.githack.com/imakshayjoshi/ajo-releases/main/version.json',
+  'https://api.github.com/repos/imakshayjoshi/ajo-releases/releases/latest',
   'https://cdn.jsdelivr.net/gh/imakshayjoshi/ajo-releases@main/version.json'
 ];
 const RELEASE_PREFIX = 'https://github.com/imakshayjoshi/ajo-releases/releases/download/';
@@ -22,12 +23,13 @@ export function isAllowedApkUrl(url) {
   const isAjoApk = /\/AJO_(PHONE|TV)\.apk(\?.*)?$/i.test(url) || url.endsWith('.apk');
   const isTrustedHost = url.includes('github.com') || 
                         url.includes('raw.githubusercontent.com') || 
+                        url.includes('githack.com') ||
                         url.includes('jsdelivr.net') || 
                         url.includes('tinyurl.com');
   return isAjoApk && isTrustedHost;
 }
 
-export async function checkForAppUpdates(appType = 'tv') {
+export async function checkForAppUpdates(appType = 'phone') {
   let manifestData = null;
   let fromGithubApi = false;
 
@@ -55,28 +57,30 @@ export async function checkForAppUpdates(appType = 'tv') {
     let latestVersion = CURRENT_APP_VERSION;
     let apkUrl = '';
     let changelog = [];
-    let size = '4.3 MB';
+    let size = '3.3 MB';
     let releaseDate = new Date().toISOString().split('T')[0];
     const packageId = appType === 'tv' ? 'com.ajo.tv' : 'com.ajo.phone';
 
+    const directApkUrl = appType === 'tv'
+      ? 'https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk'
+      : 'https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk';
+
     if (fromGithubApi && manifestData) {
       latestVersion = String(manifestData.tag_name || CURRENT_APP_VERSION).replace(/^v/, '');
-      const assetTargetName = appType === 'tv' ? 'AJO_TV.apk' : 'AJO_PHONE.apk';
-      const foundAsset = (manifestData.assets || []).find(a => (a.name || '').toLowerCase() === assetTargetName.toLowerCase());
-      apkUrl = foundAsset?.browser_download_url || `${RELEASE_PREFIX}v${latestVersion}/${assetTargetName}`;
+      apkUrl = directApkUrl;
       changelog = manifestData.body ? manifestData.body.split('\n').filter(l => l.trim().startsWith('-') || l.trim().startsWith('*')).map(l => l.replace(/^[-*]\s*/, '').trim()) : [];
       releaseDate = manifestData.published_at ? manifestData.published_at.split('T')[0] : releaseDate;
     } else if (manifestData && manifestData[appType]) {
       target = manifestData[appType] || {};
       latestVersion = target.version || manifestData.version || CURRENT_APP_VERSION;
-      apkUrl = target.apkUrl || target.apk_url || '';
+      apkUrl = target.apkUrl || target.apk_url || directApkUrl;
       changelog = Array.isArray(target.changelog) ? target.changelog : [];
       size = target.size_mb || target.size || size;
       releaseDate = manifestData.releaseDate || releaseDate;
     }
 
     if (!apkUrl) {
-      apkUrl = `${RELEASE_PREFIX}v${latestVersion}/${appType === 'tv' ? 'AJO_TV.apk' : 'AJO_PHONE.apk'}`;
+      apkUrl = directApkUrl;
     }
 
     let installedVersion = CURRENT_APP_VERSION;

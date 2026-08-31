@@ -496,44 +496,11 @@ public class MainActivity extends BridgeActivity {
                             javax.net.ssl.HttpsURLConnection.setDefaultSSLSocketFactory(sc.getSocketFactory());
                             javax.net.ssl.HttpsURLConnection.setDefaultHostnameVerifier((hostname, session) -> true);
 
-                            String currentUrl = apkUrl;
-                            HttpURLConnection conn = null;
-                            int redirects = 0;
-
-                            while (redirects < 8) {
-                                URL u = new URL(currentUrl);
-                                conn = (HttpURLConnection) u.openConnection();
-                                conn.setConnectTimeout(20000);
-                                conn.setReadTimeout(45000);
-                                conn.setInstanceFollowRedirects(true);
-                                conn.setRequestProperty("User-Agent",
-                                        "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 AJO-TV-Updater");
-                                conn.setRequestProperty("Accept", "*/*");
-                                conn.connect();
-
-                                int code = conn.getResponseCode();
-                                if (code == HttpURLConnection.HTTP_MOVED_TEMP
-                                        || code == HttpURLConnection.HTTP_MOVED_PERM || code == 307 || code == 308) {
-                                    String location = conn.getHeaderField("Location");
-                                    if (location != null && !location.isEmpty()) {
-                                        currentUrl = location;
-                                        redirects++;
-                                        continue;
-                                    }
-                                }
-                                break;
-                            }
-
-                            if (conn == null)
-                                throw new java.io.IOException("Failed to establish connection");
-                            int responseCode = conn.getResponseCode();
-                            if (responseCode != HttpURLConnection.HTTP_OK) {
-                                throw new java.io.IOException("Server returned HTTP " + responseCode + " ("
-                                        + conn.getResponseMessage() + ")");
-                            }
-
-                            int fileLength = conn.getContentLength();
-                            InputStream input = conn.getInputStream();
+                            String[] candidateUrls = new String[] {
+                                    apkUrl,
+                                    "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
+                                    "https://raw.githack.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk"
+                            };
 
                             File outputDir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
                             if (outputDir == null) {
@@ -546,35 +513,91 @@ public class MainActivity extends BridgeActivity {
                             if (apkFile.exists())
                                 apkFile.delete();
 
-                            FileOutputStream output = new FileOutputStream(apkFile);
-                            byte[] data = new byte[8192];
-                            long total = 0;
-                            int count;
-                            int lastProgress = -1;
+                            boolean downloadSuccess = false;
+                            Exception lastEx = null;
 
-                            while ((count = input.read(data)) != -1) {
-                                total += count;
-                                output.write(data, 0, count);
-                                if (fileLength > 0) {
-                                    int progress = (int) (total * 100 / fileLength);
-                                    if (progress != lastProgress) {
-                                        lastProgress = progress;
-                                        final int p = progress;
-                                        final long tot = total;
-                                        final long len = fileLength;
-                                        runOnUiThread(() -> {
-                                            webView.evaluateJavascript(
-                                                    "window.onAJOUpdateProgress && window.onAJOUpdateProgress(" + p
-                                                            + ", " + tot + ", " + len + ");",
-                                                    null);
-                                        });
+                            for (String tryUrl : candidateUrls) {
+                                if (tryUrl == null || tryUrl.isEmpty()) continue;
+                                String currentUrl = tryUrl;
+                                HttpURLConnection conn = null;
+                                int redirects = 0;
+
+                                try {
+                                    while (redirects < 8) {
+                                        URL u = new URL(currentUrl);
+                                        conn = (HttpURLConnection) u.openConnection();
+                                        conn.setConnectTimeout(15000);
+                                        conn.setReadTimeout(30000);
+                                        conn.setInstanceFollowRedirects(true);
+                                        conn.setRequestProperty("User-Agent",
+                                                "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 AJO-TV-Updater");
+                                        conn.setRequestProperty("Accept", "*/*");
+                                        conn.connect();
+
+                                        int code = conn.getResponseCode();
+                                        if (code == HttpURLConnection.HTTP_MOVED_TEMP
+                                                || code == HttpURLConnection.HTTP_MOVED_PERM || code == 307 || code == 308) {
+                                            String location = conn.getHeaderField("Location");
+                                            if (location != null && !location.isEmpty()) {
+                                                currentUrl = new URL(new URL(currentUrl), location).toString();
+                                                redirects++;
+                                                continue;
+                                            }
+                                        }
+                                        break;
                                     }
+
+                                    if (conn == null) throw new java.io.IOException("Failed to establish connection");
+                                    int responseCode = conn.getResponseCode();
+                                    if (responseCode != HttpURLConnection.HTTP_OK) {
+                                        throw new java.io.IOException("HTTP " + responseCode + " (" + conn.getResponseMessage() + ")");
+                                    }
+
+                                    int fileLength = conn.getContentLength();
+                                    InputStream input = conn.getInputStream();
+                                    FileOutputStream output = new FileOutputStream(apkFile);
+                                    byte[] data = new byte[8192];
+                                    long total = 0;
+                                    int count;
+                                    int lastProgress = -1;
+
+                                    while ((count = input.read(data)) != -1) {
+                                        total += count;
+                                        output.write(data, 0, count);
+                                        int progress = fileLength > 0 ? (int) (total * 100 / fileLength) : Math.min(99, (int) (total / 70000));
+                                        if (progress != lastProgress) {
+                                            lastProgress = progress;
+                                            final int p = progress;
+                                            final long tot = total;
+                                            final long len = fileLength;
+                                            runOnUiThread(() -> {
+                                                webView.evaluateJavascript(
+                                                        "window.onAJOUpdateProgress && window.onAJOUpdateProgress(" + p
+                                                                + ", " + tot + ", " + len + ");",
+                                                        null);
+                                            });
+                                        }
+                                    }
+
+                                    output.flush();
+                                    output.close();
+                                    input.close();
+
+                                    if (apkFile.exists() && apkFile.length() > 1024 * 1024) {
+                                        downloadSuccess = true;
+                                        break;
+                                    }
+                                } catch (Exception e) {
+                                    lastEx = e;
+                                    if (apkFile.exists()) apkFile.delete();
+                                } finally {
+                                    if (conn != null) try { conn.disconnect(); } catch (Exception ignored) {}
                                 }
                             }
 
-                            output.flush();
-                            output.close();
-                            input.close();
+                            if (!downloadSuccess) {
+                                throw (lastEx != null ? lastEx : new java.io.IOException("All update mirrors failed"));
+                            }
 
                             runOnUiThread(() -> {
                                 webView.evaluateJavascript(

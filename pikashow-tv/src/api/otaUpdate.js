@@ -63,24 +63,26 @@ export async function checkForAppUpdates(appType = 'tv') {
     let releaseDate = new Date().toISOString().split('T')[0];
     const packageId = appType === 'tv' ? 'com.ajo.tv' : 'com.ajo.phone';
 
+    const directApkUrl = appType === 'tv'
+      ? 'https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk'
+      : 'https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk';
+
     if (fromGithubApi && manifestData) {
       latestVersion = String(manifestData.tag_name || CURRENT_APP_VERSION).replace(/^v/, '');
-      const assetTargetName = appType === 'tv' ? 'AJO_TV.apk' : 'AJO_PHONE.apk';
-      const foundAsset = (manifestData.assets || []).find(a => (a.name || '').toLowerCase() === assetTargetName.toLowerCase());
-      apkUrl = foundAsset?.browser_download_url || `${RELEASE_PREFIX}v${latestVersion}/${assetTargetName}`;
+      apkUrl = directApkUrl;
       changelog = manifestData.body ? manifestData.body.split('\n').filter(l => l.trim().startsWith('-') || l.trim().startsWith('*')).map(l => l.replace(/^[-*]\s*/, '').trim()) : [];
       releaseDate = manifestData.published_at ? manifestData.published_at.split('T')[0] : releaseDate;
     } else if (manifestData && manifestData[appType]) {
       target = manifestData[appType] || {};
       latestVersion = target.version || manifestData.version || CURRENT_APP_VERSION;
-      apkUrl = target.apkUrl || target.apk_url || '';
+      apkUrl = target.apkUrl || target.apk_url || directApkUrl;
       changelog = Array.isArray(target.changelog) ? target.changelog : [];
       size = target.size_mb || target.size || size;
       releaseDate = manifestData.releaseDate || releaseDate;
     }
 
     if (!apkUrl) {
-      apkUrl = `${RELEASE_PREFIX}v${latestVersion}/${appType === 'tv' ? 'AJO_TV.apk' : 'AJO_PHONE.apk'}`;
+      apkUrl = directApkUrl;
     }
 
     let installedVersion = CURRENT_APP_VERSION;

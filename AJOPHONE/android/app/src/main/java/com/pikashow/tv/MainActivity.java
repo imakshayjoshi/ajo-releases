@@ -245,55 +245,77 @@ public class MainActivity extends BridgeActivity {
                         }
                     }
 
-                    // Run download in background thread
+                    // Run download in background thread with fallback mirrors
                     new Thread(() -> {
-                        try {
-                            runOnUiThread(() -> {
-                                webView.evaluateJavascript("window.onAJOUpdateStatus && window.onAJOUpdateStatus('DOWNLOADING', 0);", null);
-                            });
+                        String[] candidateUrls = new String[] {
+                                apkUrl,
+                                "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
+                                "https://raw.githack.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk"
+                        };
 
-                            URL url = new URL(apkUrl);
-                            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                            conn.setConnectTimeout(15000);
-                            conn.setReadTimeout(30000);
-                            conn.setInstanceFollowRedirects(true);
-                            conn.connect();
+                        File outputDir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
+                        if (outputDir == null) {
+                            outputDir = getCacheDir();
+                        }
+                        if (!outputDir.exists()) outputDir.mkdirs();
 
-                            int responseCode = conn.getResponseCode();
-                            // Handle HTTP 301/302/307/308 redirects
-                            if (responseCode == HttpURLConnection.HTTP_MOVED_TEMP || responseCode == HttpURLConnection.HTTP_MOVED_PERM || responseCode == 307 || responseCode == 308) {
-                                String newUrl = conn.getHeaderField("Location");
-                                if (newUrl != null && !newUrl.isEmpty()) {
-                                    conn = (HttpURLConnection) new URL(newUrl).openConnection();
+                        File apkFile = new File(outputDir, "update_ajo.apk");
+                        if (apkFile.exists()) apkFile.delete();
+
+                        boolean downloadSuccess = false;
+                        Exception lastEx = null;
+
+                        for (String tryUrl : candidateUrls) {
+                            if (tryUrl == null || tryUrl.isEmpty()) continue;
+                            String currentUrl = tryUrl;
+                            HttpURLConnection conn = null;
+                            int redirects = 0;
+
+                            try {
+                                runOnUiThread(() -> {
+                                    webView.evaluateJavascript("window.onAJOUpdateStatus && window.onAJOUpdateStatus('DOWNLOADING', 0);", null);
+                                });
+
+                                while (redirects < 8) {
+                                    URL u = new URL(currentUrl);
+                                    conn = (HttpURLConnection) u.openConnection();
                                     conn.setConnectTimeout(15000);
                                     conn.setReadTimeout(30000);
+                                    conn.setInstanceFollowRedirects(true);
+                                    conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 AJO-Phone-Updater");
+                                    conn.setRequestProperty("Accept", "*/*");
                                     conn.connect();
+
+                                    int code = conn.getResponseCode();
+                                    if (code == HttpURLConnection.HTTP_MOVED_TEMP || code == HttpURLConnection.HTTP_MOVED_PERM || code == 307 || code == 308) {
+                                        String location = conn.getHeaderField("Location");
+                                        if (location != null && !location.isEmpty()) {
+                                            currentUrl = new URL(new URL(currentUrl), location).toString();
+                                            redirects++;
+                                            continue;
+                                        }
+                                    }
+                                    break;
                                 }
-                            }
 
-                            int fileLength = conn.getContentLength();
-                            InputStream input = conn.getInputStream();
+                                if (conn == null) throw new java.io.IOException("Failed to establish connection");
+                                int responseCode = conn.getResponseCode();
+                                if (responseCode != HttpURLConnection.HTTP_OK) {
+                                    throw new java.io.IOException("HTTP " + responseCode + " (" + conn.getResponseMessage() + ")");
+                                }
 
-                            File outputDir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
-                            if (outputDir == null) {
-                                outputDir = getCacheDir();
-                            }
-                            if (!outputDir.exists()) outputDir.mkdirs();
+                                int fileLength = conn.getContentLength();
+                                InputStream input = conn.getInputStream();
+                                FileOutputStream output = new FileOutputStream(apkFile);
+                                byte[] data = new byte[8192];
+                                long total = 0;
+                                int count;
+                                int lastProgress = -1;
 
-                            File apkFile = new File(outputDir, "update_ajo.apk");
-                            if (apkFile.exists()) apkFile.delete();
-
-                            FileOutputStream output = new FileOutputStream(apkFile);
-                            byte[] data = new byte[4096];
-                            long total = 0;
-                            int count;
-                            int lastProgress = -1;
-
-                            while ((count = input.read(data)) != -1) {
-                                total += count;
-                                output.write(data, 0, count);
-                                if (fileLength > 0) {
-                                    int progress = (int) (total * 100 / fileLength);
+                                while ((count = input.read(data)) != -1) {
+                                    total += count;
+                                    output.write(data, 0, count);
+                                    int progress = fileLength > 0 ? (int) (total * 100 / fileLength) : Math.min(99, (int) (total / 35000));
                                     if (progress != lastProgress) {
                                         lastProgress = progress;
                                         final int p = progress;
@@ -304,25 +326,38 @@ public class MainActivity extends BridgeActivity {
                                         });
                                     }
                                 }
+
+                                output.flush();
+                                output.close();
+                                input.close();
+
+                                if (apkFile.exists() && apkFile.length() > 500 * 1024) {
+                                    downloadSuccess = true;
+                                    break;
+                                }
+                            } catch (Exception e) {
+                                lastEx = e;
+                                if (apkFile.exists()) apkFile.delete();
+                            } finally {
+                                if (conn != null) try { conn.disconnect(); } catch (Exception ignored) {}
                             }
-
-                            output.flush();
-                            output.close();
-                            input.close();
-
-                            runOnUiThread(() -> {
-                                webView.evaluateJavascript("window.onAJOUpdateStatus && window.onAJOUpdateStatus('READY_TO_INSTALL', 100);", null);
-                            });
-
-                            // Launch Android Package Installer
-                            installApk(apkFile);
-
-                        } catch (final Exception e) {
-                            runOnUiThread(() -> {
-                                webView.evaluateJavascript("window.onAJOUpdateError && window.onAJOUpdateError('" + e.getMessage() + "');", null);
-                                Toast.makeText(MainActivity.this, "Download failed: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                            });
                         }
+
+                        if (!downloadSuccess) {
+                            final String errMsg = lastEx != null ? lastEx.getMessage() : "Update download failed";
+                            runOnUiThread(() -> {
+                                webView.evaluateJavascript("window.onAJOUpdateError && window.onAJOUpdateError('" + errMsg + "');", null);
+                                Toast.makeText(MainActivity.this, "Download failed: " + errMsg, Toast.LENGTH_SHORT).show();
+                            });
+                            return;
+                        }
+
+                        runOnUiThread(() -> {
+                            webView.evaluateJavascript("window.onAJOUpdateStatus && window.onAJOUpdateStatus('READY_TO_INSTALL', 100);", null);
+                        });
+
+                        // Launch Android Package Installer
+                        installApk(apkFile);
                     }).start();
                 }
 
@@ -350,6 +385,198 @@ public class MainActivity extends BridgeActivity {
                     }
                 }
             }, "AndroidUpdater");
+
+            // 2.5. Android Native Downloader for Offline Movies & Series
+            final java.util.concurrent.ConcurrentHashMap<String, Thread> activeDownloads = new java.util.concurrent.ConcurrentHashMap<>();
+
+            webView.addJavascriptInterface(new Object() {
+                @JavascriptInterface
+                public void startDownload(final String id, final String downloadUrl, final String title, final String filename, final String mimeType) {
+                    if (downloadUrl == null || downloadUrl.isEmpty() || id == null) {
+                        runOnUiThread(() -> Toast.makeText(MainActivity.this, "Invalid download URL", Toast.LENGTH_SHORT).show());
+                        return;
+                    }
+
+                    Thread dlThread = new Thread(() -> {
+                        HttpURLConnection conn = null;
+                        FileOutputStream output = null;
+                        InputStream input = null;
+                        File targetFile = null;
+                        try {
+                            File dir = getExternalFilesDir(Environment.DIRECTORY_MOVIES);
+                            if (dir == null) dir = getFilesDir();
+                            if (!dir.exists()) dir.mkdirs();
+
+                            String safeName = filename != null && !filename.isEmpty()
+                                    ? filename.replaceAll("[^a-zA-Z0-9._-]", "_")
+                                    : ("media_" + id + ".mp4");
+                            if (!safeName.endsWith(".mp4") && !safeName.endsWith(".mkv") && !safeName.endsWith(".webm") && !safeName.endsWith(".ts")) {
+                                safeName += ".mp4";
+                            }
+                            targetFile = new File(dir, safeName);
+
+                            String currentUrl = downloadUrl;
+                            int redirects = 0;
+                            while (redirects < 8) {
+                                URL u = new URL(currentUrl);
+                                conn = (HttpURLConnection) u.openConnection();
+                                conn.setConnectTimeout(15000);
+                                conn.setReadTimeout(30000);
+                                conn.setInstanceFollowRedirects(true);
+                                conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36");
+                                conn.setRequestProperty("Accept", "*/*");
+                                conn.connect();
+                                int code = conn.getResponseCode();
+                                if (code == HttpURLConnection.HTTP_MOVED_TEMP || code == HttpURLConnection.HTTP_MOVED_PERM || code == 307 || code == 308) {
+                                    String loc = conn.getHeaderField("Location");
+                                    if (loc != null && !loc.isEmpty()) {
+                                        currentUrl = new URL(new URL(currentUrl), loc).toString();
+                                        redirects++;
+                                        continue;
+                                    }
+                                }
+                                break;
+                            }
+
+                            if (conn == null) throw new java.io.IOException("Failed to connect");
+                            int respCode = conn.getResponseCode();
+                            if (respCode >= 400) throw new java.io.IOException("HTTP " + respCode + " " + conn.getResponseMessage());
+
+                            long contentLength = conn.getContentLength();
+                            input = conn.getInputStream();
+                            output = new FileOutputStream(targetFile);
+
+                            byte[] buffer = new byte[16384];
+                            long downloaded = 0;
+                            int count;
+                            long lastNotifyTime = 0;
+
+                            while ((count = input.read(buffer)) != -1) {
+                                if (Thread.currentThread().isInterrupted()) {
+                                    throw new java.io.InterruptedIOException("Download cancelled");
+                                }
+                                output.write(buffer, 0, count);
+                                downloaded += count;
+
+                                long now = System.currentTimeMillis();
+                                if (now - lastNotifyTime > 500) {
+                                    lastNotifyTime = now;
+                                    final int pct = contentLength > 0 ? (int) (downloaded * 100 / contentLength) : -1;
+                                    final long cur = downloaded;
+                                    final long total = contentLength;
+                                    final String path = targetFile.getAbsolutePath();
+                                    runOnUiThread(() -> {
+                                        try {
+                                            if (getBridge() != null && getBridge().getWebView() != null) {
+                                                getBridge().getWebView().evaluateJavascript(
+                                                        "window.__ajoOnDownloadProgress && window.__ajoOnDownloadProgress('"
+                                                                + id + "', " + pct + ", " + cur + ", " + total + ", 'downloading', '"
+                                                                + path.replace("'", "\\'") + "', null);", null);
+                                            }
+                                        } catch (Exception ignored) {}
+                                    });
+                                }
+                            }
+                            output.flush();
+
+                            final String finalPath = targetFile.getAbsolutePath();
+                            final long finalSize = targetFile.length();
+                            runOnUiThread(() -> {
+                                Toast.makeText(MainActivity.this, "Download complete: " + title, Toast.LENGTH_SHORT).show();
+                                try {
+                                    if (getBridge() != null && getBridge().getWebView() != null) {
+                                        getBridge().getWebView().evaluateJavascript(
+                                                "window.__ajoOnDownloadProgress && window.__ajoOnDownloadProgress('"
+                                                        + id + "', 100, " + finalSize + ", " + finalSize + ", 'completed', '"
+                                                        + finalPath.replace("'", "\\'") + "', null);", null);
+                                    }
+                                } catch (Exception ignored) {}
+                            });
+
+                        } catch (final Exception e) {
+                            final String errMsg = e.getMessage() != null ? e.getMessage() : e.toString();
+                            runOnUiThread(() -> {
+                                try {
+                                    if (getBridge() != null && getBridge().getWebView() != null) {
+                                        getBridge().getWebView().evaluateJavascript(
+                                                "window.__ajoOnDownloadProgress && window.__ajoOnDownloadProgress('"
+                                                        + id + "', 0, 0, 0, 'error', null, '"
+                                                        + errMsg.replace("'", "\\'") + "');", null);
+                                    }
+                                } catch (Exception ignored) {}
+                            });
+                        } finally {
+                            activeDownloads.remove(id);
+                            if (output != null) try { output.close(); } catch (Exception ignored) {}
+                            if (input != null) try { input.close(); } catch (Exception ignored) {}
+                            if (conn != null) try { conn.disconnect(); } catch (Exception ignored) {}
+                        }
+                    });
+
+                    activeDownloads.put(id, dlThread);
+                    dlThread.start();
+                }
+
+                @JavascriptInterface
+                public void cancelDownload(String id) {
+                    if (id == null) return;
+                    Thread t = activeDownloads.remove(id);
+                    if (t != null) {
+                        t.interrupt();
+                    }
+                }
+
+                @JavascriptInterface
+                public boolean deleteFile(String path) {
+                    if (path == null || path.isEmpty()) return false;
+                    try {
+                        File f = new File(path);
+                        if (f.exists()) return f.delete();
+                    } catch (Exception ignored) {}
+                    return false;
+                }
+
+                @JavascriptInterface
+                public String getStorageInfo() {
+                    try {
+                        File path = Environment.getDataDirectory();
+                        android.os.StatFs stat = new android.os.StatFs(path.getPath());
+                        long blockSize = stat.getBlockSizeLong();
+                        long totalBlocks = stat.getBlockCountLong();
+                        long availableBlocks = stat.getAvailableBlocksLong();
+                        long freeBytes = availableBlocks * blockSize;
+                        long totalBytes = totalBlocks * blockSize;
+                        return "{\"freeBytes\":" + freeBytes + ",\"totalBytes\":" + totalBytes + "}";
+                    } catch (Exception e) {
+                        return "{\"freeBytes\":0,\"totalBytes\":0}";
+                    }
+                }
+
+                @JavascriptInterface
+                public void openOfflineVideo(String filePath, String title) {
+                    if (filePath == null || filePath.isEmpty()) return;
+                    try {
+                        File f = new File(filePath);
+                        if (!f.exists()) {
+                            runOnUiThread(() -> Toast.makeText(MainActivity.this, "File not found on device", Toast.LENGTH_SHORT).show());
+                            return;
+                        }
+                        Uri uri;
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                            uri = FileProvider.getUriForFile(MainActivity.this, getPackageName() + ".fileprovider", f);
+                        } else {
+                            uri = Uri.fromFile(f);
+                        }
+                        Intent intent = new Intent(Intent.ACTION_VIEW);
+                        intent.setDataAndType(uri, "video/*");
+                        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                        startActivity(intent);
+                    } catch (Exception e) {
+                        runOnUiThread(() -> Toast.makeText(MainActivity.this, "Could not open video player: " + e.getMessage(), Toast.LENGTH_SHORT).show());
+                    }
+                }
+            }, "AndroidDownloader");
 
             // 3. Suppress All Popups, New Tabs & Ad Redirects natively
             webView.setWebChromeClient(new BridgeWebChromeClient(getBridge()) {

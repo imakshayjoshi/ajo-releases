@@ -26,6 +26,7 @@ import { getTmdbTrending, getTmdbCatalog, getTmdbNowPlaying, enrichWithImdb, get
 import { getWatchlist, toggleWatchlist as toggleWL, mergeRemoteWatchlist, pushWatchlist } from './api/watchlistSync';
 import { getRankedServers } from './api/mirrorHealth';
 import { ShortTVView } from './components/ShortTVView';
+import { DownloadsView } from './components/DownloadsView';
 import { checkForAppUpdates, startAppUpdate } from './api/otaUpdate';
 import { Film, Video, Tv, Radio, Bookmark, Cast, Rocket, X, ArrowUpCircle, Flame } from 'lucide-react';
 
@@ -441,6 +442,11 @@ export default function App() {
           <SettingsView 
             onClearHistory={() => setContinueWatching([])}
             onReloadApp={loadAllContent}
+          />
+        ) : activeTab === 'downloads' ? (
+          <DownloadsView 
+            onBack={() => setActiveTab('home')}
+            onPlayMedia={(item, server) => handleStartPlayback(item, server)}
           />
         ) : activeTab === 'short_tv' ? (
           <ShortTVView 
