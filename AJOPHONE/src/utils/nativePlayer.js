@@ -20,6 +20,7 @@
 // every movie whose mirrors used that path shape.
 //
 // v3.9.1: Added vidsrc.xyz and superembed.stream; aligned with updated EMBED_PATTERNS.
+// v3.12.20: synced with streamingEngines.js; added nontongo, multiembed.
 const EMBED_HOST_PATTERNS = [
   /vidlink\.pro/i,
   /vidsrc\.pm/i,
@@ -28,20 +29,36 @@ const EMBED_HOST_PATTERNS = [
   /2embed\.(cc|skin)/i,
   /vidjoy\.pro/i,
   /vidsrc\.pro/i,
-  /rivestream\.live/i,
+  /nontongo\.win/i,
   /vidsrc/i,
+  /rivestream\.live/i,
   /apiplayer\.ru/i,
   /smashystream/i,
+  /multiembed\.mov/i,
   /\/embed(\/|\?|$)/i,
 ];
 
+// v3.12.20: expanded dead host list based on live testing Aug 2026
 const DEAD_HOST_PATTERNS = [
   /mainsstreaming\.info/i,
   /localhost/i,
   /127\.0\.0\.1/i,
   /0\.0\.0\.0/i,
   /moviesapi\.club/i,
-  /embed\.su/i
+  /embed\.su/i,
+  /moviesapi\.online/i,
+  /rivestream\.live/i,
+  /vidsrc\.cc/i,
+  /vidsrc\.xyz/i,
+  /vidsrc\.to/i,
+  /vidsrc\.io/i,
+  /v2\.vidsrc\.me/i,
+  /smashystream\.com/i,
+  /apiplayer\.ru/i,
+  /multiembed\.mov/i,
+  /vidbinge\.dev/i,
+  /sus\.stream/i,
+  /filmxy\.wafflehacker/i,
 ];
 
 function bridge() {
@@ -172,13 +189,9 @@ export function isDirectMediaUrl(url) {
 export function isNativePlayableUrl(url) {
   if (!url || typeof url !== 'string') return false;
   if (!/^https?:\/\//i.test(url)) return false;
-  for (const pattern of EMBED_HOST_PATTERNS) {
-    if (pattern.test(url)) return false;
-  }
   for (const pattern of DEAD_HOST_PATTERNS) {
     if (pattern.test(url)) return false;
   }
-  if (/\/play\//i.test(url) && !DIRECT_MEDIA_EXT_RE.test(url)) return false;
   return true;
 }
 
@@ -220,7 +233,7 @@ export function setNativePlaybackActive(active) {
   nativePlaybackActive = Boolean(active);
 }
 
-export function playInNativePlayer(url, title, isLive, fallbackUrls = []) {
+export function playInNativePlayer(url, title, isLive, fallbackUrls = [], startPositionMs = 0) {
   const api = bridge();
   if (!api || !url) return false;
   if (!isNativePlayableUrl(url)) return false;
@@ -237,6 +250,17 @@ export function playInNativePlayer(url, title, isLive, fallbackUrls = []) {
       ? JSON.stringify(nativeFallbacks)
       : '';
 
+    if (typeof api.playStreamWithFallbacksAndPosition === 'function') {
+      api.playStreamWithFallbacksAndPosition(
+        String(url),
+        String(title || (isLive ? 'Live Channel' : 'Video Stream')),
+        Boolean(isLive),
+        urlsJson,
+        Number(startPositionMs) || 0
+      );
+      nativePlaybackActive = true;
+      return true;
+    }
     if (typeof api.playStreamWithFallbacks === 'function') {
       api.playStreamWithFallbacks(
         String(url),

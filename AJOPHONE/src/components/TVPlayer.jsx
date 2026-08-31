@@ -207,7 +207,20 @@ export function TVPlayer({ item, server, channels = [], onSelectChannel, onClose
   }, [clearFailureTimer, failover]);
 
   useEffect(() => {
-    setSourceIndex(0);
+    if (server && sources.length > 0) {
+      const idx = sources.findIndex(s => 
+        (server.id && s.id === server.id) || 
+        (server.url && s.url === server.url) || 
+        (server.name && s.name === server.name)
+      );
+      if (idx >= 0) {
+        setSourceIndex(idx);
+      } else {
+        setSourceIndex(0);
+      }
+    } else {
+      setSourceIndex(0);
+    }
     setError('');
     // RESUME FIX: restore last watched position for this title (Continue
     // Watching). Saved by saveProgress on close; looked up by id/title.

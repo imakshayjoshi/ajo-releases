@@ -1,38 +1,38 @@
 {
   "schemaVersion": 2,
-  "version": "3.12.20",
-  "versionCode": 107,
+  "version": "3.12.21",
+  "versionCode": 108,
   "releaseDate": "2026-08-31",
   "phone": {
-    "version": "3.3.23",
-    "versionCode": 72,
+    "version": "3.3.24",
+    "versionCode": 73,
     "packageId": "com.ajo.phone",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "📥 Offline Downloads Engine: Download movies & TV series directly to device storage and watch anywhere without internet",
-      "⚡ Fast Offline Playback: 1-tap playback from local storage with hardware video acceleration",
-      "🛡️ OTA Updater Fix: Multi-mirror fallback with direct static CDN downloads"
+      "🎯 Server Selection Precision: Selected mirror / server starts immediately without reverting to Server 1",
+      "📥 Offline Downloads Engine: Download movies & TV series directly to device storage",
+      "⚡ Fast Offline Playback: 1-tap playback from local storage with hardware video acceleration"
     ],
     "size_mb": "3.3 MB",
-    "sha256": "aa692c8b9eccb7312cf37e8b4f610fe1ec2ee44bca572b0593ce707c66c1f9e7"
+    "sha256": "d45f370567f68e3ffccda39b01013b50640b94285d7b77c5d3b99f8b4d447389"
   },
   "tv": {
-    "version": "3.12.20",
-    "versionCode": 107,
+    "version": "3.12.21",
+    "versionCode": 108,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "⚡ Movie & Series Streaming Overhaul: Purged dead/unresponsive providers and reordered servers with confirmed-alive high-speed mirrors first",
-      "🛡️ Embed Failover Engine: Fixed watchdog timeout to auto-switch unresponsive/blocked mirrors within 8 seconds",
-      "🚀 Hardened OTA In-App Updater: Fixed download redirect errors with direct multi-mirror fallback"
+      "🎯 Server Selection Precision: Selected server from modal/drawer starts immediately instead of always defaulting to Server 1",
+      "🎮 TV Remote Navigation Restored: Unlocked D-pad controls across all streams (Play/Pause, Server Switcher, Fit Mode, Back)",
+      "⚡ Auto-Play & Hardware Acceleration: Auto-click and direct stream dispatch on Android TV Web Video Engine"
     ],
     "size_mb": "6.9 MB",
-    "sha256": "4dcd1f44ac3e20bed43993a9bce61dedaf20a211611b5a05d637dda778c3ac90"
+    "sha256": "2e659b7863d3d5b3c33bb94e805635024b65e8b834c6833a4e57e48e269ea3ad"
   }
 }

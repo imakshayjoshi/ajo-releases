@@ -118,12 +118,21 @@ export function TVPlayer({
 
   const [currentServerIndex, setCurrentServerIndex] = useState(0);
 
-  // v3.10.0 FIX: reset to server 0 when the item changes (channel switch,
-  // next-episode). Previously the index carried over, so switching to a
-  // channel with fewer mirrors started playback on a stale server index.
+  // Match requested server prop to currentServerIndex
   useEffect(() => {
+    if (server && orderedServers.length > 0) {
+      const idx = orderedServers.findIndex(s => 
+        (server.id && s.id === server.id) || 
+        (server.url && s.url === server.url) || 
+        (server.name && s.name === server.name)
+      );
+      if (idx >= 0) {
+        setCurrentServerIndex(idx);
+        return;
+      }
+    }
     setCurrentServerIndex(0);
-  }, [item?.id, item?.title, item?.url]);
+  }, [item?.id, item?.title, item?.url, server, orderedServers]);
   const [videoEngine, setVideoEngine] = useState('hls'); // 'hls' | 'native'
   const [fitMode, setFitMode] = useState('clean'); // 'clean' (default VBI crop) | 'zoom' | 'stretch' | 'original'
   const [isPlaying, setIsPlaying] = useState(true);
@@ -352,14 +361,13 @@ export function TVPlayer({
   /** Single entry point for every handoff to the native hardware player. */
   const handOffToNative = useCallback((message) => {
     if (!streamUrl) return false;
-    // Iframe embeds and known player pages are not streams. Launching the native
-    // player with one guarantees a black screen, so refuse here.
     if (!isNativePlayableUrl(streamUrl)) return false;
 
     // Release the decoder first, then launch. Order matters here.
     teardownWebPlayback();
 
-    if (!playInNativePlayer(streamUrl, title, isLive)) return false;
+    const fallbackUrls = orderedServers.map(s => s?.url).filter(Boolean);
+    if (!playInNativePlayer(streamUrl, title, isLive, fallbackUrls)) return false;
 
     nativeHandoffDoneRef.current = streamUrl;
     nativeActiveRef.current = true;
@@ -368,7 +376,7 @@ export function TVPlayer({
     setErrorMessage(message || '▶ Opening in hardware player...');
     setTimeout(() => setErrorMessage(null), 2500);
     return true;
-  }, [streamUrl, title, isLive, teardownWebPlayback]);
+  }, [streamUrl, title, isLive, orderedServers, teardownWebPlayback]);
 
   const launchNativeHardwarePlayer = useCallback(() => {
     if (handOffToNative('▶ Opening in hardware player...')) return true;
@@ -779,11 +787,6 @@ export function TVPlayer({
         return;
       }
 
-      // For embed video players, let Enter / D-pad arrows interact directly with the embedded player
-      if (isEmbedStream) {
-        return;
-      }
-
       // Enter/OK key handling
       if ((key === 'Enter' || keyCode === 13 || keyCode === 23)) {
         if (!showDrawer) {
@@ -828,37 +831,37 @@ export function TVPlayer({
   }, [pingOsd, showDrawer, onClose, isLive, channels, togglePlayPause, handleSeek, teardownWebPlayback]);
 
   // Format MM:SS helper
-  const formatTime = (seconds) => {
-    if (!Number.isFinite(seconds) || seconds < 0) return '00:00';
-    const m = Math.floor(seconds / 60);
-    const s = Math.floor(seconds % 60);
-    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  const formatTime = (timeInSec) => {
+    if (isNaN(timeInSec) || timeInSec === Infinity || timeInSec < 0) return '00:00';
+    const mins = Math.floor(timeInSec / 60);
+    const secs = Math.floor(timeInSec % 60);
+    return `${mins < 10 ? '0' : ''}${mins}:${secs < 10 ? '0' : ''}${secs}`;
   };
 
   return (
-    <div
-      className="tv-player-fullscreen"
+    <div 
+      className="tv-player-container"
+      onMouseMove={pingOsd}
+      onClick={pingOsd}
       style={{
         position: 'fixed',
         top: 0,
         left: 0,
         right: 0,
         bottom: 0,
-        width: '100%',
-        height: '100%',
+        zIndex: 99999,
         background: '#000',
-        overflow: 'hidden',
-        zIndex: 2000
+        overflow: 'hidden'
       }}
     >
+      {/* 1. Direct Video Element (Clean Video-Only Layer) */}
       <video
         ref={videoRef}
         className="tv-player-video"
         playsInline
         autoPlay
-        controls={false}
+        crossOrigin="anonymous"
         style={videoStyle}
-        onClick={pingOsd}
         onWaiting={() => setIsBuffering(true)}
         onPlaying={() => {
           setIsBuffering(false);
@@ -867,48 +870,6 @@ export function TVPlayer({
         onCanPlay={() => setIsBuffering(false)}
         onTimeUpdate={handleTimeUpdate}
       />
-
-      {/* WEBVIEW EMBED FALLBACK: embed mirrors render in an iframe on web fallback.
-          v3.9.1 FIX: key={streamUrl} forces a full DOM remount on every server
-          switch. Without this key, React reuses the iframe element and only
-          updates src= — but most embed pages ignore src attribute changes and
-          keep playing the old stream.
-          v3.12.20 FIX: onLoad sets dataset.loaded='1' to arm the embed watchdog.
-          onError triggers immediate failover for broken embeds. */}
-      {streamUrl && !nativeActive && embedReady && (isEmbedUrl(streamUrl) || !isDirectMediaUrl(streamUrl)) && (
-        <div style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', background: '#000', zIndex: 10 }}>
-          <iframe
-            key={streamUrl}
-            ref={iframeRef}
-            src={streamUrl}
-            title={title || 'Stream'}
-            allow="autoplay; fullscreen; encrypted-media; picture-in-picture; accelerometer; gyroscope"
-            allowFullScreen
-            onLoad={(e) => {
-              setIsBuffering(false);
-              // Signal the embed watchdog that the iframe loaded successfully
-              if (e.target) e.target.dataset.loaded = '1';
-              // Clear the embed watchdog since the page loaded
-              if (embedWatchdogRef.current) {
-                clearTimeout(embedWatchdogRef.current);
-                embedWatchdogRef.current = null;
-              }
-            }}
-            onError={() => {
-              // Immediate failover on iframe load error
-              handleFailover('Embed source failed to load');
-            }}
-            style={{
-              position: 'absolute',
-              inset: 0,
-              width: '100%',
-              height: '100%',
-              border: 'none',
-              background: '#000'
-            }}
-          />
-        </div>
-      )}
 
       {/* Buffering Spinner */}
       {isBuffering && !isEmbedStream && (
@@ -952,31 +913,86 @@ export function TVPlayer({
         </div>
       )}
 
-      {/* BINGE AUTO-ADVANCE overlay: countdown to next episode.
-          Sits above everything, doesn't block the picture. */}
-      {bingeCountdown !== null && episodes[currentEpisodeIndex + 1] && (
+      {/* Fallback to Embed Video Player */}
+      {isEmbedStream && (
+        <iframe
+          ref={iframeRef}
+          src={streamUrl}
+          title={title}
+          allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
+          allowFullScreen
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            border: 'none',
+            zIndex: 10,
+            background: '#000',
+            pointerEvents: 'auto'
+          }}
+          onLoad={() => {
+            if (iframeRef.current) iframeRef.current.dataset.loaded = '1';
+            if (embedWatchdogRef.current) {
+              clearTimeout(embedWatchdogRef.current);
+              embedWatchdogRef.current = null;
+            }
+          }}
+          onError={() => {
+            handleFailover('Embed mirror connection error');
+          }}
+        />
+      )}
+
+      {/* Binge-Watching Next Episode Countdown Floating Card */}
+      {bingeCountdown && (
         <div style={{
           position: 'absolute',
-          bottom: '140px',
-          right: '48px',
-          zIndex: 96,
-          background: 'rgba(10, 14, 24, 0.94)',
-          border: '1px solid rgba(56, 189, 248, 0.45)',
-          borderRadius: '14px',
-          padding: '16px 20px',
+          bottom: 120,
+          right: 48,
+          background: 'rgba(15, 23, 42, 0.95)',
+          backdropFilter: 'blur(16px)',
+          border: '1px solid rgba(56, 189, 248, 0.5)',
+          borderRadius: '16px',
+          padding: '20px 24px',
           display: 'flex',
           alignItems: 'center',
-          gap: '16px',
-          boxShadow: '0 12px 36px rgba(0,0,0,0.7)'
+          gap: '20px',
+          zIndex: 100,
+          boxShadow: '0 20px 40px rgba(0,0,0,0.8)'
         }}>
           <div>
-            <div style={{ fontSize: '12px', fontWeight: 800, color: '#38bdf8', letterSpacing: '0.5px' }}>
-              UP NEXT IN {bingeCountdown}s
+            <div style={{ color: '#38bdf8', fontSize: '13px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>
+              Next Episode in {bingeCountdown.countdown}s
             </div>
-            <div style={{ fontSize: '15px', fontWeight: 900, color: '#ffffff', marginTop: '4px', maxWidth: '320px' }}>
-              {episodes[currentEpisodeIndex + 1].title || `Episode ${currentEpisodeIndex + 2}`}
+            <div style={{ color: '#fff', fontSize: '16px', fontWeight: 700 }}>
+              {bingeCountdown.nextItem?.title || 'Next Episode'}
             </div>
           </div>
+          <button
+            onClick={() => {
+              if (onNextEpisode && bingeCountdown.nextItem) {
+                onNextEpisode(bingeCountdown.nextItem);
+              }
+            }}
+            style={{
+              background: 'linear-gradient(135deg, #38bdf8 0%, #0ea5e9 100%)',
+              border: 'none',
+              borderRadius: '8px',
+              color: '#030712',
+              padding: '8px 16px',
+              fontSize: '13px',
+              fontWeight: 800,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6
+            }}
+          >
+            <Play size={14} fill="#030712" />
+            Play Now
+          </button>
           <button
             onClick={() => { setBingeCountdown(null); bingeFiredRef.current = false; }}
             style={{
@@ -995,61 +1011,10 @@ export function TVPlayer({
         </div>
       )}
 
-      {/* If embed stream, render clean top floating header rather than blocking OSD */}
-      {isEmbedStream && (
-        <div style={{
-          position: 'absolute',
-          top: 24,
-          left: 32,
-          right: 32,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          zIndex: 30,
-          pointerEvents: 'none'
-        }}>
-          <div style={{
-            background: 'rgba(0, 0, 0, 0.75)',
-            backdropFilter: 'blur(8px)',
-            padding: '10px 20px',
-            borderRadius: 10,
-            border: '1px solid rgba(255, 255, 255, 0.2)',
-            color: '#fff',
-            fontSize: '15px',
-            fontWeight: 800
-          }}>
-            {title} • {activeServer?.name || 'Server 1'}
-          </div>
-          <button
-            className="tv-player-btn"
-            style={{
-              pointerEvents: 'auto',
-              background: 'rgba(239, 68, 68, 0.9)',
-              color: '#fff',
-              border: 'none',
-              borderRadius: 10,
-              padding: '10px 20px',
-              fontWeight: 800,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8
-            }}
-            onClick={() => {
-              teardownWebPlayback();
-              if (onClose) onClose(0, 0);
-            }}
-          >
-            <ArrowLeft size={16} />
-            <span>Exit Player</span>
-          </button>
-        </div>
-      )}
-
       {/* On-Screen Display (OSD) Overlay.
           Geometry is inline on purpose: this must never become a full-screen dark
           layer over the picture, and it must not depend on a CSS class existing. */}
-      {!isEmbedStream && showOsd && (
+      {showOsd && (
         <div
           className="tv-player-osd"
           style={{

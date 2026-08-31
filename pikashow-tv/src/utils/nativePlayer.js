@@ -189,13 +189,9 @@ export function isDirectMediaUrl(url) {
 export function isNativePlayableUrl(url) {
   if (!url || typeof url !== 'string') return false;
   if (!/^https?:\/\//i.test(url)) return false;
-  for (const pattern of EMBED_HOST_PATTERNS) {
-    if (pattern.test(url)) return false;
-  }
   for (const pattern of DEAD_HOST_PATTERNS) {
     if (pattern.test(url)) return false;
   }
-  if (/\/play\//i.test(url) && !DIRECT_MEDIA_EXT_RE.test(url)) return false;
   return true;
 }
 

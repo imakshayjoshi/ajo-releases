@@ -592,6 +592,8 @@ public class PlayerActivity extends AppCompatActivity {
             public void onPageFinished(WebView view, String url) {
                 uiHandler.removeCallbacks(webLoadWatchdog);
                 bufferSpinner.setVisibility(View.GONE);
+                
+                // Immediate play check and Cloudflare/error inspection
                 view.evaluateJavascript(
                         "(function(){"
                                 + "if(document.body && (document.body.innerText.includes('Error code 522') || document.body.innerText.includes('Error code 520') || document.title.includes('502') || document.title.includes('504'))){"
@@ -600,8 +602,8 @@ public class PlayerActivity extends AppCompatActivity {
                                 + "try{"
                                 + "  if(window.ppl && typeof window.ppl.api === 'function'){ window.ppl.api('play'); }"
                                 + "  if(window.player && typeof window.player.api === 'function'){ window.player.api('play'); }"
-                                + "  var v=document.querySelector('video'); if(v){v.play();}"
-                                + "  var btn=document.querySelector('.play,.play-btn,.jw-display-icon-container,[aria-label=\"Play\"],pjsdiv'); if(btn){btn.click();}"
+                                + "  var v=document.querySelector('video'); if(v){ v.muted=false; v.play(); }"
+                                + "  var btn=document.querySelector('.play,.play-btn,.jw-display-icon-container,[aria-label=\"Play\"],.vjs-big-play-button,.plyr__control--overlaid,button.play-button,pjsdiv'); if(btn){btn.click();}"
                                 + "}catch(e){}"
                                 + "return 'OK';"
                                 + "})();",
@@ -611,6 +613,27 @@ public class PlayerActivity extends AppCompatActivity {
                                 failoverToNextServer();
                             }
                         });
+
+                // Post delayed auto-click retries for dynamic player frameworks (JWPlayer, Video.js, Plyr)
+                Runnable autoPlayAttempt = new Runnable() {
+                    int attempts = 0;
+                    @Override
+                    public void run() {
+                        if (!isWebEmbedMode || webVideoView == null) return;
+                        webVideoView.evaluateJavascript(
+                            "(function(){"
+                            + "try{"
+                            + "  var v=document.querySelector('video'); if(v && v.paused){ v.muted=false; v.play(); }"
+                            + "  var btn=document.querySelector('.play,.play-btn,.jw-display-icon-container,[aria-label=\"Play\"],.vjs-big-play-button,.plyr__control--overlaid,button.play-button'); if(btn){btn.click();}"
+                            + "}catch(e){}"
+                            + "})();", null);
+                        attempts++;
+                        if (attempts < 3) {
+                            uiHandler.postDelayed(this, 1200L);
+                        }
+                    }
+                };
+                uiHandler.postDelayed(autoPlayAttempt, 800L);
             }
         });
         webVideoView.setWebChromeClient(new WebChromeClient());
@@ -775,11 +798,10 @@ public class PlayerActivity extends AppCompatActivity {
         // v3.9.1: added vidsrc.xyz and superembed.stream; kept in sync with
         // EMBED_HOST_PATTERNS in nativePlayer.js and EMBED_PATTERNS in streamingEngines.js.
         return lower.contains("/embed/") || lower.contains("apiplayer.ru")
-                || lower.contains("vidlink.pro") || lower.contains("vidsrc") || lower.contains("autoembed.co")
-                || lower.contains("smashy.stream") || lower.contains("multiembed.mov") || lower.contains("rasta428jem.com")
-                || lower.contains("2embed.cc") || lower.contains("2embed.skin") || lower.contains("embed.su")
-                || lower.contains("v2.vidsrc.me") || lower.contains("superembed.stream")
-                || lower.contains("moviesapi.club");
+                || lower.contains("vidlink.pro") || lower.contains("vidsrc") || lower.contains("autoembed")
+                || lower.contains("smashy") || lower.contains("multiembed") || lower.contains("vidjoy")
+                || lower.contains("2embed") || lower.contains("nontongo") || lower.contains("embed.su")
+                || lower.contains("superembed") || lower.contains("moviesapi");
     }
 
     private void playCurrentStream() {
@@ -821,13 +843,19 @@ public class PlayerActivity extends AppCompatActivity {
             if (lower.contains("vidlink.pro")) {
                 headers.put("Referer", "https://vidlink.pro/");
                 headers.put("Origin", "https://vidlink.pro");
+            } else if (lower.contains("vidjoy.pro")) {
+                headers.put("Referer", "https://vidjoy.pro/");
+                headers.put("Origin", "https://vidjoy.pro");
+            } else if (lower.contains("nontongo.win")) {
+                headers.put("Referer", "https://www.nontongo.win/");
+                headers.put("Origin", "https://www.nontongo.win");
             } else if (lower.contains("embed.su")) {
                 headers.put("Referer", "https://embed.su/");
                 headers.put("Origin", "https://embed.su");
             } else if (lower.contains("humma429gix.com")) {
                 headers.put("Referer", "https://allmovielandapp.app/");
                 headers.put("Origin", "https://allmovielandapp.app");
-            } else if (lower.contains("autoembed.co")) {
+            } else if (lower.contains("autoembed")) {
                 headers.put("Referer", "https://autoembed.co/");
                 headers.put("Origin", "https://autoembed.co");
             } else if (lower.contains("2embed.cc") || lower.contains("2embed.skin")) {
@@ -848,9 +876,15 @@ public class PlayerActivity extends AppCompatActivity {
             } else if (lower.contains("apiplayer.ru")) {
                 headers.put("Referer", "https://apiplayer.ru/");
                 headers.put("Origin", "https://apiplayer.ru");
-            } else if (lower.contains("vidsrc.xyz")) {
-                headers.put("Referer", "https://vidsrc.xyz/");
-                headers.put("Origin", "https://vidsrc.xyz");
+            } else if (lower.contains("vidsrc.in")) {
+                headers.put("Referer", "https://vidsrc.in/");
+                headers.put("Origin", "https://vidsrc.in");
+            } else if (lower.contains("vidsrc.pm")) {
+                headers.put("Referer", "https://vidsrc.pm/");
+                headers.put("Origin", "https://vidsrc.pm");
+            } else if (lower.contains("vidsrc.pro")) {
+                headers.put("Referer", "https://vidsrc.pro/");
+                headers.put("Origin", "https://vidsrc.pro");
             } else if (lower.contains("vidsrc")) {
                 headers.put("Referer", "https://vidsrc.cc/");
                 headers.put("Origin", "https://vidsrc.cc");
@@ -1369,8 +1403,25 @@ public class PlayerActivity extends AppCompatActivity {
     private void togglePlayPause() {
         if (isWebEmbedMode && webVideoView != null) {
             webVideoView.evaluateJavascript(
-                    "(function(){var v=document.querySelector('video'); if(v){if(v.paused)v.play();else v.pause();}else{var btn=document.querySelector('.play,.play-btn,.jw-display-icon-container,[aria-label=\"Play\"]'); if(btn)btn.click();}})();",
-                    null);
+                    "(function(){"
+                    + "var v=document.querySelector('video');"
+                    + "if(v){ if(v.paused){ v.muted=false; v.play(); } else { v.pause(); } return 'VIDEO_TOGGLED'; }"
+                    + "var btn=document.querySelector('.play,.play-btn,.jw-display-icon-container,[aria-label=\"Play\"],.vjs-big-play-button,.plyr__control--overlaid,button.play-button');"
+                    + "if(btn){ btn.click(); return 'BTN_CLICKED'; }"
+                    + "return 'NONE';"
+                    + "})();",
+                    val -> {
+                        if (val == null || val.contains("NONE")) {
+                            long downTime = android.os.SystemClock.uptimeMillis();
+                            long eventTime = android.os.SystemClock.uptimeMillis() + 100;
+                            float x = webVideoView.getWidth() / 2.0f;
+                            float y = webVideoView.getHeight() / 2.0f;
+                            if (x > 0 && y > 0) {
+                                webVideoView.dispatchTouchEvent(android.view.MotionEvent.obtain(downTime, downTime, android.view.MotionEvent.ACTION_DOWN, x, y, 0));
+                                webVideoView.dispatchTouchEvent(android.view.MotionEvent.obtain(downTime, eventTime, android.view.MotionEvent.ACTION_UP, x, y, 0));
+                            }
+                        }
+                    });
             showOsd();
             return;
         }
