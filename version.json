@@ -1,39 +1,40 @@
 {
   "schemaVersion": 2,
-  "version": "3.12.28",
-  "versionCode": 115,
+  "version": "3.12.29",
+  "versionCode": 116,
   "releaseDate": "2026-09-02",
   "phone": {
-    "version": "3.3.30",
-    "versionCode": 79,
+    "version": "3.3.31",
+    "versionCode": 80,
     "packageId": "com.ajo.phone",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "🇮🇳 Hindi Dubbed & Multi-Audio for Hollywood: Watch Mutiny and all Hollywood titles in Hindi or English",
-      "🔊 Unmuted & High Volume Audio Engine: Hardware and media volume lock ensures 100% audible sound",
-      "🎨 Safe Color Mode: Zero green screen glitches or vertical lines on all screens"
+      "📱 Mobile Bottom Sheet & One-Tap Play: Fixed details modal scrolling on all phones with instant 'Watch Now' at top",
+      "⚡ One-Tap Server Play: Tapping any server immediately begins streaming without needing to scroll",
+      "🇮🇳 Hindi Dubbed & Multi-Audio for Hollywood: Stream Mutiny and all Hollywood titles in Hindi or English",
+      "🔔 True Version Sync: Fixed recurring update banner loop by reading compiled BuildConfig directly"
     ],
     "size_mb": "3.3 MB",
-    "sha256": "08f04b10c1130031ded172026dfcf90e0ca512311e77be051101e1626a847fc9"
+    "sha256": "7a6bd63f462351de9df0ce78dcd72fdc958fd12bf55a3ae159b95a4dec7e72b5"
   },
   "tv": {
-    "version": "3.12.28",
-    "versionCode": 115,
+    "version": "3.12.29",
+    "versionCode": 116,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "🇮🇳 Hindi Dubbed & Multi-Audio for Hollywood: Stream Mutiny and all Hollywood blockbusters in Hindi or English with one click",
-      "🔊 TV Hardware Volume Maximize & Unmute Engine: Guarantees loud, clear dialogue output through TV speakers",
-      "⚡ Server Badges: Distinct 🇮🇳 Hindi Audio and 🇬🇧 English server tags on the TV remote OSD",
-      "🎨 Safe Color Mode: Fixes green screen chroma distortion on Android TV GPUs"
+      "🔔 Fixed Update Banner Loop: Accurately checks on-device compiled version without false-positive banners",
+      "▶ Top Watch Button: Instant playback action button right at top of details view",
+      "🇮🇳 Hindi Dubbed & Multi-Audio for Hollywood: Stream Mutiny and all Hollywood blockbusters in Hindi or English",
+      "🔊 TV Hardware Volume Maximize & Unmute Engine: Guarantees loud, clear dialogue output through TV speakers"
     ],
     "size_mb": "6.9 MB",
-    "sha256": "8361e84e4a4d6418109afe71b9397f36731fa08b492edfaf6b990cfa0e8097a8"
+    "sha256": "de9d94dbcc93ef2b21e91451966878c45f20112d45a1af4027d947638f8169e2"
   }
 }
