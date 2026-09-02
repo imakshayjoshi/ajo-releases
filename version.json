@@ -1,40 +1,40 @@
 {
   "schemaVersion": 2,
-  "version": "3.12.32",
-  "versionCode": 119,
+  "version": "3.12.33",
+  "versionCode": 120,
   "releaseDate": "2026-09-02",
   "phone": {
-    "version": "3.3.34",
-    "versionCode": 83,
+    "version": "3.3.35",
+    "versionCode": 84,
     "packageId": "com.ajo.phone",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
+      "⚡ Fixed Modal Hook Initialization: Resolved useRef declaration in details dialog",
       "📅 Real-Time Live EPG: Now showing current and upcoming shows directly on live channels",
       "🔙 Instant Back-to-Catalog: Pressing Back reliably exits player to catalog immediately",
-      "✨ Corrected SAB TV Spelling & Catalog Deduplication: Unified Sony SAB TV HD and removed duplicate channels",
-      "🎯 Default Focus on 'Watch Now': Modal automatically focuses on 'Watch Now' button"
+      "✨ Corrected SAB TV Spelling & Catalog Deduplication: Unified Sony SAB TV HD and removed duplicate channels"
     ],
     "size_mb": "3.3 MB",
-    "sha256": "73909383d14a61a1bcd2b8b41ec25685e1f781542cb9176e20ce11ff0c11fdeb"
+    "sha256": "29d32adebdb6d4327b92ea68727bd275d32751d844707858200db6778374c8ac"
   },
   "tv": {
-    "version": "3.12.32",
-    "versionCode": 119,
+    "version": "3.12.33",
+    "versionCode": 120,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
+      "⚡ Fixed Modal Hook Initialization: Resolved useRef declaration in details dialog",
       "📅 Real-Time Live EPG OSD: Live channels display current show (🔴 NOW) and next show (⏩ NEXT) on screen",
       "🔙 Reliable Back Key Exit: Pressing Back immediately exits the player and returns to catalog (no server loops)",
-      "✨ Corrected SAB TV Spelling & Deduplicated Catalog: Cleaned up duplicates and fixed Sub TV spelling to SAB TV HD",
-      "🎮 100% Reliable TV Remote Interception: Smooth D-Pad and OK button controls on all streams"
+      "✨ Corrected SAB TV Spelling & Deduplicated Catalog: Cleaned up duplicates and fixed Sub TV spelling to SAB TV HD"
     ],
     "size_mb": "6.9 MB",
-    "sha256": "fe333a6157b9caae6ffcd0bf063898aa8ad74426849c4f8fb28be6db80abb171"
+    "sha256": "9494b7fb6b351ea04082f8d1acd8de24173b306727a55efbcbc1f64f7ae35ee5"
   }
 }
