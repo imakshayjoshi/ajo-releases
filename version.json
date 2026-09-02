@@ -1,40 +1,40 @@
 {
   "schemaVersion": 2,
-  "version": "3.12.29",
-  "versionCode": 116,
+  "version": "3.12.30",
+  "versionCode": 117,
   "releaseDate": "2026-09-02",
   "phone": {
-    "version": "3.3.31",
-    "versionCode": 80,
+    "version": "3.3.32",
+    "versionCode": 81,
     "packageId": "com.ajo.phone",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "📱 Mobile Bottom Sheet & One-Tap Play: Fixed details modal scrolling on all phones with instant 'Watch Now' at top",
-      "⚡ One-Tap Server Play: Tapping any server immediately begins streaming without needing to scroll",
-      "🇮🇳 Hindi Dubbed & Multi-Audio for Hollywood: Stream Mutiny and all Hollywood titles in Hindi or English",
-      "🔔 True Version Sync: Fixed recurring update banner loop by reading compiled BuildConfig directly"
+      "🕒 Continue Watching & Resume: Accurately saves playback time and resumes from last paused position",
+      "✨ Clean & Instant Play: Stream best working server instantly with single click without server clutter",
+      "⚡ Optional Server Dropdown: Clean collapsed menu to change mirrors whenever needed",
+      "🇮🇳 Hindi Dubbed / Multi-Audio: One-click audio selection for Hollywood movies"
     ],
     "size_mb": "3.3 MB",
-    "sha256": "7a6bd63f462351de9df0ce78dcd72fdc958fd12bf55a3ae159b95a4dec7e72b5"
+    "sha256": "6c17182b400023bf32cae1d87621071672ed5758b818fd285f910e9f25845704"
   },
   "tv": {
-    "version": "3.12.29",
-    "versionCode": 116,
+    "version": "3.12.30",
+    "versionCode": 117,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "🔔 Fixed Update Banner Loop: Accurately checks on-device compiled version without false-positive banners",
-      "▶ Top Watch Button: Instant playback action button right at top of details view",
-      "🇮🇳 Hindi Dubbed & Multi-Audio for Hollywood: Stream Mutiny and all Hollywood blockbusters in Hindi or English",
-      "🔊 TV Hardware Volume Maximize & Unmute Engine: Guarantees loud, clear dialogue output through TV speakers"
+      "🕒 Continue Watching & Resume: Accurately saves playback time and resumes from exact paused minute/second",
+      "✨ Streamlined UI: Prominent Resume / Watch button with zero clutter; automatic working server play",
+      "⚡ Optional Mirror Switcher: Collapsible menu to switch servers only when desired",
+      "🔊 Full Audio & Progress Sync: Continuous playback time tracking across both hardware and web embed engines"
     ],
     "size_mb": "6.9 MB",
-    "sha256": "de9d94dbcc93ef2b21e91451966878c45f20112d45a1af4027d947638f8169e2"
+    "sha256": "c1b4afd844a15fe7d41808ae9979f3166ac27e5f2025f1cae57b691dfff6c80c"
   }
 }
