@@ -1,39 +1,38 @@
 {
   "schemaVersion": 2,
-  "version": "3.12.24",
-  "versionCode": 111,
+  "version": "3.12.25",
+  "versionCode": 112,
   "releaseDate": "2026-09-02",
   "phone": {
-    "version": "3.3.26",
-    "versionCode": 75,
+    "version": "3.3.27",
+    "versionCode": 76,
     "packageId": "com.ajo.phone",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "🎯 Accurate Movie ID Matcher: Fixed catalog ID resolution so Indian and classic movies (G.D.N, Batwara) stream the correct title",
-      "⚡ Next.js Crash Auto-Failover: Detects server-side exceptions and automatically switches to working mirrors",
-      "🛡️ Ad & Popup Blocker: Complete ad blocking and popup suppression for smooth streaming"
+      "⚡ Auto-Failover on Content Unavailable: Automatically detects unavailable streams and switches to alternate live mirrors seamlessly",
+      "🎯 Accurate Movie & Series ID Matcher: Fixed catalog ID resolution for Indian, classic, and web series",
+      "🛡️ Ad & Popup Blocker: Complete ad blocking and popup suppression"
     ],
     "size_mb": "3.3 MB",
-    "sha256": "723505ec90e0167a2c54ca2eeadf953e71e5b446ba3df845f1808b1612ffd309"
+    "sha256": "0869a31c07b5743104b424e8a0300b96bc51836b37d40f4a81a8ac035ecd1047"
   },
   "tv": {
-    "version": "3.12.24",
-    "versionCode": 111,
+    "version": "3.12.25",
+    "versionCode": 112,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "🎯 Accurate Title Matching: Fixed catalog ID resolution so Indian and classic movies (G.D.N, Batwara) play the exact movie instead of wrong titles",
-      "⚡ Next.js Crash Auto-Failover: Detects server exception pages and automatically switches to working mirrors",
+      "⚡ Auto-Failover on Content Unavailable: Automatically detects unindexed/unavailable streams and switches to next live mirror seamlessly",
       "🎮 Interactive TV Controls Bar: Focusable Play/Pause, Seek, Server Switcher, Safe Color, and Aspect Ratio buttons",
       "🎨 Safe Color Mode: Toggle to eliminate green screen/YUV chroma decoding artifacts on TV GPUs"
     ],
     "size_mb": "6.9 MB",
-    "sha256": "6818062cfe33c07781fa1cb1649fbb2438608670e7f17a33997c1a1e920f9633"
+    "sha256": "02ccd2d60c5967e278a18f6b6f3c2499876cf3f60dd2ae43af538e4b7ae8e4eb"
   }
 }
