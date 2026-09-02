@@ -1,37 +1,37 @@
 {
   "schemaVersion": 2,
-  "version": "3.12.27",
-  "versionCode": 114,
+  "version": "3.12.28",
+  "versionCode": 115,
   "releaseDate": "2026-09-02",
   "phone": {
-    "version": "3.3.29",
-    "versionCode": 78,
+    "version": "3.3.30",
+    "versionCode": 79,
     "packageId": "com.ajo.phone",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "🔊 Web Audio 300% Dialogue Amplifier: Crystal clear speech and volume normalization for quiet streams (Mutiny, G.D.N.)",
-      "🎨 Enhanced Safe Color Mode: Software chroma rendering engine to eliminate GPU green screen glitches and vertical lines",
-      "🔥 Worldwide Live TMDB Search: Discover and stream any new OTT & theatrical release (Bandar from Zee5, Stree 2, etc.)"
+      "🇮🇳 Hindi Dubbed & Multi-Audio for Hollywood: Watch Mutiny and all Hollywood titles in Hindi or English",
+      "🔊 Unmuted & High Volume Audio Engine: Hardware and media volume lock ensures 100% audible sound",
+      "🎨 Safe Color Mode: Zero green screen glitches or vertical lines on all screens"
     ],
     "size_mb": "3.3 MB",
-    "sha256": "c79f2ab8f451aecb271a0283dcadd9c45af2d93c71ef80070ad1d5fb674ec0c1"
+    "sha256": "08f04b10c1130031ded172026dfcf90e0ca512311e77be051101e1626a847fc9"
   },
   "tv": {
-    "version": "3.12.27",
-    "versionCode": 114,
+    "version": "3.12.28",
+    "versionCode": 115,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "🔊 300% Audio Boost & Dialogue Enhancer: Dedicated TV remote button to boost quiet movie audio up to 300% with speech compression",
-      "🎨 Enhanced Safe Color Mode: Software chroma layer rendering to eliminate GPU green patches and vertical line artifacts on TV screens",
-      "🎮 Interactive TV Remote Controls: Focusable Play/Pause, Seek, Server Switcher, Audio Boost, and Aspect Ratio buttons",
-      "🔥 Worldwide Live TMDB Search: Instant search for all new OTT and theatrical releases"
+      "🇮🇳 Hindi Dubbed & Multi-Audio for Hollywood: Stream Mutiny and all Hollywood blockbusters in Hindi or English with one click",
+      "🔊 TV Hardware Volume Maximize & Unmute Engine: Guarantees loud, clear dialogue output through TV speakers",
+      "⚡ Server Badges: Distinct 🇮🇳 Hindi Audio and 🇬🇧 English server tags on the TV remote OSD",
+      "🎨 Safe Color Mode: Fixes green screen chroma distortion on Android TV GPUs"
     ],
     "size_mb": "6.9 MB",
     "sha256": "8361e84e4a4d6418109afe71b9397f36731fa08b492edfaf6b990cfa0e8097a8"
