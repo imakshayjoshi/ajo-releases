@@ -200,7 +200,6 @@ export function SettingsView() {
         )}
       </div>
 
-      {/* App Version & OTA Update Card */}
       <div className="tv-settings-card">
         <h2 className="tv-settings-title">
           <Puzzle size={20} style={{ display: 'inline', marginRight: 8 }} />
@@ -210,7 +209,6 @@ export function SettingsView() {
           Install community addons for unlimited catalogs and streams. Paste any Stremio addon URL.
         </p>
 
-        {/* Featured one-tap addons */}
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '10px 0' }}>
           {FEATURED_ADDONS.map(fa => {
             const installed = addons.some(a => a.id === fa.id);
@@ -230,7 +228,6 @@ export function SettingsView() {
           })}
         </div>
 
-        {/* Custom URL input */}
         <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
           <input
             tabIndex={0}
@@ -254,7 +251,6 @@ export function SettingsView() {
           </p>
         )}
 
-        {/* Installed list */}
         {addons.length > 0 && (
           <div style={{ marginTop: 14 }}>
             <strong style={{ color: '#94a3b8', fontSize: '0.85rem' }}>INSTALLED ({addons.length}):</strong>
@@ -276,7 +272,7 @@ export function SettingsView() {
           Software Updates
         </h2>
         <p className="tv-settings-desc">
-          Current Installed Version: <strong>v{CURRENT_APP_VERSION} (Fire TV Edition)</strong>
+          Current Installed Version: <strong>v{installedVersion} (Build {installedCode})</strong>
         </p>
 
         <button
@@ -339,14 +335,13 @@ export function SettingsView() {
             ) : (
               <p style={{ color: '#22c55e', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
                 <CheckCircle2 size={16} />
-                You are on the latest version (v{CURRENT_APP_VERSION}).
+                You are on the latest version (v{installedVersion}).
               </p>
             )}
           </div>
         )}
       </div>
 
-      {/* Storage & Memory Cache Card */}
       <div className="tv-settings-card">
         <h2 className="tv-settings-title">
           <Trash2 size={20} style={{ display: 'inline', marginRight: 8 }} />

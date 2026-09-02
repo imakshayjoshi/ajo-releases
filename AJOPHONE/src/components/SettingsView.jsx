@@ -22,7 +22,7 @@ import {
 import { clearWatchHistory, clearAppCache, setSleepTimer as applySleepTimer } from '../api/history';
 import { getIPTVConfig, saveIPTVConfig } from '../api/iptv';
 import { getInstalledAddons, installAddon, removeAddon, FEATURED_ADDONS } from '../api/stremio';
-import { checkForAppUpdates, startAppUpdate, CURRENT_APP_VERSION } from '../api/otaUpdate';
+import { checkForAppUpdates, startAppUpdate, CURRENT_APP_VERSION, CURRENT_VERSION_CODE } from '../api/otaUpdate';
 
 export function SettingsView({ onClearHistory, onReloadApp }) {
   const currentConfig = getIPTVConfig();
@@ -31,6 +31,9 @@ try { __addonsInit = getInstalledAddons() || []; } catch {}
 const [addons, setAddons] = useState(__addonsInit);
   const [addonUrl, setAddonUrl] = useState('');
   const [addonStatus, setAddonStatus] = useState(null);
+
+  const installedVersion = (typeof window !== 'undefined' && window.AndroidUpdater?.getAppVersionName?.()) || CURRENT_APP_VERSION;
+  const installedCode = (typeof window !== 'undefined' && window.AndroidUpdater?.getAppVersionCode?.()) || CURRENT_VERSION_CODE;
 
   const refreshAddons = () => setAddons(getInstalledAddons());
 
@@ -245,7 +248,7 @@ const [addons, setAddons] = useState(__addonsInit);
                 App Software Updates
               </h3>
               <span style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 600 }}>
-                Current Installed: <strong style={{ color: '#38bdf8' }}>v{CURRENT_APP_VERSION}</strong>
+                Current Installed: <strong style={{ color: '#38bdf8' }}>v{installedVersion} (Build {installedCode})</strong>
               </span>
             </div>
           </div>
@@ -691,7 +694,7 @@ const [addons, setAddons] = useState(__addonsInit);
           <h3 style={{ fontSize: '15px', fontWeight: 800, color: '#fff', margin: 0 }}>About AJO Phone</h3>
         </div>
         <div style={{ fontSize: '12px', color: '#94a3b8', lineHeight: '1.8' }}>
-          <p style={{ margin: 0 }}><strong style={{ color: '#fff' }}>Version:</strong> v{CURRENT_APP_VERSION} (Mobile Touch & OTA Edition)</p>
+          <p style={{ margin: 0 }}><strong style={{ color: '#fff' }}>Version:</strong> v{installedVersion} (Build {installedCode}) (Mobile Touch & OTA Edition)</p>
           <p style={{ margin: 0 }}><strong style={{ color: '#fff' }}>Streaming Engine:</strong> Direct Native HLS 4K + 60fps Hardware Acceleration</p>
           <p style={{ margin: 0 }}><strong style={{ color: '#fff' }}>OTA Updater:</strong> Built-in Native APK Installer</p>
           <p style={{ margin: 0 }}><strong style={{ color: '#fff' }}>Failover Protection:</strong> 6-Engine Mirror Redundancy</p>

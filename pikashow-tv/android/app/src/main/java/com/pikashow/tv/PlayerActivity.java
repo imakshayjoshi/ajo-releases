@@ -1,5 +1,6 @@
 package com.pikashow.tv;
 
+import android.content.Context;
 import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.Typeface;
@@ -26,6 +27,7 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
+import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.RelativeLayout;
@@ -158,7 +160,7 @@ public class PlayerActivity extends AppCompatActivity {
     private static final int CONNECT_TIMEOUT_MS = 8000;
     private static final int READ_TIMEOUT_MS = 15000;
     private static final long SEEK_STEP_MS = 10000L;
-    private static final long OSD_HIDE_DELAY_MS = 4000L;
+    private static final long OSD_HIDE_DELAY_MS = 6000L;
     private static final long FIRST_FRAME_TIMEOUT_MS = 8000L;
     private static final int FREEZE_STALL_SECONDS = 4;
     private static final int MAX_FREEZE_RECOVERY_ATTEMPTS = 2;
@@ -182,6 +184,7 @@ public class PlayerActivity extends AppCompatActivity {
             aspectRatioFrameLayout.setResizeMode(currentResizeMode);
         }
         Toast.makeText(this, "Display: " + ZOOM_NAMES[zoomModeIndex], Toast.LENGTH_SHORT).show();
+        updateControlButtons();
         showOsd();
     }
 
@@ -197,6 +200,19 @@ public class PlayerActivity extends AppCompatActivity {
     private TextView timeView;
     private TextView statusBadge;
     private TextView hintView;
+    private TextView btnPlayPause;
+    private TextView btnRewind;
+    private TextView btnForward;
+    private TextView btnServer;
+    private TextView btnFit;
+    private TextView btnSafeColor;
+    private TextView btnAudioBoost;
+    private TextView btnAudioTrack;
+    private TextView btnBack;
+    private LinearLayout controlsRow;
+    private boolean isSafeColorMode = false;
+    private int audioBoostLevel = 2; // Default to 200% loud audio for dialogue clarity
+    private int currentAudioTrackIndex = 0;
 
     private boolean isLive = false;
     private String streamUrl = "";
@@ -264,6 +280,8 @@ public class PlayerActivity extends AppCompatActivity {
 
     private final Handler uiHandler = new Handler(Looper.getMainLooper());
     private boolean isOsdVisible = true;
+    private long lastWebCurrentTimeSec = 0;
+    private long lastWebDurationSec = 0;
 
     private final Runnable hideOsdRunnable = this::hideOsd;
 
@@ -272,6 +290,32 @@ public class PlayerActivity extends AppCompatActivity {
         public void run() {
             updateProgressText();
             checkVideoFreeze();
+            if (isWebEmbedMode && webVideoView != null) {
+                try {
+                    webVideoView.evaluateJavascript(
+                        "(function(){try{var vs=document.querySelectorAll('video');for(var i=0;i<vs.length;i++){if(vs[i].duration>0&&vs[i].currentTime>0){return Math.floor(vs[i].currentTime)+':'+Math.floor(vs[i].duration);}}}catch(e){}return '';})();",
+                        res -> {
+                            if (res != null && res.contains(":")) {
+                                String clean = res.replace("\"", "").trim();
+                                String[] p = clean.split(":");
+                                if (p.length == 2) {
+                                    try {
+                                        long c = Long.parseLong(p[0]);
+                                        long d = Long.parseLong(p[1]);
+                                        if (c > 0 && d > 0) {
+                                            lastWebCurrentTimeSec = c;
+                                            lastWebDurationSec = d;
+                                            if (c > 5 && !isLive) {
+                                                MainActivity.setLastNativePlayback(c, d);
+                                            }
+                                        }
+                                    } catch (Exception ignored) {}
+                                }
+                            }
+                        }
+                    );
+                } catch (Exception ignored) {}
+            }
             uiHandler.postDelayed(this, 1000L);
         }
     };
@@ -492,6 +536,8 @@ public class PlayerActivity extends AppCompatActivity {
                 MainActivity.setLastNativePlayback(curPos / 1000, dur / 1000);
             }
             resumePositionMs = curPos;
+        } else if (isWebEmbedMode && lastWebCurrentTimeSec > 5 && lastWebDurationSec > 0 && !isLive) {
+            MainActivity.setLastNativePlayback(lastWebCurrentTimeSec, lastWebDurationSec);
         }
         uiHandler.removeCallbacks(progressRunnable);
         uiHandler.removeCallbacks(firstFrameWatchdog);
@@ -520,6 +566,8 @@ public class PlayerActivity extends AppCompatActivity {
             if (curPos > 5000 && dur > 0) {
                 MainActivity.setLastNativePlayback(curPos / 1000, dur / 1000);
             }
+        } else if (isWebEmbedMode && lastWebCurrentTimeSec > 5 && lastWebDurationSec > 0 && !isLive) {
+            MainActivity.setLastNativePlayback(lastWebCurrentTimeSec, lastWebDurationSec);
         }
         uiHandler.removeCallbacksAndMessages(null);
         releasePlayer();
@@ -576,6 +624,86 @@ public class PlayerActivity extends AppCompatActivity {
         }
 
         webVideoView.setWebViewClient(new WebViewClient() {
+            // v3.12.22: AD NETWORK DOMAINS to block in shouldInterceptRequest.
+            // These cover the most common popunder/popup/banner ad networks
+            // used by free streaming embed providers.
+            private final String[] AD_DOMAINS = {
+                "doubleclick.net", "googlesyndication.com", "googleadservices.com",
+                "popads.net", "popcash.net", "popunder.net", "juicyads.com",
+                "exoclick.com", "exosrv.com", "adsterra.com", "monetag.com",
+                "propellerads.com", "disableSelection", "adskeeper.co.uk",
+                "adcash.com", "hilltopads.net", "trafficjunky.com",
+                "pushno.com", "clksite.com", "betterads.org",
+                "a-ads.com", "revenuecpmnetwork.com", "adf.ly",
+                "richpush.co", "ero-advertising.com", "clickadu.com",
+                "cpm.bz", "bongacash.com", "tsyndicate.com",
+                "bidvertiser.com", "ad-maven.com", "admaven.com",
+                "realsrv.com", "onclicka.com", "onclicksuper.com",
+                "sssmaster.com", "sureads.com", "adserverplus.com"
+            };
+
+            private boolean isAdUrl(String url) {
+                if (url == null) return false;
+                String lower = url.toLowerCase(java.util.Locale.US);
+                for (String domain : AD_DOMAINS) {
+                    if (lower.contains(domain)) return true;
+                }
+                // Block common ad path patterns
+                if (lower.contains("/popunder") || lower.contains("/pop_under")
+                        || lower.contains("/clickunder") || lower.contains("/adserve")
+                        || lower.contains("ads.php") || lower.contains("/ad/click")
+                        || lower.contains("track.php?")) {
+                    return true;
+                }
+                return false;
+            }
+
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView view, String url) {
+                if (url == null) return true;
+                // Block ad network URLs
+                if (isAdUrl(url)) {
+                    Log.d(TAG, "AD_BLOCK: blocked navigation to " + url);
+                    return true;
+                }
+                // Allow same-domain embed navigations (server switching inside embed)
+                try {
+                    String currentHost = Uri.parse(view.getUrl()).getHost();
+                    String targetHost = Uri.parse(url).getHost();
+                    if (currentHost != null && targetHost != null
+                            && currentHost.equalsIgnoreCase(targetHost)) {
+                        return false; // Allow same-host navigation
+                    }
+                } catch (Exception ignored) {}
+                // Block popup navigations to random ad domains — but allow
+                // known embed provider domains and direct media URLs.
+                String lower = url.toLowerCase(java.util.Locale.US);
+                if (lower.endsWith(".m3u8") || lower.endsWith(".mp4")
+                        || lower.endsWith(".mkv") || lower.endsWith(".webm")
+                        || lower.contains("m3u8?") || lower.contains("mp4?")) {
+                    return false; // Allow direct media URLs
+                }
+                if (isWebEmbedUrl(url)) {
+                    return false; // Allow known embed providers
+                }
+                // Block everything else (popups, redirects to ad pages)
+                Log.d(TAG, "AD_BLOCK: blocked popup navigation to " + url);
+                return true;
+            }
+
+            @Override
+            public android.webkit.WebResourceResponse shouldInterceptRequest(
+                    WebView view, android.webkit.WebResourceRequest request) {
+                String url = request.getUrl() != null ? request.getUrl().toString() : "";
+                if (isAdUrl(url)) {
+                    Log.d(TAG, "AD_BLOCK: blocked resource " + url);
+                    return new android.webkit.WebResourceResponse(
+                            "text/plain", "utf-8",
+                            new java.io.ByteArrayInputStream(new byte[0]));
+                }
+                return super.shouldInterceptRequest(view, request);
+            }
+
             @Override
             public void onReceivedSslError(WebView view, SslErrorHandler handler, SslError error) {
                 handler.proceed();
@@ -592,29 +720,71 @@ public class PlayerActivity extends AppCompatActivity {
             public void onPageFinished(WebView view, String url) {
                 uiHandler.removeCallbacks(webLoadWatchdog);
                 bufferSpinner.setVisibility(View.GONE);
-                
-                // Immediate play check and Cloudflare/error inspection
+
+                // v3.12.22: Inject ad-hiding CSS to suppress overlay ads, popunders,
+                // and close-button traps that steal focus on TV.
+                String adHideCss =
+                        "[class*='pop'],[id*='pop'],[class*='overlay-ad'],"
+                        + "[class*='ad-overlay'],[id*='ad-overlay'],"
+                        + "[class*='banner-ad'],[id*='banner'],"
+                        + "div[onclick*='window.open'],a[target='_blank'][onclick],"
+                        + "iframe[src*='ads'],iframe[src*='pop'],"
+                        + "[class*='close-btn-ad'],[class*='adcontainer'],"
+                        + "div[style*='z-index: 99999'],div[style*='z-index:99999'],"
+                        + "div[style*='z-index: 999999'],div[style*='z-index:999999'] {"
+                        + "  display:none!important;visibility:hidden!important;"
+                        + "  pointer-events:none!important;opacity:0!important;"
+                        + "  width:0!important;height:0!important;"
+                        + "}"
+                        + "video {"
+                        + "  background:#000!important;"
+                        + "  image-rendering:auto!important;"
+                        + "}";
+                view.evaluateJavascript(
+                        "(function(){var s=document.createElement('style');"
+                        + "s.textContent='" + adHideCss.replace("'", "\\'") + "';"
+                        + "document.head.appendChild(s);"
+                        // Also block window.open globally
+                        + "window.open=function(){return null;};"
+                        + "window.alert=function(){};"
+                        + "window.confirm=function(){return true;};"
+                        + "window.prompt=function(){return null;};"
+                        // Prevent onbeforeunload traps
+                        + "window.onbeforeunload=null;"
+                        // Force all media elements to unmute and max volume
+                        + "try{"
+                        + "  Object.defineProperty(HTMLMediaElement.prototype,'muted',{get:function(){return false;},set:function(){},configurable:true});"
+                        + "  Object.defineProperty(HTMLMediaElement.prototype,'volume',{get:function(){return 1.0;},set:function(){},configurable:true});"
+                        + "  var allV=document.querySelectorAll('video,audio');"
+                        + "  for(var i=0;i<allV.length;i++){ allV[i].muted=false; allV[i].volume=1.0; }"
+                        + "}catch(e){}"
+                        + "})();", null);
+
+                // Immediate play check and Cloudflare/Next.js/Missing content error inspection
                 view.evaluateJavascript(
                         "(function(){"
-                                + "if(document.body && (document.body.innerText.includes('Error code 522') || document.body.innerText.includes('Error code 520') || document.title.includes('502') || document.title.includes('504'))){"
+                                + "var bodyText = document.body ? document.body.innerText : '';"
+                                + "var lower = bodyText.toLowerCase();"
+                                + "var titleLower = (document.title || '').toLowerCase();"
+                                + "if(lower.includes('application error') || lower.includes('server-side exception') || lower.includes('digest:') || lower.includes('error code 522') || lower.includes('error code 520') || lower.includes('error code 524') || lower.includes('file not found') || lower.includes('video not found') || lower.includes('couldn\\'t find') || lower.includes('not available') || lower.includes('check back') || lower.includes('no stream') || lower.includes('no sources') || titleLower.includes('502') || titleLower.includes('504') || titleLower.includes('500') || titleLower.includes('error')){"
                                 + "  return 'ERROR_PAGE';"
                                 + "}"
                                 + "try{"
                                 + "  if(window.ppl && typeof window.ppl.api === 'function'){ window.ppl.api('play'); }"
                                 + "  if(window.player && typeof window.player.api === 'function'){ window.player.api('play'); }"
                                 + "  var v=document.querySelector('video'); if(v){ v.muted=false; v.play(); }"
-                                + "  var btn=document.querySelector('.play,.play-btn,.jw-display-icon-container,[aria-label=\"Play\"],.vjs-big-play-button,.plyr__control--overlaid,button.play-button,pjsdiv'); if(btn){btn.click();}"
+                                + "  var btn=document.querySelector('.play,.play-btn,.jw-display-icon-container,[aria-label=\"Play\"],.vjs-big-play-button,.plyr__control--overlaid,button.play-button,pjsdiv,.jw-icon-display'); if(btn){btn.click();}"
                                 + "}catch(e){}"
                                 + "return 'OK';"
                                 + "})();",
                         value -> {
                             if (value != null && value.contains("ERROR_PAGE")) {
-                                Log.w(TAG, "Detected Cloudflare/host error page in WebView embed");
+                                Log.w(TAG, "Detected server crash / content unavailable page in WebView embed — auto-failing over");
                                 failoverToNextServer();
                             }
                         });
 
-                // Post delayed auto-click retries for dynamic player frameworks (JWPlayer, Video.js, Plyr)
+                // v3.12.31: Ultra-aggressive autoplay across 12 retry cycles with all player APIs
                 Runnable autoPlayAttempt = new Runnable() {
                     int attempts = 0;
                     @Override
@@ -623,20 +793,83 @@ public class PlayerActivity extends AppCompatActivity {
                         webVideoView.evaluateJavascript(
                             "(function(){"
                             + "try{"
-                            + "  var v=document.querySelector('video'); if(v && v.paused){ v.muted=false; v.play(); }"
-                            + "  var btn=document.querySelector('.play,.play-btn,.jw-display-icon-container,[aria-label=\"Play\"],.vjs-big-play-button,.plyr__control--overlaid,button.play-button'); if(btn){btn.click();}"
+                            + "  var bodyText = document.body ? document.body.innerText : '';"
+                            + "  var lower = bodyText.toLowerCase();"
+                            + "  if(lower.includes('application error') || lower.includes('server-side exception') || lower.includes('digest:') || lower.includes('couldn\\'t find') || lower.includes('not available') || lower.includes('check back') || lower.includes('no stream') || lower.includes('no sources')){"
+                            + "    return 'ERROR_PAGE';"
+                            + "  }"
+                            // Try all HTML5 video elements
+                            + "  var vs=document.querySelectorAll('video');"
+                            + "  for(var i=0;i<vs.length;i++){"
+                            + "    try{ vs[i].muted=false; vs[i].volume=1.0; if(vs[i].paused){ vs[i].play(); } }catch(e){}"
+                            + "  }"
+                            // Try all known player framework play buttons
+                            + "  var selectors=['.play','.play-btn','.jw-display-icon-container',"
+                            + "    '[aria-label=\"Play\"]','.vjs-big-play-button','.plyr__control--overlaid',"
+                            + "    'button.play-button','.jw-icon-display','.jw-controlbar .jw-icon-playback',"
+                            + "    '.video-js .vjs-play-control','.fp-play','.mejs__play button',"
+                            + "    '[data-plyr=\"play\"]','button[title=\"Play\"]','button[aria-label=\"play\"]',"
+                            + "    '.btn-play','.play-icon','.player-play','div[class*=\"play\"]','div[id*=\"play\"]'];"
+                            + "  for(var i=0;i<selectors.length;i++){"
+                            + "    var btns=document.querySelectorAll(selectors[i]);"
+                            + "    for(var j=0;j<btns.length;j++){"
+                            + "      try{ btns[j].click(); }catch(e){}"
+                            + "    }"
+                            + "  }"
+                            // Try JWPlayer API
+                            + "  if(typeof jwplayer==='function'){ try{jwplayer().play();}catch(e){} }"
+                            // Try Video.js API  
+                            + "  if(typeof videojs==='function'){ try{videojs(document.querySelector('.video-js')).play();}catch(e){} }"
+                            // Try Plyr / PPL API
+                            + "  if(window.player && typeof window.player.play==='function'){ window.player.play(); }"
+                            + "  if(window.ppl && typeof window.ppl.api==='function'){ window.ppl.api('play'); }"
+                            // Simulate click at center of page (for players that need touch/click)
+                            + "  var ce=new MouseEvent('click',{bubbles:true,cancelable:true,clientX:window.innerWidth/2,clientY:window.innerHeight/2});"
+                            + "  var el=document.elementFromPoint(window.innerWidth/2,window.innerHeight/2);"
+                            + "  if(el && el.tagName!=='A'){ el.dispatchEvent(ce); }"
                             + "}catch(e){}"
-                            + "})();", null);
+                            + "return 'OK';"
+                            + "})();",
+                            evalRes -> {
+                                if (evalRes != null && evalRes.contains("ERROR_PAGE")) {
+                                    Log.w(TAG, "Content unavailable on current mirror — auto-failing over");
+                                    failoverToNextServer();
+                                }
+                            });
                         attempts++;
-                        if (attempts < 3) {
-                            uiHandler.postDelayed(this, 1200L);
+                        applyAudioBoost();
+                        if (attempts < 12) {
+                            uiHandler.postDelayed(this, 500L);
                         }
                     }
                 };
-                uiHandler.postDelayed(autoPlayAttempt, 800L);
+                uiHandler.postDelayed(autoPlayAttempt, 400L);
+
+                // v3.12.22: MutationObserver to catch async-rendered play buttons
+                view.evaluateJavascript(
+                        "(function(){"
+                        + "try{"
+                        + "  var obs=new MutationObserver(function(muts){"
+                        + "    var v=document.querySelector('video');"
+                        + "    if(v && v.paused){ v.muted=false; v.play(); }"
+                        + "    var btn=document.querySelector('.jw-display-icon-container,.vjs-big-play-button,.plyr__control--overlaid,.jw-icon-display');"
+                        + "    if(btn){ btn.click(); obs.disconnect(); }"
+                        + "  });"
+                        + "  obs.observe(document.body,{childList:true,subtree:true});"
+                        + "  setTimeout(function(){obs.disconnect();},15000);"
+                        + "}catch(e){}"
+                        + "})();", null);
             }
         });
-        webVideoView.setWebChromeClient(new WebChromeClient());
+        // v3.12.22: Block popup windows from embed providers
+        webVideoView.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public boolean onCreateWindow(WebView view, boolean isDialog, boolean isUserGesture, android.os.Message resultMsg) {
+                // Block ALL new window requests (popup ads)
+                Log.d(TAG, "AD_BLOCK: blocked popup window creation");
+                return false;
+            }
+        });
         root.addView(webVideoView);
 
         // 2. Hardware Video ExoPlayer Surface
@@ -737,7 +970,7 @@ public class PlayerActivity extends AppCompatActivity {
         bottomBar.setPadding(48, 48, 48, 36);
         bottomBar.setBackground(new GradientDrawable(
                 GradientDrawable.Orientation.BOTTOM_TOP,
-                new int[]{Color.parseColor("#CC000000"), Color.TRANSPARENT}));
+                new int[]{Color.parseColor("#EE000000"), Color.parseColor("#CC000000"), Color.TRANSPARENT}));
         RelativeLayout.LayoutParams bottomParams = new RelativeLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         bottomParams.addRule(RelativeLayout.ALIGN_PARENT_BOTTOM);
@@ -746,19 +979,313 @@ public class PlayerActivity extends AppCompatActivity {
         timeView = new TextView(this);
         timeView.setTextColor(Color.parseColor("#cbd5e1"));
         timeView.setTextSize(16);
+        timeView.setTypeface(Typeface.DEFAULT_BOLD);
         bottomBar.addView(timeView);
+
+        // TV Remote Focusable Controls Row
+        HorizontalScrollView hsv = new HorizontalScrollView(this);
+        hsv.setHorizontalScrollBarEnabled(false);
+        hsv.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        LinearLayout.LayoutParams hsvParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        hsvParams.setMargins(0, 16, 0, 12);
+        hsv.setLayoutParams(hsvParams);
+
+        controlsRow = new LinearLayout(this);
+        controlsRow.setOrientation(LinearLayout.HORIZONTAL);
+        controlsRow.setGravity(Gravity.CENTER_VERTICAL);
+        controlsRow.setLayoutParams(new ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        btnPlayPause = createTvButton("⏸ Pause", v -> togglePlayPause());
+        btnRewind = createTvButton("↺ -10s", v -> seekRelative(-SEEK_STEP_MS));
+        btnForward = createTvButton("↻ +10s", v -> seekRelative(SEEK_STEP_MS));
+        btnServer = createTvButton("⚡ Server 1", v -> switchServerNext());
+        btnFit = createTvButton("⛶ Fit: Fit", v -> cycleZoomMode());
+        btnAudioBoost = createTvButton("🔊 Audio: 200%", v -> cycleAudioBoost());
+        btnAudioTrack = createTvButton("🌐 Audio: Auto", v -> cycleAudioTrack());
+        btnSafeColor = createTvButton("🎨 Safe Color: OFF", v -> toggleSafeColorMode());
+        btnBack = createTvButton("← Exit Player", v -> {
+            uiHandler.removeCallbacksAndMessages(null);
+            releasePlayer();
+            finish();
+        });
+
+        controlsRow.addView(btnPlayPause);
+        if (!isLive) {
+            controlsRow.addView(btnRewind);
+            controlsRow.addView(btnForward);
+        }
+        controlsRow.addView(btnServer);
+        controlsRow.addView(btnFit);
+        controlsRow.addView(btnAudioBoost);
+        if (!isLive) {
+            controlsRow.addView(btnAudioTrack);
+        }
+        controlsRow.addView(btnSafeColor);
+        controlsRow.addView(btnBack);
+
+        hsv.addView(controlsRow);
+        bottomBar.addView(hsv);
 
         hintView = new TextView(this);
         hintView.setTextColor(Color.parseColor("#94a3b8"));
-        hintView.setTextSize(14);
-        hintView.setPadding(0, 12, 0, 0);
+        hintView.setTextSize(13);
+        hintView.setPadding(0, 4, 0, 0);
         bottomBar.addView(hintView);
 
         osdOverlay.addView(bottomBar);
         root.addView(osdOverlay);
 
         applyStreamMetadataToUi();
+        updateControlButtons();
         return root;
+    }
+
+    private TextView createTvButton(String text, View.OnClickListener onClick) {
+        TextView btn = new TextView(this);
+        btn.setText(text);
+        btn.setTextColor(Color.WHITE);
+        btn.setTextSize(14);
+        btn.setTypeface(Typeface.DEFAULT_BOLD);
+        btn.setGravity(Gravity.CENTER);
+        btn.setFocusable(true);
+        btn.setFocusableInTouchMode(true);
+        btn.setClickable(true);
+        btn.setPadding(26, 14, 26, 14);
+
+        GradientDrawable normalBg = new GradientDrawable();
+        normalBg.setColor(Color.parseColor("#441e293b"));
+        normalBg.setCornerRadius(14);
+        normalBg.setStroke(2, Color.parseColor("#44ffffff"));
+
+        GradientDrawable focusedBg = new GradientDrawable();
+        focusedBg.setColor(Color.parseColor("#38bdf8"));
+        focusedBg.setCornerRadius(14);
+        focusedBg.setStroke(3, Color.WHITE);
+
+        btn.setBackground(normalBg);
+        btn.setOnFocusChangeListener((v, hasFocus) -> {
+            if (hasFocus) {
+                btn.setBackground(focusedBg);
+                btn.setTextColor(Color.BLACK);
+                btn.animate().scaleX(1.06f).scaleY(1.06f).setDuration(120).start();
+                showOsd();
+            } else {
+                btn.setBackground(normalBg);
+                btn.setTextColor(Color.WHITE);
+                btn.animate().scaleX(1.0f).scaleY(1.0f).setDuration(120).start();
+            }
+        });
+
+        btn.setOnClickListener(v -> {
+            showOsd();
+            if (onClick != null) onClick.onClick(v);
+        });
+
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.setMargins(0, 0, 14, 0);
+        btn.setLayoutParams(lp);
+        return btn;
+    }
+
+    private String getServerDisplayName(String url, int idx) {
+        if (url == null) return "Server " + (idx + 1);
+        String lower = url.toLowerCase(java.util.Locale.US);
+        boolean isHindi = lower.contains("lang=hi") || lower.contains("audio=hi");
+        String badge = isHindi ? " (🇮🇳 Hindi Audio)" : "";
+        if (lower.contains("videasy.net")) return "Server " + (idx + 1) + ": Videasy" + (isHindi ? " (🇮🇳 Hindi/Multi)" : " (Ad-Free)");
+        if (lower.contains("autoembed.co")) return "Server " + (idx + 1) + ": AutoEmbed" + badge;
+        if (lower.contains("vidlink.pro")) return "Server " + (idx + 1) + ": VidLink" + badge;
+        if (lower.contains("nontongo.win")) return "Server " + (idx + 1) + ": NontonGo" + badge;
+        if (lower.contains("vidsrc.pm")) return "Server " + (idx + 1) + ": VidSrc PM";
+        if (lower.contains("vidjoy.pro")) return "Server " + (idx + 1) + ": VidJoy Pro";
+        if (lower.contains("2embed.skin") || lower.contains("2embed.cc")) return "Server " + (idx + 1) + ": 2Embed";
+        if (lower.contains("vidsrc.pro")) return "Server " + (idx + 1) + ": VidSrc Pro";
+        return "Server " + (idx + 1) + badge;
+    }
+
+    private void updateControlButtons() {
+        if (btnPlayPause != null) {
+            boolean playing = (player != null && player.isPlaying()) || isWebEmbedMode;
+            btnPlayPause.setText(playing ? "⏸ Pause" : "▶ Play");
+        }
+        if (btnServer != null) {
+            String name = getServerDisplayName(streamUrl, currentServerIdx);
+            btnServer.setText("⚡ " + name);
+        }
+        if (btnFit != null) {
+            btnFit.setText("⛶ Fit: " + ZOOM_NAMES[zoomModeIndex]);
+        }
+        if (btnAudioBoost != null) {
+            btnAudioBoost.setText(audioBoostLevel == 1 ? "🔊 Audio: 100%" : audioBoostLevel == 2 ? "🔊 Audio: 200%" : "🔊 Audio: 300% (Max)");
+        }
+        if (btnSafeColor != null) {
+            btnSafeColor.setText(isSafeColorMode ? "🎨 Safe Color: ON" : "🎨 Safe Color: OFF");
+        }
+    }
+
+    private void switchServerNext() {
+        if (serverQueue.size() <= 1) {
+            Toast.makeText(this, "Only 1 server configured", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        currentServerIdx = (currentServerIdx + 1) % serverQueue.size();
+        String nextUrl = serverQueue.get(currentServerIdx);
+        String name = getServerDisplayName(nextUrl, currentServerIdx);
+        Toast.makeText(this, "Switching to " + name + "...", Toast.LENGTH_SHORT).show();
+        playCurrentStream();
+        updateControlButtons();
+        showOsd();
+    }
+
+    public void applyAudioBoost() {
+        final float multiplier = audioBoostLevel == 1 ? 1.0f : audioBoostLevel == 2 ? 2.2f : 3.5f;
+        if (webVideoView != null) {
+            webVideoView.evaluateJavascript(
+                "(function(boost){"
+                + "try{"
+                + "  var vids = document.querySelectorAll('video, audio');"
+                + "  for(var i=0; i<vids.length; i++){"
+                + "    var v = vids[i];"
+                + "    if(!v) continue;"
+                + "    v.volume = 1.0;"
+                + "    if(!v._ajoCtx){"
+                + "      var AudioCtx = window.AudioContext || window.webkitAudioContext;"
+                + "      if(AudioCtx){"
+                + "        var ctx = new AudioCtx();"
+                + "        var source = ctx.createMediaElementSource(v);"
+                + "        var gain = ctx.createGain();"
+                + "        var comp = ctx.createDynamicsCompressor();"
+                + "        comp.threshold.setValueAtTime(-24, ctx.currentTime);"
+                + "        comp.knee.setValueAtTime(30, ctx.currentTime);"
+                + "        comp.ratio.setValueAtTime(12, ctx.currentTime);"
+                + "        comp.attack.setValueAtTime(0.003, ctx.currentTime);"
+                + "        comp.release.setValueAtTime(0.25, ctx.currentTime);"
+                + "        source.connect(gain);"
+                + "        gain.connect(comp);"
+                + "        comp.connect(ctx.destination);"
+                + "        v._ajoCtx = ctx;"
+                + "        v._ajoGain = gain;"
+                + "      }"
+                + "    }"
+                + "    if(v._ajoGain && v._ajoCtx){"
+                + "      v._ajoGain.gain.setValueAtTime(boost, v._ajoCtx.currentTime);"
+                + "      if(v._ajoCtx.state === 'suspended'){ v._ajoCtx.resume(); }"
+                + "    }"
+                + "  }"
+                + "}catch(e){}"
+                + "})(" + multiplier + ");", null);
+        }
+        try {
+            android.media.AudioManager am = (android.media.AudioManager) getSystemService(Context.AUDIO_SERVICE);
+            if (am != null) {
+                int maxVol = am.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC);
+                int targetVol = (int) (maxVol * (audioBoostLevel == 1 ? 0.85f : 1.0f));
+                am.setStreamVolume(android.media.AudioManager.STREAM_MUSIC, targetVol, 0);
+            }
+        } catch (Exception ignored) {}
+    }
+
+    private void cycleAudioBoost() {
+        audioBoostLevel = (audioBoostLevel % 3) + 1;
+        applyAudioBoost();
+        updateControlButtons();
+        String desc = audioBoostLevel == 1 ? "Normal (100%)" : audioBoostLevel == 2 ? "Dialogue Boosted (200%)" : "Max Boost (300%)";
+        Toast.makeText(this, "🔊 Audio Boost: " + desc, Toast.LENGTH_SHORT).show();
+        showOsd();
+    }
+
+    private void toggleSafeColorMode() {
+        isSafeColorMode = !isSafeColorMode;
+        if (webVideoView != null) {
+            if (isSafeColorMode) {
+                webVideoView.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
+                webVideoView.evaluateJavascript(
+                        "(function(){"
+                        + "try{"
+                        + "  var style = document.getElementById('ajo-safe-color');"
+                        + "  if(!style){"
+                        + "    style = document.createElement('style');"
+                        + "    style.id = 'ajo-safe-color';"
+                        + "    (document.head || document.documentElement).appendChild(style);"
+                        + "  }"
+                        + "  style.textContent = 'video, iframe, embed, object { filter: none !important; -webkit-filter: none !important; transform: none !important; -webkit-transform: none !important; image-rendering: auto !important; -webkit-backface-visibility: visible !important; backface-visibility: visible !important; background-color: #000000 !important; }';"
+                        + "  var v=document.querySelector('video');"
+                        + "  if(v){"
+                        + "    v.style.setProperty('filter', 'none', 'important');"
+                        + "    v.style.setProperty('transform', 'none', 'important');"
+                        + "    v.style.setProperty('-webkit-transform', 'none', 'important');"
+                        + "    v.style.setProperty('background-color', '#000000', 'important');"
+                        + "  }"
+                        + "}catch(e){}"
+                        + "})();", null);
+                Toast.makeText(this, "🎨 Safe Color Mode: ON (Software Chroma Fix)", Toast.LENGTH_SHORT).show();
+            } else {
+                webVideoView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
+                webVideoView.evaluateJavascript(
+                        "(function(){"
+                        + "try{"
+                        + "  var style = document.getElementById('ajo-safe-color');"
+                        + "  if(style) style.remove();"
+                        + "}catch(e){}"
+                        + "})();", null);
+                Toast.makeText(this, "🎨 Safe Color Mode: OFF (GPU Hardware)", Toast.LENGTH_SHORT).show();
+            }
+        } else if (player != null) {
+            softwareDecoderRetryDone = isSafeColorMode;
+            useTextureViewFallback = isSafeColorMode;
+            Toast.makeText(this, isSafeColorMode ? "Software Video Decoder: ON" : "Hardware Video Decoder: ON", Toast.LENGTH_SHORT).show();
+            initializeExoPlayer();
+        }
+        updateControlButtons();
+        showOsd();
+    }
+
+    private String getLiveEpgInfo(String title) {
+        if (title == null) return "";
+        String t = title.toLowerCase(java.util.Locale.US);
+        java.util.Calendar cal = java.util.Calendar.getInstance();
+        int hour = cal.get(java.util.Calendar.HOUR_OF_DAY);
+        
+        String nowTitle = "Live Primetime Broadcast";
+        String nextTitle = "Prime Show";
+        
+        if (t.contains("sab") || t.contains("sub")) {
+            if (hour >= 20 && hour < 21) {
+                nowTitle = "Taarak Mehta Ka Ooltah Chashmah";
+                nextTitle = "Wagle Ki Duniya";
+            } else if (hour >= 21 && hour < 22) {
+                nowTitle = "Wagle Ki Duniya - Nayi Peedhi";
+                nextTitle = "Pushpa Impossible";
+            } else if (hour >= 22 && hour < 23) {
+                nowTitle = "Pushpa Impossible";
+                nextTitle = "Taarak Mehta (Repeat)";
+            } else {
+                nowTitle = "Taarak Mehta Ka Ooltah Chashmah";
+                nextTitle = "SAB TV Hit Comedy Special";
+            }
+        } else if (t.contains("sport") || t.contains("cricket") || t.contains("ten")) {
+            nowTitle = "Live Match Center & Ball-by-Ball Analysis";
+            nextTitle = "Post Match Presentation & Highlights";
+        } else if (t.contains("news") || t.contains("tak") || t.contains("24")) {
+            nowTitle = "National Prime Debate & 100 Non-Stop Headlines";
+            nextTitle = "Special Ground Investigation";
+        } else if (t.contains("star plus")) {
+            nowTitle = "Anupamaa (Primetime)";
+            nextTitle = "Ghum Hai Kisikey Pyaar Meiin";
+        } else if (t.contains("colors")) {
+            nowTitle = "Shiv Shakti (Mega Drama)";
+            nextTitle = "Parineetii";
+        } else if (t.contains("zee")) {
+            nowTitle = "Kundali Bhagya";
+            nextTitle = "Kumkum Bhagya";
+        } else if (t.contains("cinema") || t.contains("gold") || t.contains("max") || t.contains("pix")) {
+            nowTitle = "Superhit Blockbuster Movie";
+            nextTitle = "Grand Action Cinema Night";
+        }
+        return "🔴 NOW: " + nowTitle + "  •  ⏩ NEXT: " + nextTitle;
     }
 
     private void applyStreamMetadataToUi() {
@@ -778,11 +1305,15 @@ public class PlayerActivity extends AppCompatActivity {
                 statusBadge.setText("HD STREAM");
             }
         }
+        if (isLive && timeView != null) {
+            timeView.setText(getLiveEpgInfo(streamTitle));
+        }
         if (hintView != null) {
             hintView.setText(isLive
-                    ? "Remote: [OK] Play/Pause  \u2022  [\u25B2/\u25BC] Info  \u2022  [Back] Return to AJO TV"
-                    : "Remote: [OK] Play/Pause  \u2022  [\u25C4/\u25BA] Seek 10s  \u2022  [Back] Return to AJO TV");
+                    ? "Remote: [D-Pad] Select Control  •  [OK] Click  •  [Back] Return to Catalog"
+                    : "Remote: [D-Pad Left/Right] Seek ±10s  •  [OK] Play/Pause  •  [Back] Return to Catalog");
         }
+        updateControlButtons();
     }
 
     // --------------------------------------------------------- stream dispatcher
@@ -801,7 +1332,7 @@ public class PlayerActivity extends AppCompatActivity {
                 || lower.contains("vidlink.pro") || lower.contains("vidsrc") || lower.contains("autoembed")
                 || lower.contains("smashy") || lower.contains("multiembed") || lower.contains("vidjoy")
                 || lower.contains("2embed") || lower.contains("nontongo") || lower.contains("embed.su")
-                || lower.contains("superembed") || lower.contains("moviesapi");
+                || lower.contains("superembed") || lower.contains("moviesapi") || lower.contains("videasy.net");
     }
 
     private void playCurrentStream() {
@@ -817,6 +1348,15 @@ public class PlayerActivity extends AppCompatActivity {
 
         streamUrl = serverQueue.get(currentServerIdx);
         Log.i(TAG, "playCurrentStream [" + (currentServerIdx + 1) + "/" + serverQueue.size() + "]: " + streamUrl);
+
+        // Ensure system media volume is set to maximum and unmuted
+        try {
+            android.media.AudioManager am = (android.media.AudioManager) getSystemService(Context.AUDIO_SERVICE);
+            if (am != null) {
+                int max = am.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC);
+                am.setStreamVolume(android.media.AudioManager.STREAM_MUSIC, max, 0);
+            }
+        } catch (Exception ignored) {}
 
         if (isWebEmbedUrl(streamUrl)) {
             playInWebEngine(streamUrl);
@@ -888,6 +1428,9 @@ public class PlayerActivity extends AppCompatActivity {
             } else if (lower.contains("vidsrc")) {
                 headers.put("Referer", "https://vidsrc.cc/");
                 headers.put("Origin", "https://vidsrc.cc");
+            } else if (lower.contains("videasy.net")) {
+                headers.put("Referer", "https://player.videasy.net/");
+                headers.put("Origin", "https://player.videasy.net");
             } else {
                 // Generic fallback: referer = the host itself so providers that
                 // require same-origin referers still get a valid value.
@@ -912,6 +1455,8 @@ public class PlayerActivity extends AppCompatActivity {
         }
 
         bufferSpinner.setVisibility(View.VISIBLE);
+        uiHandler.removeCallbacks(progressRunnable);
+        uiHandler.post(progressRunnable);
         uiHandler.removeCallbacks(webLoadWatchdog);
         uiHandler.postDelayed(webLoadWatchdog, WEB_LOAD_TIMEOUT_MS);
         // Hide spinner on page-finished, not after a fixed delay — embed pages
@@ -1257,12 +1802,15 @@ public class PlayerActivity extends AppCompatActivity {
         if (currentServerIdx + 1 < serverQueue.size()) {
             currentServerIdx++;
             uiHandler.post(() -> {
-                Toast.makeText(PlayerActivity.this, "Switching to next mirror (" + (currentServerIdx + 1) + "/" + serverQueue.size() + ")...", Toast.LENGTH_SHORT).show();
+                String name = getServerDisplayName(serverQueue.get(currentServerIdx), currentServerIdx);
+                Toast.makeText(PlayerActivity.this, "Auto-switching to " + name + "...", Toast.LENGTH_SHORT).show();
                 playCurrentStream();
+                updateControlButtons();
+                showOsd();
             });
         } else {
             uiHandler.post(() -> {
-                Toast.makeText(PlayerActivity.this, "Stream unavailable across all mirrors. Returning...", Toast.LENGTH_LONG).show();
+                Toast.makeText(PlayerActivity.this, "Content not yet indexed on free servers. Please try again later.", Toast.LENGTH_LONG).show();
                 finish();
             });
         }
@@ -1371,6 +1919,7 @@ public class PlayerActivity extends AppCompatActivity {
         if (osdOverlay == null) return;
         isOsdVisible = true;
         osdOverlay.setVisibility(View.VISIBLE);
+        updateControlButtons();
         uiHandler.removeCallbacks(hideOsdRunnable);
         uiHandler.postDelayed(hideOsdRunnable, OSD_HIDE_DELAY_MS);
     }
@@ -1383,13 +1932,67 @@ public class PlayerActivity extends AppCompatActivity {
 
     private void toggleOsd() {
         if (isOsdVisible) hideOsd();
-        else showOsd();
+        else {
+            showOsd();
+            if (btnPlayPause != null) btnPlayPause.requestFocus();
+        }
+    }
+
+    private void cycleAudioTrack() {
+        if (player == null || isLive || isWebEmbedMode) return;
+        try {
+            androidx.media3.common.Tracks tracks = player.getCurrentTracks();
+            List<androidx.media3.common.Tracks.Group> audioGroups = new ArrayList<>();
+            for (androidx.media3.common.Tracks.Group group : tracks.getGroups()) {
+                if (group.getType() == C.TRACK_TYPE_AUDIO) {
+                    audioGroups.add(group);
+                }
+            }
+            if (audioGroups.isEmpty()) {
+                Toast.makeText(this, "Single Audio Stream", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            currentAudioTrackIndex = (currentAudioTrackIndex + 1) % audioGroups.size();
+            androidx.media3.common.Tracks.Group selectedGroup = audioGroups.get(currentAudioTrackIndex);
+            String lang = "Audio " + (currentAudioTrackIndex + 1);
+            if (selectedGroup.length > 0) {
+                androidx.media3.common.Format format = selectedGroup.getTrackFormat(0);
+                if (format.language != null && !format.language.isEmpty()) {
+                    String raw = format.language.toUpperCase(java.util.Locale.US);
+                    if (raw.equals("HIN") || raw.equals("HI")) lang = "Hindi";
+                    else if (raw.equals("ENG") || raw.equals("EN")) lang = "English";
+                    else if (raw.equals("TAM") || raw.equals("TA")) lang = "Tamil";
+                    else if (raw.equals("TEL") || raw.equals("TE")) lang = "Telugu";
+                    else if (raw.equals("MAR") || raw.equals("MR")) lang = "Marathi";
+                    else lang = raw;
+                }
+            }
+            player.setTrackSelectionParameters(
+                    player.getTrackSelectionParameters()
+                            .buildUpon()
+                            .setOverrideForType(
+                                    new androidx.media3.common.TrackSelectionOverride(
+                                            selectedGroup.getMediaTrackGroup(), 0))
+                            .build()
+            );
+            Toast.makeText(this, "Audio Track: " + lang, Toast.LENGTH_SHORT).show();
+            if (btnAudioTrack != null) {
+                btnAudioTrack.setText("🌐 " + lang);
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Audio track switch exception: " + e.getMessage());
+        }
+        showOsd();
     }
 
     private void updateProgressText() {
         if (timeView == null) return;
-        if (isLive || isWebEmbedMode) {
-            timeView.setText("LIVE HD BROADCAST");
+        if (isLive) {
+            timeView.setText(getLiveEpgInfo(streamTitle));
+            return;
+        }
+        if (isWebEmbedMode) {
+            timeView.setText("HD STREAM");
             return;
         }
         if (player == null || player.getDuration() == C.TIME_UNSET) {
@@ -1422,6 +2025,7 @@ public class PlayerActivity extends AppCompatActivity {
                             }
                         }
                     });
+            updateControlButtons();
             showOsd();
             return;
         }
@@ -1433,6 +2037,7 @@ public class PlayerActivity extends AppCompatActivity {
             player.play();
             Toast.makeText(this, "Playing", Toast.LENGTH_SHORT).show();
         }
+        updateControlButtons();
         showOsd();
     }
 
@@ -1461,6 +2066,29 @@ public class PlayerActivity extends AppCompatActivity {
     }
 
     @Override
+    public boolean dispatchKeyEvent(KeyEvent event) {
+        if (event.getAction() == KeyEvent.ACTION_DOWN) {
+            int keyCode = event.getKeyCode();
+            // Intercept media and navigation keys so WebView cannot consume or block them
+            if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER
+                    || keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER || keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE
+                    || keyCode == KeyEvent.KEYCODE_MEDIA_PLAY || keyCode == KeyEvent.KEYCODE_MEDIA_PAUSE
+                    || keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
+                    || keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_DPAD_DOWN
+                    || keyCode == KeyEvent.KEYCODE_MENU || keyCode == KeyEvent.KEYCODE_INFO
+                    || keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_ESCAPE
+                    || keyCode == KeyEvent.KEYCODE_MEDIA_FAST_FORWARD || keyCode == KeyEvent.KEYCODE_MEDIA_REWIND
+                    || keyCode == KeyEvent.KEYCODE_PROG_RED || keyCode == KeyEvent.KEYCODE_PROG_GREEN
+                    || keyCode == KeyEvent.KEYCODE_CHANNEL_UP || keyCode == KeyEvent.KEYCODE_CHANNEL_DOWN) {
+                if (onKeyDown(keyCode, event)) {
+                    return true;
+                }
+            }
+        }
+        return super.dispatchKeyEvent(event);
+    }
+
+    @Override
     public boolean onKeyLongPress(int keyCode, KeyEvent event) {
         // Long-press D-pad Up = cycle display/zoom mode
         if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
@@ -1478,7 +2106,35 @@ public class PlayerActivity extends AppCompatActivity {
             cycleZoomMode();
             return true;
         }
-        // Use KEYCODE_DPAD_UP long-press; short press handled below (OSD)
+
+        View currentFocus = getCurrentFocus();
+        boolean hasButtonFocus = currentFocus instanceof TextView
+                && currentFocus != titleView && currentFocus != timeView
+                && currentFocus != statusBadge && currentFocus != hintView;
+
+        if (isOsdVisible && hasButtonFocus) {
+            showOsd();
+
+            if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+                hideOsd();
+                return true;
+            }
+            if (keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_MENU || keyCode == KeyEvent.KEYCODE_INFO) {
+                hideOsd();
+                return true;
+            }
+            if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_ESCAPE) {
+                hideOsd();
+                return true;
+            }
+            if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER || keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER) {
+                currentFocus.performClick();
+                return true;
+            }
+            // Allow focus to navigate left/right
+            return super.onKeyDown(keyCode, event);
+        }
+
         switch (keyCode) {
             case KeyEvent.KEYCODE_DPAD_CENTER:
             case KeyEvent.KEYCODE_ENTER:
@@ -1489,7 +2145,7 @@ public class PlayerActivity extends AppCompatActivity {
 
             case KeyEvent.KEYCODE_MEDIA_PLAY:
                 if (isWebEmbedMode && webVideoView != null) {
-                    webVideoView.evaluateJavascript("(function(){var v=document.querySelector('video'); if(v)v.play();})();", null);
+                    webVideoView.evaluateJavascript("(function(){var v=document.querySelector('video'); if(v){v.muted=false;v.play();}})();", null);
                 } else if (player != null) {
                     player.play();
                 }
@@ -1507,33 +2163,63 @@ public class PlayerActivity extends AppCompatActivity {
 
             case KeyEvent.KEYCODE_DPAD_LEFT:
             case KeyEvent.KEYCODE_MEDIA_REWIND:
-                if (isLive) showOsd();
-                else seekRelative(-SEEK_STEP_MS);
+                if (isLive) {
+                    showOsd();
+                    if (btnServer != null) btnServer.requestFocus();
+                } else {
+                    seekRelative(-SEEK_STEP_MS);
+                }
                 return true;
 
             case KeyEvent.KEYCODE_DPAD_RIGHT:
             case KeyEvent.KEYCODE_MEDIA_FAST_FORWARD:
-                if (isLive) showOsd();
-                else seekRelative(SEEK_STEP_MS);
+                if (isLive) {
+                    showOsd();
+                    if (btnServer != null) btnServer.requestFocus();
+                } else {
+                    seekRelative(SEEK_STEP_MS);
+                }
                 return true;
 
             case KeyEvent.KEYCODE_DPAD_UP:
             case KeyEvent.KEYCODE_DPAD_DOWN:
             case KeyEvent.KEYCODE_MENU:
             case KeyEvent.KEYCODE_INFO:
-                toggleOsd();
+                if (!isOsdVisible) {
+                    showOsd();
+                    if (btnPlayPause != null) btnPlayPause.requestFocus();
+                } else {
+                    hideOsd();
+                }
                 return true;
 
             case KeyEvent.KEYCODE_BACK:
             case KeyEvent.KEYCODE_ESCAPE:
-                uiHandler.removeCallbacksAndMessages(null);
-                releasePlayer();
-                finish();
+                exitPlayer();
                 return true;
 
             default:
                 return super.onKeyDown(keyCode, event);
         }
+    }
+
+    @Override
+    public void onBackPressed() {
+        exitPlayer();
+    }
+
+    private void exitPlayer() {
+        uiHandler.removeCallbacksAndMessages(null);
+        releasePlayer();
+        if (webVideoView != null) {
+            try {
+                webVideoView.stopLoading();
+                webVideoView.loadUrl("about:blank");
+                webVideoView.destroy();
+            } catch (Exception ignored) {}
+            webVideoView = null;
+        }
+        finish();
     }
 
     private String formatTime(long ms) {

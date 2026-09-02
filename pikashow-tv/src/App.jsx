@@ -12,6 +12,7 @@ import { MediaGridView } from './components/MediaGridView';
 import { MediaDetailsModal } from './components/MediaDetailsModal';
 import { SearchView } from './components/SearchView';
 import { SettingsView } from './components/SettingsView';
+import { EPGGuideView } from './components/EPGGuideView';
 import { TVPlayer } from './components/TVPlayer';
 import { useSpatialNavigation } from './hooks/useSpatialNavigation';
 import { shouldPreferNativePlayer, playInNativePlayer, isNativePlaybackActive, nativePlayerControl, setNativePlaybackActive } from './utils/nativePlayer';
@@ -49,6 +50,7 @@ export default function App() {
   const selectedItemRef = useRef(null);
   useEffect(() => { selectedItemRef.current = selectedItem; }, [selectedItem]);
   const [activePlayback, setActivePlayback] = useState(null); // { item, server, episodes, episodeIndex }
+  const [liveViewMode, setLiveViewMode] = useState('epg'); // 'epg' | 'grid'
   const [otaPrompt, setOtaPrompt] = useState(null);
   const [downloadProgress, setDownloadProgress] = useState(null);
 
@@ -120,12 +122,28 @@ export default function App() {
     }
   }, []);
 
-  // v3.11.1: native player finished — clear the routing flag so the next
-  // REMOTE_COMMAND targets the WebView player again.
+  const lastLaunchedItemRef = useRef(null);
+
+  // v3.12.30: Save progress and refresh Continue Watching when native player closes
   useEffect(() => {
-    const clearNative = () => { setNativePlaybackActive(false); };
-    window.addEventListener('ajo-native-player-closed', clearNative);
-    return () => window.removeEventListener('ajo-native-player-closed', clearNative);
+    const handleNativeClosed = (e) => {
+      setNativePlaybackActive(false);
+      const curTime = e?.detail?.currentTime || 0;
+      const dur = e?.detail?.duration || 0;
+      if (lastLaunchedItemRef.current && curTime > 5 && dur > 0) {
+        saveProgress(lastLaunchedItemRef.current, curTime, dur);
+        setContinueWatching(getWatchHistory() || []);
+      }
+    };
+    const handleHistoryUpdated = () => {
+      setContinueWatching(getWatchHistory() || []);
+    };
+    window.addEventListener('ajo-native-player-closed', handleNativeClosed);
+    window.addEventListener('ajo-watch-history-updated', handleHistoryUpdated);
+    return () => {
+      window.removeEventListener('ajo-native-player-closed', handleNativeClosed);
+      window.removeEventListener('ajo-watch-history-updated', handleHistoryUpdated);
+    };
   }, []);
 
   // v3.11.0 PERF: IPTV (16 playlists) no longer blocks startup. Kick it off
@@ -251,6 +269,7 @@ export default function App() {
     const selectedSrv = server || allServers[0];
     const url = selectedSrv?.url || item?.url;
     const isLiveItem = Boolean(item?.is_live || item?.type === 'live' || item?.year === 'LIVE');
+    lastLaunchedItemRef.current = resolvedItem;
     if (url && shouldPreferNativePlayer()) {
       const title = item?.title_en || item?.title || item?.name || 'Video Stream';
       const progress = getWatchProgress(resolvedItem);
@@ -384,10 +403,11 @@ export default function App() {
   }, [handleBack]);
 
   // Spatial Navigation Hook
+  const hasAnyModal = Boolean(selectedItem || activePlayback || otaPrompt);
   const { focusInitial } = useSpatialNavigation({
     onBack: handleBack,
-    isModalOpen: Boolean(selectedItem || activePlayback),
-    modalSelector: selectedItem ? '.tv-modal-card' : activePlayback ? '.tv-player-fullscreen' : null,
+    isModalOpen: hasAnyModal,
+    modalSelector: selectedItem ? '.tv-modal-card' : activePlayback ? '.tv-player-fullscreen' : '.tv-modal-card, .modal-card, .worldwide-filter-modal-content',
   });
 
   // Focus initial element ONLY when the tab actually changed (v3.10.0).
@@ -666,6 +686,57 @@ export default function App() {
             {/* 🔴 LIVE TV TAB */}
             {activeTab === 'live' && (
               <>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '12px 32px 14px 32px',
+                  borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+                  marginBottom: '12px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ fontSize: '1.4rem' }}>📡</span>
+                    <h2 style={{ fontSize: '1.35rem', fontWeight: 800, margin: 0, color: '#ffffff' }}>
+                      Live Television ({liveItems.length} Channels)
+                    </h2>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <button
+                      tabIndex={0}
+                      className={`tv-cat-btn ${liveViewMode === 'epg' ? 'active' : ''}`}
+                      onClick={() => setLiveViewMode('epg')}
+                      style={{
+                        padding: '8px 18px',
+                        fontSize: '0.9rem',
+                        fontWeight: 800,
+                        borderRadius: '20px',
+                        border: liveViewMode === 'epg' ? '2px solid #38bdf8' : '1px solid rgba(255,255,255,0.15)',
+                        background: liveViewMode === 'epg' ? 'linear-gradient(135deg, #38bdf8, #0284c7)' : 'rgba(15, 23, 42, 0.85)',
+                        color: liveViewMode === 'epg' ? '#06090e' : '#ffffff'
+                      }}
+                    >
+                      📅 TV Guide (EPG)
+                    </button>
+                    <button
+                      tabIndex={0}
+                      className={`tv-cat-btn ${liveViewMode === 'grid' ? 'active' : ''}`}
+                      onClick={() => setLiveViewMode('grid')}
+                      style={{
+                        padding: '8px 18px',
+                        fontSize: '0.9rem',
+                        fontWeight: 800,
+                        borderRadius: '20px',
+                        border: liveViewMode === 'grid' ? '2px solid #38bdf8' : '1px solid rgba(255,255,255,0.15)',
+                        background: liveViewMode === 'grid' ? 'linear-gradient(135deg, #38bdf8, #0284c7)' : 'rgba(15, 23, 42, 0.85)',
+                        color: liveViewMode === 'grid' ? '#06090e' : '#ffffff'
+                      }}
+                    >
+                      ▦ Channel Grid
+                    </button>
+                  </div>
+                </div>
+
                 {liveLoaded && liveItems.length === 0 ? (
                   <div className="tv-empty-state" style={{ textAlign: 'center', marginTop: 80 }}>
                     <p style={{ color: '#9aa3b2', fontSize: 19, marginBottom: 20 }}>
@@ -682,9 +753,14 @@ export default function App() {
                       ↻ Retry Loading Channels
                     </button>
                   </div>
+                ) : liveViewMode === 'epg' ? (
+                  <EPGGuideView
+                    channels={liveItems}
+                    onSelectChannel={handleItemClick}
+                  />
                 ) : (
                   <MediaGridView
-                    title="🔴 Live Television Channels"
+                    title="🔴 All Live Channels"
                     items={liveItems}
                     isLive={true}
                     onSelectItem={handleItemClick}

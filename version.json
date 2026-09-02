@@ -1,40 +1,43 @@
 {
   "schemaVersion": 2,
-  "version": "3.12.33",
-  "versionCode": 120,
+  "version": "3.12.34",
+  "versionCode": 121,
   "releaseDate": "2026-09-02",
   "phone": {
-    "version": "3.3.35",
-    "versionCode": 84,
+    "version": "3.3.36",
+    "versionCode": 85,
     "packageId": "com.ajo.phone",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "⚡ Fixed Modal Hook Initialization: Resolved useRef declaration in details dialog",
-      "📅 Real-Time Live EPG: Now showing current and upcoming shows directly on live channels",
-      "🔙 Instant Back-to-Catalog: Pressing Back reliably exits player to catalog immediately",
-      "✨ Corrected SAB TV Spelling & Catalog Deduplication: Unified Sony SAB TV HD and removed duplicate channels"
+      "📅 Integrated Live EPG TV Guide: Browse 24h schedule with Now/Next shows and live progress bars",
+      "📺 Multi-Season TV Series: Browse and binge all seasons (Season 1, 2, 3...) seamlessly",
+      "⚙️ Dynamic Settings Version: Real-time display of installed version and build code",
+      "✨ Corrected SAB TV Spelling & Catalog Deduplication: Unified Sony SAB TV HD"
     ],
     "size_mb": "3.3 MB",
-    "sha256": "29d32adebdb6d4327b92ea68727bd275d32751d844707858200db6778374c8ac"
+    "sha256": "938afe3a3c9eea9288f6c856d7b65525e207c13ef7a5219e5cd0b4748c1aff30"
   },
   "tv": {
-    "version": "3.12.33",
-    "versionCode": 120,
+    "version": "3.12.34",
+    "versionCode": 121,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "⚡ Fixed Modal Hook Initialization: Resolved useRef declaration in details dialog",
-      "📅 Real-Time Live EPG OSD: Live channels display current show (🔴 NOW) and next show (⏩ NEXT) on screen",
-      "🔙 Reliable Back Key Exit: Pressing Back immediately exits the player and returns to catalog (no server loops)",
-      "✨ Corrected SAB TV Spelling & Deduplicated Catalog: Cleaned up duplicates and fixed Sub TV spelling to SAB TV HD"
+      "📅 Full EPG TV Guide on Live Tab: 24h schedule with Now/Next shows, category pills, and view switcher",
+      "🔍 2-Column TV Search: On-screen keyboard on left, instant live results on right (press Right to browse)",
+      "📺 Multi-Season TV Series: Added Season Selector (Season 1, 2, 3...) with instant episode loading",
+      "🌐 Embedded Audio Track Switcher: Toggle between Hindi, English, and original audio on TV player",
+      "👑 Universal Hubs TV Remote Glow: D-pad focus outline and smooth scale animations for streaming networks",
+      "⚙️ Dynamic Settings Version: Shows true installed package version and build number",
+      "⏱️ Persistent Live EPG on Player OSD: Real-time schedule stays on screen during live streaming"
     ],
     "size_mb": "6.9 MB",
-    "sha256": "9494b7fb6b351ea04082f8d1acd8de24173b306727a55efbcbc1f64f7ae35ee5"
+    "sha256": "bddcd73a3aa40d9f66be2adb8d315d096d1f2f1961409717b716539ab45a5f87"
   }
 }

@@ -45,7 +45,9 @@ export function AppProvidersRow({ onSelectApp }) {
         {apps.map((app) => (
           <button
             key={app.id}
-            className="mobile-app-chip"
+            tabIndex={0}
+            data-focusable="true"
+            className="mobile-app-chip tv-cat-btn tv-app-provider-chip"
             onClick={() => onSelectApp(app.id)}
             style={{ 
               '--app-accent': app.color,

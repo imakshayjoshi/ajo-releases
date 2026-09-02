@@ -6,10 +6,13 @@ android {
         applicationId "com.ajo.phone"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 73
-        versionName "3.3.24"
+        versionCode 85
+        versionName "3.3.36"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions { ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~' }
+    }
+    buildFeatures {
+        buildConfig = true
     }
     buildTypes {
         release {

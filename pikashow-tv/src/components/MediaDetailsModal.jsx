@@ -1,6 +1,7 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { Play, Star, Calendar, Clock, X, Server, Tv, RotateCcw } from 'lucide-react';
 import { getSeriesEpisodes } from '../api/pikashow';
+import { getTmdbEpisodes } from '../api/tmdb';
 import { generateUniversalServers } from '../utils/streamingEngines';
 import { hasNativePlayer, playInNativePlayer } from '../utils/nativePlayer';
 import { getWatchHistory, deleteHistoryItem, getWatchProgress } from '../api/history';
@@ -59,38 +60,85 @@ export function MediaDetailsModal({ item, onClose, onStartPlayback }) {
     return getWatchProgress(item);
   }, [item]);
 
+  const [audioLang, setAudioLang] = useState('all');
+
   // Compute available servers
   const servers = useMemo(() => {
     return generateUniversalServers(item);
   }, [item]);
 
+  const filteredServers = useMemo(() => {
+    if (audioLang === 'hi') {
+      const hi = servers.filter(s => (s.name || '').includes('Hindi') || (s.name || '').includes('Multi') || (s.url || '').includes('lang=hi') || (s.url || '').includes('audio=hi'));
+      return hi.length > 0 ? hi : servers;
+    }
+    if (audioLang === 'en') {
+      const en = servers.filter(s => !(s.name || '').includes('Hindi') && !(s.url || '').includes('lang=hi'));
+      return en.length > 0 ? en : servers;
+    }
+    return servers;
+  }, [servers, audioLang]);
+
   // Load episodes if TV series
   useEffect(() => {
-    if (isSeries && item.id) {
+    if (isSeries && item) {
       setLoadingEpisodes(true);
-      getSeriesEpisodes(item.id).then((eps) => {
-        setEpisodes(eps || []);
-        setLoadingEpisodes(false);
-      }).catch(() => {
-        setLoadingEpisodes(false);
-      });
-    }
-  }, [isSeries, item]);
+      let tmdbId = item.tmdb_id;
+      if (!tmdbId && typeof item.id === 'string' && item.id.startsWith('tmdb-')) {
+        const parts = item.id.split('-');
+        const candidate = parts[parts.length - 1];
+        if (/^\d+$/.test(candidate)) tmdbId = Number(candidate);
+      }
 
-  // Initial focus on Watch button
+      if (tmdbId) {
+        getTmdbEpisodes(tmdbId, selectedSeason).then((eps) => {
+          if (eps && eps.length > 0) {
+            setEpisodes(eps);
+            setLoadingEpisodes(false);
+          } else {
+            getSeriesEpisodes(item.id).then((fallbackEps) => {
+              setEpisodes(fallbackEps || []);
+              setLoadingEpisodes(false);
+            }).catch(() => setLoadingEpisodes(false));
+          }
+        }).catch(() => {
+          getSeriesEpisodes(item.id).then((fallbackEps) => {
+            setEpisodes(fallbackEps || []);
+            setLoadingEpisodes(false);
+          }).catch(() => setLoadingEpisodes(false));
+        });
+      } else {
+        getSeriesEpisodes(item.id).then((eps) => {
+          setEpisodes(eps || []);
+          setLoadingEpisodes(false);
+        }).catch(() => {
+          setLoadingEpisodes(false);
+        });
+      }
+    }
+  }, [isSeries, item, selectedSeason]);
+
+  const [showServerMenu, setShowServerMenu] = useState(false);
+  const watchBtnRef = useRef(null);
+
+  // Initial focus directly on the Watch/Resume button
   useEffect(() => {
     const timer = setTimeout(() => {
-      const btn = document.querySelector('.tv-modal-actions .tv-btn-primary, .tv-btn-secondary');
-      if (btn) {
-        try { btn.focus(); } catch (_) {}
+      if (watchBtnRef.current) {
+        try { watchBtnRef.current.focus(); } catch (_) {}
+      } else {
+        const btn = document.querySelector('.tv-modal-actions .tv-btn-primary');
+        if (btn) {
+          try { btn.focus(); } catch (_) {}
+        }
       }
-    }, 60);
+    }, 50);
     return () => clearTimeout(timer);
   }, []);
 
-  const handlePlay = (episodeItem = null, episodeIndex = 0) => {
+  const handlePlay = (episodeItem = null, episodeIndex = 0, specificServer = null) => {
     const targetItem = episodeItem || item;
-    const srv = selectedServer > 0 ? (servers[selectedServer] || null) : null;
+    const srv = specificServer || (selectedServer < filteredServers.length ? (filteredServers[selectedServer] || null) : null);
     if (onStartPlayback) {
       onStartPlayback(targetItem, srv, episodes, episodeIndex);
     }
@@ -109,9 +157,30 @@ export function MediaDetailsModal({ item, onClose, onStartPlayback }) {
         />
 
         <div className="tv-modal-body">
-          <h1 className="tv-modal-title">{title}</h1>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+            <h1 className="tv-modal-title" style={{ flex: 1, margin: 0 }}>{title}</h1>
+            <button
+              className="tv-modal-close-btn"
+              tabIndex={-1}
+              onClick={onClose}
+              aria-label="Close"
+              style={{
+                background: 'rgba(255, 255, 255, 0.1)',
+                border: 'none',
+                color: '#94a3b8',
+                padding: '6px 10px',
+                borderRadius: 8,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              <X size={18} />
+            </button>
+          </div>
 
-          <div className="tv-modal-meta-row">
+          <div className="tv-modal-meta-row" style={{ margin: '8px 0 12px 0' }}>
             <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#f59e0b', fontWeight: 700 }}>
               <Star size={14} fill="#f59e0b" /> {rating}
             </span>
@@ -126,13 +195,61 @@ export function MediaDetailsModal({ item, onClose, onStartPlayback }) {
             </span>
           </div>
 
-          <p className="tv-modal-desc">{description}</p>
+          {/* Primary Action Buttons — Instant Play */}
+          <div className="tv-modal-actions" style={{ marginBottom: 12 }}>
+            {watchProgress ? (
+              <>
+                <button ref={watchBtnRef} id="modal-primary-watch-btn" className="tv-btn-primary" tabIndex={0} onClick={() => handlePlay()}>
+                  <Play size={18} fill="#07090e" />
+                  <span>Resume at {formatTime(watchProgress.currentTime)}</span>
+                </button>
+                <button
+                  className="tv-btn-secondary"
+                  tabIndex={0}
+                  onClick={() => {
+                    deleteHistoryItem(item);
+                    handlePlay();
+                  }}
+                  style={{ borderColor: 'rgba(255, 255, 255, 0.2)' }}
+                >
+                  <RotateCcw size={18} />
+                  <span>Restart</span>
+                </button>
+              </>
+            ) : (
+              <button ref={watchBtnRef} id="modal-primary-watch-btn" className="tv-btn-primary" tabIndex={0} onClick={() => handlePlay()}>
+                <Play size={18} fill="#07090e" />
+                <span>{isLive ? 'Watch Live' : '▶ Watch Now'}</span>
+              </button>
+            )}
+
+            <button
+              className="tv-btn-secondary"
+              tabIndex={0}
+              onClick={() => {
+                const srv = filteredServers[selectedServer] || servers[0];
+                const streamUrl = srv?.url || srv?.src || '';
+                if (!streamUrl) return;
+                const fallbacks = filteredServers
+                  .filter((_, i) => i !== selectedServer)
+                  .map((s) => s?.url)
+                  .filter(Boolean);
+                if (!playInNativePlayer(streamUrl, title, false, fallbacks)) {
+                  handlePlay();
+                }
+              }}
+              style={{ borderColor: 'rgba(56, 189, 248, 0.4)', color: '#38bdf8' }}
+            >
+              <Tv size={18} />
+              <span>{hasNativePlayer() ? 'Hardware Player' : 'Web Player'}</span>
+            </button>
+          </div>
 
           {/* Resume Progress Bar */}
           {watchProgress && (
-            <div style={{ marginBottom: 16, background: 'rgba(56, 189, 248, 0.08)', border: '1px solid rgba(56, 189, 248, 0.25)', borderRadius: 8, padding: '10px 14px' }}>
+            <div style={{ marginBottom: 12, background: 'rgba(56, 189, 248, 0.08)', border: '1px solid rgba(56, 189, 248, 0.25)', borderRadius: 8, padding: '10px 14px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#94a3b8', marginBottom: 6 }}>
-                <span style={{ color: '#38bdf8', fontWeight: 700 }}>Resume Playback</span>
+                <span style={{ color: '#38bdf8', fontWeight: 700 }}>Watching in Progress</span>
                 <span>{formatTime(watchProgress.currentTime)} / {formatTime(watchProgress.duration)} ({watchProgress.percentage}%)</span>
               </div>
               <div style={{ height: 4, background: 'rgba(255, 255, 255, 0.1)', borderRadius: 2, overflow: 'hidden' }}>
@@ -141,23 +258,101 @@ export function MediaDetailsModal({ item, onClose, onStartPlayback }) {
             </div>
           )}
 
-          {/* Available Servers Selector */}
-          {servers.length > 1 && (
-            <div style={{ marginBottom: 18 }}>
-              <span style={{ fontSize: '0.8rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', display: 'block', marginBottom: 8 }}>
-                Select Streaming Server:
+          {/* Audio Language Selection */}
+          {servers.some(s => (s.name || '').includes('Hindi') || (s.url || '').includes('lang=hi') || (s.url || '').includes('audio=hi')) && (
+            <div style={{ marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '0.8rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase' }}>
+                Audio:
               </span>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {servers.map((srv, idx) => (
+              <button
+                tabIndex={0}
+                className={`tv-cat-btn ${audioLang === 'hi' ? 'active' : ''}`}
+                onClick={() => { setAudioLang('hi'); setSelectedServer(0); }}
+                style={{ padding: '6px 12px', fontSize: '0.82rem' }}
+              >
+                🇮🇳 Hindi Dubbed / Multi
+              </button>
+              <button
+                tabIndex={0}
+                className={`tv-cat-btn ${audioLang === 'en' ? 'active' : ''}`}
+                onClick={() => { setAudioLang('en'); setSelectedServer(0); }}
+                style={{ padding: '6px 12px', fontSize: '0.82rem' }}
+              >
+                🇬🇧 English Original
+              </button>
+            </div>
+          )}
+
+          {/* Optional Collapsible Server Selector */}
+          {filteredServers.length > 1 && (
+            <div style={{ marginBottom: 12 }}>
+              <button
+                tabIndex={0}
+                className="tv-btn-secondary"
+                onClick={() => setShowServerMenu(!showServerMenu)}
+                style={{
+                  fontSize: '0.8rem',
+                  padding: '6px 14px',
+                  borderRadius: 8,
+                  borderColor: 'rgba(255, 255, 255, 0.15)',
+                  color: '#94a3b8',
+                  width: '100%',
+                  justifyContent: 'space-between'
+                }}
+              >
+                <span>⚡ Server: <strong style={{ color: '#38bdf8' }}>{filteredServers[selectedServer]?.name || `Server ${selectedServer + 1}`}</strong></span>
+                <span>{showServerMenu ? '▲ Hide Mirrors' : '▼ Change Mirror'}</span>
+              </button>
+
+              {showServerMenu && (
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+                  {filteredServers.map((srv, idx) => (
+                    <button
+                      key={srv.id || srv.url || idx}
+                      tabIndex={0}
+                      className={`tv-cat-btn ${selectedServer === idx ? 'active' : ''}`}
+                      onClick={() => {
+                        setSelectedServer(idx);
+                        handlePlay(null, 0, srv);
+                      }}
+                      style={{ padding: '8px 14px', fontSize: '0.82rem' }}
+                    >
+                      <Play size={12} style={{ display: 'inline', marginRight: 4 }} />
+                      {srv.name || `Server ${idx + 1}`}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          <p className="tv-modal-desc" style={{ marginBottom: 14 }}>{description}</p>
+
+          {/* Season Selector for TV Series */}
+          {isSeries && (
+            <div style={{ marginBottom: 16 }}>
+              <span style={{ fontSize: '0.8rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', display: 'block', marginBottom: 8 }}>
+                Seasons:
+              </span>
+              <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 6 }} data-horizontal-scroll="true">
+                {[1, 2, 3, 4, 5, 6, 7, 8].slice(0, Math.max(1, item.number_of_seasons || item.seasons_count || 6)).map(sNum => (
                   <button
-                    key={srv.id || idx}
+                    key={sNum}
                     tabIndex={0}
-                    className={`tv-cat-btn ${selectedServer === idx ? 'active' : ''}`}
-                    onClick={() => setSelectedServer(idx)}
-                    style={{ padding: '6px 12px', fontSize: '0.8rem' }}
+                    className={`tv-cat-btn ${selectedSeason === sNum ? 'active' : ''}`}
+                    onClick={() => setSelectedSeason(sNum)}
+                    style={{
+                      padding: '6px 14px',
+                      fontSize: '0.82rem',
+                      whiteSpace: 'nowrap',
+                      borderRadius: '8px',
+                      background: selectedSeason === sNum ? 'linear-gradient(135deg, #38bdf8, #0284c7)' : 'rgba(255, 255, 255, 0.08)',
+                      color: selectedSeason === sNum ? '#06090e' : '#ffffff',
+                      fontWeight: 800,
+                      border: selectedSeason === sNum ? '2px solid #38bdf8' : '1px solid rgba(255, 255, 255, 0.15)'
+                    }}
                   >
-                    <Server size={12} style={{ display: 'inline', marginRight: 4 }} />
-                    {srv.name || `Server ${idx + 1}`}
+                    Season {sNum}
                   </button>
                 ))}
               </div>
@@ -168,7 +363,7 @@ export function MediaDetailsModal({ item, onClose, onStartPlayback }) {
           {isSeries && episodes.length > 0 && (
             <div style={{ marginBottom: 20 }}>
               <span style={{ fontSize: '0.8rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', display: 'block', marginBottom: 8 }}>
-                Episodes ({episodes.length}):
+                Season {selectedSeason} Episodes ({episodes.length}):
               </span>
               <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 6 }} data-horizontal-scroll="true">
                 {episodes.map((ep, idx) => (
@@ -185,61 +380,6 @@ export function MediaDetailsModal({ item, onClose, onStartPlayback }) {
               </div>
             </div>
           )}
-
-          {/* Action Buttons */}
-          <div className="tv-modal-actions">
-            {watchProgress ? (
-              <>
-                <button className="tv-btn-primary" tabIndex={0} onClick={() => handlePlay()}>
-                  <Play size={18} fill="#07090e" />
-                  <span>Resume ({formatTime(watchProgress.currentTime)})</span>
-                </button>
-                <button
-                  className="tv-btn-secondary"
-                  tabIndex={0}
-                  onClick={() => {
-                    deleteHistoryItem(item);
-                    handlePlay();
-                  }}
-                  style={{ borderColor: 'rgba(255, 255, 255, 0.2)' }}
-                >
-                  <RotateCcw size={18} />
-                  <span>Restart</span>
-                </button>
-              </>
-            ) : (
-              <button className="tv-btn-primary" tabIndex={0} onClick={() => handlePlay()}>
-                <Play size={18} fill="#07090e" />
-                <span>{isLive ? 'Watch Live' : 'Watch Now'}</span>
-              </button>
-            )}
-
-            <button
-              className="tv-btn-secondary"
-              tabIndex={0}
-              onClick={() => {
-                const srv = servers[selectedServer] || servers[0];
-                const streamUrl = srv?.url || srv?.src || '';
-                if (!streamUrl) return;
-                const fallbacks = servers
-                  .filter((_, i) => i !== selectedServer)
-                  .map((s) => s?.url)
-                  .filter(Boolean);
-                if (!playInNativePlayer(streamUrl, title, false, fallbacks)) {
-                  handlePlay();
-                }
-              }}
-              style={{ borderColor: 'rgba(56, 189, 248, 0.4)', color: '#38bdf8' }}
-            >
-              <Tv size={18} />
-              <span>{hasNativePlayer() ? 'Hardware Player' : 'Web Player'}</span>
-            </button>
-
-            <button className="tv-btn-secondary" tabIndex={0} onClick={onClose}>
-              <X size={18} />
-              <span>Close</span>
-            </button>
-          </div>
         </div>
       </div>
     </div>
