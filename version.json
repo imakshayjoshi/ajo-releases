@@ -1,43 +1,40 @@
 {
   "schemaVersion": 2,
-  "version": "3.12.34",
-  "versionCode": 121,
+  "version": "3.12.35",
+  "versionCode": 122,
   "releaseDate": "2026-09-02",
   "phone": {
-    "version": "3.3.36",
-    "versionCode": 85,
+    "version": "3.3.37",
+    "versionCode": 86,
     "packageId": "com.ajo.phone",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "📅 Integrated Live EPG TV Guide: Browse 24h schedule with Now/Next shows and live progress bars",
-      "📺 Multi-Season TV Series: Browse and binge all seasons (Season 1, 2, 3...) seamlessly",
-      "⚙️ Dynamic Settings Version: Real-time display of installed version and build code",
-      "✨ Corrected SAB TV Spelling & Catalog Deduplication: Unified Sony SAB TV HD"
+      "⚡ Instant Live TV Navigation: Zero delay channel browsing with progressive card rendering",
+      "🌐 Strict Language Filter: Only Hindi, Marathi, and English channels (all other regional/foreign channels removed)",
+      "📺 Dedicated Marathi (मराठी) Filter: Quickly find Zee Marathi, ABP Majha, Star Pravah, and more",
+      "📅 High-Speed Guide View: Synchronous memoized scheduling with responsive pagination"
     ],
     "size_mb": "3.3 MB",
-    "sha256": "938afe3a3c9eea9288f6c856d7b65525e207c13ef7a5219e5cd0b4748c1aff30"
+    "sha256": "dc7e54cbc9c1a2031f0dc9a390d6f29e8145112a69861e5eb8044b7629dfb224"
   },
   "tv": {
-    "version": "3.12.34",
-    "versionCode": 121,
+    "version": "3.12.35",
+    "versionCode": 122,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "📅 Full EPG TV Guide on Live Tab: 24h schedule with Now/Next shows, category pills, and view switcher",
-      "🔍 2-Column TV Search: On-screen keyboard on left, instant live results on right (press Right to browse)",
-      "📺 Multi-Season TV Series: Added Season Selector (Season 1, 2, 3...) with instant episode loading",
-      "🌐 Embedded Audio Track Switcher: Toggle between Hindi, English, and original audio on TV player",
-      "👑 Universal Hubs TV Remote Glow: D-pad focus outline and smooth scale animations for streaming networks",
-      "⚙️ Dynamic Settings Version: Shows true installed package version and build number",
-      "⏱️ Persistent Live EPG on Player OSD: Real-time schedule stays on screen during live streaming"
+      "⚡ Instant Live TV Navigation: 60fps buttery smooth Channel Grid default with zero freezing or hang",
+      "🌐 Strict Language Filter: Exclusively Hindi, Marathi, and English channels (all other regional/foreign channels removed)",
+      "📺 Dedicated Marathi (मराठी) Category: Direct category pill for instant access to all Marathi entertainment and news channels",
+      "📅 High-Performance EPG Guide: Progressive loading with Show More Channels keeps spatial navigation responsive"
     ],
     "size_mb": "6.9 MB",
-    "sha256": "bddcd73a3aa40d9f66be2adb8d315d096d1f2f1961409717b716539ab45a5f87"
+    "sha256": "67be841ff6ee22671842eb17faf3219873db773df2b43e43d427a37c328e276e"
   }
 }
