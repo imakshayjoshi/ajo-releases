@@ -1,38 +1,41 @@
 {
   "schemaVersion": 2,
-  "version": "3.12.21",
-  "versionCode": 108,
-  "releaseDate": "2026-08-31",
+  "version": "3.12.22",
+  "versionCode": 109,
+  "releaseDate": "2026-09-02",
   "phone": {
-    "version": "3.3.24",
-    "versionCode": 73,
+    "version": "3.3.25",
+    "versionCode": 74,
     "packageId": "com.ajo.phone",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "🎯 Server Selection Precision: Selected mirror / server starts immediately without reverting to Server 1",
-      "📥 Offline Downloads Engine: Download movies & TV series directly to device storage",
-      "⚡ Fast Offline Playback: 1-tap playback from local storage with hardware video acceleration"
+      "🛡️ Ad & Popup Blocker: Complete ad blocking and popup suppression for smooth streaming",
+      "⚡ Instant Auto-Play: Aggressive auto-play triggers for movies and TV series across all servers",
+      "🌐 Videasy Server Added: New lightning-fast ad-free provider added for all titles",
+      "📥 Offline Downloads Engine: Download movies & TV series directly to device storage"
     ],
     "size_mb": "3.3 MB",
-    "sha256": "d45f370567f68e3ffccda39b01013b50640b94285d7b77c5d3b99f8b4d447389"
+    "sha256": "042d4b232e82dc13248f2ce84fc03d7d4b90dc8a5ee2f8d31eccadaa4dfc47ec"
   },
   "tv": {
-    "version": "3.12.21",
-    "versionCode": 108,
+    "version": "3.12.22",
+    "versionCode": 109,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "🎯 Server Selection Precision: Selected server from modal/drawer starts immediately instead of always defaulting to Server 1",
-      "🎮 TV Remote Navigation Restored: Unlocked D-pad controls across all streams (Play/Pause, Server Switcher, Fit Mode, Back)",
-      "⚡ Auto-Play & Hardware Acceleration: Auto-click and direct stream dispatch on Android TV Web Video Engine"
+      "🛡️ Ad & Popup Elimination: Intercepts and blocks all intrusive popup ads, overlays, and ad network requests",
+      "⚡ Auto-Play Fixed: Movies and series auto-start immediately with center-click simulation and MutationObserver",
+      "🎮 Full Remote Control: D-pad controls now fully responsive across all embed and native streams",
+      "🌐 Videasy Fast Server: Added dedicated ad-free provider, VidLink autoplay parameters attached",
+      "🎯 Seamless Server Switching: Swapping servers immediately loads and auto-plays selected mirror"
     ],
     "size_mb": "6.9 MB",
-    "sha256": "2e659b7863d3d5b3c33bb94e805635024b65e8b834c6833a4e57e48e269ea3ad"
+    "sha256": "e357df930c34b4f8ab6876114183c62ca937c678fb3cdfbadc1c83535d143ff0"
   }
 }
