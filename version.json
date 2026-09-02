@@ -19,7 +19,7 @@
       "📺 Dedicated Marathi (मराठी) Category: Direct filter for Marathi entertainment & news channels"
     ],
     "size_mb": "3.3 MB",
-    "sha256": "dc9bcc9cea6d02218573feec7044acccd698699aabb2d8c51dbc84cb45a99f10"
+    "sha256": "77c73851bbab62328527ee42c627bc5c7ff0fb1da5462b4239383ddc26de55c2"
   },
   "tv": {
     "version": "3.12.35",
@@ -33,9 +33,10 @@
       "⚡ Instant Live TV Navigation: 60fps buttery smooth Channel Grid default with zero freezing or hang",
       "🌐 Strict Language Filter: Exclusively Hindi, Marathi, and English channels (all other regional/foreign channels removed)",
       "📺 Dedicated Marathi (मराठी) Category: Direct category pill for instant access to all Marathi entertainment and news channels",
-      "📅 High-Performance EPG Guide: Progressive loading with Show More Channels keeps spatial navigation responsive"
+      "📅 High-Performance EPG Guide: Progressive loading with Show More Channels keeps spatial navigation responsive",
+      "📱 Smartphone Rescue: Automatically prompts to install AJO Phone if opened on a mobile device"
     ],
     "size_mb": "6.9 MB",
-    "sha256": "67be841ff6ee22671842eb17faf3219873db773df2b43e43d427a37c328e276e"
+    "sha256": "a463b84f064a702f0ec2b1e3213afc22c50342b3ed74d735bd1cd5a852b656bc"
   }
 }
