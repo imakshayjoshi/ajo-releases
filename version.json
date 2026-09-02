@@ -1,38 +1,39 @@
 {
   "schemaVersion": 2,
-  "version": "3.12.25",
-  "versionCode": 112,
+  "version": "3.12.26",
+  "versionCode": 113,
   "releaseDate": "2026-09-02",
   "phone": {
-    "version": "3.3.27",
-    "versionCode": 76,
+    "version": "3.3.28",
+    "versionCode": 77,
     "packageId": "com.ajo.phone",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "⚡ Auto-Failover on Content Unavailable: Automatically detects unavailable streams and switches to alternate live mirrors seamlessly",
-      "🎯 Accurate Movie & Series ID Matcher: Fixed catalog ID resolution for Indian, classic, and web series",
-      "🛡️ Ad & Popup Blocker: Complete ad blocking and popup suppression"
+      "🔥 Worldwide Live TMDB Search: Discover and stream any new OTT & theatrical release (Bandar from Zee5, Stree 2, Kalki, etc.)",
+      "⚡ Now Playing & New Releases: Fixed New Releases rail with real-time Indian and Hollywood movies",
+      "📺 TMDB Series Episode Explorer: Full episode lists with descriptions and stills for any web series"
     ],
     "size_mb": "3.3 MB",
-    "sha256": "0869a31c07b5743104b424e8a0300b96bc51836b37d40f4a81a8ac035ecd1047"
+    "sha256": "968e3a88da091a9100a4cd4f492d362e6e5ef728490ff927bbd53be9537ab9bf"
   },
   "tv": {
-    "version": "3.12.25",
-    "versionCode": 112,
+    "version": "3.12.26",
+    "versionCode": 113,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "⚡ Auto-Failover on Content Unavailable: Automatically detects unindexed/unavailable streams and switches to next live mirror seamlessly",
-      "🎮 Interactive TV Controls Bar: Focusable Play/Pause, Seek, Server Switcher, Safe Color, and Aspect Ratio buttons",
-      "🎨 Safe Color Mode: Toggle to eliminate green screen/YUV chroma decoding artifacts on TV GPUs"
+      "🔥 Worldwide Live TMDB Search: Instantly search and stream any new OTT & theatrical release (Bandar from Zee5, Stree 2, Kalki, etc.)",
+      "⚡ Now Playing & New Releases: Fixed New Releases rail with real-time Indian and Hollywood movies",
+      "📺 TMDB Series Episode Explorer: Full episode lists with descriptions and stills for any web series",
+      "🎨 Safe Color Mode & Interactive TV Remote: Seamless D-pad navigation and video stream controls"
     ],
     "size_mb": "6.9 MB",
-    "sha256": "02ccd2d60c5967e278a18f6b6f3c2499876cf3f60dd2ae43af538e4b7ae8e4eb"
+    "sha256": "8361e84e4a4d6418109afe71b9397f36731fa08b492edfaf6b990cfa0e8097a8"
   }
 }
