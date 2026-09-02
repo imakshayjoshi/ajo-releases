@@ -1,40 +1,40 @@
 {
   "schemaVersion": 2,
-  "version": "3.12.31",
-  "versionCode": 118,
+  "version": "3.12.32",
+  "versionCode": 119,
   "releaseDate": "2026-09-02",
   "phone": {
-    "version": "3.3.33",
-    "versionCode": 82,
+    "version": "3.3.34",
+    "versionCode": 83,
     "packageId": "com.ajo.phone",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "🎯 Default Focus on 'Watch Now': Modal automatically focuses on 'Watch Now' button instead of the close button",
-      "📱 Fixed Update Routing: Phone app now downloads AJO_PHONE.apk instead of TV build",
-      "⚡ Instant Server Autoplay: Enhanced 12-cycle autoplay engine automatically starts playback immediately",
-      "🕒 Continue Watching & Resume: Accurately saves playback time and resumes from last paused position"
+      "📅 Real-Time Live EPG: Now showing current and upcoming shows directly on live channels",
+      "🔙 Instant Back-to-Catalog: Pressing Back reliably exits player to catalog immediately",
+      "✨ Corrected SAB TV Spelling & Catalog Deduplication: Unified Sony SAB TV HD and removed duplicate channels",
+      "🎯 Default Focus on 'Watch Now': Modal automatically focuses on 'Watch Now' button"
     ],
     "size_mb": "3.3 MB",
-    "sha256": "489a2a2a35d7d9fea0a844fa9e770dbd6a9f0089972ff56d8d482662412edd66"
+    "sha256": "73909383d14a61a1bcd2b8b41ec25685e1f781542cb9176e20ce11ff0c11fdeb"
   },
   "tv": {
-    "version": "3.12.31",
-    "versionCode": 118,
+    "version": "3.12.32",
+    "versionCode": 119,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "🎮 100% Reliable Remote Controls: Intercepts all D-Pad, Enter, Media & Seek keys so player controls are always responsive",
-      "🎯 Default Focus on 'Watch Now': TV remote starts directly on the Watch/Resume button when details open",
-      "⚡ Ultra-Aggressive Autoplay: 12 retry cycles with multi-player unmuting and click simulation to start every stream immediately",
-      "🕒 Continue Watching & Resume: Accurately saves playback time and resumes from exact paused position"
+      "📅 Real-Time Live EPG OSD: Live channels display current show (🔴 NOW) and next show (⏩ NEXT) on screen",
+      "🔙 Reliable Back Key Exit: Pressing Back immediately exits the player and returns to catalog (no server loops)",
+      "✨ Corrected SAB TV Spelling & Deduplicated Catalog: Cleaned up duplicates and fixed Sub TV spelling to SAB TV HD",
+      "🎮 100% Reliable TV Remote Interception: Smooth D-Pad and OK button controls on all streams"
     ],
     "size_mb": "6.9 MB",
-    "sha256": "d73a0f7c546420cd372d1277068bff38bb072cceb32258187ec520a167dace52"
+    "sha256": "fe333a6157b9caae6ffcd0bf063898aa8ad74426849c4f8fb28be6db80abb171"
   }
 }
