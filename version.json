@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "version": "3.12.22",
-  "versionCode": 109,
+  "version": "3.12.23",
+  "versionCode": 110,
   "releaseDate": "2026-09-02",
   "phone": {
     "version": "3.3.25",
@@ -21,21 +21,21 @@
     "sha256": "042d4b232e82dc13248f2ce84fc03d7d4b90dc8a5ee2f8d31eccadaa4dfc47ec"
   },
   "tv": {
-    "version": "3.12.22",
-    "versionCode": 109,
+    "version": "3.12.23",
+    "versionCode": 110,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "🛡️ Ad & Popup Elimination: Intercepts and blocks all intrusive popup ads, overlays, and ad network requests",
-      "⚡ Auto-Play Fixed: Movies and series auto-start immediately with center-click simulation and MutationObserver",
-      "🎮 Full Remote Control: D-pad controls now fully responsive across all embed and native streams",
-      "🌐 Videasy Fast Server: Added dedicated ad-free provider, VidLink autoplay parameters attached",
-      "🎯 Seamless Server Switching: Swapping servers immediately loads and auto-plays selected mirror"
+      "🎮 Interactive TV Controls Bar: Added focusable Play/Pause, Rewind, Forward, and Server Switcher buttons for TV remotes",
+      "⚡ 1-Click Server Switcher: Switch between VidLink, VidSrc PM, Videasy, AutoEmbed, and VidJoy directly from player OSD",
+      "🎨 Safe Color Mode: Toggle to eliminate green screen/YUV chroma decoding artifacts on TV GPUs",
+      "⛶ Aspect Ratio Fit Modes: Clean, 16:9, Stretch, and Zoom controls right on the playback bar",
+      "🛡️ Popunder & Overlay Ad Suppression: Completely blocks popups and overlay traps"
     ],
     "size_mb": "6.9 MB",
-    "sha256": "e357df930c34b4f8ab6876114183c62ca937c678fb3cdfbadc1c83535d143ff0"
+    "sha256": "c4a62466ff82e467307db54befd14c351047f723bc1a65bcaa3fc5eea0f03b5d"
   }
 }
