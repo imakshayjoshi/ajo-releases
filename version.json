@@ -1,41 +1,39 @@
 {
   "schemaVersion": 2,
-  "version": "3.12.23",
-  "versionCode": 110,
+  "version": "3.12.24",
+  "versionCode": 111,
   "releaseDate": "2026-09-02",
   "phone": {
-    "version": "3.3.25",
-    "versionCode": 74,
+    "version": "3.3.26",
+    "versionCode": 75,
     "packageId": "com.ajo.phone",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "🛡️ Ad & Popup Blocker: Complete ad blocking and popup suppression for smooth streaming",
-      "⚡ Instant Auto-Play: Aggressive auto-play triggers for movies and TV series across all servers",
-      "🌐 Videasy Server Added: New lightning-fast ad-free provider added for all titles",
-      "📥 Offline Downloads Engine: Download movies & TV series directly to device storage"
+      "🎯 Accurate Movie ID Matcher: Fixed catalog ID resolution so Indian and classic movies (G.D.N, Batwara) stream the correct title",
+      "⚡ Next.js Crash Auto-Failover: Detects server-side exceptions and automatically switches to working mirrors",
+      "🛡️ Ad & Popup Blocker: Complete ad blocking and popup suppression for smooth streaming"
     ],
     "size_mb": "3.3 MB",
-    "sha256": "042d4b232e82dc13248f2ce84fc03d7d4b90dc8a5ee2f8d31eccadaa4dfc47ec"
+    "sha256": "723505ec90e0167a2c54ca2eeadf953e71e5b446ba3df845f1808b1612ffd309"
   },
   "tv": {
-    "version": "3.12.23",
-    "versionCode": 110,
+    "version": "3.12.24",
+    "versionCode": 111,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "🎮 Interactive TV Controls Bar: Added focusable Play/Pause, Rewind, Forward, and Server Switcher buttons for TV remotes",
-      "⚡ 1-Click Server Switcher: Switch between VidLink, VidSrc PM, Videasy, AutoEmbed, and VidJoy directly from player OSD",
-      "🎨 Safe Color Mode: Toggle to eliminate green screen/YUV chroma decoding artifacts on TV GPUs",
-      "⛶ Aspect Ratio Fit Modes: Clean, 16:9, Stretch, and Zoom controls right on the playback bar",
-      "🛡️ Popunder & Overlay Ad Suppression: Completely blocks popups and overlay traps"
+      "🎯 Accurate Title Matching: Fixed catalog ID resolution so Indian and classic movies (G.D.N, Batwara) play the exact movie instead of wrong titles",
+      "⚡ Next.js Crash Auto-Failover: Detects server exception pages and automatically switches to working mirrors",
+      "🎮 Interactive TV Controls Bar: Focusable Play/Pause, Seek, Server Switcher, Safe Color, and Aspect Ratio buttons",
+      "🎨 Safe Color Mode: Toggle to eliminate green screen/YUV chroma decoding artifacts on TV GPUs"
     ],
     "size_mb": "6.9 MB",
-    "sha256": "c4a62466ff82e467307db54befd14c351047f723bc1a65bcaa3fc5eea0f03b5d"
+    "sha256": "6818062cfe33c07781fa1cb1649fbb2438608670e7f17a33997c1a1e920f9633"
   }
 }
