@@ -4,22 +4,22 @@
   "versionCode": 122,
   "releaseDate": "2026-09-02",
   "phone": {
-    "version": "3.3.38",
-    "versionCode": 87,
+    "version": "3.3.39",
+    "versionCode": 88,
     "packageId": "com.ajo.phone",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "🛡️ Eliminated AJO Error crash and restored full mobile phone touch interface",
-      "📱 Restored Mobile Bottom Navigation (Home, Movies, Shows, Downloads, Live TV, TV Cast, Search)",
-      "⚡ Instant Live TV Navigation: Seamless switching between ▦ Grid and 📅 Guide view",
-      "🌐 Strict Language Filter: Exclusively Hindi, Marathi, and English channels",
-      "📺 Dedicated Marathi (मराठी) Category: Direct filter for Marathi entertainment & news channels"
+      "🛡️ Fixed selectedSeason ReferenceError causing AJO Error in media details",
+      "⚡ Eliminated crash on movie and TV series detail view",
+      "📱 Restored Mobile Bottom Navigation & Touch Gestures",
+      "📥 Hardened Downloads tab and local storage safeguards",
+      "📺 Smooth Live TV Guide and Channel Grid with Marathi category"
     ],
     "size_mb": "3.3 MB",
-    "sha256": "77c73851bbab62328527ee42c627bc5c7ff0fb1da5462b4239383ddc26de55c2"
+    "sha256": "73df7b615e7c080a011afb7c9852b0c16153ff56b1b0e242468cb9000fc037c4"
   },
   "tv": {
     "version": "3.12.35",
