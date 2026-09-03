@@ -1,8 +1,8 @@
 {
   "schemaVersion": 2,
-  "version": "3.12.35",
-  "versionCode": 122,
-  "releaseDate": "2026-09-02",
+  "version": "3.12.36",
+  "versionCode": 123,
+  "releaseDate": "2026-09-03",
   "phone": {
     "version": "3.3.40",
     "versionCode": 89,
@@ -22,21 +22,21 @@
     "sha256": "64aa2d8b32e7a50d070cc5c5bc90e63d80f0d206b97fd7bb027d3139c86f386e"
   },
   "tv": {
-    "version": "3.12.35",
-    "versionCode": 122,
+    "version": "3.12.36",
+    "versionCode": 123,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "⚡ Instant Live TV Navigation: 60fps buttery smooth Channel Grid default with zero freezing or hang",
-      "🌐 Strict Language Filter: Exclusively Hindi, Marathi, and English channels (all other regional/foreign channels removed)",
-      "📺 Dedicated Marathi (मराठी) Category: Direct category pill for instant access to all Marathi entertainment and news channels",
-      "📅 High-Performance EPG Guide: Progressive loading with Show More Channels keeps spatial navigation responsive",
-      "📱 Smartphone Rescue: Automatically prompts to install AJO Phone if opened on a mobile device"
+      "🚀 Eliminated 'iframe sandbox detected' restriction across all web embed players",
+      "⚡ Ultra-smooth buffer-free streaming with 64MB adaptive HLS buffering engine",
+      "🛡️ Native WebView subframe routing & WebResourceRequest handling prevents player aborts",
+      "🌐 High-speed multi-audio & Hindi dubbed servers (VidLink Pro, AutoEmbed, VidSrc PM, Videasy)",
+      "📺 Fire TV / Android TV hardware acceleration with SSL error bypass on live streams"
     ],
     "size_mb": "6.9 MB",
-    "sha256": "a463b84f064a702f0ec2b1e3213afc22c50342b3ed74d735bd1cd5a852b656bc"
+    "sha256": "50863204b4996fb28921e47d45f25aab50fd0cae64cc1e3754e68d233b58504b"
   }
 }
