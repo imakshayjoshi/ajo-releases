@@ -4,22 +4,22 @@
   "versionCode": 122,
   "releaseDate": "2026-09-02",
   "phone": {
-    "version": "3.3.39",
-    "versionCode": 88,
+    "version": "3.3.40",
+    "versionCode": 89,
     "packageId": "com.ajo.phone",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "🛡️ Fixed selectedSeason ReferenceError causing AJO Error in media details",
-      "⚡ Eliminated crash on movie and TV series detail view",
-      "📱 Restored Mobile Bottom Navigation & Touch Gestures",
-      "📥 Hardened Downloads tab and local storage safeguards",
-      "📺 Smooth Live TV Guide and Channel Grid with Marathi category"
+      "🚀 Eliminated 'iframe sandbox detected' restriction across all embed players",
+      "⚡ Ultra-smooth buffer-free streaming with 64MB adaptive HLS buffering engine",
+      "🛡️ Native WebView subframe routing prevents rogue ad hijacking while streaming",
+      "🌐 High-speed multi-audio & Hindi dubbed servers (VidLink Pro, AutoEmbed, VidSrc)",
+      "📺 Unlocked mixed-content HTTP/HTTPS Live TV channels with SSL bypass"
     ],
     "size_mb": "3.3 MB",
-    "sha256": "73df7b615e7c080a011afb7c9852b0c16153ff56b1b0e242468cb9000fc037c4"
+    "sha256": "64aa2d8b32e7a50d070cc5c5bc90e63d80f0d206b97fd7bb027d3139c86f386e"
   },
   "tv": {
     "version": "3.12.35",
