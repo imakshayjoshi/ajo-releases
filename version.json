@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "version": "3.12.37",
-  "versionCode": 124,
+  "version": "3.12.38",
+  "versionCode": 125,
   "releaseDate": "2026-09-08",
   "phone": {
     "version": "3.3.41",
@@ -21,21 +21,22 @@
     "sha256": "be6237378ffdcf712fdda324f7046591cca02b0a4ccc5c7a2f3e30af29b0b128"
   },
   "tv": {
-    "version": "3.12.37",
-    "versionCode": 124,
+    "version": "3.12.38",
+    "versionCode": 125,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "🔥 Fixed Fire TV stick system freeze: Right-sized ExoPlayer and Hls.js memory buffers to prevent RAM exhaustion and kernel lockup",
-      "⚡ Cleaned up progressSaverRef and bingeCountdownRef interval leaks in player lifecycle",
-      "🛡️ Fixed AJO TV Error: Removed corrupted JSX fragments and stabilized UI render trees",
-      "🧹 Completely removed Castle remnants from all views and menus",
-      "📺 Smooth, buffer-free Live TV channels and high-speed VOD streaming"
+      "🔥 100% Zero-Freeze Fire TV Stability: Eliminated software decoder CPU stall trap that locked up Fire TV sticks",
+      "⚡ Flawless Resume & Continue Watching: Preserved playback position on remote Back key and Exit Player",
+      "🛡️ Stream Stability: Stopped premature stream failovers caused by blocked ad trackers in web video views",
+      "🌐 Native DASH (.mpd) Support: Added ExoPlayer DashMediaSource module for broader stream compatibility",
+      "🎮 TV Remote Navigation: Remote Back key now cleanly exits app on Home tab, and ErrorBoundary has full D-pad recovery controls",
+      "🧹 Memory & Resource Hardening: Shared singleton OkHttpClient and enabled largeHeap + WAKE_LOCK"
     ],
     "size_mb": "6.9 MB",
-    "sha256": "97c75ceb7fb994551c30649fbef5c5a3613c82f972d9b1e10a2c6de1d6697017"
+    "sha256": "a9b00167a349630c3ed39b0756a5076b8ad1938299865e4e81b59f06efc7a3ad"
   }
 }
