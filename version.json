@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "version": "3.12.40",
-  "versionCode": 127,
+  "version": "3.12.41",
+  "versionCode": 128,
   "releaseDate": "2026-09-08",
   "phone": {
     "version": "3.3.41",
@@ -21,20 +21,20 @@
     "sha256": "be6237378ffdcf712fdda324f7046591cca02b0a4ccc5c7a2f3e30af29b0b128"
   },
   "tv": {
-    "version": "3.12.40",
-    "versionCode": 127,
+    "version": "3.12.41",
+    "versionCode": 128,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "📺 Fixed Live Channel Freezing: Eliminated hardware decoder buffer lockup by restoring keyframe dropping and A/V sync",
-      "🛡️ Fixed 'Content not indexed yet on free servers': Stopped WebView redirects from exhausting server mirror queue",
-      "⚡ Smooth Live HLS Streaming: Safe 15s target live offset and expanded 15s-45s buffer window prevents starvation stalls",
-      "🚀 Instant Back Key Interception: Single press exits the player cleanly with immediate lifecycle teardown"
+      "📺 Fixed Live Channel Freezing: Removed AUD marker wait stalls and tuned buffers for 18-second sliding HLS broadcast windows",
+      "⚡ Instant Live Stream Startup: Enabled chunkless preparation so live channels start immediately without waiting for chunk download",
+      "🛡️ Auto-Recovery on Playlist Delay: Re-syncs cleanly to live edge if CDN playlist delays instead of terminating stream",
+      "🚀 Zero Freezes & Instant Remote Back: Remote Back exits cleanly on first press with zero latency"
     ],
     "size_mb": "6.9 MB",
-    "sha256": "474a367829ad5749603e4cbdc335db199a1afdcc9a0f060de171620b913aac9a"
+    "sha256": "6184aa6c3663a69f6e4be425e9d5350f0b4b1506e4fac423fd552baf5fbb11f0"
   }
 }
