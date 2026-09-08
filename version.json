@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "version": "3.12.38",
-  "versionCode": 125,
+  "version": "3.12.39",
+  "versionCode": 126,
   "releaseDate": "2026-09-08",
   "phone": {
     "version": "3.3.41",
@@ -21,22 +21,20 @@
     "sha256": "be6237378ffdcf712fdda324f7046591cca02b0a4ccc5c7a2f3e30af29b0b128"
   },
   "tv": {
-    "version": "3.12.38",
-    "versionCode": 125,
+    "version": "3.12.39",
+    "versionCode": 126,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "🔥 100% Zero-Freeze Fire TV Stability: Eliminated software decoder CPU stall trap that locked up Fire TV sticks",
-      "⚡ Flawless Resume & Continue Watching: Preserved playback position on remote Back key and Exit Player",
-      "🛡️ Stream Stability: Stopped premature stream failovers caused by blocked ad trackers in web video views",
-      "🌐 Native DASH (.mpd) Support: Added ExoPlayer DashMediaSource module for broader stream compatibility",
-      "🎮 TV Remote Navigation: Remote Back key now cleanly exits app on Home tab, and ErrorBoundary has full D-pad recovery controls",
-      "🧹 Memory & Resource Hardening: Shared singleton OkHttpClient and enabled largeHeap + WAKE_LOCK"
+      "⚡ Instant Remote Back Button: Remote Back button now exits playback immediately on the very first press with zero latency",
+      "🛡️ Fixed 'Content not indexed yet on free servers': Eliminated premature false error scraping and rapid server exhaustion",
+      "📺 Zero Freezing on Live Channels: Upgraded live HLS buffer window (8s-25s) and eliminated destructive ExoPlayer teardowns during live stream playback",
+      "🍿 Seamless Movie & Series Playback: Allowed verified CDN and token gateway redirects in embed engine with accurate provider headers"
     ],
     "size_mb": "6.9 MB",
-    "sha256": "a9b00167a349630c3ed39b0756a5076b8ad1938299865e4e81b59f06efc7a3ad"
+    "sha256": "ac1cd9b00b9561d93c6fd341af1b88193e6d7f2ecbf6ffe5cc822f74d5eab4e1"
   }
 }
