@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "version": "3.12.39",
-  "versionCode": 126,
+  "version": "3.12.40",
+  "versionCode": 127,
   "releaseDate": "2026-09-08",
   "phone": {
     "version": "3.3.41",
@@ -21,20 +21,20 @@
     "sha256": "be6237378ffdcf712fdda324f7046591cca02b0a4ccc5c7a2f3e30af29b0b128"
   },
   "tv": {
-    "version": "3.12.39",
-    "versionCode": 126,
+    "version": "3.12.40",
+    "versionCode": 127,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "⚡ Instant Remote Back Button: Remote Back button now exits playback immediately on the very first press with zero latency",
-      "🛡️ Fixed 'Content not indexed yet on free servers': Eliminated premature false error scraping and rapid server exhaustion",
-      "📺 Zero Freezing on Live Channels: Upgraded live HLS buffer window (8s-25s) and eliminated destructive ExoPlayer teardowns during live stream playback",
-      "🍿 Seamless Movie & Series Playback: Allowed verified CDN and token gateway redirects in embed engine with accurate provider headers"
+      "📺 Fixed Live Channel Freezing: Eliminated hardware decoder buffer lockup by restoring keyframe dropping and A/V sync",
+      "🛡️ Fixed 'Content not indexed yet on free servers': Stopped WebView redirects from exhausting server mirror queue",
+      "⚡ Smooth Live HLS Streaming: Safe 15s target live offset and expanded 15s-45s buffer window prevents starvation stalls",
+      "🚀 Instant Back Key Interception: Single press exits the player cleanly with immediate lifecycle teardown"
     ],
     "size_mb": "6.9 MB",
-    "sha256": "ac1cd9b00b9561d93c6fd341af1b88193e6d7f2ecbf6ffe5cc822f74d5eab4e1"
+    "sha256": "474a367829ad5749603e4cbdc335db199a1afdcc9a0f060de171620b913aac9a"
   }
 }
