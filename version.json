@@ -2,23 +2,23 @@
   "schemaVersion": 2,
   "version": "3.12.41",
   "versionCode": 128,
-  "releaseDate": "2026-09-08",
+  "releaseDate": "2026-09-09",
   "phone": {
-    "version": "3.3.41",
-    "versionCode": 90,
+    "version": "3.3.42",
+    "versionCode": 91,
     "packageId": "com.ajo.phone",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "⚡ Fixed player interval accumulation and memory leak in lifecycle teardown",
-      "🛡️ Memory-safe Hls.js adaptive buffers preventing low-RAM device stutters",
-      "🚀 Resolved React ErrorBoundary crashes across media rail views",
-      "🍿 Ultra-smooth buffer-free streaming across movies, serials, and live channels"
+      "📺 Fixed Live Channel Freezing: Tuned HLS sliding broadcast window buffers and added live-edge anti-stall recovery",
+      "⚡ Fixed Web Player Breakdown: Prevented native player handoff from destroying web video engine on phones",
+      "🛡️ Instant Back Button: Responsive 1-tap exit from player and modals without multi-press lag",
+      "🚀 Memory Optimization: Added OS low-memory cache pruning for uninterrupted long streaming sessions"
     ],
     "size_mb": "3.3 MB",
-    "sha256": "be6237378ffdcf712fdda324f7046591cca02b0a4ccc5c7a2f3e30af29b0b128"
+    "sha256": "c3a2be29682a490fdab98b6a30bd598e6c5c2d04db55a76ac3b53d2dbbd8288a"
   },
   "tv": {
     "version": "3.12.41",
