@@ -37,21 +37,21 @@
     "size_mb": "6.9 MB"
   },
   "android_tv": {
-    "version": "3.12.45",
-    "versionCode": 132,
+    "version": "3.12.46",
+    "versionCode": 133,
     "packageId": "com.ajo.androidtv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
+      "🛠️ Fixed Settings Recovery Crash: Resolved 'installedVersion is not defined' error when opening Settings on Android TV",
+      "⚡ Instant OTA Update Discovery: Fast-tracked multi-CDN update discovery (raw.githack, jsdelivr, raw.github) with automatic check on tab switch",
       "📋 Quick Channel Guide Drawer: Press LEFT arrow or click '☰ Channels' while watching Live TV to browse all channels with live preview in background",
       "🔲 Native Picture-in-Picture (PiP): Press Home button or click '🔲 PiP' to keep watching streams in a floating TV window while browsing apps",
-      "⭐ Channel Favorites & Quick Surfing: Press Blue remote button or star icon to favorite channels; surf only starred favorites with UP/DOWN",
-      "🎙️ Multi-Audio Commentary Switching: Seamlessly switch commentary and language audio tracks on Live TV sports and news broadcasts",
-      "🔖 10-Foot UI/UX Polish: Added ambient glowing focus states and direct '+ Watchlist' bookmarking to TV details modal"
+      "⭐ Channel Favorites & Quick Surfing: Press Blue remote button or star icon to favorite channels; surf only starred favorites with UP/DOWN"
     ],
     "size_mb": "7.0 MB",
-    "sha256": "3206029f6981532c1fc59b184aca548da5d707c29aa214c893bd12eee9e8e913"
+    "sha256": "7c4515570d1aa79fce054e6793c639881222c7ee465eacb5102a4c00b4ed3da7"
   }
 }
