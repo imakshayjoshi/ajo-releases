@@ -37,20 +37,21 @@
     "size_mb": "6.9 MB"
   },
   "android_tv": {
-    "version": "3.12.43",
-    "versionCode": 130,
+    "version": "3.12.44",
+    "versionCode": 131,
     "packageId": "com.ajo.androidtv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "🔊 Fixed Movie Audio Muting: Removed Web Audio CORS silence and restored native unmuting",
-      "🎛️ TV Volume Protection: TV master hardware volume no longer overridden to ~90%",
-      "🎯 TV Remote Unmute Button: Added dedicated 🔊 Unmute button to remote controls bar",
-      "⚡ Remote OK Unmute: Pressing OK on TV remote instantly un-mutes playing videos"
+      "📺 Remote Channel Switcher: Press UP or DOWN arrow on Android TV remote while watching Live TV to change channels instantly",
+      "⚡ Hardware Channel Keys: Dedicated CH+/CH-, PageUp/PageDown, and Last Channel (recall) remote buttons fully mapped",
+      "🔢 Direct Number Tuning: Press remote digits 0-9 to jump directly to any channel number",
+      "🎨 Floating Channel HUD: Sleek glassmorphic channel zap card displaying channel name, number, category, and counter",
+      "🛡️ Decoder Anti-Stall: 250ms debounce prevents video decoder stalls during rapid channel surfing"
     ],
     "size_mb": "7.0 MB",
-    "sha256": "0477fac4ac0c504262e3229b809a9aebe3b0b738a678954d0f9081da9775a6e9"
+    "sha256": "2e8aa81e4255402580366fae31275da8cf8a8161080eb297b283410bd37a7abb"
   }
 }
