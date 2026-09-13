@@ -34,7 +34,23 @@
       "🛡️ Auto-Recovery on Playlist Delay: Re-syncs cleanly to live edge if CDN playlist delays instead of terminating stream",
       "🚀 Zero Freezes & Instant Remote Back: Remote Back exits cleanly on first press with zero latency"
     ],
-    "size_mb": "6.9 MB",
-    "sha256": "6184aa6c3663a69f6e4be425e9d5350f0b4b1506e4fac423fd552baf5fbb11f0"
+    "size_mb": "6.9 MB"
+  },
+  "android_tv": {
+    "version": "3.12.41",
+    "versionCode": 128,
+    "packageId": "com.ajo.androidtv",
+    "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
+    "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
+    "mandatory": false,
+    "minimumVersionCode": 1,
+    "changelog": [
+      "📺 Dedicated Android TV & Google TV release",
+      "⚡ Fixed Leanback launcher crash on standard Android TV / Google TV",
+      "🛡️ Dedicated Android TV OTA update channel",
+      "🚀 Ultra HD Hardware ExoPlayer streaming pipeline"
+    ],
+    "size_mb": "7.0 MB",
+    "sha256": "1ebb0b04ba110c9798645228da5cd0e25a218858e97c5561331f65e9d3e6a0e0"
   }
 }
