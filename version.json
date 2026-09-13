@@ -37,20 +37,20 @@
     "size_mb": "6.9 MB"
   },
   "android_tv": {
-    "version": "3.12.41",
-    "versionCode": 128,
+    "version": "3.12.42",
+    "versionCode": 129,
     "packageId": "com.ajo.androidtv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "📺 Dedicated Android TV & Google TV release",
-      "⚡ Fixed Leanback launcher crash on standard Android TV / Google TV",
-      "🛡️ Dedicated Android TV OTA update channel",
-      "🚀 Ultra HD Hardware ExoPlayer streaming pipeline"
+      "📺 Fixed Android 14 TV OS playback crash on Live TV, Movies & Series",
+      "⚡ Android 14 API 34 Compatibility: Removed legacy AudioBecomingNoisy receiver crash",
+      "🛡️ Ultra-Stable ExoPlayer: Lazy web engine initialization and robust crash protection",
+      "🚀 Dedicated Android TV & Google TV release with OTA update channel"
     ],
     "size_mb": "7.0 MB",
-    "sha256": "1ebb0b04ba110c9798645228da5cd0e25a218858e97c5561331f65e9d3e6a0e0"
+    "sha256": "7aab8752a117cad6e0c5f08d3315437ec29d050694fa3fcfe6f2e04314b256d9"
   }
 }
