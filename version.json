@@ -37,20 +37,20 @@
     "size_mb": "6.9 MB"
   },
   "android_tv": {
-    "version": "3.12.42",
-    "versionCode": 129,
+    "version": "3.12.43",
+    "versionCode": 130,
     "packageId": "com.ajo.androidtv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "📺 Fixed Android 14 TV OS playback crash on Live TV, Movies & Series",
-      "⚡ Android 14 API 34 Compatibility: Removed legacy AudioBecomingNoisy receiver crash",
-      "🛡️ Ultra-Stable ExoPlayer: Lazy web engine initialization and robust crash protection",
-      "🚀 Dedicated Android TV & Google TV release with OTA update channel"
+      "🔊 Fixed Movie Audio Muting: Removed Web Audio CORS silence and restored native unmuting",
+      "🎛️ TV Volume Protection: TV master hardware volume no longer overridden to ~90%",
+      "🎯 TV Remote Unmute Button: Added dedicated 🔊 Unmute button to remote controls bar",
+      "⚡ Remote OK Unmute: Pressing OK on TV remote instantly un-mutes playing videos"
     ],
     "size_mb": "7.0 MB",
-    "sha256": "7aab8752a117cad6e0c5f08d3315437ec29d050694fa3fcfe6f2e04314b256d9"
+    "sha256": "0477fac4ac0c504262e3229b809a9aebe3b0b738a678954d0f9081da9775a6e9"
   }
 }
