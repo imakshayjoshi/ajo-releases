@@ -21,20 +21,21 @@
     "sha256": "c3a2be29682a490fdab98b6a30bd598e6c5c2d04db55a76ac3b53d2dbbd8288a"
   },
   "tv": {
-    "version": "3.12.41",
-    "versionCode": 128,
+    "version": "3.12.42",
+    "versionCode": 129,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "📺 Fixed Live Channel Freezing: Removed AUD marker wait stalls and tuned buffers for 18-second sliding HLS broadcast windows",
-      "⚡ Instant Live Stream Startup: Enabled chunkless preparation so live channels start immediately without waiting for chunk download",
-      "🛡️ Auto-Recovery on Playlist Delay: Re-syncs cleanly to live edge if CDN playlist delays instead of terminating stream",
-      "🚀 Zero Freezes & Instant Remote Back: Remote Back exits cleanly on first press with zero latency"
+      "🎬 Fixed TV Series Episode Streaming: Selecting any season and episode (such as Panchayat S2, S3) now streams the exact episode selected instead of locking to Season 1 Episode 1",
+      "⚡ Dynamic Episode Server Matching: Episode playback automatically generates and binds to mirror servers specifically configured for the selected season & episode",
+      "🏷️ Accurate Episode Badging: Episode list buttons accurately reflect TMDB episode numbers across all seasons",
+      "📺 Seamless Hardware Player Integration: Instant native player handoff for all series episodes with multi-audio commentary support"
     ],
-    "size_mb": "6.9 MB"
+    "size_mb": "6.9 MB",
+    "sha256": "738a261b44d815e7bd782ffcc123b41a0c3d262801ad2498e9ffa7f617d22f68"
   },
   "android_tv": {
     "version": "3.12.46",
