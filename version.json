@@ -38,21 +38,20 @@
     "sha256": "738a261b44d815e7bd782ffcc123b41a0c3d262801ad2498e9ffa7f617d22f68"
   },
   "android_tv": {
-    "version": "3.12.46",
-    "versionCode": 133,
+    "version": "3.12.47",
+    "versionCode": 134,
     "packageId": "com.ajo.androidtv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "🛠️ Fixed Settings Recovery Crash: Resolved 'installedVersion is not defined' error when opening Settings on Android TV",
-      "⚡ Instant OTA Update Discovery: Fast-tracked multi-CDN update discovery (raw.githack, jsdelivr, raw.github) with automatic check on tab switch",
-      "📋 Quick Channel Guide Drawer: Press LEFT arrow or click '☰ Channels' while watching Live TV to browse all channels with live preview in background",
-      "🔲 Native Picture-in-Picture (PiP): Press Home button or click '🔲 PiP' to keep watching streams in a floating TV window while browsing apps",
-      "⭐ Channel Favorites & Quick Surfing: Press Blue remote button or star icon to favorite channels; surf only starred favorites with UP/DOWN"
+      "🎬 Fixed TV Series Episode Streaming: Selecting any season and episode (such as Panchayat S2, S3) now streams the exact episode selected instead of locking to Season 1 Episode 1",
+      "⚡ Dynamic Episode Server Matching: Episode playback automatically generates and binds to mirror servers specifically configured for the selected season & episode",
+      "🏷️ Accurate Episode Badging: Episode list buttons accurately reflect TMDB episode numbers across all seasons",
+      "📺 Seamless Hardware Player Integration: Instant native player handoff for all series episodes with multi-audio commentary support"
     ],
     "size_mb": "7.0 MB",
-    "sha256": "12e3d007cedd974762a1734d30a0d25d272873800e8ccd5a42a5c3bd62a2b012"
+    "sha256": "6b8b0d162e2247210cb5bc9d3902d512d1fe21dddf30a3b88a233d42f9fd7d01"
   }
 }
