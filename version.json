@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "version": "3.12.47",
-  "versionCode": 134,
+  "version": "3.12.48",
+  "versionCode": 135,
   "releaseDate": "2026-09-23",
   "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
   "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
@@ -23,37 +23,45 @@
     "sha256": "c3a2be29682a490fdab98b6a30bd598e6c5c2d04db55a76ac3b53d2dbbd8288a"
   },
   "tv": {
-    "version": "3.12.42",
-    "versionCode": 129,
+    "version": "3.12.43",
+    "versionCode": 130,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "🎬 Fixed TV Series Episode Streaming: Selecting any season and episode (such as Panchayat S2, S3) now streams the exact episode selected instead of locking to Season 1 Episode 1",
-      "⚡ Dynamic Episode Server Matching: Episode playback automatically generates and binds to mirror servers specifically configured for the selected season & episode",
-      "🏷️ Accurate Episode Badging: Episode list buttons accurately reflect TMDB episode numbers across all seasons",
-      "📺 Seamless Hardware Player Integration: Instant native player handoff for all series episodes with multi-audio commentary support"
+      "📺 Live TV Revival: Channel server back online — 2,147 channels re-verified, 15 Sony-family channels on tested streams",
+      "🔊 Autoplay & resume fixed on HLS streams with multiple audio tracks",
+      "⏸️ Pausing for 8+ seconds no longer hijacks playback into a server switch",
+      "🩹 Channels with a healthy primary stream are no longer hidden for 6 hours because a backup server died",
+      "🛑 'Stream offline' no longer loops the failure watchdog every 8 seconds",
+      "🎯 Focus can no longer escape behind the fullscreen player",
+      "🔄 OTA: older GitHub releases can no longer override newer manifests"
     ],
     "size_mb": "6.9 MB",
-    "sha256": "cf10381424fb695c17fb8ec23f404aa8a5d199e4a8c8f953b8120d2a04bb7c6f"
+    "sha256": "f08f67123e18a0ad80da425b2c8c22af9f1b179e8ebef19aa286e3fb4cc92c86"
   },
   "android_tv": {
-    "version": "3.12.47",
-    "versionCode": 134,
+    "version": "3.12.48",
+    "versionCode": 135,
     "packageId": "com.ajo.androidtv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "🎬 Fixed TV Series Episode Streaming: Selecting any season and episode (such as Panchayat S2, S3) now streams the exact episode selected instead of locking to Season 1 Episode 1",
-      "⚡ Dynamic Episode Server Matching: Episode playback automatically generates and binds to mirror servers specifically configured for the selected season & episode",
-      "🏷️ Accurate Episode Badging: Episode list buttons accurately reflect TMDB episode numbers across all seasons",
-      "📺 Seamless Hardware Player Integration: Instant native player handoff for all series episodes with multi-audio commentary support"
+      "📺 Live TV Revival: The channel server on new.ajo.co.in is back online — all 2,147 channels re-verified, 15 Sony-family channels (SET HD, MAX, MAX 2, Marathi, Pix, Pal, Yay!, Wah, BBC Earth, Sports Ten 1/2/3/5) now serve from tested streams",
+      "💥 CRITICAL FIX: Opening the Providers tab no longer crashes the app to the recovery screen",
+      "🔊 Autoplay & resume fixed on every HLS stream with multiple audio tracks (broken setter crashed the manifest handler)",
+      "⏸️ Pausing for 8+ seconds no longer hijacks playback into a server switch or native handoff",
+      "🩹 Channels with a healthy primary stream are no longer hidden for 6 hours because a backup server died",
+      "🛑 'Stream offline' no longer loops the failure watchdog every 8 seconds",
+      "🎯 Remote UP/DOWN no longer teleports focus behind the fullscreen player while zapping channels",
+      "🔄 OTA: older GitHub releases can no longer override newer manifests; correct APK asset picked; update check 4h instead of 3 min",
+      "➕ New channels: Sony MAX 2, Sony Yay!, Sony Wah, Sony BBC Earth HD + verified HD backups for SET HD"
     ],
     "size_mb": "7.0 MB",
-    "sha256": "6b8b0d162e2247210cb5bc9d3902d512d1fe21dddf30a3b88a233d42f9fd7d01"
+    "sha256": "b8d65ffe7c673d59f7f48181b534fb85c8e81546f863613a624cf1650c74b7ba"
   }
 }
