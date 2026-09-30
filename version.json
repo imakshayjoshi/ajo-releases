@@ -1,60 +1,53 @@
 {
   "schemaVersion": 2,
-  "version": "3.12.50",
-  "versionCode": 137,
-  "releaseDate": "2026-09-30",
+  "version": "3.12.51",
+  "versionCode": 201,
+  "releaseDate": "2026-10-01",
   "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
   "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
   "phone": {
-    "version": "3.3.43",
-    "versionCode": 92,
+    "version": "3.3.44",
+    "versionCode": 201,
     "packageId": "com.ajo.phone",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "🩹 Fixed black screen crash at the end of multi-episode binge playback (countdown card bug)",
-      "🛡️ New renderer-crash guard: if the video engine dies the app now recovers itself instead of staying black",
-      "🚪 Back button escape hatch: 3 quick Back presses always return you to the Home screen, even if the app is stuck",
-      "🚀 Memory optimization: OS low-memory cache pruning for uninterrupted long streaming sessions"
+      "↩️ Rolled back to the classic AJO Phone you know. The 4.0 rebuild is withdrawn.",
+      "Everything back the way it was"
     ],
     "size_mb": "3.5 MB",
-    "sha256": "843655e606a88c5fb5c5288a22b000a07d4367f470ee897e26d2a5c4986fbe29"
+    "sha256": "a49077144c15aaa7c70ba14b7c295405c3efd2a86e9e0b67303100db2971151e"
   },
   "tv": {
-    "version": "3.12.50",
-    "versionCode": 137,
+    "version": "3.12.51",
+    "versionCode": 201,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "📺 Restored Sony channels (SET HD, Sony SAB, Sony Pal, Sony BBC Earth, Sony Sports Ten 1) with verified live streams",
-      "🛡️ Fixed dead channel filtering so Indian and Sony channel tiles are never hidden from the Live TV grid",
-      "⚡ Invalidated stale channel cache and reduced failure cooldown to 10 minutes",
-      "🩹 Fixed Settings recovery screen crash ('installedVersion is not defined')"
+      "↩️ Rolled back to the classic AJO TV you love. The 4.0 rebuild is withdrawn.",
+      "Your channels, settings and favorites are right where you left them"
     ],
     "size_mb": "6.9 MB",
-    "sha256": "9e0bb6d94a00de836f357447f9f6cb0d2f86a23b8079dfc349b8ea6ce27706a5"
+    "sha256": "181cdf5995651b28e7c3593fc365b58f054d1b83d8428624c967c8a370f0dcd0"
   },
   "android_tv": {
-    "version": "3.12.50",
-    "versionCode": 137,
+    "version": "3.12.51",
+    "versionCode": 201,
     "packageId": "com.ajo.androidtv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "📺 Restored Sony channels (SET HD, Sony SAB, Sony Pal, Sony BBC Earth, Sony Sports Ten 1) with verified live streams",
-      "🛡️ Fixed dead channel filtering so Indian and Sony channel tiles are never hidden from the Live TV grid",
-      "⚡ Invalidated stale channel cache and reduced failure cooldown to 10 minutes",
-      "🩹 Fixed Settings recovery screen crash ('installedVersion is not defined')",
-      "💥 Fire TV / Android TV whole-device freeze fix and RAM optimization"
+      "↩️ Rolled back to the classic AJO TV you love. The 4.0 rebuild is withdrawn.",
+      "Your channels, settings and favorites are right where you left them"
     ],
     "size_mb": "7.0 MB",
-    "sha256": "9af911ffce71eb804999cede0385151904dc875f790c9375170a7cf0da5ddd20"
+    "sha256": "5507cfd83ad6f5f72655fec8b1096f62fb11198986ed93a8023a0d3d566937ac"
   }
 }
