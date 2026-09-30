@@ -23,21 +23,22 @@
     "sha256": "843655e606a88c5fb5c5288a22b000a07d4367f470ee897e26d2a5c4986fbe29"
   },
   "tv": {
-    "version": "3.12.44",
-    "versionCode": 131,
+    "version": "3.12.45",
+    "versionCode": 132,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
+      "🩹 Fixed AJO TV Recovery crash on Settings screen ('installedVersion is not defined')",
       "💥 CRITICAL FIX: Fire TV stick no longer freezes the whole device — video buffer is now capped to your stick's memory so the system never runs out of RAM",
       "🛡️ New renderer-crash guard: if the app's video engine dies it recovers automatically instead of showing a dead black screen",
       "🚪 Escape hatch: 3 quick Back presses always background the app so Home stays reachable — no more pulling the power plug",
       "🩹 Fixed end-of-episode binge crash that black-screened the player"
     ],
     "size_mb": "7.0 MB",
-    "sha256": "8b802a24c42c38db0b5e1a1ef5d583ff919072c8e95cb925a0b31ee99e45e43f"
+    "sha256": "0180cfcfacc7a845b406d54c6b509eeac7335c59221e977036839eaa302843a0"
   },
   "android_tv": {
     "version": "3.12.49",
