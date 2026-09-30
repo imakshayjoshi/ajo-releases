@@ -37,7 +37,7 @@
       "🩹 Fixed end-of-episode binge crash that black-screened the player"
     ],
     "size_mb": "7.0 MB",
-    "sha256": "98c33e300be57d57c1ae45811e8af3979f3e8484458d19db75ef97235239105f"
+    "sha256": "8b802a24c42c38db0b5e1a1ef5d583ff919072c8e95cb925a0b31ee99e45e43f"
   },
   "android_tv": {
     "version": "3.12.49",
