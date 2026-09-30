@@ -1,16 +1,21 @@
-export const CURRENT_APP_VERSION = '3.12.34';
-export const CURRENT_VERSION_CODE = 121;
+export const CURRENT_APP_VERSION = '3.12.44';
+export const CURRENT_VERSION_CODE = 131;
 const MANIFEST_SOURCES = [
   'https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/version.json',
-  'https://raw.githack.com/imakshayjoshi/ajo-releases/main/version.json',
+  'https://cdn.jsdelivr.net/gh/imakshayjoshi/ajo-releases@main/version.json',
   'https://api.github.com/repos/imakshayjoshi/ajo-releases/releases/latest',
-  'https://cdn.jsdelivr.net/gh/imakshayjoshi/ajo-releases@main/version.json'
+  'https://raw.githack.com/imakshayjoshi/ajo-releases/main/version.json'
 ];
 const RELEASE_PREFIX = 'https://github.com/imakshayjoshi/ajo-releases/releases/download/';
 
+export function extractVersion(tagOrVersion) {
+  const match = String(tagOrVersion || '').match(/\d+(?:\.\d+)+/);
+  return match ? match[0] : String(tagOrVersion || '0').replace(/^[^\d]*/, '').split(/[-+]/)[0];
+}
+
 export function compareVersions(a, b) {
-  const cleanA = String(a || '0').replace(/^v/, '').split(/[-+]/)[0];
-  const cleanB = String(b || '0').replace(/^v/, '').split(/[-+]/)[0];
+  const cleanA = extractVersion(a);
+  const cleanB = extractVersion(b);
   const left = cleanA.split('.').map(Number);
   const right = cleanB.split('.').map(Number);
   for (let index = 0; index < Math.max(left.length, right.length); index += 1) {
@@ -22,7 +27,7 @@ export function compareVersions(a, b) {
 
 export function isAllowedApkUrl(url) {
   if (typeof url !== 'string') return false;
-  const isAjoApk = /\/AJO_(PHONE|TV)\.apk(\?.*)?$/i.test(url) || url.endsWith('.apk');
+  const isAjoApk = /\/AJO_(PHONE|TV|ANDROID_TV)\.apk(\?.*)?$/i.test(url) || url.endsWith('.apk');
   const isTrustedHost = url.includes('github.com') || 
                         url.includes('raw.githubusercontent.com') || 
                         url.includes('githack.com') ||
@@ -34,20 +39,45 @@ export function isAllowedApkUrl(url) {
 export async function checkForAppUpdates(appType = 'tv') {
   let manifestData = null;
   let fromGithubApi = false;
+  let highestVersion = '0.0.0';
+  let highestCode = 0;
 
   for (const sourceUrl of MANIFEST_SOURCES) {
     try {
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 4000);
-      const response = await fetch(sourceUrl + (sourceUrl.includes('api.github') ? '' : '?time=' + Date.now()), {
-        cache: 'no-store',
+      const timer = setTimeout(() => controller.abort(), 3500);
+      const url = sourceUrl + (sourceUrl.includes('?') ? '&' : '?') + 't=' + Date.now();
+      const response = await fetch(url, {
+        cache: 'no-cache',
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        },
         signal: controller.signal
       });
       clearTimeout(timer);
       if (response.ok) {
-        manifestData = await response.json();
-        if (manifestData.assets) fromGithubApi = true;
-        break;
+        const data = await response.json();
+        if (data && data.assets && data.tag_name) {
+          const v = extractVersion(data.tag_name);
+          // v3.12.43: strict > — an older release from a later-queried source
+          // must never override a newer version.json result.
+          if (compareVersions(v, highestVersion) > 0) {
+            highestVersion = v;
+            manifestData = data;
+            fromGithubApi = true;
+          }
+        } else if (data) {
+          const target = data[appType] || {};
+          const v = extractVersion(target.version || data.version || '0.0.0');
+          const code = Number(target.versionCode || data.versionCode || 0);
+          if (compareVersions(v, highestVersion) > 0 || (compareVersions(v, highestVersion) === 0 && code >= highestCode)) {
+            highestVersion = v;
+            highestCode = code;
+            manifestData = data;
+            fromGithubApi = false;
+          }
+        }
       }
     } catch {
       // Failover to next CDN/API source
@@ -56,10 +86,10 @@ export async function checkForAppUpdates(appType = 'tv') {
 
   try {
     let target = {};
-    let latestVersion = CURRENT_APP_VERSION;
+    let latestVersion = highestVersion !== '0.0.0' ? highestVersion : CURRENT_APP_VERSION;
     let apkUrl = '';
     let changelog = [];
-    let size = '4.3 MB';
+    let size = '6.9 MB';
     let releaseDate = new Date().toISOString().split('T')[0];
     const packageId = appType === 'tv' ? 'com.ajo.tv' : 'com.ajo.phone';
 
@@ -68,13 +98,19 @@ export async function checkForAppUpdates(appType = 'tv') {
       : 'https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk';
 
     if (fromGithubApi && manifestData) {
-      latestVersion = String(manifestData.tag_name || CURRENT_APP_VERSION).replace(/^v/, '');
-      apkUrl = directApkUrl;
+      latestVersion = extractVersion(manifestData.tag_name || CURRENT_APP_VERSION);
+      if (Array.isArray(manifestData.assets)) {
+        const apkAsset = manifestData.assets.find(a => (a.name || '').includes('TV') && (a.name || '').endsWith('.apk'));
+        if (apkAsset?.browser_download_url) {
+          apkUrl = apkAsset.browser_download_url;
+        }
+      }
+      if (!apkUrl) apkUrl = directApkUrl;
       changelog = manifestData.body ? manifestData.body.split('\n').filter(l => l.trim().startsWith('-') || l.trim().startsWith('*')).map(l => l.replace(/^[-*]\s*/, '').trim()) : [];
       releaseDate = manifestData.published_at ? manifestData.published_at.split('T')[0] : releaseDate;
     } else if (manifestData && manifestData[appType]) {
       target = manifestData[appType] || {};
-      latestVersion = target.version || manifestData.version || CURRENT_APP_VERSION;
+      latestVersion = extractVersion(target.version || manifestData.version || CURRENT_APP_VERSION);
       apkUrl = target.apkUrl || target.apk_url || directApkUrl;
       changelog = Array.isArray(target.changelog) ? target.changelog : [];
       size = target.size_mb || target.size || size;

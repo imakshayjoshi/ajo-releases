@@ -161,8 +161,8 @@ public class PlayerActivity extends AppCompatActivity {
     private static final int READ_TIMEOUT_MS = 15000;
     private static final long SEEK_STEP_MS = 10000L;
     private static final long OSD_HIDE_DELAY_MS = 6000L;
-    private static final long FIRST_FRAME_TIMEOUT_MS = 8000L;
-    private static final int FREEZE_STALL_SECONDS = 4;
+    private static final long FIRST_FRAME_TIMEOUT_MS = 20000L;
+    private static final int FREEZE_STALL_SECONDS = 8;
     private static final int MAX_FREEZE_RECOVERY_ATTEMPTS = 2;
 
     // Zoom modes cycled by remote (D-pad Up long-press / PROG+ keys)
@@ -236,6 +236,7 @@ public class PlayerActivity extends AppCompatActivity {
         }
     };
     private long resumePositionMs = C.TIME_UNSET;
+    private Runnable autoPlayAttemptRunnable = null;
 
     // ---- FREEZE DETECTION (fix): audio-plays-but-picture-frozen on Fire OS.
     // The first-frame watchdog cannot catch this because the first frame DOES
@@ -356,24 +357,35 @@ public class PlayerActivity extends AppCompatActivity {
             lastRenderedOutputBuffers = rendered;
         }
 
-        // Video-frame counter frozen for 4s while state says "playing" = the video
-        // decoder stalled (audio renderer is a separate pipeline, so sound keeps
-        // going — this is exactly the field symptom). v3.8.0: detector now watches
-        // real rendered-frame counts instead of the audio-driven position clock,
-        // which is why previous hardening never caught these freezes.
+        if (isLive) {
+            // Live HLS streams: do not tear down the pipeline.
+            // If stalled for 5 seconds, gently re-sync to the live edge and re-prepare.
+            if (freezeStableSeconds >= 5) {
+                freezeStableSeconds = 0;
+                Log.w(TAG, "LIVE_STREAM_STALL: resyncing to live broadcast edge.");
+                try {
+                    if (player != null) {
+                        player.seekToDefaultPosition();
+                        player.prepare();
+                        player.play();
+                    }
+                } catch (Exception ignored) {}
+            }
+            return;
+        }
+
+        // VOD streams: Video-frame counter frozen for FREEZE_STALL_SECONDS while state says "playing"
         if (freezeStableSeconds >= FREEZE_STALL_SECONDS && freezeRecoveryAttempts < MAX_FREEZE_RECOVERY_ATTEMPTS) {
             freezeRecoveryAttempts++;
             freezeStableSeconds = 0;
             Log.w(TAG, "VIDEO_FREEZE_DETECTED (attempt " + freezeRecoveryAttempts + "/"
-                    + MAX_FREEZE_RECOVERY_ATTEMPTS + "): position stalled while playing.");
-            Toast.makeText(this, "Fixing video playback...", Toast.LENGTH_SHORT).show();
-            resumePositionMs = isLive ? C.TIME_UNSET : player.getCurrentPosition();
-            useTextureViewFallback = true;
-            softwareDecoderRetryDone = true; // go straight to software decode
+                    + MAX_FREEZE_RECOVERY_ATTEMPTS + "): decoder stalled while playing.");
+            Toast.makeText(this, "Optimizing playback stream...", Toast.LENGTH_SHORT).show();
+            resumePositionMs = player.getCurrentPosition();
             showOsd();
             initializeExoPlayer();
         } else if (freezeStableSeconds >= FREEZE_STALL_SECONDS) {
-            // Already recovered once and it froze again — this mirror is bad.
+            // Video freeze persists after recovery — failover to next mirror.
             Log.w(TAG, "VIDEO_FREEZE persists after recovery. Failing over to next mirror.");
             freezeStableSeconds = 0;
             failoverToNextServer();
@@ -396,6 +408,17 @@ public class PlayerActivity extends AppCompatActivity {
 
             Log.w(TAG, "NO_FIRST_FRAME after " + FIRST_FRAME_TIMEOUT_MS
                     + "ms on server " + (currentServerIdx + 1) + "/" + serverQueue.size());
+
+            if (isLive) {
+                // For live channels, re-sync to live edge once before any failover
+                if (player != null) {
+                    try {
+                        player.seekToDefaultPosition();
+                        player.prepare();
+                    } catch (Exception ignored) {}
+                }
+                return;
+            }
 
             if (currentServerIdx + 1 < serverQueue.size()) {
                 failoverToNextServer();
@@ -524,20 +547,24 @@ public class PlayerActivity extends AppCompatActivity {
         }
     }
 
-    @Override
-    protected void onStop() {
-        super.onStop();
-        // Fully release the decoder — app is now truly invisible (Home pressed,
-        // task switched, etc.). Free the hardware codec for other apps.
+    private void saveLastPlaybackPosition() {
         if (player != null && !isLive) {
             long curPos = player.getCurrentPosition();
             long dur = player.getDuration();
             if (curPos > 5000 && dur > 0) {
                 MainActivity.setLastNativePlayback(curPos / 1000, dur / 1000);
             }
-            resumePositionMs = curPos;
         } else if (isWebEmbedMode && lastWebCurrentTimeSec > 5 && lastWebDurationSec > 0 && !isLive) {
             MainActivity.setLastNativePlayback(lastWebCurrentTimeSec, lastWebDurationSec);
+        }
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        saveLastPlaybackPosition();
+        if (player != null && !isLive) {
+            resumePositionMs = player.getCurrentPosition();
         }
         uiHandler.removeCallbacks(progressRunnable);
         uiHandler.removeCallbacks(firstFrameWatchdog);
@@ -560,16 +587,12 @@ public class PlayerActivity extends AppCompatActivity {
     protected void onDestroy() {
         super.onDestroy();
         if (activeInstance == this) activeInstance = null;
-        if (player != null && !isLive) {
-            long curPos = player.getCurrentPosition();
-            long dur = player.getDuration();
-            if (curPos > 5000 && dur > 0) {
-                MainActivity.setLastNativePlayback(curPos / 1000, dur / 1000);
-            }
-        } else if (isWebEmbedMode && lastWebCurrentTimeSec > 5 && lastWebDurationSec > 0 && !isLive) {
-            MainActivity.setLastNativePlayback(lastWebCurrentTimeSec, lastWebDurationSec);
-        }
+        saveLastPlaybackPosition();
         uiHandler.removeCallbacksAndMessages(null);
+        if (autoPlayAttemptRunnable != null) {
+            uiHandler.removeCallbacks(autoPlayAttemptRunnable);
+            autoPlayAttemptRunnable = null;
+        }
         releasePlayer();
         uiHandler.removeCallbacks(webLoadWatchdog);
         if (webVideoView != null) {
@@ -659,36 +682,27 @@ public class PlayerActivity extends AppCompatActivity {
             }
 
             @Override
+            public boolean shouldOverrideUrlLoading(WebView view, android.webkit.WebResourceRequest request) {
+                if (request == null || request.getUrl() == null) return false;
+                if (!request.isForMainFrame()) {
+                    return false; // NEVER block subframe navigations (video players, CDNs, HLS)
+                }
+                return shouldOverrideUrlLoading(view, request.getUrl().toString());
+            }
+
+            @Override
             public boolean shouldOverrideUrlLoading(WebView view, String url) {
                 if (url == null) return true;
+                if (!url.startsWith("http://") && !url.startsWith("https://")) {
+                    return true; // Block intent:, market:, tel:, etc.
+                }
                 // Block ad network URLs
                 if (isAdUrl(url)) {
                     Log.d(TAG, "AD_BLOCK: blocked navigation to " + url);
                     return true;
                 }
-                // Allow same-domain embed navigations (server switching inside embed)
-                try {
-                    String currentHost = Uri.parse(view.getUrl()).getHost();
-                    String targetHost = Uri.parse(url).getHost();
-                    if (currentHost != null && targetHost != null
-                            && currentHost.equalsIgnoreCase(targetHost)) {
-                        return false; // Allow same-host navigation
-                    }
-                } catch (Exception ignored) {}
-                // Block popup navigations to random ad domains — but allow
-                // known embed provider domains and direct media URLs.
-                String lower = url.toLowerCase(java.util.Locale.US);
-                if (lower.endsWith(".m3u8") || lower.endsWith(".mp4")
-                        || lower.endsWith(".mkv") || lower.endsWith(".webm")
-                        || lower.contains("m3u8?") || lower.contains("mp4?")) {
-                    return false; // Allow direct media URLs
-                }
-                if (isWebEmbedUrl(url)) {
-                    return false; // Allow known embed providers
-                }
-                // Block everything else (popups, redirects to ad pages)
-                Log.d(TAG, "AD_BLOCK: blocked popup navigation to " + url);
-                return true;
+                // Allow all legitimate navigations and redirects to video players/CDNs
+                return false;
             }
 
             @Override
@@ -710,10 +724,19 @@ public class PlayerActivity extends AppCompatActivity {
             }
 
             @Override
+            public void onReceivedError(WebView view, android.webkit.WebResourceRequest request, android.webkit.WebResourceError error) {
+                if (request != null && !request.isForMainFrame()) return;
+                uiHandler.removeCallbacks(webLoadWatchdog);
+                Log.w(TAG, "Web video onReceivedError (main frame): " + (error != null ? error.getDescription() : "unknown"));
+            }
+
+            @Override
             public void onReceivedError(WebView view, int errorCode, String description, String failingUrl) {
+                if (failingUrl != null && view.getUrl() != null && !failingUrl.equals(view.getUrl())) {
+                    return;
+                }
                 uiHandler.removeCallbacks(webLoadWatchdog);
                 Log.w(TAG, "Web video onReceivedError (" + errorCode + "): " + description);
-                failoverToNextServer();
             }
 
             @Override
@@ -760,32 +783,23 @@ public class PlayerActivity extends AppCompatActivity {
                         + "}catch(e){}"
                         + "})();", null);
 
-                // Immediate play check and Cloudflare/Next.js/Missing content error inspection
+                // Immediate play check
                 view.evaluateJavascript(
                         "(function(){"
-                                + "var bodyText = document.body ? document.body.innerText : '';"
-                                + "var lower = bodyText.toLowerCase();"
-                                + "var titleLower = (document.title || '').toLowerCase();"
-                                + "if(lower.includes('application error') || lower.includes('server-side exception') || lower.includes('digest:') || lower.includes('error code 522') || lower.includes('error code 520') || lower.includes('error code 524') || lower.includes('file not found') || lower.includes('video not found') || lower.includes('couldn\\'t find') || lower.includes('not available') || lower.includes('check back') || lower.includes('no stream') || lower.includes('no sources') || titleLower.includes('502') || titleLower.includes('504') || titleLower.includes('500') || titleLower.includes('error')){"
-                                + "  return 'ERROR_PAGE';"
-                                + "}"
-                                + "try{"
-                                + "  if(window.ppl && typeof window.ppl.api === 'function'){ window.ppl.api('play'); }"
-                                + "  if(window.player && typeof window.player.api === 'function'){ window.player.api('play'); }"
-                                + "  var v=document.querySelector('video'); if(v){ v.muted=false; v.play(); }"
-                                + "  var btn=document.querySelector('.play,.play-btn,.jw-display-icon-container,[aria-label=\"Play\"],.vjs-big-play-button,.plyr__control--overlaid,button.play-button,pjsdiv,.jw-icon-display'); if(btn){btn.click();}"
-                                + "}catch(e){}"
-                                + "return 'OK';"
-                                + "})();",
-                        value -> {
-                            if (value != null && value.contains("ERROR_PAGE")) {
-                                Log.w(TAG, "Detected server crash / content unavailable page in WebView embed — auto-failing over");
-                                failoverToNextServer();
-                            }
-                        });
+                        + "try{"
+                        + "  if(window.ppl && typeof window.ppl.api === 'function'){ window.ppl.api('play'); }"
+                        + "  if(window.player && typeof window.player.api === 'function'){ window.player.api('play'); }"
+                        + "  var v=document.querySelector('video'); if(v){ v.muted=false; v.play(); }"
+                        + "  var btn=document.querySelector('.play,.play-btn,.jw-display-icon-container,[aria-label=\"Play\"],.vjs-big-play-button,.plyr__control--overlaid,button.play-button,pjsdiv,.jw-icon-display'); if(btn){btn.click();}"
+                        + "}catch(e){}"
+                        + "return 'OK';"
+                        + "})();", null);
 
-                // v3.12.31: Ultra-aggressive autoplay across 12 retry cycles with all player APIs
-                Runnable autoPlayAttempt = new Runnable() {
+                // Auto-play attempt across retry cycles
+                if (autoPlayAttemptRunnable != null) {
+                    uiHandler.removeCallbacks(autoPlayAttemptRunnable);
+                }
+                autoPlayAttemptRunnable = new Runnable() {
                     int attempts = 0;
                     @Override
                     public void run() {
@@ -793,11 +807,6 @@ public class PlayerActivity extends AppCompatActivity {
                         webVideoView.evaluateJavascript(
                             "(function(){"
                             + "try{"
-                            + "  var bodyText = document.body ? document.body.innerText : '';"
-                            + "  var lower = bodyText.toLowerCase();"
-                            + "  if(lower.includes('application error') || lower.includes('server-side exception') || lower.includes('digest:') || lower.includes('couldn\\'t find') || lower.includes('not available') || lower.includes('check back') || lower.includes('no stream') || lower.includes('no sources')){"
-                            + "    return 'ERROR_PAGE';"
-                            + "  }"
                             // Try all HTML5 video elements
                             + "  var vs=document.querySelectorAll('video');"
                             + "  for(var i=0;i<vs.length;i++){"
@@ -829,13 +838,7 @@ public class PlayerActivity extends AppCompatActivity {
                             + "  if(el && el.tagName!=='A'){ el.dispatchEvent(ce); }"
                             + "}catch(e){}"
                             + "return 'OK';"
-                            + "})();",
-                            evalRes -> {
-                                if (evalRes != null && evalRes.contains("ERROR_PAGE")) {
-                                    Log.w(TAG, "Content unavailable on current mirror — auto-failing over");
-                                    failoverToNextServer();
-                                }
-                            });
+                            + "})();", null);
                         attempts++;
                         applyAudioBoost();
                         if (attempts < 12) {
@@ -843,7 +846,7 @@ public class PlayerActivity extends AppCompatActivity {
                         }
                     }
                 };
-                uiHandler.postDelayed(autoPlayAttempt, 400L);
+                uiHandler.postDelayed(autoPlayAttemptRunnable, 400L);
 
                 // v3.12.22: MutationObserver to catch async-rendered play buttons
                 view.evaluateJavascript(
@@ -886,25 +889,6 @@ public class PlayerActivity extends AppCompatActivity {
         currentResizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT;
 
         surfaceView = new SurfaceView(this);
-        surfaceView.setZOrderMediaOverlay(true);
-        surfaceView.getHolder().addCallback(new SurfaceHolder.Callback() {
-            @Override
-            public void surfaceCreated(@NonNull SurfaceHolder holder) {
-                if (player != null && !useTextureViewFallback) {
-                    player.setVideoSurface(holder.getSurface());
-                }
-            }
-
-            @Override
-            public void surfaceChanged(@NonNull SurfaceHolder holder, int format, int width, int height) { }
-
-            @Override
-            public void surfaceDestroyed(@NonNull SurfaceHolder holder) {
-                if (player != null && !useTextureViewFallback) {
-                    player.setVideoSurface(null);
-                }
-            }
-        });
         FrameLayout.LayoutParams surfaceParams = new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT, Gravity.CENTER);
         surfaceView.setLayoutParams(surfaceParams);
@@ -1005,11 +989,7 @@ public class PlayerActivity extends AppCompatActivity {
         btnAudioBoost = createTvButton("🔊 Audio: 200%", v -> cycleAudioBoost());
         btnAudioTrack = createTvButton("🌐 Audio: Auto", v -> cycleAudioTrack());
         btnSafeColor = createTvButton("🎨 Safe Color: OFF", v -> toggleSafeColorMode());
-        btnBack = createTvButton("← Exit Player", v -> {
-            uiHandler.removeCallbacksAndMessages(null);
-            releasePlayer();
-            finish();
-        });
+        btnBack = createTvButton("← Exit Player", v -> exitPlayer());
 
         controlsRow.addView(btnPlayPause);
         if (!isLive) {
@@ -1332,7 +1312,7 @@ public class PlayerActivity extends AppCompatActivity {
                 || lower.contains("vidlink.pro") || lower.contains("vidsrc") || lower.contains("autoembed")
                 || lower.contains("smashy") || lower.contains("multiembed") || lower.contains("vidjoy")
                 || lower.contains("2embed") || lower.contains("nontongo") || lower.contains("embed.su")
-                || lower.contains("superembed") || lower.contains("moviesapi") || lower.contains("videasy.net");
+                || lower.contains("superembed") || lower.contains("moviesapi") || lower.contains("videasy");
     }
 
     private void playCurrentStream() {
@@ -1428,9 +1408,9 @@ public class PlayerActivity extends AppCompatActivity {
             } else if (lower.contains("vidsrc")) {
                 headers.put("Referer", "https://vidsrc.cc/");
                 headers.put("Origin", "https://vidsrc.cc");
-            } else if (lower.contains("videasy.net")) {
-                headers.put("Referer", "https://player.videasy.net/");
-                headers.put("Origin", "https://player.videasy.net");
+            } else if (lower.contains("videasy")) {
+                headers.put("Referer", "https://player.videasy.to/");
+                headers.put("Origin", "https://player.videasy.to");
             } else {
                 // Generic fallback: referer = the host itself so providers that
                 // require same-origin referers still get a valid value.
@@ -1485,114 +1465,44 @@ public class PlayerActivity extends AppCompatActivity {
         firstFrameRendered = false;
         hasVideoTrack = false;
 
-        DefaultRenderersFactory renderersFactory = new DefaultRenderersFactory(this) {
-            @Override
-            protected void buildVideoRenderers(
-                    android.content.Context context,
-                    @DefaultRenderersFactory.ExtensionRendererMode int extensionRendererMode,
-                    androidx.media3.exoplayer.mediacodec.MediaCodecSelector mediaCodecSelector,
-                    boolean enableDecoderFallback,
-                    Handler eventHandler,
-                    androidx.media3.exoplayer.video.VideoRendererEventListener eventListener,
-                    long allowedVideoJoiningTimeMs,
-                    java.util.ArrayList<androidx.media3.exoplayer.Renderer> out) {
-                androidx.media3.exoplayer.video.MediaCodecVideoRenderer videoRenderer =
-                        new androidx.media3.exoplayer.video.MediaCodecVideoRenderer(
-                                context,
-                                getCodecAdapterFactory(),
-                                mediaCodecSelector,
-                                allowedVideoJoiningTimeMs,
-                                enableDecoderFallback,
-                                eventHandler,
-                                eventListener,
-                                50) {
-                            @Override
-                            protected boolean shouldDropBuffersToKeyframe(long earlyUs, long elapsedRealtimeUs, boolean isLastBuffer) {
-                                return false;
-                            }
-
-                            @Override
-                            protected boolean shouldDropOutputBuffer(long earlyUs, long elapsedRealtimeUs, boolean isLastBuffer) {
-                                return earlyUs < -1000000L;
-                            }
-                        };
-                out.add(videoRenderer);
-            }
-        }
-                .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
+        DefaultRenderersFactory renderersFactory = new DefaultRenderersFactory(this)
+                .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
                 .setEnableDecoderFallback(true)
                 .setAllowedVideoJoiningTimeMs(15000L)
-                .setMediaCodecSelector(
-                        softwareDecoderRetryDone
-                                ? (mimeType, requiresSecureDecoder, requiresTunnelingDecoder) -> {
-                                    java.util.List<androidx.media3.exoplayer.mediacodec.MediaCodecInfo> all =
-                                            androidx.media3.exoplayer.mediacodec.MediaCodecUtil.getDecoderInfos(
-                                                    mimeType, requiresSecureDecoder, requiresTunnelingDecoder);
-                                    java.util.List<androidx.media3.exoplayer.mediacodec.MediaCodecInfo> software =
-                                            new java.util.ArrayList<>();
-                                    for (androidx.media3.exoplayer.mediacodec.MediaCodecInfo info : all) {
-                                        if (!info.hardwareAccelerated) software.add(info);
-                                    }
-                                    return software.isEmpty() ? all : software;
-                                }
-                                : androidx.media3.exoplayer.mediacodec.MediaCodecSelector.DEFAULT);
+                .setMediaCodecSelector(androidx.media3.exoplayer.mediacodec.MediaCodecSelector.DEFAULT);
 
         androidx.media3.exoplayer.upstream.DefaultBandwidthMeter bandwidthMeter =
                 new androidx.media3.exoplayer.upstream.DefaultBandwidthMeter.Builder(this)
-                        .setInitialBitrateEstimate(4_000_000L)
+                        .setInitialBitrateEstimate(2_000_000L)
                         .build();
 
-        androidx.media3.exoplayer.trackselection.AdaptiveTrackSelection.Factory adaptiveFactory =
-                new androidx.media3.exoplayer.trackselection.AdaptiveTrackSelection.Factory(
-                        /* minDurationForQualityIncreaseMs= */ 5000,
-                        /* maxDurationForQualityDecreaseMs= */ 10000,
-                        /* minDurationToRetainAfterDiscardMs= */
-                                25000,
-                        /* bandwidthFraction= */ 0.7f);
-
-        DefaultTrackSelector trackSelector = new DefaultTrackSelector(this, adaptiveFactory);
+        DefaultTrackSelector trackSelector = new DefaultTrackSelector(this);
         trackSelector.setParameters(trackSelector.buildUponParameters()
                 .setPreferredVideoMimeType(MimeTypes.VIDEO_H264)
-                .setMaxVideoSize(3840, 2160)
+                .setMaxVideoSize(1920, 1080)
                 .setMaxVideoFrameRate(60)
                 .setExceedVideoConstraintsIfNecessary(true)
                 .setTunnelingEnabled(false)
                 .setForceLowestBitrate(false));
 
-        // Nuvio-style RAM-adaptive buffering: FireTV Stick 4K (1.5GB) gets
-        // right-sized buffers instead of one-size-fits-all. Bigger target on
-        // bigger TVs eliminates mid-stream rebuffering.
-        int totalMemMb;
-        android.app.ActivityManager.MemoryInfo mi = new android.app.ActivityManager.MemoryInfo();
-        ((android.app.ActivityManager) getSystemService(ACTIVITY_SERVICE)).getMemoryInfo(mi);
-        long gb = 1024L * 1024L * 1024L;
-        if (mi.totalMem <= 0) {
-            totalMemMb = 250;
-        } else if (mi.totalMem < 1.15 * gb) {
-            totalMemMb = 150;   // 1GB-class sticks
-        } else if (mi.totalMem < 1.45 * gb) {
-            totalMemMb = 200;   // FireTV Stick 4K (1.5GB)
-        } else if (mi.totalMem < 2.3 * gb) {
-            totalMemMb = 250;
-        } else if (mi.totalMem < 3.2 * gb) {
-            totalMemMb = 500;
-        } else if (mi.totalMem < 4.8 * gb) {
-            totalMemMb = 1000;
-        } else {
-            totalMemMb = 1600;  // high-end TVs
-        }
-        int targetBufferBytes = Math.min(totalMemMb * 1024 * 1024, Integer.MAX_VALUE);
-
         DefaultLoadControl loadControl = new DefaultLoadControl.Builder()
-                .setAllocator(new androidx.media3.exoplayer.upstream.DefaultAllocator(true, 256 * 1024))
+                .setAllocator(new androidx.media3.exoplayer.upstream.DefaultAllocator(true, 64 * 1024))
                 .setBufferDurationsMs(
-                        /* minBufferMs= */ isLive ? 3500 : 30000,
-                        /* maxBufferMs= */ isLive ? 25000 : 90000,
+                        /* minBufferMs= */ isLive ? 3500 : 25000,
+                        /* maxBufferMs= */ isLive ? 15000 : 50000,
                         /* bufferForPlaybackMs= */ isLive ? 1000 : 2500,
-                        /* bufferForPlaybackAfterRebufferMs= */ isLive ? 2500 : 5000)
-                .setTargetBufferBytes(targetBufferBytes)
-                .setPrioritizeTimeOverSizeThresholds(false)
-                .setBackBuffer(12000, true)
+                        /* bufferForPlaybackAfterRebufferMs= */ isLive ? 2000 : 5000)
+                // v3.12.44 FIX (the whole-stick freeze): cap the buffer to the
+                // device's RAM class. Without setTargetBufferBytes ExoPlayer uses
+                // its default (C.LENGTH_UNSET -> derived from bitrate*maxBuffer,
+                // can exceed 200MB on 1080p streams). With the WebView also
+                // resident and largeHeap=true, a 1GB/1.5GB Fire TV stick hits
+                // kernel OOM / kswapd thrash: the ENTIRE device freezes, not just
+                // the app — remote stops responding, Home button dead, only a
+                // power-cycle recovers. This is exactly the reported symptom.
+                .setTargetBufferBytes(deviceClassTargetBufferBytes())
+                .setPrioritizeTimeOverSizeThresholds(true)
+                .setBackBuffer(isLive ? 2000 : 10000, false)
                 .build();
 
         ExoPlayer exo = new ExoPlayer.Builder(this, renderersFactory)
@@ -1600,6 +1510,13 @@ public class PlayerActivity extends AppCompatActivity {
                 .setLoadControl(loadControl)
                 .setBandwidthMeter(bandwidthMeter)
                 .setMediaSourceFactory(new DefaultMediaSourceFactory(buildDataSourceFactory()))
+                .setAudioAttributes(
+                        new androidx.media3.common.AudioAttributes.Builder()
+                                .setUsage(C.USAGE_MEDIA)
+                                .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
+                                .build(),
+                        true /* handleAudioFocus */
+                )
                 .build();
 
         exo.setHandleAudioBecomingNoisy(true);
@@ -1633,6 +1550,30 @@ public class PlayerActivity extends AppCompatActivity {
         uiHandler.postDelayed(firstFrameWatchdog, FIRST_FRAME_TIMEOUT_MS);
     }
 
+    /**
+     * v3.12.44: RAM-class-aware buffer budget. ExoPlayer's default target
+     * buffer bytes is uncapped (derived from bitrate x duration) and can reach
+     * 200MB+ on 1080p content; on 1GB/1.5GB Fire TV sticks that plus the
+     * resident WebView pushes the whole system into kernel OOM — the
+     * entire-stick freeze. Keep the budget a small fraction of total RAM.
+     */
+    private int deviceClassTargetBufferBytes() {
+        try {
+            android.app.ActivityManager.MemoryInfo mi = new android.app.ActivityManager.MemoryInfo();
+            android.app.ActivityManager am = (android.app.ActivityManager) getSystemService(ACTIVITY_SERVICE);
+            if (am == null) return 48 * 1024 * 1024;
+            am.getMemoryInfo(mi);
+            long gb = 1024L * 1024L * 1024L;
+            long total = mi.totalMem > 0 ? mi.totalMem : gb; // unknown -> 1GB class
+            if (total < 1.15 * gb) return 32 * 1024 * 1024;  // 1GB sticks (Lite/Gen1)
+            if (total < 1.45 * gb) return 48 * 1024 * 1024;  // FireTV Stick 4K (1.5GB)
+            if (total < 2.3 * gb) return 64 * 1024 * 1024;
+            return 96 * 1024 * 1024;                          // 4K boxes / real TVs
+        } catch (Throwable t) {
+            return 48 * 1024 * 1024;
+        }
+    }
+
     private MediaSource buildMediaSource(String url) {
         DataSource.Factory dataSourceFactory = buildDataSourceFactory();
         Uri uri = Uri.parse(url);
@@ -1641,9 +1582,8 @@ public class PlayerActivity extends AppCompatActivity {
         if (isLive) {
             itemBuilder.setLiveConfiguration(
                     new MediaItem.LiveConfiguration.Builder()
-                            .setMinPlaybackSpeed(0.95f)
-                            .setMaxPlaybackSpeed(1.05f)
-                            .setTargetOffsetMs(8000L)
+                            .setMinPlaybackSpeed(1.0f)
+                            .setMaxPlaybackSpeed(1.0f)
                             .build());
         }
 
@@ -1655,12 +1595,18 @@ public class PlayerActivity extends AppCompatActivity {
             itemBuilder.setMimeType(MimeTypes.APPLICATION_M3U8);
             DefaultHlsExtractorFactory hlsExtractorFactory = new DefaultHlsExtractorFactory(
                     DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES
-                            | DefaultTsPayloadReaderFactory.FLAG_DETECT_ACCESS_UNITS
                             | DefaultTsPayloadReaderFactory.FLAG_IGNORE_SPLICE_INFO_STREAM,
                     /* exposeCea608WhenMissingDeclarations= */ true);
             return new HlsMediaSource.Factory(dataSourceFactory)
                     .setExtractorFactory(hlsExtractorFactory)
-                    .setAllowChunklessPreparation(false)
+                    .setAllowChunklessPreparation(true)
+                    .createMediaSource(itemBuilder.build());
+        }
+
+        boolean looksLikeDash = lower.contains(".mpd") || lower.contains("/dash/");
+        if (looksLikeDash) {
+            itemBuilder.setMimeType(MimeTypes.APPLICATION_MPD);
+            return new androidx.media3.exoplayer.dash.DashMediaSource.Factory(dataSourceFactory)
                     .createMediaSource(itemBuilder.build());
         }
 
@@ -1675,14 +1621,22 @@ public class PlayerActivity extends AppCompatActivity {
                 .createMediaSource(itemBuilder.build());
     }
 
+    private static volatile OkHttpClient sharedOkHttpClient = null;
+
+    private static synchronized OkHttpClient getSharedOkHttpClient() throws Exception {
+        if (sharedOkHttpClient == null) {
+            sharedOkHttpClient = buildPermissiveOkHttpClient();
+        }
+        return sharedOkHttpClient;
+    }
+
     private DataSource.Factory buildDataSourceFactory() {
         Map<String, String> defaultHeaders = new HashMap<>();
         defaultHeaders.put("Accept", "*/*");
-        defaultHeaders.put("Referer", "https://ajo.co.in/");
 
         HttpDataSource.Factory httpFactory;
         try {
-            OkHttpClient client = buildPermissiveOkHttpClient();
+            OkHttpClient client = getSharedOkHttpClient();
             httpFactory = new OkHttpDataSource.Factory(client)
                     .setUserAgent(USER_AGENT)
                     .setDefaultRequestProperties(defaultHeaders);
@@ -1700,7 +1654,7 @@ public class PlayerActivity extends AppCompatActivity {
         return new DefaultDataSource.Factory(this, httpFactory);
     }
 
-    private OkHttpClient buildPermissiveOkHttpClient() throws Exception {
+    private static OkHttpClient buildPermissiveOkHttpClient() throws Exception {
         final X509TrustManager trustAll = new X509TrustManager() {
             @Override
             public void checkClientTrusted(X509Certificate[] chain, String authType) { }
@@ -1799,6 +1753,12 @@ public class PlayerActivity extends AppCompatActivity {
     }
 
     private void failoverToNextServer() {
+        if (autoPlayAttemptRunnable != null) {
+            uiHandler.removeCallbacks(autoPlayAttemptRunnable);
+            autoPlayAttemptRunnable = null;
+        }
+        uiHandler.removeCallbacks(webLoadWatchdog);
+        uiHandler.removeCallbacks(firstFrameWatchdog);
         if (currentServerIdx + 1 < serverQueue.size()) {
             currentServerIdx++;
             uiHandler.post(() -> {
@@ -1829,7 +1789,18 @@ public class PlayerActivity extends AppCompatActivity {
                     break;
                 case Player.STATE_ENDED:
                     bufferSpinner.setVisibility(View.GONE);
-                    finish();
+                    if (isLive) {
+                        Log.i(TAG, "Live stream reached end of playlist window, resyncing to live edge...");
+                        if (player != null) {
+                            try {
+                                player.seekToDefaultPosition();
+                                player.prepare();
+                                player.play();
+                            } catch (Exception ignored) {}
+                        }
+                    } else {
+                        finish();
+                    }
                     break;
                 case Player.STATE_IDLE:
                 default:
@@ -1842,7 +1813,20 @@ public class PlayerActivity extends AppCompatActivity {
             Log.e(TAG, "PLAYER_ERROR on server " + (currentServerIdx + 1) + ": " + error.getMessage() + " (code " + error.errorCode + ")", error);
             bufferSpinner.setVisibility(View.GONE);
 
-            // Failover to next stream server in queue
+            if (isLive) {
+                // Live channels: re-sync to live broadcast edge without burning through server queue
+                Log.w(TAG, "Live channel error (" + error.errorCode + "), resyncing to live broadcast...");
+                if (player != null) {
+                    try {
+                        player.seekToDefaultPosition();
+                        player.prepare();
+                        player.play();
+                    } catch (Exception ignored) {}
+                }
+                return;
+            }
+
+            // Failover to next stream server in queue for VOD
             if (currentServerIdx + 1 < serverQueue.size()) {
                 failoverToNextServer();
                 return;
@@ -1862,14 +1846,6 @@ public class PlayerActivity extends AppCompatActivity {
                     initializeExoPlayer();
                     return;
                 }
-            }
-
-            if (isLive && code == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW) {
-                if (player != null) {
-                    player.seekToDefaultPosition();
-                    player.prepare();
-                }
-                return;
             }
 
             Toast.makeText(PlayerActivity.this,
@@ -2067,8 +2043,15 @@ public class PlayerActivity extends AppCompatActivity {
 
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
+        int keyCode = event.getKeyCode();
+        if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_ESCAPE) {
+            if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                exitPlayer();
+            }
+            return true;
+        }
+
         if (event.getAction() == KeyEvent.ACTION_DOWN) {
-            int keyCode = event.getKeyCode();
             // Intercept media and navigation keys so WebView cannot consume or block them
             if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER
                     || keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER || keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE
@@ -2076,7 +2059,6 @@ public class PlayerActivity extends AppCompatActivity {
                     || keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
                     || keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_DPAD_DOWN
                     || keyCode == KeyEvent.KEYCODE_MENU || keyCode == KeyEvent.KEYCODE_INFO
-                    || keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_ESCAPE
                     || keyCode == KeyEvent.KEYCODE_MEDIA_FAST_FORWARD || keyCode == KeyEvent.KEYCODE_MEDIA_REWIND
                     || keyCode == KeyEvent.KEYCODE_PROG_RED || keyCode == KeyEvent.KEYCODE_PROG_GREEN
                     || keyCode == KeyEvent.KEYCODE_CHANNEL_UP || keyCode == KeyEvent.KEYCODE_CHANNEL_DOWN) {
@@ -2120,10 +2102,6 @@ public class PlayerActivity extends AppCompatActivity {
                 return true;
             }
             if (keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_MENU || keyCode == KeyEvent.KEYCODE_INFO) {
-                hideOsd();
-                return true;
-            }
-            if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_ESCAPE) {
                 hideOsd();
                 return true;
             }
@@ -2209,7 +2187,12 @@ public class PlayerActivity extends AppCompatActivity {
     }
 
     private void exitPlayer() {
+        saveLastPlaybackPosition();
         uiHandler.removeCallbacksAndMessages(null);
+        if (autoPlayAttemptRunnable != null) {
+            uiHandler.removeCallbacks(autoPlayAttemptRunnable);
+            autoPlayAttemptRunnable = null;
+        }
         releasePlayer();
         if (webVideoView != null) {
             try {
@@ -2263,5 +2246,25 @@ public class PlayerActivity extends AppCompatActivity {
     public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
         if (hasFocus) enableImmersiveMode();
+    }
+
+    @Override
+    public void onTrimMemory(int level) {
+        super.onTrimMemory(level);
+        if (webVideoView != null) {
+            try {
+                webVideoView.clearCache(false);
+            } catch (Exception ignored) {}
+        }
+    }
+
+    @Override
+    public void onLowMemory() {
+        super.onLowMemory();
+        if (webVideoView != null) {
+            try {
+                webVideoView.clearCache(true);
+            } catch (Exception ignored) {}
+        }
     }
 }

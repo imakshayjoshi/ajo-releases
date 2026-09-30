@@ -1,67 +1,60 @@
 {
   "schemaVersion": 2,
-  "version": "3.12.48",
-  "versionCode": 135,
-  "releaseDate": "2026-09-23",
+  "version": "3.12.49",
+  "versionCode": 136,
+  "releaseDate": "2026-09-30",
   "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
   "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
   "phone": {
-    "version": "3.3.42",
-    "versionCode": 91,
+    "version": "3.3.43",
+    "versionCode": 92,
     "packageId": "com.ajo.phone",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "📺 Fixed Live Channel Freezing: Tuned HLS sliding broadcast window buffers and added live-edge anti-stall recovery",
-      "⚡ Fixed Web Player Breakdown: Prevented native player handoff from destroying web video engine on phones",
-      "🛡️ Instant Back Button: Responsive 1-tap exit from player and modals without multi-press lag",
-      "🚀 Memory Optimization: Added OS low-memory cache pruning for uninterrupted long streaming sessions"
+      "🩹 Fixed black screen crash at the end of multi-episode binge playback (countdown card bug)",
+      "🛡️ New renderer-crash guard: if the video engine dies the app now recovers itself instead of staying black",
+      "🚪 Back button escape hatch: 3 quick Back presses always return you to the Home screen, even if the app is stuck",
+      "🚀 Memory optimization: OS low-memory cache pruning for uninterrupted long streaming sessions"
     ],
-    "size_mb": "3.3 MB",
-    "sha256": "c3a2be29682a490fdab98b6a30bd598e6c5c2d04db55a76ac3b53d2dbbd8288a"
+    "size_mb": "3.5 MB",
+    "sha256": "843655e606a88c5fb5c5288a22b000a07d4367f470ee897e26d2a5c4986fbe29"
   },
   "tv": {
-    "version": "3.12.43",
-    "versionCode": 130,
+    "version": "3.12.44",
+    "versionCode": 131,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "📺 Live TV Revival: Channel server back online — 2,147 channels re-verified, 15 Sony-family channels on tested streams",
-      "🔊 Autoplay & resume fixed on HLS streams with multiple audio tracks",
-      "⏸️ Pausing for 8+ seconds no longer hijacks playback into a server switch",
-      "🩹 Channels with a healthy primary stream are no longer hidden for 6 hours because a backup server died",
-      "🛑 'Stream offline' no longer loops the failure watchdog every 8 seconds",
-      "🎯 Focus can no longer escape behind the fullscreen player",
-      "🔄 OTA: older GitHub releases can no longer override newer manifests"
+      "💥 CRITICAL FIX: Fire TV stick no longer freezes the whole device — video buffer is now capped to your stick's memory so the system never runs out of RAM",
+      "🛡️ New renderer-crash guard: if the app's video engine dies it recovers automatically instead of showing a dead black screen",
+      "🚪 Escape hatch: 3 quick Back presses always background the app so Home stays reachable — no more pulling the power plug",
+      "🩹 Fixed end-of-episode binge crash that black-screened the player"
     ],
-    "size_mb": "6.9 MB",
-    "sha256": "f08f67123e18a0ad80da425b2c8c22af9f1b179e8ebef19aa286e3fb4cc92c86"
+    "size_mb": "7.0 MB",
+    "sha256": "98c33e300be57d57c1ae45811e8af3979f3e8484458d19db75ef97235239105f"
   },
   "android_tv": {
-    "version": "3.12.48",
-    "versionCode": 135,
+    "version": "3.12.49",
+    "versionCode": 136,
     "packageId": "com.ajo.androidtv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "📺 Live TV Revival: The channel server on new.ajo.co.in is back online — all 2,147 channels re-verified, 15 Sony-family channels (SET HD, MAX, MAX 2, Marathi, Pix, Pal, Yay!, Wah, BBC Earth, Sports Ten 1/2/3/5) now serve from tested streams",
-      "💥 CRITICAL FIX: Opening the Providers tab no longer crashes the app to the recovery screen",
-      "🔊 Autoplay & resume fixed on every HLS stream with multiple audio tracks (broken setter crashed the manifest handler)",
-      "⏸️ Pausing for 8+ seconds no longer hijacks playback into a server switch or native handoff",
-      "🩹 Channels with a healthy primary stream are no longer hidden for 6 hours because a backup server died",
-      "🛑 'Stream offline' no longer loops the failure watchdog every 8 seconds",
-      "🎯 Remote UP/DOWN no longer teleports focus behind the fullscreen player while zapping channels",
-      "🔄 OTA: older GitHub releases can no longer override newer manifests; correct APK asset picked; update check 4h instead of 3 min",
-      "➕ New channels: Sony MAX 2, Sony Yay!, Sony Wah, Sony BBC Earth HD + verified HD backups for SET HD"
+      "💥 CRITICAL FIX: Fire TV / Android TV stick no longer freezes the whole device — video buffer is now capped to your stick's memory so the system never runs out of RAM",
+      "🛡️ New renderer-crash guard: if the app's video engine dies it recovers automatically instead of showing a dead black screen",
+      "🚪 Escape hatch: 3 quick Back presses always background the app so Home stays reachable — no more pulling the power plug",
+      "🩹 Fixed end-of-episode binge crash that black-screened the player",
+      "🪟 Ad popup windows now blocked at the native layer"
     ],
     "size_mb": "7.0 MB",
-    "sha256": "b8d65ffe7c673d59f7f48181b534fb85c8e81546f863613a624cf1650c74b7ba"
+    "sha256": "caa4ab0bca73b2eb00a52b6ae5d5bb03e91f3dc4eb54431a53a364cc1d4a83bb"
   }
 }

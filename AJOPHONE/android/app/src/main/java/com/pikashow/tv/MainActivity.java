@@ -15,7 +15,9 @@ import android.view.Window;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
 import android.view.WindowManager;
+import android.net.http.SslError;
 import android.webkit.JavascriptInterface;
+import android.webkit.SslErrorHandler;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.widget.Toast;
@@ -29,6 +31,9 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 
 public class MainActivity extends BridgeActivity {
+
+    // v3.3.43: unacknowledged Back press counter (dead-WebView escape hatch).
+    private int backPressCount = 0;
 
     // ---- v3.3.1 (ported from TV app 3.10.1): embed preflight ----
     // Server-side error pages (Vercel "Application error", Cloudflare 52x,
@@ -76,11 +81,20 @@ public class MainActivity extends BridgeActivity {
             webView.setHorizontalScrollBarEnabled(false);
             
             WebSettings settings = webView.getSettings();
+            settings.setJavaScriptEnabled(true);
             settings.setSupportMultipleWindows(false);
             settings.setJavaScriptCanOpenWindowsAutomatically(false);
             settings.setMediaPlaybackRequiresUserGesture(false);
             settings.setDomStorageEnabled(true);
             settings.setDatabaseEnabled(true);
+            settings.setAllowFileAccess(true);
+            settings.setAllowContentAccess(true);
+            settings.setLoadWithOverviewMode(true);
+            settings.setUseWideViewPort(true);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+            }
+            settings.setUserAgentString("Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36");
 
             // 1. Android Native Orientation Interface
             webView.addJavascriptInterface(new Object() {
@@ -181,26 +195,12 @@ public class MainActivity extends BridgeActivity {
             webView.addJavascriptInterface(new Object() {
                 @JavascriptInterface
                 public String getAppVersionName() {
-                    try {
-                        PackageInfo pInfo = getPackageManager().getPackageInfo(getPackageName(), 0);
-                        return pInfo.versionName != null ? pInfo.versionName : "2.1.0";
-                    } catch (Exception e) {
-                        return "2.1.0";
-                    }
+                    return com.pikashow.tv.BuildConfig.VERSION_NAME;
                 }
 
                 @JavascriptInterface
                 public int getAppVersionCode() {
-                    try {
-                        PackageInfo pInfo = getPackageManager().getPackageInfo(getPackageName(), 0);
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                            return (int) pInfo.getLongVersionCode();
-                        } else {
-                            return pInfo.versionCode;
-                        }
-                    } catch (Exception e) {
-                        return 1;
-                    }
+                    return com.pikashow.tv.BuildConfig.VERSION_CODE;
                 }
 
                 // v3.2.0 keystore cutover: lets the web app detect whether THIS
@@ -247,8 +247,12 @@ public class MainActivity extends BridgeActivity {
 
                     // Run download in background thread with fallback mirrors
                     new Thread(() -> {
+                        String safeUrl = apkUrl;
+                        if (safeUrl != null && safeUrl.contains("AJO_TV.apk")) {
+                            safeUrl = "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk";
+                        }
                         String[] candidateUrls = new String[] {
-                                apkUrl,
+                                safeUrl,
                                 "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
                                 "https://raw.githack.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk"
                         };
@@ -579,6 +583,8 @@ public class MainActivity extends BridgeActivity {
             }, "AndroidDownloader");
 
             // 3. Suppress All Popups, New Tabs & Ad Redirects natively
+            // (v3.3.43: the renderer-crash guard lives in the WebViewClient
+            // below — onRenderProcessGone is a WebViewClient callback.)
             webView.setWebChromeClient(new BridgeWebChromeClient(getBridge()) {
                 @Override
                 public boolean onCreateWindow(WebView view, boolean isDialog, boolean isUserGesture, Message resultMsg) {
@@ -588,8 +594,20 @@ public class MainActivity extends BridgeActivity {
 
             webView.setWebViewClient(new com.getcapacitor.BridgeWebViewClient(getBridge()) {
                 @Override
+                public void onReceivedSslError(WebView view, SslErrorHandler handler, SslError error) {
+                    // Ignore expired/untrusted intermediate certificates on free streaming CDNs & IPTV
+                    handler.proceed();
+                }
+
+                @Override
                 public boolean shouldOverrideUrlLoading(WebView view, android.webkit.WebResourceRequest request) {
-                    if (request == null || request.getUrl() == null) return true;
+                    if (request == null || request.getUrl() == null) return false;
+
+                    // IFRAME SUB-REQUESTS (Embed video players, CDNs, media streams) must NEVER be blocked
+                    if (!request.isForMainFrame()) {
+                        return false;
+                    }
+
                     String url = request.getUrl().toString();
                     if (url.startsWith("http://localhost") || 
                         url.startsWith("https://localhost") || 
@@ -598,7 +616,27 @@ public class MainActivity extends BridgeActivity {
                         url.contains("github.com/imakshayjoshi/ajo-releases")) {
                         return false;
                     }
-                    // Intercept and drop any third-party ad / new tab launches
+                    // Intercept and drop any rogue top-level ad navigations
+                    return true;
+                }
+
+                // v3.3.43 FIX: renderer-crash guard. onRenderProcessGone is a
+                // WebViewClient callback. Without it, a Chromium renderer OOM
+                // leaves the WebView a dead BLACK surface — app looks frozen,
+                // Back does nothing. Recreate the activity so the UI returns.
+                @Override
+                public boolean onRenderProcessGone(WebView view, android.webkit.RenderProcessGoneDetail detail) {
+                    android.util.Log.e("AJO.MainActivity", "WebView RENDERER CRASHED (rendererCrash="
+                            + detail.didCrash() + ") — recreating activity");
+                    try {
+                        view.destroy();
+                    } catch (Throwable ignored) {}
+                    android.os.Handler h = new android.os.Handler(android.os.Looper.getMainLooper());
+                    h.postDelayed(() -> {
+                        try {
+                            recreate();
+                        } catch (Throwable ignored) {}
+                    }, 250L);
                     return true;
                 }
             });
@@ -648,19 +686,65 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
-        if (event.getAction() == KeyEvent.ACTION_DOWN) {
-            int keyCode = event.getKeyCode();
-            if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_ESCAPE) {
-                // Forward back button event directly to web app so it handles closing player/modals
+        int keyCode = event.getKeyCode();
+        if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_ESCAPE) {
+            if (event.getAction() == KeyEvent.ACTION_DOWN) {
                 if (getBridge() != null && getBridge().getWebView() != null) {
                     getBridge().getWebView().evaluateJavascript(
-                        "(function(){ window.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', code: 'Escape', keyCode: 27, bubbles: true})); })();",
+                        "(function(){ window.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', code: 'Escape', keyCode: 27, which: 27, bubbles: true, cancelable: true})); })();",
                         null
                     );
-                    return true; // Prevent Android OS from killing the app and exiting to TV home!
+                    // v3.3.43 FIX: dead-WebView escape hatch. If the web layer
+                    // never reacts (renderer dead, JS hung), repeated Back
+                    // presses looped into the frozen page forever. After 3
+                    // unacknowledged presses, background the app so the phone
+                    // Home screen stays reachable instead of needing an app
+                    // kill from recents.
+                    backPressCount++;
+                    android.os.Handler h = new android.os.Handler(android.os.Looper.getMainLooper());
+                    h.postDelayed(() -> { if (backPressCount > 0) backPressCount--; }, 1500L);
+                    if (backPressCount >= 3) {
+                        backPressCount = 0;
+                        android.util.Log.w("AJO.MainActivity",
+                                "3 unacknowledged Back presses — web layer dead, backgrounding app");
+                        moveTaskToBack(true);
+                    }
                 }
             }
+            return true;
         }
         return super.dispatchKeyEvent(event);
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (getBridge() != null && getBridge().getWebView() != null) {
+            getBridge().getWebView().evaluateJavascript(
+                "(function(){ window.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', code: 'Escape', keyCode: 27, which: 27, bubbles: true, cancelable: true})); })();",
+                null
+            );
+        } else {
+            super.onBackPressed();
+        }
+    }
+
+    @Override
+    public void onTrimMemory(int level) {
+        super.onTrimMemory(level);
+        if (getBridge() != null && getBridge().getWebView() != null) {
+            try {
+                getBridge().getWebView().clearCache(false);
+            } catch (Exception ignored) {}
+        }
+    }
+
+    @Override
+    public void onLowMemory() {
+        super.onLowMemory();
+        if (getBridge() != null && getBridge().getWebView() != null) {
+            try {
+                getBridge().getWebView().clearCache(true);
+            } catch (Exception ignored) {}
+        }
     }
 }

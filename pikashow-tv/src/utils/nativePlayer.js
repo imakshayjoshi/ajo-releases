@@ -192,6 +192,15 @@ export function isNativePlayableUrl(url) {
   for (const pattern of DEAD_HOST_PATTERNS) {
     if (pattern.test(url)) return false;
   }
+  // v3.12.35 FIX (test C1): embed/iframe pages must NEVER reach ExoPlayer —
+  // it tries to decode an HTML page and dies with a source error. Reject the
+  // embed host list AND generic /embed/ + /play/ path shapes (except real
+  // media extensions), not just the dead-host list.
+  for (const pattern of EMBED_HOST_PATTERNS) {
+    if (pattern.test(url)) return false;
+  }
+  if (/\/embed(\/|\?|$)/i.test(url)) return false;
+  if (/\/play(\/|\?|$)/i.test(url) && !DIRECT_MEDIA_EXT_RE.test(url)) return false;
   return true;
 }
 

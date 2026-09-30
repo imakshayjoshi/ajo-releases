@@ -7,6 +7,7 @@ class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
     this.state = { hasError: false, error: null };
+    this.reloadBtnRef = React.createRef();
   }
 
   static getDerivedStateFromError(error) {
@@ -16,6 +17,56 @@ class ErrorBoundary extends React.Component {
   componentDidCatch(error, errorInfo) {
     console.error("React ErrorBoundary caught error:", error, errorInfo);
   }
+
+  componentDidUpdate(prevProps, prevState) {
+    if (this.state.hasError && !prevState.hasError) {
+      setTimeout(() => {
+        if (this.reloadBtnRef.current) {
+          this.reloadBtnRef.current.focus();
+        }
+      }, 100);
+    }
+  }
+
+  componentDidMount() {
+    window.addEventListener('keydown', this.handleKeyDown);
+  }
+
+  componentWillUnmount() {
+    window.removeEventListener('keydown', this.handleKeyDown);
+  }
+
+  handleKeyDown = (e) => {
+    if (!this.state.hasError) return;
+    if (e.key === 'Enter' || e.keyCode === 13) {
+      if (document.activeElement && document.activeElement.tagName === 'BUTTON') {
+        document.activeElement.click();
+      } else {
+        window.location.reload();
+      }
+    } else if (e.key === 'Escape' || e.key === 'Backspace' || e.keyCode === 27 || e.keyCode === 8) {
+      if (window.AndroidNativePlayer?.exitApp) {
+        window.AndroidNativePlayer.exitApp();
+      } else {
+        window.location.reload();
+      }
+    }
+  };
+
+  handleClearCacheAndReload = () => {
+    try {
+      localStorage.clear();
+      sessionStorage.clear();
+      if ('caches' in window) {
+        caches.keys().then((names) => {
+          names.forEach((name) => caches.delete(name));
+        });
+      }
+    } catch (e) {
+      console.warn("Error clearing cache:", e);
+    }
+    window.location.reload();
+  };
 
   render() {
     if (this.state.hasError) {
@@ -33,24 +84,69 @@ class ErrorBoundary extends React.Component {
           padding: '40px',
           textAlign: 'center'
         }}>
-          <h1 style={{ fontSize: '32px', marginBottom: '16px', color: '#f87171' }}>AJO TV Error</h1>
-          <p style={{ color: '#94a3b8', maxWidth: '600px', marginBottom: '24px', lineHeight: '1.6' }}>
-            {this.state.error?.message || "An unexpected rendering error occurred."}
+          <h1 style={{ fontSize: '32px', marginBottom: '16px', color: '#f87171' }}>AJO TV Recovery</h1>
+          <p style={{ color: '#94a3b8', maxWidth: '600px', marginBottom: '28px', lineHeight: '1.6' }}>
+            {this.state.error?.message || "An unexpected error occurred while loading this view."}
           </p>
-          <button
-            onClick={() => window.location.reload()}
-            style={{
-              padding: '12px 28px',
-              backgroundColor: '#3b82f6',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: '12px',
-              fontWeight: 700,
-              cursor: 'pointer'
-            }}
-          >
-            Reload Interface
-          </button>
+          <div style={{ display: 'flex', gap: '16px' }}>
+            <button
+              ref={this.reloadBtnRef}
+              autoFocus
+              tabIndex={0}
+              onClick={() => window.location.reload()}
+              style={{
+                padding: '14px 32px',
+                backgroundColor: '#0284c7',
+                color: '#ffffff',
+                border: '3px solid transparent',
+                borderRadius: '12px',
+                fontSize: '16px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                outline: 'none',
+              }}
+              onFocus={(e) => {
+                e.target.style.borderColor = '#ffffff';
+                e.target.style.backgroundColor = '#38bdf8';
+                e.target.style.color = '#000000';
+              }}
+              onBlur={(e) => {
+                e.target.style.borderColor = 'transparent';
+                e.target.style.backgroundColor = '#0284c7';
+                e.target.style.color = '#ffffff';
+              }}
+            >
+              🔄 Reload App
+            </button>
+            <button
+              tabIndex={0}
+              onClick={this.handleClearCacheAndReload}
+              style={{
+                padding: '14px 32px',
+                backgroundColor: '#334155',
+                color: '#ffffff',
+                border: '3px solid transparent',
+                borderRadius: '12px',
+                fontSize: '16px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                outline: 'none',
+              }}
+              onFocus={(e) => {
+                e.target.style.borderColor = '#ffffff';
+                e.target.style.backgroundColor = '#64748b';
+              }}
+              onBlur={(e) => {
+                e.target.style.borderColor = 'transparent';
+                e.target.style.backgroundColor = '#334155';
+              }}
+            >
+              🧹 Reset Cache & Restart
+            </button>
+          </div>
+          <p style={{ marginTop: '24px', fontSize: '13px', color: '#64748b' }}>
+            Remote: Press [OK] to execute • [Back] to exit
+          </p>
         </div>
       );
     }

@@ -1,1146 +1,1413 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { 
-  ArrowLeft, 
-  Check, 
-  Loader2, 
-  Pause, 
   Play, 
+  Pause, 
   RotateCcw, 
   RotateCw, 
-  Settings2,
-  History, 
   Volume2, 
-  VolumeX, 
-  Cast, 
+  ArrowLeft, 
   Tv, 
-  Radio, 
-  FastForward, 
-  Rewind 
+  Server, 
+  Layers,
+  X,
+  AlertCircle,
+  RefreshCw,
+  Maximize,
+  Radio
 } from 'lucide-react';
+import { generateUniversalServers, isEmbedUrl } from '../utils/streamingEngines';
+import { getCurrentAndNextProgram } from '../api/epg';
+import {
+  hasNativePlayer,
+  shouldPreferNativePlayer,
+  isNativePlayableUrl,
+  isDirectMediaUrl,
+  playInNativePlayer,
+  preflightEmbedUrl
+} from '../utils/nativePlayer';
 import { saveProgress, getWatchHistory, getWatchProgress } from '../api/history';
 import { markChannelDead } from '../api/iptv';
-import { CatchupDrawer } from './CatchupDrawer';
-import { detectStreamType, generateUniversalServers } from '../utils/streamingEngines';
-import { castEngine } from '../api/castSync';
-import { getLiveConfig, getVodConfig, createErrorHandler } from '../utils/hlsConfig';
+import { BINGE_COUNTDOWN_SECONDS } from '../utils/binge';
+import './TVPlayer.css';
 
-const STARTUP_TIMEOUT_MS = 6500;
-const REBUFFER_TIMEOUT_MS = 6000;
-const AUTO_DISMISS_DELAY_MS = 3000;
+// v3.12.20: how long to wait for an embed iframe to signal a load before
+// auto-failing over. Dead hosts never fire onLoad; Cloudflare hang pages
+// usually do not either. Reduced from 12000 to speed up fallback further.
+const EMBED_LOAD_TIMEOUT_MS = 8000;
 
-function formatTime(seconds) {
-  if (!seconds || isNaN(seconds) || !isFinite(seconds)) return '00:00';
-  const total = Math.floor(seconds);
-  const hrs = Math.floor(total / 3600);
-  const mins = Math.floor((total % 3600) / 60);
-  const secs = total % 60;
-  if (hrs > 0) {
-    return `${hrs}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-  }
-  return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-}
-
-export function TVPlayer({ item, server, channels = [], onSelectChannel, onClose }) {
+export function TVPlayer({
+  item,
+  server,
+  // v3.9.1: accept pre-ranked allServers from App.jsx so the health-sorted,
+  // addon-enriched list isn't discarded by an in-component recompute.
+  allServers: externalAllServers,
+  channels = [],
+  episodes = [],
+  currentEpisodeIndex = 0,
+  onSelectEpisode,
+  onSelectChannel,
+  onClose
+}) {
   const videoRef = useRef(null);
   const hlsRef = useRef(null);
-  const timeoutRef = useRef(null);
-  const controlsTimerRef = useRef(null);
-  const retriesRef = useRef(0);
-  // v3.2.0 watchdog: wall-clock timestamps (timeupdate fires ~4x/sec, so tick
-  // counting would be 4x too fast). 0 = timer not armed.
-  const noStartSinceRef = useRef(0);
-  const frameStallSinceRef = useRef(0);
-
-  const [sourceIndex, setSourceIndex] = useState(0);
-  const [playing, setPlaying] = useState(false);
-  const [buffering, setBuffering] = useState(true);
-  const [muted, setMuted] = useState(false);
-  const [error, setError] = useState('');
-  const [showControls, setShowControls] = useState(true);
-  const [showSettings, setShowSettings] = useState(false);
-  const [showCatchup, setShowCatchup] = useState(false);
-  const [seekFeedback, setSeekFeedback] = useState(null);
-  const [levels, setLevels] = useState([]);
-  const [level, setLevel] = useState(-1);
-  const [time, setTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [bufferedEnd, setBufferedEnd] = useState(0);
-  const [castSuccess, setCastSuccess] = useState(false);
-  const rotateFlippedRef = useRef(false);
+  const iframeRef = useRef(null);
+  const embedWatchdogRef = useRef(null);
+  const showDrawerRef = useRef(null);
+  const osdTimerRef = useRef(null);
+  const stallWatchdogRef = useRef(null);
   const resumePositionRef = useRef(null);
+  const lastPositionRef = useRef(0);
+  const progressSaverRef = useRef(null);
+  const bingeFiredRef = useRef(false);
+  const bingeCountdownRef = useRef(null);
+  const blackScreenWatchdogRef = useRef(null);
+  const nativeHandoffDoneRef = useRef(false);
+  // Read synchronously by the pipeline effect. State alone lands one commit too
+  // late, which is long enough for Hls.js to grab the decoder we just gave away.
+  const nativeActiveRef = useRef(false);
 
-  // ---- ZOOM / FIT MODES: cycle Clean (VBI crop) → Fit → Zoom → Stretch.
-  // Pinch on the video adjusts free-form zoom (phone); double-tap cycles.
-  // NOTE: cycleFit references resetControlsTimer which is defined below —
-  // use a ref indirection so hoisting is never an issue.
-  const resetControlsTimerRef = useRef(() => {});
-  const FIT_MODES = ['clean', 'contain', 'cover', 'fill'];
-  const [fitMode, setFitMode] = useState('clean');
-  const [pinchScale, setPinchScale] = useState(1);
-  const pinchStartRef = useRef(null);
-  const pinchDistRef = useRef(0);
-  const lastTapRef = useRef(0);
+  const isLive = item?.is_live || 
+                 item?.type === 'live' || 
+                 item?.year === 'LIVE' || 
+                 item?.category === 'Live TV' || 
+                 item?.category === 'Live Channels' || 
+                 item?.category === 'Sports' || 
+                 item?.category === 'News';
 
-  const cycleFit = useCallback(() => {
-    setFitMode(prev => {
-      const next = FIT_MODES[(FIT_MODES.indexOf(prev) + 1) % FIT_MODES.length];
-      return next;
-    });
-    setPinchScale(1);
-    try { resetControlsTimerRef.current(); } catch {}
-  }, []);
+  const title = typeof item?.title_en === 'string' && item.title_en
+    ? item.title_en
+    : typeof item?.title === 'string' && item.title
+    ? item.title
+    : typeof item?.name === 'string' && item.name
+    ? item.name
+    : (isLive ? 'Live Channel' : 'Video Stream');
 
-  // Pinch-to-zoom handlers
-  const onTouchStart = useCallback((e) => {
-    if (e.touches.length === 2) {
-      const [a, b] = e.touches;
-      pinchStartRef.current = pinchScale || 1;
-      pinchDistRef.current = Math.max(1, Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY));
+  const subtitle = isLive
+    ? 'Live Broadcast'
+    : (typeof item?.year === 'string' || typeof item?.year === 'number'
+      ? `${item.year} • ${typeof item?.category === 'string' ? item.category : 'HD'}`
+      : 'HD Stream');
+
+  // Compute all playable servers.
+  // v3.9.1: prefer the pre-ranked list from App.jsx (health-checked + stremio
+  // addon streams included). Fall back to local computation only when absent.
+  const allServers = useMemo(() => {
+    if (Array.isArray(externalAllServers) && externalAllServers.length > 0) {
+      return externalAllServers;
     }
-  }, [pinchScale]);
-
-  const onTouchMove = useCallback((e) => {
-    if (e.touches.length !== 2) return;
-    const [a, b] = e.touches;
-    const dist = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
-    // Late-start tolerance: some devices/CDPs deliver touchstart with 1 finger
-    // then add the second. If pinch wasn't armed at start, arm it now using
-    // the current distance as baseline (first move sets the origin).
-    if (!pinchStartRef.current || pinchDistRef.current === 0) {
-      // Late-arm: second finger arrived after touchstart. Use current spread
-      // as baseline but apply an immediate 1.15x step so the user sees
-      // instant feedback instead of nothing on the first move.
-      pinchStartRef.current = 1.15;
-      pinchDistRef.current = dist;
-      setPinchScale(1.15);
-      return;
+    if (isLive) {
+      const p = item?.players || item?.player;
+      if (Array.isArray(p) && p.length > 0) return p;
+      if (server && server.url) return [server];
+      if (item?.url) return [{ id: 'live-1', name: 'Direct Live Stream', url: item.url, source: 'm3u8' }];
+      return [];
     }
-    let scale = pinchStartRef.current * (dist / pinchDistRef.current);
-    scale = Math.min(4, Math.max(1, scale));
-    setPinchScale(scale);
-  }, []);
+    return generateUniversalServers(item);
+  }, [externalAllServers, isLive, item, server]);
 
-  const onTouchEnd = useCallback(() => {
-    pinchStartRef.current = null;
-    pinchDistRef.current = 0;
-    // Snap back to 1x when close, otherwise keep zoom and switch to fill behavior
-    if (pinchScale < 1.08) {
-      setPinchScale(1);
-    }
-    try { resetControlsTimerRef.current(); } catch {}
-  }, [pinchScale]);
+  // On a TV box, an iframe embed source can never render: the native player only
+  // accepts real stream URLs, and the legacy WebView cannot composite MSE video.
+  // So put directly playable sources first and leave the embeds at the bottom.
+  const orderedServers = useMemo(() => {
+    if (!shouldPreferNativePlayer() || allServers.length < 2) return allServers;
+    const playable = allServers.filter((srv) => isNativePlayableUrl(srv?.url));
+    if (playable.length === 0) return allServers;
+    const rest = allServers.filter((srv) => !isNativePlayableUrl(srv?.url));
+    return [...playable, ...rest];
+  }, [allServers]);
 
-  // Double-tap to cycle fit mode (single tap still toggles play via onClick)
-  const handleVideoTouch = useCallback((e) => {
-    const now = Date.now();
-    if (now - lastTapRef.current < 300) {
-      // double tap
-      e.preventDefault();
-      e.stopPropagation();
-      cycleFit();
-      lastTapRef.current = 0;
-    } else {
-      lastTapRef.current = now;
-    }
-  }, [cycleFit]);
+  const [currentServerIndex, setCurrentServerIndex] = useState(0);
 
-  const videoTransform = pinchScale > 1
-    ? `scale(${pinchScale})`
-    : 'none';
-
-
-  const isLive = Boolean(item?.is_live || item?.type === 'live' || item?.year === 'LIVE');
-  const sources = useMemo(() => {
-    return generateUniversalServers({
-      ...item,
-      players: [
-        ...(item?.players || item?.player || []),
-        ...(server ? [server] : [])
-      ]
-    });
-  }, [item, server]);
-  const activeSource = sources[sourceIndex];
-
-  const [autoFailoverMsg, setAutoFailoverMsg] = useState(null);
-
-  // Auto-dismiss Controls Timer (3 seconds inactivity)
-  const resetControlsTimer = useCallback(() => {
-    setShowControls(true);
-    if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current);
-
-    // Only auto-dismiss if video is playing and settings drawers are closed
-    controlsTimerRef.current = setTimeout(() => {
-      if (videoRef.current && !videoRef.current.paused && !showSettings) {
-        setShowControls(false);
-      }
-    }, AUTO_DISMISS_DELAY_MS);
-  }, [showSettings]);
-  // Keep the ref in sync so zoom handlers defined earlier can call it safely
-  useEffect(() => { resetControlsTimerRef.current = resetControlsTimer; }, [resetControlsTimer]);
-
-  const clearFailureTimer = useCallback(() => {
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    timeoutRef.current = null;
-  }, []);
-
-  const failover = useCallback((message) => {
-    clearFailureTimer();
-    if (sourceIndex + 1 < sources.length) {
-      const nextIdx = sourceIndex + 1;
-      const nextServer = sources[nextIdx];
-      setAutoFailoverMsg(`⚡ Mirror ${sourceIndex + 1} busy. Auto-connecting to ${nextServer?.name || `Server ${nextIdx + 1}`}...`);
-      setTimeout(() => setAutoFailoverMsg(null), 3500);
-      setSourceIndex(nextIdx);
-    } else {
-      if (item && (item.is_live || item.type === 'live' || item.year === 'LIVE')) {
-        const failedUrl = sources[sourceIndex]?.url || item.url;
-        if (failedUrl) markChannelDead(failedUrl);
-      }
-      setBuffering(false);
-      setError('Primary streams are currently busy. Select a backup mirror below:');
-    }
-  }, [clearFailureTimer, sourceIndex, sources]);
-
-  const armFailureTimer = useCallback((delay, message) => {
-    clearFailureTimer();
-    timeoutRef.current = setTimeout(() => failover(message), delay);
-  }, [clearFailureTimer, failover]);
-
+  // Match requested server prop to currentServerIndex
   useEffect(() => {
-    if (server && sources.length > 0) {
-      const idx = sources.findIndex(s => 
+    if (server && orderedServers.length > 0) {
+      const idx = orderedServers.findIndex(s => 
         (server.id && s.id === server.id) || 
         (server.url && s.url === server.url) || 
         (server.name && s.name === server.name)
       );
       if (idx >= 0) {
-        setSourceIndex(idx);
-      } else {
-        setSourceIndex(0);
+        setCurrentServerIndex(idx);
+        return;
       }
-    } else {
-      setSourceIndex(0);
     }
-    setError('');
-    // RESUME FIX: restore last watched position for this title (Continue
-    // Watching). Saved by saveProgress on close; looked up by id/title.
+    setCurrentServerIndex(0);
+  }, [item?.id, item?.title, item?.url, server, orderedServers]);
+  const [videoEngine, setVideoEngine] = useState('hls'); // 'hls' | 'native'
+  const [fitMode, setFitMode] = useState('clean'); // 'clean' (default VBI crop) | 'zoom' | 'stretch' | 'original'
+  const [isPlaying, setIsPlaying] = useState(true);
+  const [isBuffering, setIsBuffering] = useState(true);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [bingeCountdown, setBingeCountdown] = useState(null);
+  const [showOsd, setShowOsd] = useState(true);
+  const [showDrawer, setShowDrawer] = useState(null); // 'channels' | 'servers' | 'audio' | 'epg' | null
+  const [audioTracks, setAudioTracks] = useState([]);
+  const [currentAudio, setCurrentAudio] = useState(0);
+  const [errorMessage, setErrorMessage] = useState(null);
+  const [nativeActive, setNativeActive] = useState(false);
+  // v3.10.1: embed mirrors are preflighted by the native bridge before the
+  // iframe mounts, so a provider's server-error page (Vercel 500 etc.) is
+  // skipped before the user ever sees it.
+  const [embedReady, setEmbedReady] = useState(true);
+  const preflightDoneRef = useRef(false);
+
+  const activeServer = orderedServers[currentServerIndex] || orderedServers[0] || server;
+  const streamUrl = activeServer?.url || item?.url;
+  const isEmbedStream = Boolean(streamUrl && (isEmbedUrl(streamUrl) || !isDirectMediaUrl(streamUrl)));
+
+  const cycleFitMode = useCallback(() => {
+    setFitMode(prev => {
+      const next = prev === 'clean' ? 'zoom' : prev === 'zoom' ? 'stretch' : prev === 'stretch' ? 'original' : 'clean';
+      setErrorMessage(`Aspect Fit: ${next === 'clean' ? 'Clean (No Lines)' : next === 'zoom' ? '16:9 Zoom' : next === 'stretch' ? 'Stretch Full' : 'Original 1:1'}`);
+      setTimeout(() => setErrorMessage(null), 2500);
+      return next;
+    });
+  }, []);
+
+  const videoStyle = useMemo(() => {
+    if (fitMode === 'zoom') {
+      return {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        display: 'block',
+        width: '100%',
+        height: '100%',
+        objectFit: 'cover',
+        backgroundColor: 'transparent',
+        background: 'transparent'
+      };
+    }
+    if (fitMode === 'stretch') {
+      return {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        display: 'block',
+        width: '100%',
+        height: '100%',
+        objectFit: 'fill',
+        backgroundColor: 'transparent',
+        background: 'transparent'
+      };
+    }
+    if (fitMode === 'original') {
+      return {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        display: 'block',
+        width: '100%',
+        height: '100%',
+        objectFit: 'contain',
+        backgroundColor: 'transparent',
+        background: 'transparent'
+      };
+    }
+    return {
+      position: 'absolute',
+      top: '-1%',
+      left: '-1%',
+      display: 'block',
+      width: '102%',
+      height: '102%',
+      objectFit: 'contain',
+      clipPath: 'inset(3px 0 0 0)',
+      backgroundColor: 'transparent',
+      background: 'transparent'
+    };
+  }, [fitMode]);
+
+  // Wake up OSD and reset auto-hide timer
+  // v3.10.0 FIX: read drawer state through a ref so the timer closure never
+  // captures a stale showDrawer value — previously the OSD could vanish
+  // underneath an open drawer.
+  const pingOsd = useCallback(() => {
+    setShowOsd(true);
+    if (osdTimerRef.current) clearTimeout(osdTimerRef.current);
+    osdTimerRef.current = setTimeout(() => {
+      if (!showDrawerRef.current) {
+        setShowOsd(false);
+      }
+    }, 4500);
+  }, []);
+
+  useEffect(() => {
+    showDrawerRef.current = showDrawer;
+  }, [showDrawer]);
+
+  // v3.10.0: let App.handleBack know the drawer is open so the global Back
+  // handler closes the drawer (via TVPlayer's own handler) instead of
+  // tearing down the whole player and losing the resume position.
+  useEffect(() => {
+    window.__ajoPlayerDrawerOpen = Boolean(showDrawer);
+    return () => {
+      if (window.__ajoPlayerDrawerOpen) window.__ajoPlayerDrawerOpen = false;
+    };
+  }, [showDrawer]);
+
+  // Initial OSD wake-up + resume lookup
+  useEffect(() => {
+    pingOsd();
     try {
       const progress = getWatchProgress(item);
-      if (progress && progress.currentTime > 15) {
+      if (progress && progress.currentTime > 5) {
         resumePositionRef.current = progress.currentTime;
-      } else {
-        resumePositionRef.current = null;
       }
-    } catch {
-      resumePositionRef.current = null;
+    } catch {}
+    return () => {
+      if (osdTimerRef.current) clearTimeout(osdTimerRef.current);
+    };
+  }, [item, pingOsd]);
+
+  // BINGE: countdown ticker — fires next episode at 0
+  useEffect(() => {
+    if (bingeCountdown === null) {
+      if (bingeCountdownRef.current) {
+        clearInterval(bingeCountdownRef.current);
+        bingeCountdownRef.current = null;
+      }
+      return;
     }
-  }, [item]);
+    bingeCountdownRef.current = setInterval(() => {
+      setBingeCountdown(prev => {
+        if (prev === null) return null;
+        // v3.3.43: countdown state is an OBJECT {countdown, nextItem} —
+        // decrement the countdown field, keep nextItem.
+        if (typeof prev === 'number') {
+          if (prev <= 1) {
+            const nextIdx = currentEpisodeIndex + 1;
+            if (nextIdx < episodes.length && onSelectEpisode) {
+              onSelectEpisode(episodes[nextIdx], nextIdx);
+            }
+            return null;
+          }
+          return prev - 1;
+        }
+        if (prev.countdown <= 1) {
+          const nextIdx = currentEpisodeIndex + 1;
+          if (nextIdx < episodes.length && onSelectEpisode) {
+            onSelectEpisode(episodes[nextIdx], nextIdx);
+          }
+          return null;
+        }
+        return { ...prev, countdown: prev.countdown - 1 };
+      });
+    }, 1000);
+    return () => {
+      clearInterval(bingeCountdownRef.current);
+      bingeCountdownRef.current = null;
+    };
+  }, [bingeCountdown, currentEpisodeIndex, episodes, onSelectEpisode]);
 
-  // ---- ORIENTATION (fix): auto-rotate to landscape when playback starts,
-  // restore sensor/auto when the player closes. Uses the AndroidOrientation
-  // bridge exposed by MainActivity; falls back to the Fullscreen API on
-  // devices where the bridge is unavailable.
-  const lockLandscape = useCallback(() => {
-    try {
-      if (window.AndroidOrientation?.setLandscape) { window.AndroidOrientation.setLandscape(); return; }
-    } catch {}
-    try {
-      if (document.documentElement.requestFullscreen) {
-        document.documentElement.requestFullscreen().then(() =>
-          window.screen?.orientation?.lock?.('landscape').catch(() => {})
-        ).catch(() => {});
+  // Auto failover to next server if current server fails
+  const handleFailover = useCallback((reason = 'Stream connection error') => {
+    if (orderedServers.length > 1 && currentServerIndex < orderedServers.length - 1) {
+      const nextIdx = currentServerIndex + 1;
+      const nextName = orderedServers[nextIdx]?.name || `Server ${nextIdx + 1}`;
+      setErrorMessage(`⚡ ${reason}. Switching to ${nextName}...`);
+      setCurrentServerIndex(nextIdx);
+      setTimeout(() => setErrorMessage(null), 3000);
+    } else {
+      if (item && (item.is_live || item.type === 'live' || item.year === 'LIVE')) {
+        const failedUrl = orderedServers[currentServerIndex]?.url || item.url;
+        if (failedUrl) markChannelDead(failedUrl);
       }
-    } catch {}
+      setErrorMessage('Stream offline. Please select another server or channel.');
+      setIsBuffering(false);
+    }
+  }, [orderedServers, currentServerIndex]);
+
+  // Toggle Video Engine (HLS.js vs Native Android HTML5 Video)
+  const toggleEngine = useCallback(() => {
+    const nextEngine = videoEngine === 'hls' ? 'native' : 'hls';
+    setVideoEngine(nextEngine);
+    setErrorMessage(`Switched Video Engine to: ${nextEngine === 'hls' ? 'HLS.js' : 'Native TV Player'}`);
+    setTimeout(() => setErrorMessage(null), 2500);
+  }, [videoEngine]);
+
+  /**
+   * Fully stops WebView playback and frees the video decoder.
+   *
+   * Fire TV boxes have a tiny MediaCodec budget. Handing a stream to the native
+   * ExoPlayer activity while Hls.js still holds a decoder is how you end up with
+   * audio on top of a black picture, so nothing may launch before this runs.
+   */
+  const teardownWebPlayback = useCallback(() => {
+    if (stallWatchdogRef.current) {
+      clearInterval(stallWatchdogRef.current);
+      stallWatchdogRef.current = null;
+    }
+    if (blackScreenWatchdogRef.current) {
+      clearInterval(blackScreenWatchdogRef.current);
+      blackScreenWatchdogRef.current = null;
+    }
+    if (progressSaverRef.current) {
+      clearInterval(progressSaverRef.current);
+      progressSaverRef.current = null;
+    }
+    if (hlsRef.current) {
+      try {
+        hlsRef.current.destroy();
+      } catch (err) {
+        console.warn('Hls teardown notice:', err);
+      }
+      hlsRef.current = null;
+    }
+    const video = videoRef.current;
+    if (video) {
+      try {
+        // SAVE POSITION BEFORE teardown zeroes the element. Read it first and
+        // stash it so onClose() still gets a real value after src removal.
+        lastPositionRef.current = video.currentTime || 0;
+        video.pause();
+        video.removeAttribute('src');
+        video.load();
+      } catch (err) {
+        console.warn('Video teardown notice:', err);
+      }
+    }
   }, []);
 
-  const unlockOrientation = useCallback(() => {
-    try {
-      if (window.AndroidOrientation?.setAuto) { window.AndroidOrientation.setAuto(); return; }
-    } catch {}
-    try {
-      window.screen?.orientation?.unlock?.();
-      if (document.fullscreenElement?.exitFullscreen) document.fullscreenElement.exitFullscreen().catch(() => {});
-    } catch {}
-  }, []);
+  /** Single entry point for every handoff to the native hardware player. */
+  const handOffToNative = useCallback((message) => {
+    if (!hasNativePlayer()) return false;
+    if (!streamUrl) return false;
+    if (!isNativePlayableUrl(streamUrl)) return false;
 
-  // Lock landscape as soon as the player mounts
+    // Release the decoder first, then launch. Order matters here.
+    teardownWebPlayback();
+
+    const fallbackUrls = orderedServers.map(s => s?.url).filter(Boolean);
+    if (!playInNativePlayer(streamUrl, title, isLive, fallbackUrls)) return false;
+
+    nativeHandoffDoneRef.current = streamUrl;
+    nativeActiveRef.current = true;
+    setNativeActive(true);
+    setIsBuffering(false);
+    setErrorMessage(message || '▶ Opening in hardware player...');
+    setTimeout(() => setErrorMessage(null), 2500);
+    return true;
+  }, [streamUrl, title, isLive, orderedServers, teardownWebPlayback]);
+
+  const launchNativeHardwarePlayer = useCallback(() => {
+    if (handOffToNative('▶ Opening in hardware player...')) return true;
+    setErrorMessage(
+      hasNativePlayer()
+        ? 'This source cannot open in the hardware player. Try another server.'
+        : 'Native Player only available on Android / Fire TV'
+    );
+    setTimeout(() => setErrorMessage(null), 3000);
+    return false;
+  }, [handOffToNative]);
+
+  // Let the Android layer stop web playback directly before it starts the native
+  // player, so the decoder is free even if the handoff came from the Java side.
   useEffect(() => {
-    lockLandscape();
-    return () => unlockOrientation();
-  }, [lockLandscape, unlockOrientation]);
+    window.__ajoStopWebPlayback = () => teardownWebPlayback();
+    return () => {
+      if (window.__ajoStopWebPlayback) delete window.__ajoStopWebPlayback;
+    };
+  }, [teardownWebPlayback]);
 
-
-  const isEmbed = useMemo(() => {
-    return activeSource?.type === 'embed' || activeSource?.source === 'embed' || detectStreamType(activeSource?.url) === 'embed';
-  }, [activeSource]);
-
+  // The native player finished or the user pressed Back inside it. Close this view
+  // instead of leaving a dead, black <video> element on screen.
   useEffect(() => {
-    if (isEmbed) {
-      setBuffering(false);
-      setPlaying(true);
-      setError('');
-      clearFailureTimer();
-      resetControlsTimer();
+    const handleNativeClosed = (e) => {
+      if (!nativeActiveRef.current) return;
+      teardownWebPlayback();
+      if (onClose) {
+        const video = videoRef.current;
+        const cur = e?.detail?.currentTime || lastPositionRef.current || video?.currentTime || 0;
+        const dur = e?.detail?.duration || video?.duration || 0;
+        onClose(cur, dur);
+      }
+    };
+    window.addEventListener('ajo-native-player-closed', handleNativeClosed);
+    return () => window.removeEventListener('ajo-native-player-closed', handleNativeClosed);
+  }, [onClose, teardownWebPlayback]);
+
+  // v3.12.22: On Fire TV / Android TV, hand ALL streams (including embeds) to
+  // the native PlayerActivity. Its WebView engine has ad-blocking, popup-blocking,
+  // auto-play scripts, and D-pad remote support that the Capacitor iframe lacks.
+  // Previously embed URLs were skipped here because isNativePlayableUrl filtered
+  // them, leaving them to the iframe which couldn't auto-play or block ads.
+  useEffect(() => {
+    if (!streamUrl) return;
+    if (nativeHandoffDoneRef.current === streamUrl) return;
+    if (!shouldPreferNativePlayer()) return;
+    if (!isNativePlayableUrl(streamUrl)) return;
+
+    nativeHandoffDoneRef.current = streamUrl;
+    handOffToNative('▶ Opening in hardware player...');
+  }, [streamUrl, handOffToNative]);
+
+  // v3.12.16: Embed mirrors mount immediately so video player starts right away
+  useEffect(() => {
+    if (!streamUrl) return;
+    if (nativeActiveRef.current) return;
+    setEmbedReady(true);
+    setErrorMessage(null);
+  }, [streamUrl]);
+
+  // Video & Hls.js Pipeline Setup
+  useEffect(() => {
+    if (!streamUrl) {
+      setIsBuffering(false);
+      setErrorMessage('No valid stream URL found.');
+      return;
+    }
+
+    // Playback belongs to the native player now. Building the WebView pipeline
+    // here would take a second decoder and black out the native surface.
+    if (nativeActiveRef.current) {
+      setIsBuffering(false);
       return;
     }
 
     const video = videoRef.current;
-    if (!video || !activeSource?.url) {
-      setBuffering(false);
-      setError('No checked stream is available for this title.');
-      return;
+    if (!video) return;
+
+    setIsBuffering(true);
+    setErrorMessage(null);
+
+    let hls = null;
+    let disposed = false; // v3.11.0: guards the lazy hls.js import resolving after cleanup
+    let lastProgressTime = 0;
+    // v3.8.0: bounded fatal-error retries. Unbounded startLoad()/recoverMediaError()
+    // loops kept the "Connecting..." state alive for minutes on dead CDNs.
+    const isEmbedStream = isEmbedUrl(streamUrl) || !isDirectMediaUrl(streamUrl);
+    if (isEmbedStream) {
+      setIsBuffering(false);
+      setErrorMessage(null);
+
+      // v3.12.20 FIX: embed watchdog was previously dead code after this
+      // early return. Now it's registered HERE so it actually fires. When the
+      // iframe's onLoad sets dataset.loaded='1', the watchdog is a no-op.
+      // If the embed times out (dead host / Cloudflare block), we failover.
+      if (embedWatchdogRef.current) clearTimeout(embedWatchdogRef.current);
+      embedWatchdogRef.current = setTimeout(() => {
+        const iframe = iframeRef.current;
+        const loaded = iframe && iframe.dataset && iframe.dataset.loaded === '1';
+        if (!loaded && !nativeActiveRef.current) {
+          handleFailover('Embed mirror not responding');
+        }
+      }, EMBED_LOAD_TIMEOUT_MS);
+
+      return () => {
+        disposed = true;
+        if (embedWatchdogRef.current) {
+          clearTimeout(embedWatchdogRef.current);
+          embedWatchdogRef.current = null;
+        }
+      };
     }
 
-    let disposed = false;
-    retriesRef.current = 0;
-    setBuffering(true);
-    setError('');
-    setLevels([]);
-    // Startup tolerance: CDNs can take 10-15s to first segment. The failure
-    // timer only fires if hls.js has NOT received ANY data (manifest parsed
-    // resets it). Prevents false failovers on slow-but-working mirrors.
-    armFailureTimer(STARTUP_TIMEOUT_MS, 'The stream took too long to start.');
-
-    const startPlayback = () => {
-      video.play().then(() => {
-        if (!disposed) {
-          setPlaying(true);
-          setBuffering(false);
-          clearFailureTimer();
-          resetControlsTimer();
-        }
-      }).catch(() => {
-        if (!disposed) setPlaying(false);
-      });
-    };
-
-    const type = detectStreamType(activeSource.url, activeSource.type || activeSource.source);
-
-    if (type === 'hls' && (activeSource.url.includes('.m3u8') || activeSource.url.includes('.m3u') || activeSource.type === 'hls' || activeSource.source === 'hls')) {
+    if (videoEngine === 'hls' && (streamUrl.includes('.m3u8') || streamUrl.includes('/getm3u8/') || isLive || streamUrl.endsWith('.m3u8'))) {
       (async () => {
-        // v3.3.1: hls.js is a lazy chunk — fetched only when a stream needs it.
+        // v3.11.0: hls.js (~350KB) is a lazy chunk now — fetched only when a
+        // stream actually needs it. Boot time and RAM on Fire TV drop sharply.
         const Hls = (await import('hls.js')).default;
         const videoNow = videoRef.current;
         if (disposed || !videoNow || videoNow !== video) return;
         if (!Hls.isSupported()) {
-          onError(new Error('HLS unsupported'));
+          if (!handOffToNative('Web player unavailable, switching to hardware player...')) {
+            handleFailover('Player engine error');
+          }
           return;
         }
-
-        // Use optimized HLS config based on content type
-        const hlsConfig = isLive
-          ? getLiveConfig(activeSource.headers || {})
-          : getVodConfig(activeSource.headers || {});
-
-        const hls = new Hls(hlsConfig);
+        hls = new Hls({
+          enableWorker: true,
+          lowLatencyMode: false,
+          liveSyncDurationCount: isLive ? 3 : undefined,
+          liveMaxLatencyDurationCount: isLive ? 6 : undefined,
+          startFragPrefetch: true,
+          startLevel: -1,
+          capLevelToPlayerSize: true,
+          backBufferLength: isLive ? 2 : 15,
+          maxBufferLength: isLive ? 12 : 25,
+          maxMaxBufferLength: isLive ? 20 : 45,
+          maxBufferSize: 24 * 1024 * 1024,
+          maxBufferHole: 0.5,
+          highBufferWatchdogPeriod: 2,
+          nudgeOffset: 0.2,
+          nudgeMaxRetry: 5,
+          fragLoadingTimeOut: 15000,
+          manifestLoadingTimeOut: 15000,
+          levelLoadingTimeOut: 15000,
+          fragLoadingMaxRetry: 4,
+          manifestLoadingMaxRetry: 4,
+          levelLoadingMaxRetry: 4,
+        });
         hlsRef.current = hls;
-        hls.loadSource(activeSource.url);
+  
+        hls.loadSource(streamUrl);
         hls.attachMedia(video);
-        hls.on(Hls.Events.MANIFEST_PARSED, (_e, data) => {
-          if (disposed) return;
-          setLevels(data.levels.map((lvl, index) => ({ index, label: `${lvl.height || 720}p` })));
-          // Manifest arrived = mirror is alive. Cancel the startup failover so
-          // slow segment loads don't trigger a false "took too long" switch.
-          clearFailureTimer();
-          // RESUME: jump to last watched position before starting playback
-          if (resumePositionRef.current && Number.isFinite(resumePositionRef.current)) {
-            try { video.currentTime = resumePositionRef.current; } catch {}
+  
+        hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
+          if (data.audioTracks && data.audioTracks.length > 0) {
+            setAvailableAudioTracks(data.audioTracks.map((t, idx) => ({
+              id: idx,
+              label: t.name || t.lang || `Track ${idx + 1}`
+            })));
+          }
+          video.play().then(() => {
+            setIsPlaying(true);
+            setIsBuffering(false);
+            if (resumePositionRef.current) {
+              try {
+                video.currentTime = resumePositionRef.current;
+              } catch {}
+              resumePositionRef.current = null;
+            }
+          }).catch(err => {
+            console.warn('Autoplay notification:', err);
+          });
+        });
+  
+        hls.on(Hls.Events.FRAG_LOADED, () => {
+          setIsBuffering(false);
+          if (resumePositionRef.current) {
+            try {
+              const v = videoRef.current;
+              if (v) v.currentTime = resumePositionRef.current;
+            } catch {}
             resumePositionRef.current = null;
           }
-          startPlayback();
         });
-        // Enhanced error handler with auto-failover on 403/404
-        hls.on(Hls.Events.ERROR, createErrorHandler(hls, (msg) => {
-          if (disposed) return;
-          // Fallback to Native Player first
-          try {
-            hls.destroy();
-            hlsRef.current = null;
-            video.src = activeSource.url;
-            video.load();
-            startPlayback();
-          } catch {
-            failover(msg || 'Stream playback error encountered.');
+  
+        hls.on(Hls.Events.AUDIO_TRACK_SWITCHED, (event, data) => {
+          setCurrentAudio(data.id);
+        });
+  
+        hls.on(Hls.Events.ERROR, (event, data) => {
+          if (data.fatal) {
+            switch (data.type) {
+              case Hls.ErrorTypes.NETWORK_ERROR:
+                if (!handOffToNative('Network error, switching to hardware player...')) {
+                  hls.startLoad();
+                }
+                break;
+              case Hls.ErrorTypes.MEDIA_ERROR:
+                if (!handOffToNative('Media decode error, switching to hardware player...')) {
+                  hls.recoverMediaError();
+                }
+                break;
+              default:
+                if (!handOffToNative('Stream engine error, switching to hardware player...')) {
+                  hls.destroy();
+                  hlsRef.current = null;
+                  handleFailover('Stream engine error');
+                }
+                break;
+            }
           }
-        }, retriesRef));
+        });
+  
+        // 24/7 Anti-Stall and Anti-Buffering watchdog timer
+        let bufferingDuration = 0;
+        let stallDuration = 0;
+        let lastProgressTime = 0;
+        stallWatchdogRef.current = setInterval(() => {
+          if (video) {
+            if (video.paused && isBuffering) {
+              bufferingDuration += 2;
+              if (bufferingDuration >= 8) {
+                bufferingDuration = 0;
+                if (isLive && hls) {
+                  // Re-sync live broadcast cleanly to the live edge without failing over
+                  hls.startLoad();
+                  if (video.buffered.length > 0) {
+                    video.currentTime = Math.max(0, video.buffered.end(video.buffered.length - 1) - 0.5);
+                  }
+                  video.play().catch(() => {});
+                } else if (!handOffToNative('Buffering timeout, switching to hardware player...')) {
+                  handleFailover('Stream buffering timed out');
+                }
+              }
+            } else if (!video.paused && video.readyState >= 2) {
+              bufferingDuration = 0;
+              if (video.currentTime === lastProgressTime && isLive) {
+                stallDuration += 2;
+                if (stallDuration >= 6) {
+                  stallDuration = 0;
+                  if (hls) {
+                    hls.startLoad();
+                    if (video.buffered.length > 0) {
+                      video.currentTime = Math.max(0, video.buffered.end(video.buffered.length - 1) - 0.5);
+                    }
+                    video.play().catch(() => {});
+                  }
+                }
+              } else {
+                stallDuration = 0;
+              }
+              lastProgressTime = video.currentTime;
+            }
+          }
+        }, 2000);
       })();
+
+    // v3.12.20: embed watchdog moved to the early-return block above (line ~460)
     } else {
-      video.src = activeSource.url;
-      video.load();
-      // RESUME for non-HLS (mp4 etc): seek once metadata is known
-      if (resumePositionRef.current) {
-        const rp = resumePositionRef.current;
-        const onMeta = () => {
-          try { video.currentTime = rp; } catch {}
+      // Native Android HTML5 video playback
+      video.src = streamUrl;
+      const onLoadedMeta = () => {
+        if (resumePositionRef.current) {
+          try { video.currentTime = resumePositionRef.current; } catch {}
           resumePositionRef.current = null;
-          video.removeEventListener('loadedmetadata', onMeta);
-        };
-        video.addEventListener('loadedmetadata', onMeta);
-      }
-      startPlayback();
+        }
+      };
+      video.addEventListener('loadedmetadata', onLoadedMeta, { once: true });
+      video.play().then(() => {
+        setIsPlaying(true);
+        setIsBuffering(false);
+        if (resumePositionRef.current) {
+          try { video.currentTime = resumePositionRef.current; } catch {}
+          resumePositionRef.current = null;
+        }
+      }).catch(err => console.warn(err));
     }
 
-    const onWaiting = () => {
-      setBuffering(true);
-      armFailureTimer(REBUFFER_TIMEOUT_MS, 'Playback stalled.');
-    };
-    const onPlaying = () => {
-      setPlaying(true);
-      setBuffering(false);
-      setError('');
-      noStartSinceRef.current = 0;
-      frameStallSinceRef.current = 0;
-      clearFailureTimer();
-    };
-    const onPause = () => {
-      setPlaying(false);
-      setShowControls(true);
-      if (!isLive && video.currentTime > 5 && video.duration > 0) {
-        saveProgress(item, video.currentTime, video.duration);
-      }
-    };
-    const onError = () => failover('The device could not play this source.');
-    const onTime = () => {
-      setTime(video.currentTime || 0);
-      setDuration(Number.isFinite(video.duration) ? video.duration : 0);
-      if (video.buffered && video.buffered.length > 0) {
-        setBufferedEnd(video.buffered.end(video.buffered.length - 1));
-      }
-      // PROGRESS = ALIVE: any timeupdate while stalled means data is flowing.
-      // Reset the rebuffer failover so slow-but-moving streams never get
-      // killed and dumped into the Recovery modal.
-      if (!video.paused) clearFailureTimer();
+    // Periodic progress save (every 5s) so Continue Watching is accurate
+    // even if the app crashes or power dies mid-watch.
+    progressSaverRef.current = setInterval(() => {
+      try {
+        if (video.currentTime > 5 && video.duration > 0 && !isLive) {
+          saveProgress(item, video.currentTime, video.duration);
+        }
+      } catch {}
+    }, 5000);
 
-      // ---- v3.2.0 FRAME-TRUTH WATCHDOG (fixes ">1min stuck" modal hang) ----
-      // play() resolving or timeupdate firing is NOT proof of video. The
-      // playback clock can tick on audio alone while the video plane shows a
-      // frozen frame forever. Watch DECODED-FRAME COUNTS instead (wall-clock
-      // based; timeupdate fires ~4x/sec so tick counting would be 4x fast):
-      const now = Date.now();
-      const frames =
-        (typeof video.getVideoPlaybackQuality === 'function'
-          ? video.getVideoPlaybackQuality().totalVideoFrames
-          : (video.webkitDecodedFrameCount ?? 0)) || 0;
-      const hasEverRendered = frames > 0;
+    // Black Screen Detection & Auto-Recovery Watchdog:
+    // If audio is progressing (currentTime advancing) but the video plane never
+    // reports dimensions / decoded frames, the WebView compositor is painting
+    // opaque black over the hardware video surface. Hand off to the native
+    // ExoPlayer activity. Only active when a native player is available.
+    if (hasNativePlayer()) {
+      let blackScreenChecks = 0;
+      blackScreenWatchdogRef.current = setInterval(() => {
+        if (!video || nativeActiveRef.current || nativeHandoffDoneRef.current === streamUrl) return;
+        blackScreenChecks += 1;
 
-      if (!hasEverRendered && !isLive && video.duration > 0 && video.readyState < 2) {
-        // VOD that never decoded its first frame — give it 12s, then fail over.
-        if (!noStartSinceRef.current) noStartSinceRef.current = now;
-        else if (now - noStartSinceRef.current >= 12000) {
-          noStartSinceRef.current = 0;
-          failover('This source never produced video.');
+        const advancing = !video.paused && video.currentTime > 1;
+        const noVideoPlane = video.videoWidth === 0 || video.videoHeight === 0;
+        // decoded-frame counters where the browser exposes them
+        const decodedFrames =
+          (typeof video.getVideoPlaybackQuality === 'function'
+            ? video.getVideoPlaybackQuality().totalVideoFrames
+            : video.webkitDecodedFrameCount) ?? null;
+        const noFrames = decodedFrames !== null && decodedFrames === 0;
+
+        if (advancing && (noVideoPlane || noFrames)) {
+          console.warn('Black screen detected in WebView, handing off to native hardware player');
+          const watchdog = blackScreenWatchdogRef.current;
+          if (!handOffToNative('Black screen detected, switching to hardware player...')) {
+            // Cannot hand off (not a real stream URL, or not an Android build).
+            // Try the next source rather than staring at a black screen.
+            nativeHandoffDoneRef.current = streamUrl;
+            handleFailover('Video not rendering');
+          }
+          if (watchdog) clearInterval(watchdog);
           return;
         }
-      } else {
-        noStartSinceRef.current = 0;
-      }
 
-      if (!video.paused && hasEverRendered) {
-        frameStallSinceRef.current = 0;
-      } else if (!video.paused) {
-        // Playing per the clock but zero rendered frames: the exact "frozen
-        // picture, audio continues" case. 6s → failover instead of hanging.
-        if (!frameStallSinceRef.current) frameStallSinceRef.current = now;
-        else if (now - frameStallSinceRef.current >= 6000) {
-          frameStallSinceRef.current = 0;
-          failover('Video froze while audio continued.');
-          return;
+        // Stop polling once we have a healthy picture, or after ~15s.
+        if ((advancing && !noVideoPlane) || blackScreenChecks > 10) {
+          clearInterval(blackScreenWatchdogRef.current);
         }
-      }
-
-      if (!isLive && video.duration > 0 && Math.floor(video.currentTime) % 5 === 0) {
-        saveProgress(item, video.currentTime, video.duration);
-      }
-    };
-
-    video.addEventListener('waiting', onWaiting);
-    video.addEventListener('playing', onPlaying);
-    video.addEventListener('pause', onPause);
-    video.addEventListener('error', onError);
-    video.addEventListener('timeupdate', onTime);
+      }, 1500);
+    }
 
     return () => {
       disposed = true;
-      clearFailureTimer();
-      if (!isLive && video.currentTime > 5 && video.duration > 0) {
-        saveProgress(item, video.currentTime, video.duration);
-      }
-      if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current);
-      video.removeEventListener('waiting', onWaiting);
-      video.removeEventListener('playing', onPlaying);
-      video.removeEventListener('pause', onPause);
-      video.removeEventListener('error', onError);
-      video.removeEventListener('timeupdate', onTime);
-      if (hlsRef.current) {
-        hlsRef.current.destroy();
+      if (stallWatchdogRef.current) { clearInterval(stallWatchdogRef.current); stallWatchdogRef.current = null; }
+      if (blackScreenWatchdogRef.current) { clearInterval(blackScreenWatchdogRef.current); blackScreenWatchdogRef.current = null; }
+      if (embedWatchdogRef.current) { clearTimeout(embedWatchdogRef.current); embedWatchdogRef.current = null; }
+      // v3.3.41: CRITICAL — progressSaverRef and bingeCountdownRef were never
+      // cleared here, causing interval accumulation that exhausted device RAM.
+      if (progressSaverRef.current) { clearInterval(progressSaverRef.current); progressSaverRef.current = null; }
+      if (bingeCountdownRef.current) { clearInterval(bingeCountdownRef.current); bingeCountdownRef.current = null; }
+      if (hls) {
+        hls.destroy();
         hlsRef.current = null;
       }
-      video.removeAttribute('src');
-      video.load();
+      if (video) {
+        video.pause();
+        video.removeAttribute('src');
+        video.load();
+      }
     };
-  }, [activeSource?.url, isLive, item]);
+  }, [streamUrl, isLive, videoEngine, nativeActive, handOffToNative, handleFailover]);
 
-  const close = useCallback(() => {
-    if (!isLive && duration > 0) saveProgress(item, time, duration);
-    onClose?.(time, duration);
-  }, [duration, isLive, item, onClose, time]);
-
-  const togglePlay = () => {
-    resetControlsTimer();
-    const video = videoRef.current;
-    if (!video) return;
-    // LIVE channels never pause — a tap just toggles the controls overlay.
-    // Pausing a live stream makes no sense (you'd fall behind the broadcast).
-    if (isLive) {
-      setShowControls(prev => !prev);
-      return;
+  // Auto-clear transient error messages after 3.5s
+  useEffect(() => {
+    if (errorMessage && !errorMessage.includes('Failed') && !errorMessage.includes('Error')) {
+      const t = setTimeout(() => setErrorMessage(null), 3500);
+      return () => clearTimeout(t);
     }
-    if (video.paused) video.play().catch(() => {});
-    else video.pause();
-  };
+  }, [errorMessage]);
 
-  const seekRelative = (delta) => {
-    resetControlsTimer();
+  // Video Time Update & Progress
+  const handleTimeUpdate = useCallback(() => {
     const video = videoRef.current;
     if (!video || isLive) return;
-    const target = Math.max(0, Math.min(duration || Infinity, (video.currentTime || 0) + delta));
-    video.currentTime = target;
-    setTime(target);
+    setCurrentTime(video.currentTime);
+    setDuration(video.duration || 0);
 
-    setSeekFeedback(delta > 0 ? `+${delta}s` : `${delta}s`);
-    setTimeout(() => setSeekFeedback(null), 600);
-  };
+    // BINGE AUTO-ADVANCE: near the end of a multi-episode title, show a
+    // countdown; at 0, jump to the next episode automatically.
+    if (episodes.length > 1 && onSelectEpisode && video.duration > 0) {
+      const left = video.duration - video.currentTime;
+      if (left <= BINGE_COUNTDOWN_SECONDS && !bingeFiredRef.current) {
+        bingeFiredRef.current = true;
+        // v3.3.43 FIX: the countdown card reads bingeCountdown.countdown /
+        // bingeCountdown.nextItem, but the state was a bare NUMBER here —
+        // `bingeCountdown.nextItem?.title` throws on a number and takes the
+        // whole app down to the error boundary (black screen).
+        const nextIdx = currentEpisodeIndex + 1;
+        setBingeCountdown({
+          countdown: BINGE_COUNTDOWN_SECONDS,
+          nextItem: episodes[nextIdx] || null
+        });
+      }
+      if (bingeCountdownRef.current !== null && left > BINGE_COUNTDOWN_SECONDS + 5) {
+        // user seeked backwards out of the window — cancel
+        bingeFiredRef.current = false;
+        setBingeCountdown(null);
+        bingeCountdownRef.current = null;
+      }
+    }
+  }, [isLive, episodes, onSelectEpisode]);
 
-  const handleScrubberClick = (e) => {
-    resetControlsTimer();
+  // Play / Pause Toggle
+  const togglePlayPause = useCallback(() => {
     const video = videoRef.current;
-    if (!video || isLive || !duration) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const pos = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-    const target = pos * duration;
-    video.currentTime = target;
-    setTime(target);
-  };
+    if (!video) return;
+    if (video.paused) {
+      video.play().then(() => setIsPlaying(true)).catch(() => {});
+    } else {
+      video.pause();
+      setIsPlaying(false);
+    }
+    pingOsd();
+  }, [pingOsd]);
 
-  const chooseLevel = (value) => {
-    setLevel(value);
-    if (hlsRef.current) hlsRef.current.currentLevel = value;
-    setShowSettings(false);
-    resetControlsTimer();
-  };
+  // Seeking Forward / Backward
+  const handleSeek = useCallback((deltaSeconds) => {
+    const video = videoRef.current;
+    if (!video || isLive) return;
+    const newTime = Math.max(0, Math.min(video.currentTime + deltaSeconds, video.duration || 0));
+    video.currentTime = newTime;
+    setCurrentTime(newTime);
+    pingOsd();
+  }, [isLive, pingOsd]);
 
-  const chooseSource = (idx) => {
-    setSourceIndex(idx);
-    setShowSettings(false);
-    resetControlsTimer();
-  };
+  // Audio Track Switcher
+  const handleSwitchAudio = useCallback((trackId) => {
+    if (hlsRef.current && hlsRef.current.audioTracks.length > trackId) {
+      hlsRef.current.audioTrack = trackId;
+      setCurrentAudio(trackId);
+      setShowDrawer(null);
+      pingOsd();
+    }
+  }, [pingOsd]);
 
-  const handleCastFromPlayer = () => {
-    resetControlsTimer();
-    castEngine.castMedia(item, {
-      server: activeSource,
-      startPosition: Math.floor(time) || 0
-    }).catch(() => {});
-    setCastSuccess(true);
-    setTimeout(() => setCastSuccess(false), 3000);
-  };
-
+  // TV Remote KeyDown Controller
   useEffect(() => {
-    const onKey = (event) => {
-      if (!showControls) {
-        event.preventDefault();
-        event.stopPropagation();
-        resetControlsTimer();
+    const handleKeyDown = (e) => {
+      pingOsd();
+
+      const key = e.key;
+      const keyCode = e.keyCode;
+
+      // Back key exits player cleanly
+      if (key === 'Escape' || key === 'Backspace' || keyCode === 4 || keyCode === 27 || keyCode === 8) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (showDrawer) {
+          setShowDrawer(null);
+          return;
+        }
+        if (onClose) {
+          const video = videoRef.current;
+          teardownWebPlayback();
+          onClose(lastPositionRef.current || video?.currentTime || 0, video?.duration || 0);
+        }
         return;
       }
-      resetControlsTimer();
 
-      if (event.key === 'Escape' || event.key === 'GoBack' || event.key === 'Backspace') {
-        event.preventDefault();
-        if (showSettings) setShowSettings(false);
-        else close();
-      } else if (event.key === 'Enter' || event.key === ' ') {
-        if (!document.activeElement || document.activeElement === document.body || document.activeElement.tagName === 'VIDEO') {
-          event.preventDefault();
-          togglePlay();
+      // Enter/OK key handling
+      if ((key === 'Enter' || keyCode === 13 || keyCode === 23)) {
+        if (!showDrawer) {
+          if (isLive) {
+            setShowDrawer('epg');
+            e.preventDefault();
+            e.stopPropagation();
+            return;
+          }
+          if (!document.activeElement || document.activeElement === document.body) {
+            togglePlayPause();
+          }
         }
-      } else if (!isLive && event.key === 'ArrowRight') {
-        event.preventDefault();
-        seekRelative(10);
-      } else if (!isLive && event.key === 'ArrowLeft') {
-        event.preventDefault();
-        seekRelative(-10);
+      }
+
+      // v3.10.0 FIX: if spatial navigation already consumed this key
+      // (e.preventDefault was called to move focus), don't ALSO seek or
+      // open drawers — previously ArrowLeft/Right both moved focus and
+      // seeked ±10s, and ArrowDown opened the channel drawer mid-navigation.
+      const navHandled = e.defaultPrevented;
+
+      // Left / Right keys for seeking
+      if (!showDrawer && !isLive && !navHandled) {
+        if (key === 'ArrowLeft' || keyCode === 21 || keyCode === 37) {
+          handleSeek(-10);
+        } else if (key === 'ArrowRight' || keyCode === 22 || keyCode === 39) {
+          handleSeek(10);
+        }
+      }
+
+      // Up / Down key quick drawers. Only hijack when the OSD is visible,
+      // otherwise let the spatial-nav system scroll the live rail.
+      if (showOsd && !navHandled && (key === 'ArrowDown' || keyCode === 20 || keyCode === 40)) {
+        if (!showDrawer && isLive && channels.length > 0) {
+          setShowDrawer('channels');
+        }
       }
     };
-    window.addEventListener('keydown', onKey, true);
-    return () => window.removeEventListener('keydown', onKey, true);
-  }, [showControls, showSettings, close, duration, isLive, resetControlsTimer]);
 
-  const progressPercent = duration > 0 ? (time / duration) * 100 : 0;
-  const bufferedPercent = duration > 0 ? (bufferedEnd / duration) * 100 : 0;
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
+  }, [pingOsd, showDrawer, onClose, isLive, channels, togglePlayPause, handleSeek, teardownWebPlayback]);
+
+  // Format MM:SS helper
+  const formatTime = (timeInSec) => {
+    if (isNaN(timeInSec) || timeInSec === Infinity || timeInSec < 0) return '00:00';
+    const mins = Math.floor(timeInSec / 60);
+    const secs = Math.floor(timeInSec % 60);
+    return `${mins < 10 ? '0' : ''}${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  };
 
   return (
     <div 
-      className="tv-player-container" 
-      onMouseMove={resetControlsTimer}
-      onTouchStart={resetControlsTimer}
-      style={{ 
-        position: 'fixed', 
-        inset: 0, 
-        zIndex: 10000, 
+      className="tv-player-container"
+      onMouseMove={pingOsd}
+      onClick={pingOsd}
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: 99999,
         background: '#000',
-        cursor: showControls ? 'default' : 'none',
         overflow: 'hidden'
       }}
     >
-      {isEmbed ? (
-        <div style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', background: '#000', zIndex: 1 }}>
-          <iframe
-            src={activeSource.url}
-            title={item?.title || 'Player'}
-            allow="autoplay; fullscreen; encrypted-media; picture-in-picture; accelerometer; gyroscope"
-            allowFullScreen
-            style={{
-              width: '100%',
-              height: '100%',
-              border: 'none',
-              background: '#000',
-              position: 'absolute',
-              inset: 0
-            }}
-          />
-        </div>
-      ) : (
-        <video 
-          ref={videoRef} 
-          playsInline 
-          poster={playing ? undefined : (item?.backdrop_url || item?.poster_url || item?.poster || '')} 
+      {/* 1. Direct Video Element (Clean Video-Only Layer) */}
+      <video
+        ref={videoRef}
+        className="tv-player-video"
+        playsInline
+        autoPlay
+        crossOrigin="anonymous"
+        style={videoStyle}
+        onWaiting={() => setIsBuffering(true)}
+        onPlaying={() => {
+          setIsBuffering(false);
+          setIsPlaying(true);
+        }}
+        onCanPlay={() => setIsBuffering(false)}
+        onTimeUpdate={handleTimeUpdate}
+      />
+
+      {/* Buffering Spinner */}
+      {isBuffering && !isEmbedStream && (
+        <div
+          className="tv-center-state"
           style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            textAlign: 'center',
+            pointerEvents: 'none',
+            zIndex: 80
+          }}
+        >
+          <div className="tv-spinner" />
+          <p style={{ fontWeight: 700, color: '#38bdf8', marginTop: 12 }}>Buffering Stream...</p>
+        </div>
+      )}
+
+      {/* Error Message Toast */}
+      {errorMessage && (
+        <div style={{
+          position: 'absolute',
+          top: 32,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: 'rgba(239, 68, 68, 0.95)',
+          color: '#fff',
+          padding: '12px 24px',
+          borderRadius: 9999,
+          fontWeight: 700,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          zIndex: 200,
+          boxShadow: '0 8px 30px rgba(0,0,0,0.5)'
+        }}>
+          <AlertCircle size={20} />
+          <span>{errorMessage}</span>
+        </div>
+      )}
+
+      {/* Fallback to Embed Video Player */}
+      {isEmbedStream && (
+        <iframe
+          ref={iframeRef}
+          src={streamUrl}
+          title={title}
+          allow="autoplay *; encrypted-media *; fullscreen *; picture-in-picture *; clipboard-write *"
+          allowFullScreen
+          referrerPolicy="no-referrer-when-downgrade"
+          loading="eager"
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
             width: '100%',
             height: '100%',
-            objectFit: pinchScale > 1 ? 'cover' : fitMode === 'clean' ? 'contain' : fitMode,
-            transform: pinchScale > 1 ? videoTransform : fitMode === 'clean' ? 'scale(1.02)' : 'none',
-            clipPath: fitMode === 'clean' && pinchScale === 1 ? 'inset(3px 0 0 0)' : 'none',
-            transition: 'transform 0.15s ease-out',
-            backgroundColor: '#000000',
-            touchAction: 'none'
-          }} 
-          onClick={togglePlay}
-          onTouchStart={onTouchStart}
-          onTouchMove={onTouchMove}
-          onTouchEnd={onTouchEnd}
-          onTouchStartCapture={handleVideoTouch}
+            border: 'none',
+            zIndex: 10,
+            background: '#000',
+            pointerEvents: 'auto'
+          }}
+          onLoad={() => {
+            if (iframeRef.current) iframeRef.current.dataset.loaded = '1';
+            if (embedWatchdogRef.current) {
+              clearTimeout(embedWatchdogRef.current);
+              embedWatchdogRef.current = null;
+            }
+          }}
+          onError={() => {
+            handleFailover('Embed mirror connection error');
+          }}
         />
       )}
 
-      {/* Fit mode indicator (brief toast when cycling) */}
-      {fitMode !== 'contain' && pinchScale === 1 && (
+      {/* Binge-Watching Next Episode Countdown Floating Card */}
+      {bingeCountdown && (
         <div style={{
           position: 'absolute',
-          bottom: '84px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          background: 'rgba(15, 23, 42, 0.9)',
+          bottom: 120,
+          right: 48,
+          background: 'rgba(15, 23, 42, 0.95)',
+          backdropFilter: 'blur(16px)',
           border: '1px solid rgba(56, 189, 248, 0.5)',
-          color: '#38bdf8',
-          padding: '6px 14px',
-          borderRadius: 16,
-          fontSize: 12,
-          fontWeight: 800,
-          pointerEvents: 'none'
-        }}>
-          {fitMode === 'clean' ? '✨ Clean (No Lines)' : fitMode === 'cover' ? '🔍 Zoom to Fill' : '📐 Stretch'}
-        </div>
-      )}
-      {pinchScale > 1 && (
-        <div style={{
-          position: 'absolute',
-          bottom: '84px',
-          right: '16px',
-          background: 'rgba(15, 23, 42, 0.9)',
-          border: '1px solid rgba(56, 189, 248, 0.5)',
-          color: '#38bdf8',
-          padding: '6px 12px',
-          borderRadius: 16,
-          fontSize: 12,
-          fontWeight: 800,
-          pointerEvents: 'none'
-        }}>
-          🔍 {Math.round(pinchScale * 100)}%
-        </div>
-      )}
-
-      {/* Auto-Failover Live Toast HUD */}
-      {autoFailoverMsg && (
-        <div style={{
-          position: 'absolute',
-          top: '24px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          background: 'rgba(15, 23, 42, 0.96)',
-          border: '1.5px solid #38bdf8',
-          borderRadius: '24px',
-          padding: '8px 20px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          zIndex: 95,
-          boxShadow: '0 12px 30px rgba(0,0,0,0.8)',
-          maxWidth: '90%'
-        }}>
-          <Loader2 className="spin-animation" size={16} color="#38bdf8" />
-          <span style={{ fontSize: '13px', fontWeight: 800, color: '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {autoFailoverMsg}
-          </span>
-        </div>
-      )}
-
-      {/* Seek Ripple Feedback */}
-      {seekFeedback && (
-        <div className={`seek-ripple-box ${seekFeedback.startsWith('+') ? 'seek-ripple-right' : 'seek-ripple-left'}`}>
-          {seekFeedback.startsWith('+') ? <FastForward size={32} color="#38bdf8" /> : <Rewind size={32} color="#38bdf8" />}
-          <span style={{ fontSize: '16px', fontWeight: 900, color: '#ffffff' }}>{seekFeedback}</span>
-        </div>
-      )}
-
-      {/* Center Buffering Spinner */}
-      {buffering && !error && (
-        <div style={{
-          position: 'absolute',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: '10px',
-          background: 'rgba(15, 23, 42, 0.85)',
-          padding: '16px 24px',
           borderRadius: '16px',
-          border: '1px solid rgba(56, 189, 248, 0.3)',
-          zIndex: 80,
-          pointerEvents: 'none'
-        }}>
-          <Loader2 className="spin-animation" size={32} color="#38bdf8" />
-          <span style={{ fontSize: '13px', fontWeight: 800, color: '#ffffff' }}>
-            {activeSource?.name ? `Connecting to ${activeSource.name}...` : 'Loading stream...'}
-          </span>
-        </div>
-      )}
-
-      {/* Stream Recovery Center */}
-      {error && (
-        <div style={{
-          position: 'absolute',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          background: 'rgba(15, 23, 42, 0.98)',
-          border: '1.5px solid rgba(56, 189, 248, 0.5)',
-          borderRadius: '20px',
-          padding: '24px',
+          padding: '20px 24px',
           display: 'flex',
-          flexDirection: 'column',
           alignItems: 'center',
-          gap: '14px',
-          zIndex: 90,
-          boxShadow: '0 16px 40px rgba(0,0,0,0.9)',
-          maxWidth: '440px',
-          width: '90%',
-          textAlign: 'center'
+          gap: '20px',
+          zIndex: 100,
+          boxShadow: '0 20px 40px rgba(0,0,0,0.8)'
         }}>
-          <div style={{ fontSize: '16px', fontWeight: 900, color: '#38bdf8' }}>
-            ⚡ Smart Stream Recovery
-          </div>
-          <span style={{ fontSize: '13px', fontWeight: 700, color: '#cbd5e1' }}>
-            {error}
-          </span>
-
-          {/* Server Mirror Picker */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '100%', maxHeight: '180px', overflowY: 'auto' }}>
-            {sources.map((src, idx) => (
-              <button
-                key={src.id || idx}
-                onClick={() => {
-                  setError('');
-                  setBuffering(true);
-                  setSourceIndex(idx);
-                }}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  background: sourceIndex === idx ? 'rgba(56, 189, 248, 0.25)' : 'rgba(255, 255, 255, 0.06)',
-                  border: sourceIndex === idx ? '1px solid #38bdf8' : '1px solid rgba(255,255,255,0.1)',
-                  borderRadius: '10px',
-                  padding: '8px 14px',
-                  color: '#ffffff',
-                  fontSize: '12px',
-                  fontWeight: 800,
-                  cursor: 'pointer'
-                }}
-              >
-                <span>{src.name || `Mirror ${idx + 1}`}</span>
-                {sourceIndex === idx ? <Check size={14} color="#38bdf8" /> : <span style={{ fontSize: '10px', color: '#94a3b8' }}>Connect</span>}
-              </button>
-            ))}
-          </div>
-
-          <div style={{ display: 'flex', gap: '10px', marginTop: '6px', width: '100%', justifyContent: 'center' }}>
-            <button
-              className="player-btn"
-              onClick={() => {
-                setError('');
-                setBuffering(true);
-                setSourceIndex(0);
-              }}
-              style={{ borderRadius: '10px', width: 'auto', padding: '0 16px', fontSize: '12px', fontWeight: 800, background: '#38bdf8', color: '#06090e' }}
-            >
-              Retry Primary
-            </button>
-            <button
-              className="player-btn"
-              onClick={close}
-              style={{ borderRadius: '10px', width: 'auto', padding: '0 16px', fontSize: '12px', fontWeight: 800 }}
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Auto-Dismissing OSD Controls */}
-      <div
-        className={`player-osd ${showControls ? 'is-visible' : 'is-hidden'}`}
-        style={{
-          position: 'absolute',
-          inset: 0,
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'space-between',
-          padding: '20px',
-          background: 'linear-gradient(180deg, rgba(0,0,0,0.8) 0%, transparent 35%, transparent 60%, rgba(0,0,0,0.85) 100%)',
-          opacity: showControls ? 1 : 0,
-          transition: 'opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-          // PINCH FIX: the overlay must never swallow touches meant for the
-          // video. Only the top/bottom bars (buttons) capture; the middle
-          // region passes gestures (pinch/double-tap) through to the video.
-          pointerEvents: 'none'
-        }}
-      >
-        {/* Top Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pointerEvents: 'auto' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-            <button 
-              className="player-btn" 
-              onClick={close} 
-              style={{ minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-            >
-              <ArrowLeft size={22} />
-            </button>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <strong style={{ fontSize: '16px' }}>{item?.title_en || item?.title || 'Playback'}</strong>
-                {isLive && (
-                  <span style={{ background: '#ef4444', color: '#fff', fontSize: '9px', fontWeight: 900, padding: '2px 6px', borderRadius: '4px' }}>
-                    LIVE
-                  </span>
-                )}
-              </div>
-              <div style={{ opacity: 0.75, fontSize: '12px', marginTop: '2px' }}>
-                {activeSource?.name || 'Fast Server'} • {item?.category || (isLive ? 'Live TV' : (item?.year || '2026'))}
-              </div>
+          <div>
+            <div style={{ color: '#38bdf8', fontSize: '13px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>
+              Next Episode in {bingeCountdown.countdown}s
+            </div>
+            <div style={{ color: '#fff', fontSize: '16px', fontWeight: 700 }}>
+              {bingeCountdown.nextItem?.title || 'Next Episode'}
             </div>
           </div>
+          <button
+            onClick={() => {
+              if (onNextEpisode && bingeCountdown.nextItem) {
+                onNextEpisode(bingeCountdown.nextItem);
+              }
+            }}
+            style={{
+              background: 'linear-gradient(135deg, #38bdf8 0%, #0ea5e9 100%)',
+              border: 'none',
+              borderRadius: '8px',
+              color: '#030712',
+              padding: '8px 16px',
+              fontSize: '13px',
+              fontWeight: 800,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6
+            }}
+          >
+            <Play size={14} fill="#030712" />
+            Play Now
+          </button>
+          <button
+            onClick={() => { setBingeCountdown(null); bingeFiredRef.current = false; }}
+            style={{
+              background: 'rgba(255,255,255,0.08)',
+              border: '1px solid rgba(255,255,255,0.25)',
+              borderRadius: '8px',
+              color: '#e2e8f0',
+              padding: '8px 14px',
+              fontSize: '12px',
+              fontWeight: 800,
+              cursor: 'pointer'
+            }}
+          >
+            Cancel
+          </button>
+        </div>
+      )}
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+      {/* On-Screen Display (OSD) Overlay.
+          Geometry is inline on purpose: this must never become a full-screen dark
+          layer over the picture, and it must not depend on a CSS class existing. */}
+      {showOsd && (
+        <div
+          className="tv-player-osd"
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            background: 'transparent',
+            pointerEvents: 'none',
+            zIndex: 60
+          }}
+        >
+          {/* Top Bar */}
+          <div
+            className="tv-player-osd-top"
+            style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              justifyContent: 'space-between',
+              gap: 24,
+              padding: '28px 40px 56px',
+              background: 'linear-gradient(180deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0) 100%)',
+              pointerEvents: 'auto'
+            }}
+          >
+            <div className="tv-player-osd-title-box">
+              <h1 className="tv-player-title">{title}</h1>
+              <p className="tv-player-subtitle">{subtitle} • {activeServer?.name || 'Server 1'} ({nativeActive ? 'Hardware Player' : videoEngine === 'hls' ? 'HLS Engine' : 'Native Engine'})</p>
+            </div>
+
             <button 
-              className="player-btn" 
-              onClick={handleCastFromPlayer}
-              style={{ 
-                minWidth: 44, 
-                minHeight: 44, 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'center', 
-                background: castSuccess ? 'rgba(56,189,248,0.35)' : 'rgba(255,255,255,0.12)', 
-                color: '#38bdf8' 
+              className="tv-player-btn"
+              tabIndex={0}
+              onClick={() => {
+                teardownWebPlayback();
+                if (onClose) onClose(videoRef.current?.currentTime || 0, videoRef.current?.duration || 0);
               }}
-              title="Cast to TV"
             >
-              <Cast size={20} />
+              <ArrowLeft size={18} />
+              <span>Back (Return)</span>
             </button>
+          </div>
 
-            <button
-              className={`player-btn ${showSettings ? 'is-focused' : ''}`}
-              onClick={() => setShowSettings(!showSettings)}
-              style={{ minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-              title="Stream Settings"
-            >
-              <Settings2 size={20} />
-            </button>
-
-            {/* CATCH-UP TV button — only for live channels */}
-            {isLive && (
-              <button
-                className={`player-btn ${showCatchup ? 'is-focused' : ''}`}
-                onClick={() => setShowCatchup(!showCatchup)}
-                style={{ minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                title="Catch-Up TV — watch past programmes"
-              >
-                <History size={20} />
-              </button>
+          {/* Bottom Controls Bar */}
+          <div
+            className="tv-player-osd-bottom"
+            style={{
+              padding: '56px 40px 28px',
+              background: 'linear-gradient(0deg, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0) 100%)',
+              pointerEvents: 'auto'
+            }}
+          >
+            {!isLive && duration > 0 && (
+              <div className="tv-player-progress-row">
+                <span className="tv-player-time">{formatTime(currentTime)}</span>
+                <div className="tv-player-progress-bar">
+                  <div 
+                    className="tv-player-progress-fill" 
+                    style={{ width: `${(currentTime / duration) * 100}%` }}
+                  />
+                </div>
+                <span className="tv-player-time">{formatTime(duration)}</span>
+              </div>
             )}
 
-            {/* Manual rotate toggle (fix): flips landscape/portrait on demand */}
-            <button
-              className="player-btn"
-              onClick={() => {
-                try {
-                  if (window.AndroidOrientation?.setPortrait) {
-                    window.AndroidOrientation.setPortrait();
-                    // Toggle back to landscape on next tap via state flip below
-                    rotateFlippedRef.current = !rotateFlippedRef.current;
-                    if (!rotateFlippedRef.current) window.AndroidOrientation.setLandscape();
-                  } else {
-                    window.screen?.orientation?.unlock?.();
-                  }
-                } catch {}
-              }}
-              style={{ minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-              title="Rotate Screen"
+            <div className="tv-player-controls-row">
+              <div
+                className="tv-player-controls-group"
+                style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12 }}
+              >
+                <button className="tv-player-btn" tabIndex={0} onClick={togglePlayPause}>
+                  {isPlaying ? <Pause size={18} /> : <Play size={18} />}
+                  <span>{isPlaying ? 'Pause' : 'Play'}</span>
+                </button>
+
+                {!isLive && (
+                  <>
+                    <button className="tv-player-btn" tabIndex={0} onClick={() => handleSeek(-10)}>
+                      <RotateCcw size={18} />
+                      <span>-10s</span>
+                    </button>
+                    <button className="tv-player-btn" tabIndex={0} onClick={() => handleSeek(10)}>
+                      <RotateCw size={18} />
+                      <span>+10s</span>
+                    </button>
+                  </>
+                )}
+
+                {isLive && (
+                  <button 
+                    className="tv-player-btn" 
+                    tabIndex={0}
+                    onClick={() => setShowDrawer(showDrawer === 'epg' ? null : 'epg')}
+                    style={{ background: 'rgba(239, 68, 68, 0.2)', color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.4)' }}
+                  >
+                    <Radio size={18} />
+                    <span>EPG Guide (OK)</span>
+                  </button>
+                )}
+
+                {orderedServers.length > 1 && (
+                  <button 
+                    className="tv-player-btn" 
+                    tabIndex={0}
+                    onClick={() => setShowDrawer(showDrawer === 'servers' ? null : 'servers')}
+                  >
+                    <Server size={18} />
+                    <span>Servers ({currentServerIndex + 1}/{orderedServers.length})</span>
+                  </button>
+                )}
+
+                {hasNativePlayer() && (
+                  <button 
+                    className="tv-player-btn" 
+                    tabIndex={0}
+                    onClick={launchNativeHardwarePlayer}
+                    style={{ background: 'linear-gradient(135deg, #38bdf8, #0284c7)', color: '#000', fontWeight: 800 }}
+                  >
+                    <Tv size={18} />
+                    <span>Hardware Player</span>
+                  </button>
+                )}
+
+                <button 
+                  className="tv-player-btn" 
+                  tabIndex={0}
+                  onClick={toggleEngine}
+                >
+                  <RefreshCw size={18} />
+                  <span>Engine: {videoEngine === 'hls' ? 'HLS' : 'Native'}</span>
+                </button>
+
+                <button 
+                  className="tv-player-btn" 
+                  tabIndex={0}
+                  onClick={cycleFitMode}
+                  title="Screen Aspect Ratio & Line Cropping"
+                >
+                  <Maximize size={18} />
+                  <span>Fit: {fitMode === 'clean' ? 'Clean' : fitMode === 'zoom' ? 'Zoom 16:9' : fitMode === 'stretch' ? 'Stretch' : 'Original'}</span>
+                </button>
+
+                {audioTracks.length > 1 && (
+                  <button 
+                    className="tv-player-btn" 
+                    tabIndex={0}
+                    onClick={() => setShowDrawer(showDrawer === 'audio' ? null : 'audio')}
+                  >
+                    <Volume2 size={18} />
+                    <span>Audio ({audioTracks[currentAudio]?.label || 'Default'})</span>
+                  </button>
+                )}
+
+                {isLive && channels.length > 0 && (
+                  <button 
+                    className="tv-player-btn" 
+                    tabIndex={0}
+                    onClick={() => setShowDrawer(showDrawer === 'channels' ? null : 'channels')}
+                  >
+                    <Tv size={18} />
+                    <span>Channels Guide</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Side Quick Drawer: Channels / Servers / Audio */}
+      {showDrawer && (
+        <div
+          className="tv-player-drawer"
+          style={{
+            position: 'absolute',
+            top: 0,
+            right: 0,
+            bottom: 0,
+            width: 420,
+            maxWidth: '45%',
+            padding: 20,
+            background: 'rgba(2, 6, 23, 0.96)',
+            overflowY: 'auto',
+            zIndex: 120
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#fff' }}>
+              {showDrawer === 'channels' && '📺 Live Channels'}
+              {showDrawer === 'epg' && '📅 Live Channel EPG Guide'}
+              {showDrawer === 'servers' && '⚡ Select Server'}
+              {showDrawer === 'audio' && '🔊 Audio Tracks'}
+            </h3>
+            <button 
+              className="tv-player-btn" 
+              tabIndex={0}
+              onClick={() => setShowDrawer(null)}
+              style={{ padding: '6px 10px' }}
             >
-              <RotateCcw size={20} />
+              <X size={16} />
             </button>
           </div>
-        </div>
 
-        {/* Bottom Controls Bar */}
-        <div style={{ pointerEvents: 'auto' }}>
-          {/* VOD Scrubber Track */}
-          {!isLive && (
-            <div 
-              className="player-scrubber-track"
-              onClick={handleScrubberClick}
-              style={{ 
-                position: 'relative', 
-                height: '6px', 
-                borderRadius: '3px', 
-                background: 'rgba(255, 255, 255, 0.25)', 
-                cursor: 'pointer',
-                marginBottom: '14px'
+          {/* EPG Now / Next Guide for current channel & all channels */}
+          {showDrawer === 'epg' && (() => {
+            const currentEpg = getCurrentAndNextProgram(item);
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                {/* Active Channel Now/Next Banner */}
+                <div style={{ padding: 14, background: 'rgba(30, 41, 59, 0.8)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.1)' }}>
+                  <div style={{ fontSize: '0.85rem', color: '#ef4444', fontWeight: 800, textTransform: 'uppercase', marginBottom: 4 }}>
+                    🔴 NOW AIRING ON {item?.title || 'THIS CHANNEL'}
+                  </div>
+                  <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#fff', marginBottom: 4 }}>
+                    {currentEpg?.current?.title || 'Live Broadcast'}
+                  </div>
+                  <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginBottom: 8 }}>
+                    {currentEpg?.current?.startTimeFormatted} - {currentEpg?.current?.endTimeFormatted} ({currentEpg?.current?.durationMin} min)
+                  </div>
+                  {currentEpg?.current?.description && (
+                    <div style={{ fontSize: '0.8rem', color: '#cbd5e1', lineHeight: 1.4, marginBottom: 8 }}>
+                      {currentEpg?.current?.description}
+                    </div>
+                  )}
+                  {currentEpg?.current?.progressPercent != null && (
+                    <div style={{ width: '100%', height: 4, background: 'rgba(255,255,255,0.15)', borderRadius: 2, overflow: 'hidden' }}>
+                      <div style={{ width: `${currentEpg.current.progressPercent}%`, height: '100%', background: '#ef4444' }} />
+                    </div>
+                  )}
+
+                  {currentEpg?.next && (
+                    <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px dashed rgba(255,255,255,0.15)' }}>
+                      <div style={{ fontSize: '0.75rem', color: '#38bdf8', fontWeight: 800, textTransform: 'uppercase', marginBottom: 2 }}>
+                        NEXT SHOW ({currentEpg.next.startTimeFormatted})
+                      </div>
+                      <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#e2e8f0' }}>
+                        {currentEpg.next.title}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* All Channels Quick Switch with EPG */}
+                {channels.length > 0 && (
+                  <div>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#94a3b8', marginBottom: 8 }}>
+                      All Live Channels & Current Shows
+                    </div>
+                    {channels.map((ch, idx) => {
+                      const chEpg = getCurrentAndNextProgram(ch);
+                      return (
+                        <button
+                          key={ch.id || idx}
+                          tabIndex={0}
+                          className={`tv-drawer-item ${ch.id === item?.id ? 'active' : ''}`}
+                          style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', padding: 10, marginBottom: 6 }}
+                          onClick={() => {
+                            if (onSelectChannel) onSelectChannel(ch);
+                            setShowDrawer(null);
+                          }}
+                        >
+                          <div style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontWeight: 800, color: '#fff' }}>{ch.title || ch.name}</span>
+                            <span style={{ fontSize: '0.7rem', color: '#94a3b8', background: 'rgba(255,255,255,0.1)', padding: '2px 6px', borderRadius: 4 }}>{ch.category || 'Live'}</span>
+                          </div>
+                          {chEpg?.current && (
+                            <div style={{ fontSize: '0.75rem', color: '#cbd5e1', marginTop: 4 }}>
+                              NOW: <span style={{ color: '#ef4444' }}>{chEpg.current.title}</span>
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+          {showDrawer === 'channels' && channels.map((ch, idx) => (
+            <button
+              key={ch.id || idx}
+              tabIndex={0}
+              className={`tv-drawer-item ${ch.id === item?.id ? 'active' : ''}`}
+              onClick={() => {
+                if (onSelectChannel) onSelectChannel(ch);
+                setShowDrawer(null);
               }}
             >
-              <div 
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  bottom: 0,
-                  width: `${bufferedPercent}%`,
-                  background: 'rgba(255, 255, 255, 0.35)',
-                  borderRadius: '3px',
-                  pointerEvents: 'none'
+              <span>{ch.title || ch.name}</span>
+              <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{ch.category || 'Live'}</span>
+            </button>
+          ))}
+
+          {/* Servers List */}
+          {showDrawer === 'servers' && orderedServers.map((srv, idx) => {
+            const badgeText = srv.quality || (srv.source === 'embed' ? '1080p HD' : (srv.source?.toUpperCase() || 'HLS'));
+            return (
+              <button
+                key={srv.id || idx}
+                tabIndex={0}
+                className={`tv-drawer-item ${idx === currentServerIndex ? 'active' : ''}`}
+                onClick={() => {
+                  // v3.9.1 FIX: reset native-player state so the new server
+                  // actually triggers playback instead of returning early
+                  // because nativeActiveRef/nativeHandoffDoneRef is still set
+                  // from the previous server's handoff.
+                  nativeHandoffDoneRef.current = null;
+                  nativeActiveRef.current = false;
+                  setNativeActive(false);
+                  setCurrentServerIndex(idx);
+                  setShowDrawer(null);
+                  pingOsd();
                 }}
-              />
-              <div 
-                className="player-scrubber-fill"
-                style={{
-                  width: `${progressPercent}%`,
-                  background: 'linear-gradient(90deg, #38bdf8 0%, #0284c7 100%)',
-                  borderRadius: '3px',
-                  pointerEvents: 'none'
-                }}
-              />
-            </div>
-          )}
-
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <button 
-                className="player-btn" 
-                onClick={togglePlay} 
-                style={{ minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#38bdf8', color: '#06090e' }}
               >
-                {playing ? <Pause size={22} fill="#06090e" /> : <Play size={22} fill="#06090e" style={{ marginLeft: '2px' }} />}
+                <span>{srv.name || `Server ${idx + 1}`}</span>
+                <span style={{ fontSize: '0.75rem', color: '#38bdf8' }}>
+                  {badgeText}
+                </span>
               </button>
+            );
+          })}
 
-              {!isLive && (
-                <>
-                  <button 
-                    className="player-btn" 
-                    onClick={() => seekRelative(-10)} 
-                    style={{ minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                    title="Rewind 10s"
-                  >
-                    <RotateCcw size={18} />
-                  </button>
-                  <button 
-                    className="player-btn" 
-                    onClick={() => seekRelative(10)} 
-                    style={{ minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                    title="Forward 10s"
-                  >
-                    <RotateCw size={18} />
-                  </button>
-                </>
-              )}
-
-              <button 
-                className="player-btn" 
-                onClick={() => { 
-                  if (videoRef.current) { 
-                    videoRef.current.muted = !videoRef.current.muted; 
-                    setMuted(videoRef.current.muted); 
-                  } 
-                }} 
-                style={{ minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-              >
-                {muted ? <VolumeX size={20} /> : <Volume2 size={20} />}
-              </button>
-            </div>
-
-            <span style={{ fontSize: '13px', fontWeight: 800, color: '#ffffff' }}>
-              {isLive ? (
-                <span style={{ color: '#ef4444' }}>● LIVE</span>
-              ) : (
-                `${formatTime(time)} / ${formatTime(duration)}`
-              )}
-            </span>
-          </div>
-
-          {/* CATCH-UP TV Drawer: watch past programmes on this channel */}
-          {showCatchup && isLive && (
-            <CatchupDrawer
-              channel={item}
-              onClose={() => setShowCatchup(false)}
-              onPlay={(url) => {
-                setShowCatchup(false);
-                // swap the live stream to the catch-up (timeshift) URL
-                const v = videoRef.current;
-                if (v) {
-                  v.src = url;
-                  v.load();
-                  v.play().catch(() => {});
-                }
-              }}
-            />
-          )}
-
-          {/* Settings Drawer */}
-          {showSettings && (
-            <div style={{ 
-              marginTop: '14px', 
-              padding: '14px', 
-              background: 'rgba(15, 23, 42, 0.98)', 
-              border: '1px solid rgba(56, 189, 248, 0.4)',
-              borderRadius: '16px',
-              boxShadow: '0 12px 30px rgba(0,0,0,0.8)'
-            }}>
-              <div style={{ fontSize: '12px', fontWeight: 900, color: '#38bdf8', marginBottom: '8px', textTransform: 'uppercase' }}>
-                Stream Quality
-              </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '12px' }}>
-                <button 
-                  onClick={() => chooseLevel(-1)} 
-                  style={{ 
-                    padding: '6px 12px', 
-                    borderRadius: '8px', 
-                    background: level === -1 ? '#38bdf8' : 'rgba(255,255,255,0.08)',
-                    color: level === -1 ? '#06090e' : '#fff',
-                    border: 'none',
-                    fontWeight: 800,
-                    fontSize: '12px',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Auto
-                </button>
-                {levels.map(entry => (
-                  <button 
-                    key={entry.index} 
-                    onClick={() => chooseLevel(entry.index)} 
-                    style={{ 
-                      padding: '6px 12px', 
-                      borderRadius: '8px', 
-                      background: level === entry.index ? '#38bdf8' : 'rgba(255,255,255,0.08)',
-                      color: level === entry.index ? '#06090e' : '#fff',
-                      border: 'none',
-                      fontWeight: 800,
-                      fontSize: '12px',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    {entry.label}
-                  </button>
-                ))}
-              </div>
-
-              {sources.length > 1 && (
-                <>
-                  <div style={{ fontSize: '12px', fontWeight: 900, color: '#38bdf8', marginBottom: '8px', textTransform: 'uppercase' }}>
-                    Streaming Servers
-                  </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                    {sources.map((entry, index) => (
-                      <button 
-                        key={entry.id || index} 
-                        onClick={() => chooseSource(index)} 
-                        style={{ 
-                          padding: '6px 12px', 
-                          borderRadius: '8px', 
-                          background: sourceIndex === index ? '#38bdf8' : 'rgba(255,255,255,0.08)',
-                          color: sourceIndex === index ? '#06090e' : '#fff',
-                          border: 'none',
-                          fontWeight: 800,
-                          fontSize: '12px',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        {entry.name || `Server ${index + 1}`}
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
-
-              {/* v3.2.0: Video Fit / Zoom controls (gestures existed but were
-                  undiscoverable — user reported "aspect ratio fit zoom doesnt work") */}
-              <div style={{ fontSize: '12px', fontWeight: 900, color: '#38bdf8', marginBottom: '8px', textTransform: 'uppercase' }}>
-                Video Fit
-              </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '4px' }}>
-                {FIT_MODES.map(mode => (
-                  <button
-                    key={mode}
-                    onClick={() => {
-                      setFitMode(mode);
-                      setPinchScale(1);
-                      resetControlsTimer();
-                    }}
-                    style={{
-                      padding: '6px 12px',
-                      borderRadius: '8px',
-                      background: fitMode === mode && pinchScale === 1 ? '#38bdf8' : 'rgba(255,255,255,0.08)',
-                      color: fitMode === mode && pinchScale === 1 ? '#06090e' : '#fff',
-                      border: 'none',
-                      fontWeight: 800,
-                      fontSize: '12px',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    {mode === 'clean' ? 'Clean' : mode === 'contain' ? 'Fit' : mode === 'cover' ? 'Zoom' : 'Stretch'}
-                  </button>
-                ))}
-              </div>
-              <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '10px' }}>
-                Or pinch the video to zoom free-form • double-tap cycles modes.
-              </div>
-            </div>
-          )}
+          {/* Audio Tracks List */}
+          {showDrawer === 'audio' && audioTracks.map((trk) => (
+            <button
+              key={trk.id}
+              tabIndex={0}
+              className={`tv-drawer-item ${trk.id === currentAudio ? 'active' : ''}`}
+              onClick={() => handleSwitchAudio(trk.id)}
+            >
+              <span>{trk.label}</span>
+              {trk.id === currentAudio && <span style={{ color: '#38bdf8' }}>✓ Active</span>}
+            </button>
+          ))}
         </div>
-      </div>
+      )}
     </div>
   );
 }
-

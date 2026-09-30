@@ -8,6 +8,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Message;
+import android.util.Log;
 import android.provider.Settings;
 import android.view.KeyEvent;
 import android.view.View;
@@ -32,6 +33,11 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 
 public class MainActivity extends BridgeActivity {
+
+    private static final String TAG = "AJO.MainActivity";
+
+    // v3.12.44: unacknowledged Back press counter (dead-WebView escape hatch).
+    private int backPressCount = 0;
 
     /**
      * Stops WebView media and frees the hardware decoder. Runs before the native
@@ -126,6 +132,7 @@ public class MainActivity extends BridgeActivity {
 
         // --- FULLSCREEN IMMERSIVE MODE & HARDWARE ACCELERATED VIDEO ---
         enableImmersiveMode();
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         getWindow().setFlags(
             WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
             WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED
@@ -185,10 +192,40 @@ public class MainActivity extends BridgeActivity {
                     // Drop top-level popup navigations
                     return true;
                 }
+
+                // v3.12.44 FIX (the whole-stick freeze): render-process crash
+                // guard. onRenderProcessGone is a WebViewClient callback (NOT
+                // WebChromeClient). When the Chromium renderer OOMs — common on
+                // 1GB/1.5GB Fire TV sticks with poster-heavy grids — the
+                // WebView is left a dead BLACK surface that no key can recover
+                // from: the app looks frozen and only power-cycling the stick
+                // "fixes" it. Recreate the activity so the UI comes back.
+                @Override
+                public boolean onRenderProcessGone(WebView view, android.webkit.RenderProcessGoneDetail detail) {
+                    Log.e(TAG, "WebView RENDERER CRASHED (rendererCrash=" + detail.didCrash()
+                            + ") — recreating activity to avoid dead black screen");
+                    try {
+                        view.destroy();
+                    } catch (Throwable t) {
+                        Log.w(TAG, "destroy() of crashed WebView failed: " + t.getMessage());
+                    }
+                    android.os.Handler h = new android.os.Handler(android.os.Looper.getMainLooper());
+                    h.postDelayed(() -> {
+                        try {
+                            recreate();
+                        } catch (Throwable t) {
+                            Log.w(TAG, "recreate() failed: " + t.getMessage());
+                        }
+                    }, 250L);
+                    return true;
+                }
             });
 
             // Enable fullscreen video and autoplay permission for Fire TV, and drop
             // all popup windows / ad redirects.
+            // (v3.12.44: the render-process crash guard lives in the
+            // WebViewClient above — onRenderProcessGone is a WebViewClient
+            // callback, not a WebChromeClient one.)
             webView.setWebChromeClient(new BridgeWebChromeClient(getBridge()) {
                 @Override
                 public boolean onCreateWindow(WebView view, boolean isDialog, boolean isUserGesture,
@@ -389,32 +426,23 @@ public class MainActivity extends BridgeActivity {
                 public String getDeviceInfo() {
                     return Build.MANUFACTURER + " " + Build.MODEL + " (Android API " + Build.VERSION.SDK_INT + ")";
                 }
+
+                @JavascriptInterface
+                public void exitApp() {
+                    runOnUiThread(() -> finishAffinity());
+                }
             }, "AndroidNativePlayer");
 
             // 2. Android On-Device OTA Updater Interface
             webView.addJavascriptInterface(new Object() {
                 @JavascriptInterface
                 public String getAppVersionName() {
-                    try {
-                        PackageInfo pInfo = getPackageManager().getPackageInfo(getPackageName(), 0);
-                        return pInfo.versionName != null ? pInfo.versionName : "3.1.3";
-                    } catch (Exception e) {
-                        return "3.1.3";
-                    }
+                    return com.pikashow.tv.BuildConfig.VERSION_NAME;
                 }
 
                 @JavascriptInterface
                 public int getAppVersionCode() {
-                    try {
-                        PackageInfo pInfo = getPackageManager().getPackageInfo(getPackageName(), 0);
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                            return (int) pInfo.getLongVersionCode();
-                        } else {
-                            return pInfo.versionCode;
-                        }
-                    } catch (Exception e) {
-                        return 50;
-                    }
+                    return com.pikashow.tv.BuildConfig.VERSION_CODE;
                 }
 
                 // v3.8.0 keystore cutover: lets the web app detect whether THIS
@@ -751,17 +779,63 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
-        if (event.getAction() == KeyEvent.ACTION_DOWN) {
-            int keyCode = event.getKeyCode();
-            if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_ESCAPE) {
+        int keyCode = event.getKeyCode();
+        if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_ESCAPE) {
+            if (event.getAction() == KeyEvent.ACTION_DOWN) {
                 if (getBridge() != null && getBridge().getWebView() != null) {
                     getBridge().getWebView().evaluateJavascript(
                             "(function(){ window.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', code: 'Escape', keyCode: 27, which: 27, bubbles: true, cancelable: true})); })();",
                             null);
-                    return true;
+                    // v3.12.44 FIX: dead-WebView escape hatch. If the web layer
+                    // never reacts (renderer dead, JS stuck), repeated Back
+                    // presses used to loop into the frozen page forever — the
+                    // "no way back to Home, must pull the power" symptom.
+                    // Track when the page last acknowledged Back; after 3
+                    // unacknowledged presses, background the app so Fire OS
+                    // Home and other apps stay reachable.
+                    backPressCount++;
+                    android.os.Handler h = new android.os.Handler(android.os.Looper.getMainLooper());
+                    h.postDelayed(() -> { if (backPressCount > 0) backPressCount--; }, 1500L);
+                    if (backPressCount >= 3) {
+                        backPressCount = 0;
+                        Log.w(TAG, "3 unacknowledged Back presses — web layer dead, backgrounding app");
+                        moveTaskToBack(true);
+                    }
                 }
             }
+            return true;
         }
         return super.dispatchKeyEvent(event);
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (getBridge() != null && getBridge().getWebView() != null) {
+            getBridge().getWebView().evaluateJavascript(
+                    "(function(){ window.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', code: 'Escape', keyCode: 27, which: 27, bubbles: true, cancelable: true})); })();",
+                    null);
+        } else {
+            super.onBackPressed();
+        }
+    }
+
+    @Override
+    public void onTrimMemory(int level) {
+        super.onTrimMemory(level);
+        if (getBridge() != null && getBridge().getWebView() != null) {
+            try {
+                getBridge().getWebView().clearCache(false);
+            } catch (Exception ignored) {}
+        }
+    }
+
+    @Override
+    public void onLowMemory() {
+        super.onLowMemory();
+        if (getBridge() != null && getBridge().getWebView() != null) {
+            try {
+                getBridge().getWebView().clearCache(true);
+            } catch (Exception ignored) {}
+        }
     }
 }

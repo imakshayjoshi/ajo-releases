@@ -61,6 +61,7 @@ export function TVPlayer({
   const bingeFiredRef = useRef(false);
   const bingeCountdownRef = useRef(null);
   const blackScreenWatchdogRef = useRef(null);
+  const userPausedRef = useRef(false); // v3.12.43: true only when the USER paused, never during autoplay-stall
   const nativeHandoffDoneRef = useRef(false);
   // Read synchronously by the pipeline effect. State alone lands one commit too
   // late, which is long enough for Hls.js to grab the decoder we just gave away.
@@ -273,14 +274,26 @@ export function TVPlayer({
     bingeCountdownRef.current = setInterval(() => {
       setBingeCountdown(prev => {
         if (prev === null) return null;
-        if (prev <= 1) {
+        // v3.12.44: countdown state is an OBJECT {countdown, nextItem} (see
+        // handleTimeUpdate) — decrement the countdown field, keep nextItem.
+        if (typeof prev === 'number') {
+          if (prev <= 1) {
+            const nextIdx = currentEpisodeIndex + 1;
+            if (nextIdx < episodes.length && onSelectEpisode) {
+              onSelectEpisode(episodes[nextIdx], nextIdx);
+            }
+            return null;
+          }
+          return prev - 1;
+        }
+        if (prev.countdown <= 1) {
           const nextIdx = currentEpisodeIndex + 1;
           if (nextIdx < episodes.length && onSelectEpisode) {
             onSelectEpisode(episodes[nextIdx], nextIdx);
           }
           return null;
         }
-        return prev - 1;
+        return { ...prev, countdown: prev.countdown - 1 };
       });
     }, 1000);
     return () => {
@@ -298,6 +311,11 @@ export function TVPlayer({
       setCurrentServerIndex(nextIdx);
       setTimeout(() => setErrorMessage(null), 3000);
     } else {
+      // v3.12.43: terminal branch — clear the stall/black-screen watchdogs so the
+      // failure path stops re-entering every 8s (re-marking dead + re-flashing
+      // the toast forever).
+      if (stallWatchdogRef.current) { clearInterval(stallWatchdogRef.current); stallWatchdogRef.current = null; }
+      if (blackScreenWatchdogRef.current) { clearInterval(blackScreenWatchdogRef.current); blackScreenWatchdogRef.current = null; }
       if (item && (item.is_live || item.type === 'live' || item.year === 'LIVE')) {
         const failedUrl = orderedServers[currentServerIndex]?.url || item.url;
         if (failedUrl) markChannelDead(failedUrl);
@@ -401,27 +419,29 @@ export function TVPlayer({
   // The native player finished or the user pressed Back inside it. Close this view
   // instead of leaving a dead, black <video> element on screen.
   useEffect(() => {
-    const handleNativeClosed = () => {
+    const handleNativeClosed = (e) => {
       if (!nativeActiveRef.current) return;
       teardownWebPlayback();
       if (onClose) {
         const video = videoRef.current;
-        onClose(lastPositionRef.current || video?.currentTime || 0, video?.duration || 0);
+        const cur = e?.detail?.currentTime || lastPositionRef.current || video?.currentTime || 0;
+        const dur = e?.detail?.duration || video?.duration || 0;
+        onClose(cur, dur);
       }
     };
     window.addEventListener('ajo-native-player-closed', handleNativeClosed);
     return () => window.removeEventListener('ajo-native-player-closed', handleNativeClosed);
   }, [onClose, teardownWebPlayback]);
 
-  // On Fire TV / legacy Android TV WebViews, MSE video never composites over the
-  // hardware plane — audio plays while the surface stays black. Hand the stream
-  // straight to the native ExoPlayer activity instead of waiting for the
-  // black-screen watchdog to trip 3 seconds in.
+  // v3.12.22: On Fire TV / Android TV, hand ALL streams (including embeds) to
+  // the native PlayerActivity. Its WebView engine has ad-blocking, popup-blocking,
+  // auto-play scripts, and D-pad remote support that the Capacitor iframe lacks.
+  // Previously embed URLs were skipped here because isNativePlayableUrl filtered
+  // them, leaving them to the iframe which couldn't auto-play or block ads.
   useEffect(() => {
     if (!streamUrl) return;
     if (nativeHandoffDoneRef.current === streamUrl) return;
     if (!shouldPreferNativePlayer()) return;
-    // Not a real stream URL. The embed guard below deals with it.
     if (!isNativePlayableUrl(streamUrl)) return;
 
     nativeHandoffDoneRef.current = streamUrl;
@@ -504,22 +524,26 @@ export function TVPlayer({
         }
         hls = new Hls({
           enableWorker: true,
-          lowLatencyMode: isLive,
-          liveSyncDurationCount: isLive ? 2 : undefined,
+          lowLatencyMode: false,
+          liveSyncDurationCount: isLive ? 3 : undefined,
+          liveMaxLatencyDurationCount: isLive ? 6 : undefined,
           startFragPrefetch: true,
           startLevel: -1,
           capLevelToPlayerSize: true,
-          backBufferLength: isLive ? 30 : 60,
-          maxBufferLength: 30,
-          maxMaxBufferLength: 60,
-          maxBufferSize: 8 * 1024 * 1024,
+          backBufferLength: isLive ? 2 : 15,
+          maxBufferLength: isLive ? 12 : 25,
+          maxMaxBufferLength: isLive ? 20 : 45,
+          maxBufferSize: 24 * 1024 * 1024,
           maxBufferHole: 0.5,
           highBufferWatchdogPeriod: 2,
           nudgeOffset: 0.2,
           nudgeMaxRetry: 5,
-          fragLoadingTimeOut: 12000,
-          manifestLoadingTimeOut: 12000,
-          levelLoadingTimeOut: 12000,
+          fragLoadingTimeOut: 15000,
+          manifestLoadingTimeOut: 15000,
+          levelLoadingTimeOut: 15000,
+          fragLoadingMaxRetry: 4,
+          manifestLoadingMaxRetry: 4,
+          levelLoadingMaxRetry: 4,
         });
         hlsRef.current = hls;
   
@@ -528,7 +552,7 @@ export function TVPlayer({
   
         hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
           if (data.audioTracks && data.audioTracks.length > 0) {
-            setAvailableAudioTracks(data.audioTracks.map((t, idx) => ({
+            setAudioTracks(data.audioTracks.map((t, idx) => ({
               id: idx,
               label: t.name || t.lang || `Track ${idx + 1}`
             })));
@@ -588,10 +612,15 @@ export function TVPlayer({
   
         // 24/7 Anti-Stall and Anti-Buffering watchdog timer
         let bufferingDuration = 0;
+        let stallDuration = 0;
         let lastProgressTime = 0;
         stallWatchdogRef.current = setInterval(() => {
           if (video) {
-            if (video.paused && isBuffering) {
+            // v3.12.43: escalate only when playback never started (autoplay stuck
+            // while buffering). A deliberate user pause is NOT a failure — the old
+            // `video.paused && isBuffering` check used a stale closure and hijacked
+            // every 8s user pause into a native handoff / server failover.
+            if (video.paused && !userPausedRef.current && video.readyState < 3) {
               bufferingDuration += 2;
               if (bufferingDuration >= 8) {
                 bufferingDuration = 0;
@@ -602,8 +631,14 @@ export function TVPlayer({
             } else if (!video.paused && video.readyState >= 2) {
               bufferingDuration = 0;
               if (video.currentTime === lastProgressTime && isLive) {
-                hls?.recoverMediaError();
-                video.play().catch(() => {});
+                stallDuration += 2;
+                if (stallDuration >= 8) {
+                  stallDuration = 0;
+                  hls?.recoverMediaError();
+                  video.play().catch(() => {});
+                }
+              } else {
+                stallDuration = 0;
               }
               lastProgressTime = video.currentTime;
             }
@@ -683,9 +718,13 @@ export function TVPlayer({
 
     return () => {
       disposed = true;
-      if (stallWatchdogRef.current) clearInterval(stallWatchdogRef.current);
-      if (blackScreenWatchdogRef.current) clearInterval(blackScreenWatchdogRef.current);
-      if (embedWatchdogRef.current) clearTimeout(embedWatchdogRef.current);
+      if (stallWatchdogRef.current) { clearInterval(stallWatchdogRef.current); stallWatchdogRef.current = null; }
+      if (blackScreenWatchdogRef.current) { clearInterval(blackScreenWatchdogRef.current); blackScreenWatchdogRef.current = null; }
+      if (embedWatchdogRef.current) { clearTimeout(embedWatchdogRef.current); embedWatchdogRef.current = null; }
+      // v3.12.37: CRITICAL — progressSaverRef and bingeCountdownRef were never
+      // cleared here, causing interval accumulation that exhausted Fire TV RAM.
+      if (progressSaverRef.current) { clearInterval(progressSaverRef.current); progressSaverRef.current = null; }
+      if (bingeCountdownRef.current) { clearInterval(bingeCountdownRef.current); bingeCountdownRef.current = null; }
       if (hls) {
         hls.destroy();
         hlsRef.current = null;
@@ -719,7 +758,17 @@ export function TVPlayer({
       const left = video.duration - video.currentTime;
       if (left <= BINGE_COUNTDOWN_SECONDS && !bingeFiredRef.current) {
         bingeFiredRef.current = true;
-        setBingeCountdown(BINGE_COUNTDOWN_SECONDS);
+        // v3.12.44 FIX: the countdown card template reads
+        // bingeCountdown.countdown / bingeCountdown.nextItem, but the state was
+        // set to a bare NUMBER here. Rendering {number.countdown} is undefined,
+        // then `bingeCountdown.nextItem?.title` throws on a number -> React
+        // error boundary -> fullscreen black screen on TV with an unfocusable
+        // reload button. Store the object the render expects.
+        const nextIdx = currentEpisodeIndex + 1;
+        setBingeCountdown({
+          countdown: BINGE_COUNTDOWN_SECONDS,
+          nextItem: episodes[nextIdx] || null
+        });
       }
       if (bingeCountdownRef.current !== null && left > BINGE_COUNTDOWN_SECONDS + 5) {
         // user seeked backwards out of the window — cancel
@@ -736,9 +785,11 @@ export function TVPlayer({
     if (!video) return;
     if (video.paused) {
       video.play().then(() => setIsPlaying(true)).catch(() => {});
+      userPausedRef.current = false;
     } else {
       video.pause();
       setIsPlaying(false);
+      userPausedRef.current = true;
     }
     pingOsd();
   }, [pingOsd]);
@@ -919,8 +970,10 @@ export function TVPlayer({
           ref={iframeRef}
           src={streamUrl}
           title={title}
-          allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
+          allow="autoplay *; encrypted-media *; fullscreen *; picture-in-picture *; clipboard-write *"
           allowFullScreen
+          referrerPolicy="no-referrer-when-downgrade"
+          loading="eager"
           style={{
             position: 'absolute',
             top: 0,
