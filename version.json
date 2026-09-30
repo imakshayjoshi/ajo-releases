@@ -1,10 +1,10 @@
 {
   "schemaVersion": 2,
-  "version": "3.12.49",
-  "versionCode": 136,
+  "version": "3.12.50",
+  "versionCode": 137,
   "releaseDate": "2026-09-30",
-  "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
-  "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
+  "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
+  "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
   "phone": {
     "version": "3.3.43",
     "versionCode": 92,
@@ -23,8 +23,8 @@
     "sha256": "843655e606a88c5fb5c5288a22b000a07d4367f470ee897e26d2a5c4986fbe29"
   },
   "tv": {
-    "version": "3.12.46",
-    "versionCode": 133,
+    "version": "3.12.50",
+    "versionCode": 137,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
@@ -37,24 +37,24 @@
       "🩹 Fixed Settings recovery screen crash ('installedVersion is not defined')"
     ],
     "size_mb": "6.9 MB",
-    "sha256": "f3de5738eb14e2fa58b32006cb418aa97af349b2dfbd021588f7b91f14d9f5b2"
+    "sha256": "9e0bb6d94a00de836f357447f9f6cb0d2f86a23b8079dfc349b8ea6ce27706a5"
   },
   "android_tv": {
-    "version": "3.12.49",
-    "versionCode": 136,
+    "version": "3.12.50",
+    "versionCode": 137,
     "packageId": "com.ajo.androidtv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "💥 CRITICAL FIX: Fire TV / Android TV stick no longer freezes the whole device — video buffer is now capped to your stick's memory so the system never runs out of RAM",
-      "🛡️ New renderer-crash guard: if the app's video engine dies it recovers automatically instead of showing a dead black screen",
-      "🚪 Escape hatch: 3 quick Back presses always background the app so Home stays reachable — no more pulling the power plug",
-      "🩹 Fixed end-of-episode binge crash that black-screened the player",
-      "🪟 Ad popup windows now blocked at the native layer"
+      "📺 Restored Sony channels (SET HD, Sony SAB, Sony Pal, Sony BBC Earth, Sony Sports Ten 1) with verified live streams",
+      "🛡️ Fixed dead channel filtering so Indian and Sony channel tiles are never hidden from the Live TV grid",
+      "⚡ Invalidated stale channel cache and reduced failure cooldown to 10 minutes",
+      "🩹 Fixed Settings recovery screen crash ('installedVersion is not defined')",
+      "💥 Fire TV / Android TV whole-device freeze fix and RAM optimization"
     ],
     "size_mb": "7.0 MB",
-    "sha256": "caa4ab0bca73b2eb00a52b6ae5d5bb03e91f3dc4eb54431a53a364cc1d4a83bb"
+    "sha256": "9af911ffce71eb804999cede0385151904dc875f790c9375170a7cf0da5ddd20"
   }
 }
