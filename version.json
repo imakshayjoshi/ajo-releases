@@ -1,62 +1,60 @@
 {
   "schemaVersion": 2,
-  "version": "4.0.0",
-  "versionCode": 200,
+  "version": "3.12.50",
+  "versionCode": 137,
   "releaseDate": "2026-09-30",
   "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
   "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
   "phone": {
-    "version": "4.0.0",
-    "versionCode": 200,
+    "version": "3.3.43",
+    "versionCode": 92,
     "packageId": "com.ajo.phone",
-    "apkUrl": "https://github.com/imakshayjoshi/ajo-phone/releases/download/v4.0.0/AJO_Phone.apk",
-    "apk_url": "https://github.com/imakshayjoshi/ajo-phone/releases/download/v4.0.0/AJO_Phone.apk",
+    "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
+    "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "🎬 AJO Phone 4.0 — completely rebuilt as a native app: faster menus, smoother playback, better battery",
-      "📺 2000+ live channels now built in (AJO Live source auto-installs on first launch) — Indian, news, sports, movies, kids, music",
-      "🗂️ Browse live channels by category: News, Movies, Entertainment, Sports, Kids and more",
-      "🔊 Subtitles, audio track selection and resume-where-you-left-off",
-      "⬆️ Faster in-app updates delivered straight from GitHub"
+      "🩹 Fixed black screen crash at the end of multi-episode binge playback (countdown card bug)",
+      "🛡️ New renderer-crash guard: if the video engine dies the app now recovers itself instead of staying black",
+      "🚪 Back button escape hatch: 3 quick Back presses always return you to the Home screen, even if the app is stuck",
+      "🚀 Memory optimization: OS low-memory cache pruning for uninterrupted long streaming sessions"
     ],
-    "size_mb": "42 MB",
-    "sha256": "0df9411ec92c300d6b7f5adf2beba11de69683544a7f693a33534b3a10e3a5ce"
+    "size_mb": "3.5 MB",
+    "sha256": "843655e606a88c5fb5c5288a22b000a07d4367f470ee897e26d2a5c4986fbe29"
   },
   "tv": {
-    "version": "4.0.0",
-    "versionCode": 200,
+    "version": "3.12.50",
+    "versionCode": 137,
     "packageId": "com.ajo.tv",
-    "apkUrl": "https://github.com/imakshayjoshi/ajo-tv/releases/download/v4.0.0/AJO_TV_universal.apk",
-    "apk_url": "https://github.com/imakshayjoshi/ajo-tv/releases/download/v4.0.0/AJO_TV_universal.apk",
+    "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
+    "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "🎬 AJO TV 4.0 — completely rebuilt as a native app: faster menus, smooth 4K playback, better remote handling",
-      "📺 2000+ live channels now built in (AJO Live source auto-installs on first launch) — Indian, news, sports, movies, kids, music",
-      "🗂️ Browse live channels by category: News, Movies, Entertainment, Sports, Kids and more",
-      "🔊 Subtitles, audio track selection and resume-where-you-left-off",
-      "⬆️ Faster in-app updates delivered straight from GitHub"
+      "📺 Restored Sony channels (SET HD, Sony SAB, Sony Pal, Sony BBC Earth, Sony Sports Ten 1) with verified live streams",
+      "🛡️ Fixed dead channel filtering so Indian and Sony channel tiles are never hidden from the Live TV grid",
+      "⚡ Invalidated stale channel cache and reduced failure cooldown to 10 minutes",
+      "🩹 Fixed Settings recovery screen crash ('installedVersion is not defined')"
     ],
-    "size_mb": "127 MB",
-    "sha256": "4ae83cebb601886487f6a5cfabcc117e2bc0bc0acefbe5d5d8b0f56ee3a016cf"
+    "size_mb": "6.9 MB",
+    "sha256": "9e0bb6d94a00de836f357447f9f6cb0d2f86a23b8079dfc349b8ea6ce27706a5"
   },
   "android_tv": {
-    "version": "4.0.0",
-    "versionCode": 200,
+    "version": "3.12.50",
+    "versionCode": 137,
     "packageId": "com.ajo.androidtv",
-    "apkUrl": "https://github.com/imakshayjoshi/ajo-tv/releases/download/v4.0.0/AJO_ANDROID_TV_universal.apk",
-    "apk_url": "https://github.com/imakshayjoshi/ajo-tv/releases/download/v4.0.0/AJO_ANDROID_TV_universal.apk",
+    "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
+    "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "🎬 AJO TV 4.0 — completely rebuilt as a native app: faster menus, smooth 4K playback, better remote handling",
-      "📺 2000+ live channels now built in (AJO Live source auto-installs on first launch) — Indian, news, sports, movies, kids, music",
-      "🗂️ Browse live channels by category: News, Movies, Entertainment, Sports, Kids and more",
-      "🔊 Subtitles, audio track selection and resume-where-you-left-off",
-      "⬆️ Faster in-app updates delivered straight from GitHub"
+      "📺 Restored Sony channels (SET HD, Sony SAB, Sony Pal, Sony BBC Earth, Sony Sports Ten 1) with verified live streams",
+      "🛡️ Fixed dead channel filtering so Indian and Sony channel tiles are never hidden from the Live TV grid",
+      "⚡ Invalidated stale channel cache and reduced failure cooldown to 10 minutes",
+      "🩹 Fixed Settings recovery screen crash ('installedVersion is not defined')",
+      "💥 Fire TV / Android TV whole-device freeze fix and RAM optimization"
     ],
-    "size_mb": "127 MB",
-    "sha256": "ef1586fb7f42e5e8169aa4da7ba94ed679df783e7053ca6b52168e360ea3fa0e"
+    "size_mb": "7.0 MB",
+    "sha256": "9af911ffce71eb804999cede0385151904dc875f790c9375170a7cf0da5ddd20"
   }
 }
