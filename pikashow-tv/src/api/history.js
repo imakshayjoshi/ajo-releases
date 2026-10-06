@@ -11,15 +11,37 @@ function normalizeTitle(t) {
   return String(t || '').toLowerCase().trim().replace(/[^a-z0-9]/g, '');
 }
 
+// v3.12.59: one shared live-content check (was three drifted copies).
+function isLiveContent(item) {
+  return Boolean(
+    item?.is_live
+    || item?.type === 'live'
+    || item?.year === 'LIVE'
+    || item?.category === 'Live TV'
+    || item?.category === 'Sports'
+    || item?.category === 'News'
+  );
+}
+
 export function matchMediaItem(a, b) {
   if (!a || !b) return false;
   const idA = a.id || a.tmdb_id || a.imdb_id || a.kinopoisk_id || a.movie_id;
   const idB = b.id || b.tmdb_id || b.imdb_id || b.kinopoisk_id || b.movie_id;
   if (idA && idB && String(idA) === String(idB)) return true;
 
+  // v3.12.59 FIX: bare-title matching merged different shows that share a
+  // name (remakes, same-title remasters) into one Continue Watching entry —
+  // one overwrote the other's progress. Title alone now only matches when
+  // the content TYPE also agrees, and when both entries have an id we never
+  // fall through (two ids that differ = two different things, period).
+  if (idA && idB) return false;
+  const typeA = a.type || (a.category === 'Web Series' || a.category === 'Series' ? 'series' : a.category === 'Live TV' || a.category === 'Sports' || a.category === 'News' ? 'live' : '');
+  const typeB = b.type || (b.category === 'Web Series' || b.category === 'Series' ? 'series' : b.category === 'Live TV' || b.category === 'Sports' || b.category === 'News' ? 'live' : '');
   const titleA = normalizeTitle(a.title_en || a.title || a.name);
   const titleB = normalizeTitle(b.title_en || b.title || b.name);
-  if (titleA && titleB && titleA === titleB) return true;
+  if (titleA && titleB && titleA === titleB) {
+    return typeA === typeB;
+  }
   return false;
 }
 
@@ -28,7 +50,9 @@ export function matchMediaItem(a, b) {
 // ==========================================
 export function saveProgress(item, currentTime, duration) {
   if (!item || !duration || duration <= 0) return;
-  const isLive = Boolean(item.is_live || item.type === 'live' || item.year === 'LIVE' || item.category === 'Live TV' || item.category === 'Sports' || item.category === 'News');
+  // v3.12.59: single shared isLive check (was duplicated with drifted
+  // conditions in saveProgress and getWatchProgress).
+  const isLive = isLiveContent(item);
   if (isLive) return;
 
   const percentage = Math.min(100, Math.max(0, Math.round((currentTime / duration) * 100)));
@@ -97,7 +121,7 @@ export function getWatchHistory() {
 
 export function getWatchProgress(item) {
   if (!item) return null;
-  const isLive = Boolean(item.is_live || item.type === 'live' || item.year === 'LIVE');
+  const isLive = isLiveContent(item);
   if (isLive) return null;
   try {
     const history = getWatchHistory();
@@ -246,8 +270,52 @@ export function setSleepTimer(minutes, onTrigger) {
   }, minutes * 60 * 1000);
 }
 
+// v3.12.59 FIX: "clear cache" used localStorage.clear() — one Settings tap
+// silently destroyed watch history, favorites, watchlist, cast pairing and
+// the dead-channel list. Cache means re-fetchable data, so only sweep keys
+// that repopulate from the network. User data keys are never touched here.
+const CACHE_KEY_PATTERNS = [
+  /^ajo_iptv_cache_v\d+$/,
+  /^ajo_channels_manifest_v\d+$/,
+  /^ajo_sports_cache_v\d+$/,
+  /^ajo_catalog_v\d+$/,
+];
+
 export function clearAppCache() {
   try {
-    localStorage.clear();
+    const keys = [];
+    for (let i = 0; i < localStorage.length; i++) keys.push(localStorage.key(i));
+    for (const key of keys) {
+      if (CACHE_KEY_PATTERNS.some((p) => p.test(key))) {
+        localStorage.removeItem(key);
+      }
+    }
   } catch (err) {}
+}
+
+// v3.12.59: sweep ancient versioned keys left behind by upgrades (v1..v27 of
+// the iptv cache etc.) — dead weight inside the 5MB localStorage quota.
+// Runs once per install; only deletes keys NO current module references.
+const CACHE_SWEEP_FLAG = 'ajo_cache_sweep_v1_done';
+const LIVE_CACHE_KEYS = [
+  'ajo_iptv_cache_v28', 'ajo_channels_manifest_v8', 'ajo_sports_cache_v2', 'ajo_catalog_v6'
+];
+
+export function sweepStaleCacheKeys() {
+  try {
+    if (localStorage.getItem(CACHE_SWEEP_FLAG)) return;
+    const liveSet = new Set(LIVE_CACHE_KEYS);
+    const keys = [];
+    for (let i = 0; i < localStorage.length; i++) keys.push(localStorage.key(i));
+    let removed = 0;
+    for (const key of keys) {
+      if (liveSet.has(key)) continue;
+      if (CACHE_KEY_PATTERNS.some((p) => p.test(key))) {
+        localStorage.removeItem(key);
+        removed++;
+      }
+    }
+    localStorage.setItem(CACHE_SWEEP_FLAG, String(Date.now()));
+    if (removed > 0) console.warn(`[ajo] swept ${removed} stale cache key(s)`);
+  } catch {}
 }

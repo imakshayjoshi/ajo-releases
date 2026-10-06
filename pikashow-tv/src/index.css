@@ -4,23 +4,37 @@
    ======================================================== */
 
 :root {
-  --bg-main: #07090e;
-  --bg-surface: #0f141f;
-  --bg-card: #151c2c;
-  --bg-card-hover: #1e283d;
-  --accent-cyan: #38bdf8;
-  --accent-blue: #2563eb;
+  /* v3.12.59 PREMIUM (UX spec: Apple TV / Netflix / Google TV / DirecTV
+     distillation). Darker cinematic base, red-discipline accent, motion
+     tokens with real easing curves. Old cyan-accent theme retired. */
+  --bg-main: #0A0C10;            /* app canvas — darker = cinematic [NF] */
+  --bg-surface: #12151B;
+  --bg-card: #1A1E26;
+  --bg-card-hover: #22262F;
+  --skel: #141821;
+  --hairline: rgba(255,255,255,0.07);
+  --accent: #E62117;             /* AJO red — CTA/LIVE/progress/focus ONLY */
+  --accent-press: #C4180F;
+  --accent-cyan: #E62117;        /* legacy var alias: old components reference it */
+  --accent-blue: #46D369;        /* match green (legacy alias) */
   --accent-gold: #f59e0b;
-  --accent-red: #ef4444;
-  --text-primary: #ffffff;
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
-  --focus-ring: 0 0 0 3px #38bdf8;
-  --focus-scale: scale(1.04);
+  --accent-red: #E62117;
+  --match: #46D369;
+  --cta-secondary: rgba(255,255,255,0.14);
+  --text-primary: #F2F4F8;       /* never #FFF — blooms on TV panels [ATV] */
+  --text-secondary: #A9B1BD;
+  --text-muted: #737B87;
+  --focus-ring: 0 0 0 3px #F2F4F8, 0 14px 32px rgba(0,0,0,0.65);
+  --focus-scale: scale(1.06);
   --radius-sm: 8px;
-  --radius-md: 12px;
+  --radius-md: 8px;
   --radius-lg: 16px;
   --radius-full: 9999px;
+  /* Motion tokens [ATV/GTV/NF duration table] */
+  --ease-out-quick: cubic-bezier(0.2, 0, 0, 1);
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-scroll: cubic-bezier(0.25, 0.1, 0.25, 1);
+  --ease-hero: cubic-bezier(0.5, 0, 0.5, 1);
   --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 }
 
@@ -49,10 +63,31 @@ html, body, #root {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  background: radial-gradient(circle at 50% 0%, #151d30 0%, #07090e 70%);
+  /* v3.12.59: flat cinematic canvas — radial gradient read muddy on Fire TV
+     panels and fought the ambient backdrop layer. [NF: flat #141414-class] */
+  background: var(--bg-main);
   position: relative;
   overflow: hidden;
 }
+
+/* v3.12.59 PREMIUM #1 [ATV ambient backdrop]: the focused row's artwork,
+   blurred, sits behind rails at low opacity. ONE blurred element per screen,
+   down-scaled source (blur cost scales with pixels). Swaps on row-change
+   only, 700ms ease-hero fade. Rendered by <AmbientBackdrop/>. */
+.ambient-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-size: cover;
+  background-position: center;
+  filter: blur(60px) saturate(0.65) brightness(0.5);
+  transform: scale(1.2); /* hide blur edge fringes */
+  opacity: 0.35;
+  transition: opacity 700ms var(--ease-hero);
+}
+.ambient-backdrop.ambient-hidden { opacity: 0; }
+.tv-header, .tv-main-content { position: relative; z-index: 1; }
 
 /* Top Navigation Bar */
 /* v3.8.2 UI FIX: on 720p-class TVs the 7-tab nav plus logo plus clock
@@ -68,8 +103,8 @@ html, body, #root {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  background: rgba(7, 9, 14, 0.85);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(10, 12, 16, 0.92);
+  border-bottom: 1px solid var(--hairline);
   z-index: 100;
 }
 
@@ -81,7 +116,7 @@ html, body, #root {
 }
 
 .tv-logo-badge {
-  background: linear-gradient(135deg, #38bdf8, #2563eb);
+  background: var(--accent);
   color: #ffffff;
   font-weight: 900;
   font-size: 1.1rem;
@@ -106,15 +141,16 @@ html, body, #root {
 }
 
 .tv-nav-pill {
-  padding: 8px 14px;
+  padding: 9px 18px;
   border-radius: var(--radius-full);
-  background: rgba(255, 255, 255, 0.05);
+  background: transparent;
   color: var(--text-secondary);
-  font-size: 0.88rem;
+  font-size: 0.95rem;
   font-weight: 600;
-  border: 1px solid transparent;
+  border: none;
   cursor: pointer;
-  transition: all 0.15s ease-out;
+  /* v3.12.59 [GTV pill tabs]: 180ms out-quick on transform only */
+  transition: transform 180ms var(--ease-out-quick), background 180ms var(--ease-standard), color 180ms var(--ease-standard);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -122,16 +158,19 @@ html, body, #root {
   flex-shrink: 0;
 }
 
-.tv-nav-pill:focus,
+/* v3.12.59 [GTV]: active = soft glass fill; FOCUSED = ring + scale (kept
+   distinct so D-pad focus is always visible, FTV rule) */
 .tv-nav-pill.active {
-  background: rgba(56, 189, 248, 0.15);
-  color: #ffffff;
-  border-color: var(--accent-cyan);
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--text-primary);
 }
 
 .tv-nav-pill:focus {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--text-primary);
   box-shadow: var(--focus-ring);
-  transform: scale(1.06);
+  transform: scale(1.05);
+  z-index: 5;
 }
 
 .tv-header-info {
@@ -179,30 +218,36 @@ html, body, #root {
 /* Spotlight / Hero Card */
 .tv-hero {
   width: 100%;
-  height: 280px;
-  border-radius: var(--radius-lg);
+  height: 380px;
+  border-radius: 0;
   position: relative;
   overflow: hidden;
-  margin-bottom: 32px;
+  margin-bottom: 40px;
   display: flex;
   align-items: flex-end;
-  padding: 32px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 32px 48px;
+  border: none;
   background-color: var(--bg-card);
   background-size: cover;
-  background-position: center;
-  transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
+  /* v3.12.59 [NF billboard]: key art right, text zone left */
+  background-position: 75% 30%;
+  transition: transform 180ms var(--ease-out-quick), box-shadow 180ms var(--ease-out-quick);
 }
 
 .tv-hero:focus {
   box-shadow: var(--focus-ring);
   transform: var(--focus-scale);
+  z-index: 5;
 }
 
 .tv-hero-overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(0deg, rgba(7, 9, 14, 0.95) 0%, rgba(7, 9, 14, 0.4) 60%, transparent 100%);
+  /* v3.12.59 [NF two-gradient scrim stack]: left scrim for the text zone +
+     bottom scrim that MELTS into the canvas — the #1 "is this Netflix?" tell */
+  background:
+    linear-gradient(90deg, rgba(10,12,16,0.94) 0%, rgba(10,12,16,0.55) 38%, transparent 65%),
+    linear-gradient(180deg, transparent 55%, rgba(10,12,16,0.7) 82%, #0A0C10 100%);
   pointer-events: none;
 }
 
@@ -221,46 +266,99 @@ html, body, #root {
   font-size: 0.75rem;
   font-weight: 800;
   text-transform: uppercase;
-  padding: 3px 8px;
-  border-radius: var(--radius-sm);
+  letter-spacing: 1.5px;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
   margin-bottom: 8px;
+  box-shadow: 0 4px 16px rgba(230, 33, 23, 0.4);
+}
+
+/* v3.12.59 [NF metadata line] */
+.tv-hero-meta {
+  font-size: 1rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+  letter-spacing: 0.3px;
+  margin-bottom: 10px;
 }
 
 .tv-hero-title {
-  font-size: 1.8rem;
-  font-weight: 800;
-  margin-bottom: 8px;
-  line-height: 1.2;
+  font-size: 2.6rem;
+  font-weight: 700;
+  margin-bottom: 10px;
+  line-height: 1.08;
+  letter-spacing: -0.5px;
+  text-shadow: 0 2px 18px rgba(0,0,0,0.55);
+  max-width: 780px;
 }
 
 .tv-hero-desc {
-  font-size: 0.9rem;
+  font-size: 1.05rem;
   color: var(--text-secondary);
-  line-height: 1.4;
-  margin-bottom: 16px;
+  line-height: 1.45;
+  margin-bottom: 20px;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  max-width: 840px;
+  text-shadow: 0 1px 12px rgba(0,0,0,0.5);
 }
 
 .tv-hero-btn {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 24px;
-  background: var(--accent-cyan);
-  color: #07090e;
+  gap: 10px;
+  padding: 14px 32px;
+  background: var(--accent);
+  color: #ffffff;
   font-weight: 700;
-  font-size: 0.95rem;
+  font-size: 1.05rem;
   border-radius: var(--radius-full);
   border: none;
   cursor: pointer;
+  box-shadow: 0 8px 24px rgba(230, 33, 23, 0.35);
+  transition: transform 80ms var(--ease-out-quick), background 180ms var(--ease-standard);
 }
+
+.tv-hero-btn:active { transform: scale(0.97); background: var(--accent-press); }
 
 /* Horizontal Media Rail */
 .tv-rail {
   margin-bottom: 32px;
+  /* v3.12.59 PREMIUM #4 [NF/GTV edge fades]: hard-clipped rails read
+     2015-Android. The gradient fades both ends via ::before/::after. */
+  position: relative;
+}
+
+.tv-rail::before,
+.tv-rail::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 96px;
+  pointer-events: none;
+  z-index: 2;
+}
+.tv-rail::before {
+  left: 0;
+  background: linear-gradient(90deg, var(--bg-main) 0%, transparent 100%);
+}
+.tv-rail::after {
+  right: 0;
+  background: linear-gradient(270deg, var(--bg-main) 0%, transparent 100%);
+}
+
+/* v3.12.59 PREMIUM #5 [LB row-focus dimming]: when a row is focused, rows
+   above dim — attention funnel, opacity-only (GPU free). Applied via
+   .tv-rail.is-dimmed from the focus tracker. */
+.tv-rail.is-dimmed {
+  opacity: 0.5;
+  transition: opacity 200ms var(--ease-standard);
+}
+.tv-rail {
+  transition: opacity 200ms var(--ease-standard);
 }
 
 .tv-rail-header {
@@ -301,6 +399,59 @@ html, body, #root {
   display: none;
 }
 
+/* v3.12.59 [skeleton rails, spec §4.1]: layout-correct blocks so nothing
+   shifts when data lands; ONE shimmer layer per screen (compositor rule:
+   1 animated layer beats 20). */
+.rail-skeleton {
+  display: flex;
+  gap: 18px;
+  padding: 12px 6px;
+  margin: -12px -6px;
+}
+.skel-card {
+  flex: 0 0 160px;
+  width: 160px;
+}
+.skel-block {
+  background: var(--skel);
+  border-radius: 8px;
+}
+.skel-poster {
+  width: 100%;
+  height: 230px;
+  margin-bottom: 8px;
+}
+.skel-line {
+  height: 14px;
+  border-radius: 4px;
+  background: var(--skel);
+  margin-bottom: 6px;
+  width: 80%;
+}
+.tv-screen-shimmer {
+  position: fixed;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  overflow: hidden;
+  display: none;
+}
+.tv-screen-shimmer.shimmering {
+  display: block;
+}
+.tv-screen-shimmer.shimmering::after {
+  content: '';
+  position: absolute;
+  inset: -50% 0;
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.04) 50%, transparent 100%);
+  animation: screen-shimmer 1400ms ease-in-out infinite;
+  will-change: transform;
+}
+@keyframes screen-shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
 /* Media Card */
 .tv-card {
   flex: 0 0 160px;
@@ -308,19 +459,20 @@ html, body, #root {
   display: flex;
   flex-direction: column;
   background: var(--bg-card);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   overflow: hidden;
-  border: 2px solid transparent;
+  border: none;
   cursor: pointer;
   position: relative;
-  transition: transform 0.15s ease-out, border-color 0.15s ease-out, box-shadow 0.15s ease-out;
+  /* v3.12.59 [ATV focus platter + GTV scale]: 180ms out-quick; will-change
+     set ONLY while transitioning (see .tv-card:focus) — GPU budget. */
+  transition: transform 180ms var(--ease-out-quick), box-shadow 180ms var(--ease-out-quick);
 }
 
 .tv-card:focus {
   transform: var(--focus-scale);
-  border-color: var(--accent-cyan);
   box-shadow: var(--focus-ring);
-  z-index: 10;
+  z-index: 30;
   background: var(--bg-card-hover);
 }
 
@@ -378,6 +530,27 @@ html, body, #root {
   padding: 2px 6px;
   border-radius: 4px;
   text-transform: uppercase;
+  letter-spacing: 1.5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* v3.12.59 PREMIUM #9 [live metadata pulse]: the LIVE red dot breathes —
+   the ONLY looping animation allowed outside skeletons. Opacity-only,
+   ~6 visible instances max. */
+.tv-badge-live::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #fff;
+  animation: live-pulse 2s ease-in-out 1.2s infinite;
+}
+
+@keyframes live-pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
 }
 
 .tv-badge-rating {
@@ -841,8 +1014,8 @@ html, body, #root {
 .tv-app-provider-chip:focus,
 .tv-app-provider-chip.focused {
   transform: scale(1.12) translateY(-2px) !important;
-  border-color: #38bdf8 !important;
-  box-shadow: 0 0 0 3px #38bdf8, 0 8px 24px rgba(56, 189, 248, 0.45) !important;
+  border-color: #F2F4F8 !important;
+  box-shadow: var(--focus-ring) !important;
   background: rgba(30, 41, 59, 0.98) !important;
   z-index: 30 !important;
   outline: none !important;

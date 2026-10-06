@@ -16,6 +16,13 @@ class ErrorBoundary extends React.Component {
 
   componentDidCatch(error, errorInfo) {
     console.error("React ErrorBoundary caught error:", error, errorInfo);
+    // v3.12.59: analytics — crash capture (message + stack head).
+    try {
+      import('./api/analytics').then((m) => {
+        m.track('crash', { msg: String(error).slice(0, 160) });
+        m.flush();
+      }).catch(() => {});
+    } catch {}
   }
 
   componentDidUpdate(prevProps, prevState) {
@@ -55,7 +62,23 @@ class ErrorBoundary extends React.Component {
 
   handleClearCacheAndReload = () => {
     try {
-      localStorage.clear();
+      // v3.12.59 FIX: was localStorage.clear() + sessionStorage.clear() —
+      // nuked watch history, favorites and cast pairing. This is the
+      // recovery path used when playback misbehaves, so it must stay
+      // destructive to CACHES ONLY. App state rebuilds on reload.
+      const CACHE_KEY_PATTERNS = [
+        /^ajo_iptv_cache_v\d+$/,
+        /^ajo_channels_manifest_v\d+$/,
+        /^ajo_sports_cache_v\d+$/,
+        /^ajo_catalog_v\d+$/,
+      ];
+      const keys = [];
+      for (let i = 0; i < localStorage.length; i++) keys.push(localStorage.key(i));
+      for (const key of keys) {
+        if (CACHE_KEY_PATTERNS.some((p) => p.test(key))) {
+          localStorage.removeItem(key);
+        }
+      }
       sessionStorage.clear();
       if ('caches' in window) {
         caches.keys().then((names) => {

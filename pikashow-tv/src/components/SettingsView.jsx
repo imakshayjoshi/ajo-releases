@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { RefreshCw, Trash2, ShieldCheck, Download, Tv, Info, CheckCircle2, AlertCircle, Puzzle, Plus, Cast } from 'lucide-react';
-import { checkForAppUpdates, CURRENT_APP_VERSION } from '../api/otaUpdate';
+import { checkForAppUpdates, CURRENT_APP_VERSION, CURRENT_VERSION_CODE } from '../api/otaUpdate';
 import { getInstalledAddons, installAddon, removeAddon, FEATURED_ADDONS } from '../api/stremio';
 
 export function SettingsView() {
@@ -12,6 +12,24 @@ export function SettingsView() {
   const [addons, setAddons] = useState([]);
   const [addonUrl, setAddonUrl] = useState('');
   const [addonStatus, setAddonStatus] = useState(null);
+
+  const installedVersion = (() => {
+    try {
+      if (typeof window !== 'undefined' && window.AndroidUpdater?.getAppVersionName) {
+        return window.AndroidUpdater.getAppVersionName();
+      }
+    } catch (_) {}
+    return CURRENT_APP_VERSION;
+  })();
+
+  const installedCode = (() => {
+    try {
+      if (typeof window !== 'undefined' && window.AndroidUpdater?.getAppVersionCode) {
+        return Number(window.AndroidUpdater.getAppVersionCode()) || CURRENT_VERSION_CODE;
+      }
+    } catch (_) {}
+    return CURRENT_VERSION_CODE;
+  })();
 
   const refreshAddons = () => setAddons(getInstalledAddons());
   useEffect(() => { refreshAddons(); }, []);
@@ -124,7 +142,23 @@ export function SettingsView() {
 
   const handleClearCache = () => {
     try {
-      localStorage.clear();
+      // v3.12.59 FIX: was localStorage.clear() — wiped watch history,
+      // favorites, watchlist and cast pairing on one tap. Now cache-only.
+      const CACHE_KEY_PATTERNS = [
+        /^ajo_iptv_cache_v\d+$/,
+        /^ajo_channels_manifest_v\d+$/,
+        /^ajo_sports_cache_v\d+$/,
+        /^ajo_catalog_v\d+$/,
+      ];
+      const keys = [];
+      for (let i = 0; i < localStorage.length; i++) keys.push(localStorage.key(i));
+      let removed = 0;
+      for (const key of keys) {
+        if (CACHE_KEY_PATTERNS.some((p) => p.test(key))) {
+          localStorage.removeItem(key);
+          removed++;
+        }
+      }
       setCacheCleared(true);
       setTimeout(() => setCacheCleared(false), 3000);
     } catch (_) {}

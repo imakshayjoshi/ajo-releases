@@ -15,7 +15,7 @@ import {
   Maximize,
   Radio
 } from 'lucide-react';
-import { generateUniversalServers, isEmbedUrl } from '../utils/streamingEngines';
+import { generateUniversalServers, isEmbedUrl, detectStreamType } from '../utils/streamingEngines';
 import { getCurrentAndNextProgram } from '../api/epg';
 import {
   hasNativePlayer,
@@ -26,6 +26,10 @@ import {
   preflightEmbedUrl
 } from '../utils/nativePlayer';
 import { saveProgress, getWatchHistory, getWatchProgress } from '../api/history';
+import {
+  trackPlaybackStart, trackPlaybackEngine, trackFailover,
+  trackPlaybackError, trackWatchTick, trackPlaybackEnd
+} from '../api/analytics';
 import { markChannelDead } from '../api/iptv';
 import { BINGE_COUNTDOWN_SECONDS } from '../utils/binge';
 import './TVPlayer.css';
@@ -59,6 +63,8 @@ export function TVPlayer({
   const lastPositionRef = useRef(0);
   const progressSaverRef = useRef(null);
   const bingeFiredRef = useRef(false);
+  // v3.12.59: analytics — one playback_start per (item, stream) mount.
+  const playingTrackedRef = useRef(false);
   const bingeCountdownRef = useRef(null);
   const blackScreenWatchdogRef = useRef(null);
   const userPausedRef = useRef(false); // v3.12.43: true only when the USER paused, never during autoplay-stall
@@ -315,6 +321,7 @@ export function TVPlayer({
 
   // Auto failover to next server if current server fails
   const handleFailover = useCallback((reason = 'Stream connection error') => {
+    trackFailover(reason); // v3.12.59: analytics funnel
     if (orderedServers.length > 1 && currentServerIndex < orderedServers.length - 1) {
       const nextIdx = currentServerIndex + 1;
       const nextName = orderedServers[nextIdx]?.name || `Server ${nextIdx + 1}`;
@@ -325,12 +332,19 @@ export function TVPlayer({
       // v3.12.43: terminal branch — clear the stall/black-screen watchdogs so the
       // failure path stops re-entering every 8s (re-marking dead + re-flashing
       // the toast forever).
-      if (stallWatchdogRef.current) { clearInterval(stallWatchdogRef.current); stallWatchdogRef.current = null; }
-      if (blackScreenWatchdogRef.current) { clearInterval(blackScreenWatchdogRef.current); blackScreenWatchdogRef.current = null; }
+      if (stallWatchdogRef.current) {
+        clearInterval(stallWatchdogRef.current);
+        stallWatchdogRef.current = null;
+      }
+      if (blackScreenWatchdogRef.current) {
+        clearInterval(blackScreenWatchdogRef.current);
+        blackScreenWatchdogRef.current = null;
+      }
       if (item && (item.is_live || item.type === 'live' || item.year === 'LIVE')) {
         const failedUrl = orderedServers[currentServerIndex]?.url || item.url;
         if (failedUrl) markChannelDead(failedUrl);
       }
+      trackPlaybackError(reason); // v3.12.59: analytics funnel
       setErrorMessage('Stream offline. Please select another server or channel.');
       setIsBuffering(false);
     }
@@ -352,6 +366,8 @@ export function TVPlayer({
    * audio on top of a black picture, so nothing may launch before this runs.
    */
   const teardownWebPlayback = useCallback(() => {
+    // v3.12.59: analytics — ship the aggregated watch time on exit.
+    trackPlaybackEnd();
     if (stallWatchdogRef.current) {
       clearInterval(stallWatchdogRef.current);
       stallWatchdogRef.current = null;
@@ -520,7 +536,12 @@ export function TVPlayer({
       };
     }
 
-    if (videoEngine === 'hls' && (streamUrl.includes('.m3u8') || streamUrl.includes('/getm3u8/') || isLive || streamUrl.endsWith('.m3u8'))) {
+    // v3.12.59 FIX: this gate used to string-match .m3u8/getm3u8/isLive only,
+    // but streamingEngines classifies /getstream/, /live/ and /playlist URLs
+    // as HLS too. Those mirrors fell through to the <video> tag — which can't
+    // play HLS — and surfaced as "this server is broken" black screens on
+    // perfectly live mirrors. Use the SAME classifier the server list uses.
+    if (videoEngine === 'hls' && detectStreamType(streamUrl) === 'hls') {
       (async () => {
         // v3.11.0: hls.js (~350KB) is a lazy chunk now — fetched only when a
         // stream actually needs it. Boot time and RAM on Fire TV drop sharply.
@@ -817,6 +838,9 @@ export function TVPlayer({
     if (!video || isLive) return;
     setCurrentTime(video.currentTime);
     setDuration(video.duration || 0);
+    // v3.12.59: analytics — piggyback watch-second aggregation on the
+    // existing 30s saver cadence (no new timers).
+    trackWatchTick();
 
     // BINGE AUTO-ADVANCE: near the end of a multi-episode title, show a
     // countdown; at 0, jump to the next episode automatically.
@@ -985,6 +1009,12 @@ export function TVPlayer({
         onPlaying={() => {
           setIsBuffering(false);
           setIsPlaying(true);
+          // v3.12.59: analytics — first frame rolling. Engine + server for
+          // the QBR (quality/bitrate/robustness) picture.
+          if (!playingTrackedRef.current) {
+            playingTrackedRef.current = true;
+            trackPlaybackStart(item, nativeActive ? 'native' : videoEngine, orderedServers[currentServerIndex]?.name);
+          }
         }}
         onCanPlay={() => setIsBuffering(false)}
         onTimeUpdate={handleTimeUpdate}

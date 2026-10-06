@@ -119,7 +119,13 @@ export const MediaCard = React.memo(function MediaCard({ item, onClick, isLive =
           alt={title}
           className={isLive ? 'tv-card-poster tv-card-live-poster' : 'tv-card-poster'}
           loading="lazy"
+          decoding="async"
+          // v3.12.59 PREMIUM #7 [GTV 300ms crossfade]: posters fade in over
+          // the card bg, never pop.
+          style={{ opacity: 0, transition: 'opacity 300ms var(--ease-standard)' }}
+          onLoad={(e) => { e.target.style.opacity = 1; }}
           onError={(e) => {
+            e.target.style.opacity = 1;
             if (e.target.dataset.fallbackTried) return;
             e.target.dataset.fallbackTried = 'true';
             e.target.src = fallbackPoster;
@@ -138,8 +144,8 @@ export const MediaCard = React.memo(function MediaCard({ item, onClick, isLive =
             <div style={{
               width: `${Math.min(100, Math.max(2, item.percentage))}%`,
               height: '100%',
-              background: '#e50914',
-              boxShadow: '0 0 6px #e50914'
+              background: 'var(--accent)',
+              boxShadow: '0 0 6px rgba(230,33,23,0.8)'
             }} />
           </div>
         )}

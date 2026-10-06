@@ -16,10 +16,10 @@ export function GoogleTVHeader({ activeTab, onSelectTab }) {
 
   const tabs = [
     { id: 'home', label: 'Home', icon: Home },
-    { id: 'sports', label: 'Sports', icon: Trophy },
-    { id: 'movies', label: 'Movies', icon: Film },
-    { id: 'series', label: 'Web Series', icon: Tv },
     { id: 'live', label: 'Live TV', icon: Radio },
+    { id: 'movies', label: 'Movies', icon: Film },
+    { id: 'series', label: 'Series', icon: Tv },
+    { id: 'sports', label: 'Sports', icon: Trophy },
     { id: 'search', label: 'Search', icon: Search },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];

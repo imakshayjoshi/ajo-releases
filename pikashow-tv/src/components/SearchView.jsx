@@ -35,6 +35,10 @@ export function SearchView({ onSelectItem }) {
         if (reqSeqRef.current !== id) return; // superseded by a newer query
         setResults(items);
         setIsSearching(false);
+        // v3.12.59: analytics — what people search for, and hit-rate.
+        try {
+          import('../api/analytics').then((m) => m.trackSearchQuery(query, items.length)).catch(() => {});
+        } catch {}
       }).catch(() => {
         if (reqSeqRef.current !== id) return;
         setIsSearching(false);
