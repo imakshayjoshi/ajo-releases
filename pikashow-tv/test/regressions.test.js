@@ -134,8 +134,8 @@ test('Bug C2: getPairingRoom / setPairingRoom persist correctly', () => {
 // test must track *this* app's OTA constants, not the AJO TV android build.
 test('OTA version and code are consistent with the build', async () => {
   const ota = await import('../src/api/otaUpdate.js');
-  assert.equal(ota.CURRENT_APP_VERSION, '3.12.59');
-  assert.equal(ota.CURRENT_VERSION_CODE, 209);
+  assert.equal(ota.CURRENT_APP_VERSION, '3.12.60');
+  assert.equal(ota.CURRENT_VERSION_CODE, 210);
   assert.equal(ota.compareVersions('3.12.48', '3.12.47'), 1);
   assert.equal(ota.compareVersions('3.12.47', '3.12.48'), -1);
   assert.equal(ota.compareVersions('3.12.48', '3.12.48'), 0);

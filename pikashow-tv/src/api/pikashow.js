@@ -1,5 +1,5 @@
 import { getIPTVChannels, LOGO_OVERRIDES, normalizeChannelKey } from './iptv.js';
-import { isSafeHttpUrl } from '../utils/streamingEngines.js';
+import { isSafeHttpUrl, generateUniversalServers } from '../utils/streamingEngines.js';
 
 const BASE_URL = 'https://mapi.elochkaigolochla.com/api/v1';
 const CACHE_KEY = 'ajo_catalog_v6';
@@ -206,11 +206,12 @@ export async function getLiveBroadcasts() {
   // Tamil feeds and floated unranked channels above the priority brands.
 
 
-  const { isBlockedChannelTitle, channelPriority, normalizeChannelKey: normalizeTitleKey } = await import('./iptv.js');
+  const { isBlockedChannelTitle, channelPriority, normalizeChannelKey: normalizeTitleKey, isAllowedLanguageChannel } = await import('./iptv.js');
   const seenMap = new Map();
   raw.forEach((entry) => {
     const item = normalizeMediaItem(entry, 'live');
     if (!item?.playable) return;
+    if (isAllowedLanguageChannel && !isAllowedLanguageChannel(item)) return;
     const titleKey = normalizeTitleKey(item.title_en || item.title);
     if (!titleKey || isBlockedChannelTitle(item.title_en || item.title)) return;
     
@@ -238,39 +239,109 @@ export async function getLiveBroadcasts() {
 }
 
 export async function getBollywoodCatalog() {
-  try { return (await loadCatalog()).bollywood; } catch { return []; }
+  try {
+    const [mapiRes, tmdbRes] = await Promise.allSettled([
+      loadCatalog().then(c => c.bollywood),
+      import('./tmdb.js').then(m => m.getTmdbIndianMovies())
+    ]);
+    const mapiList = mapiRes.status === 'fulfilled' && Array.isArray(mapiRes.value) ? mapiRes.value : [];
+    const tmdbList = tmdbRes.status === 'fulfilled' && Array.isArray(tmdbRes.value) ? tmdbRes.value : [];
+    
+    // Merge TMDB Indian movies (such as Bandar) with mapi catalog
+    const seen = new Set();
+    const merged = [];
+    for (const item of [...tmdbList, ...mapiList]) {
+      const key = (item.title || '').toLowerCase().trim();
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      merged.push(item);
+    }
+    return merged;
+  } catch {
+    return [];
+  }
 }
 
 export async function getHollywoodCatalog() {
-  try { return (await loadCatalog()).hollywood; } catch { return []; }
+  try {
+    const [mapiRes, tmdbRes] = await Promise.allSettled([
+      loadCatalog().then(c => c.hollywood),
+      import('./tmdb.js').then(m => m.getTmdbCatalog('movie', 'popular'))
+    ]);
+    const mapiList = mapiRes.status === 'fulfilled' && Array.isArray(mapiRes.value) ? mapiRes.value : [];
+    const tmdbList = tmdbRes.status === 'fulfilled' && Array.isArray(tmdbRes.value) ? tmdbRes.value : [];
+    
+    const seen = new Set();
+    const merged = [];
+    for (const item of [...tmdbList, ...mapiList]) {
+      const key = (item.title || '').toLowerCase().trim();
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      merged.push(item);
+    }
+    return merged;
+  } catch {
+    return [];
+  }
 }
 
 export async function getSerialsCatalog() {
-  try { return (await loadCatalog()).serials; } catch { return []; }
+  try {
+    const [mapiRes, tmdbRes] = await Promise.allSettled([
+      loadCatalog().then(c => c.serials),
+      import('./tmdb.js').then(m => m.getTmdbCatalog('tv', 'popular'))
+    ]);
+    const mapiList = mapiRes.status === 'fulfilled' && Array.isArray(mapiRes.value) ? mapiRes.value : [];
+    const tmdbList = tmdbRes.status === 'fulfilled' && Array.isArray(tmdbRes.value) ? tmdbRes.value : [];
+    
+    const seen = new Set();
+    const merged = [];
+    for (const item of [...tmdbList, ...mapiList]) {
+      const key = (item.title || '').toLowerCase().trim();
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      merged.push(item);
+    }
+    return merged;
+  } catch {
+    return [];
+  }
 }
 
 export async function searchAllMedia(query) {
   const clean = String(query || '').trim().toLowerCase();
   if (!clean) return [];
 
-  const [catalog, live] = await Promise.allSettled([
+  const [catalog, live, tmdbRes, ytRes] = await Promise.allSettled([
     loadCatalog(),
-    getLiveBroadcasts()
+    getLiveBroadcasts(),
+    import('./tmdb.js').then(m => m.searchTmdb(clean)),
+    // v3.12.60: YouTube search results in global search (Piped-backed).
+    import('./youtube.js').then(m => m.searchYouTubeVideos(clean)).catch(() => [])
   ]);
 
-  const items = [
+  const localItems = [
     ...(catalog.status === 'fulfilled' ? catalog.value.all : []),
     ...(live.status === 'fulfilled' ? live.value : [])
   ];
+  const tmdbItems = tmdbRes.status === 'fulfilled' && Array.isArray(tmdbRes.value) ? tmdbRes.value : [];
+  const ytItems = ytRes.status === 'fulfilled' && Array.isArray(ytRes.value) ? ytRes.value : [];
+
+  const matchedLocal = localItems.filter((item) => {
+    return `${item.title} ${item.category || ''}`.toLowerCase().includes(clean);
+  });
 
   const seen = new Set();
-  return items.filter((item) => {
-    const hit = `${item.title} ${item.category || ''}`.toLowerCase().includes(clean);
-    const key = String(item.id);
-    if (!hit || seen.has(key)) return false;
+  const results = [];
+
+  for (const item of [...tmdbItems, ...ytItems, ...matchedLocal]) {
+    const key = (item.title || '').toLowerCase().trim() + ':' + (item.type || 'movie');
+    if (!key || seen.has(key)) continue;
     seen.add(key);
-    return true;
-  });
+    results.push(item);
+  }
+
+  return results;
 }
 
 export async function getSeriesEpisodes(movieId) {
@@ -279,11 +350,20 @@ export async function getSeriesEpisodes(movieId) {
     const data = await fetchJson(BASE_URL + '/serial/episodes/' + encodeURIComponent(movieId));
     const raw = Array.isArray(data) ? data : data?.results || data?.result || [];
     return raw.flatMap((episode, index) => {
-      const sources = generateUniversalServers(episode);
-      return sources.length ? [{
+      // v3.12.50: PIKASHOW episode rows often omit season/episode per row — bind
+      // explicit numbers (falling back to list order) BEFORE building mirrors, or
+      // every episode bakes the same Season 1 Episode 1 embed URL ("episode 8
+      // streams episode 1").
+      const numbered = {
         ...episode,
+        season_number: Number(episode.season_number || episode.season_num || episode.season || 1) || 1,
+        episode_number: Number(episode.episode_number || episode.episode_num || episode.episode || index + 1) || index + 1
+      };
+      const sources = generateUniversalServers(numbered);
+      return sources.length ? [{
+        ...numbered,
         id: String(episode.id || `${movieId}:${index + 1}`),
-        episode: String(episode.episode || index + 1),
+        episode: String(numbered.episode_number),
         players: sources,
         player: sources,
         url: sources[0].url,

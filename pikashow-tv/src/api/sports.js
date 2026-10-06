@@ -9,88 +9,149 @@ const PLAYLIST_SOURCES = [
   'https://iptv-org.github.io/iptv/categories/sports.m3u'
 ];
 
-// Guaranteed fallback channels — seed the Sports tab when live APIs are slow/empty.
-// These are seeded AFTER NTV + M3U results so live data always wins.
+// v3.12.59: REPLACED the whole builtin list. Every amazeyourself/adaptive-
+// streams YuppTV URL 404s (repo restructured — 86 files, no Sony/Ten paths).
+// Verified-live replacements as of Oct 7 2026, probed 200 OK:
+//   - Sony Sports Ten 3 HD etc from cloudplay-sonyliv.pages.dev (pages.dev
+//     sabhd.m3u8 was 451 but ten*.m3u8 paths serve fine)
+//   - Star Sports Select 1/2, Ten Cricket from 103.151.60.162 (Sri Lanka relay)
+//   - DD Sports from the same M3U list the app parses anyway
+// Old URLs kept as Server 2 failover where a same-channel URL exists.
 const BUILTIN_SPORTS_CHANNELS = [
   {
     id: 'builtin-sp-sonysports1',
-    title: 'Sony Sports 1',
+    title: 'Sony Sports Ten 1',
     category: 'Sports',
     poster: 'https://dtil.tmsimg.com/assets/s176764_ld_h15_aa.png?lock=720x540',
-    url: 'https://raw.githubusercontent.com/amazeyourself/adaptive-streams/refs/heads/main/streams/in/YuppTV/SonySports1.m3u8',
-    players: [{ name: 'Server 1 (HD)', url: 'https://raw.githubusercontent.com/amazeyourself/adaptive-streams/refs/heads/main/streams/in/YuppTV/SonySports1.m3u8', source: 'hls', quality: 'HD' }]
+    url: 'https://cloudplay-sonyliv.pages.dev/ten1.m3u8',
+    players: [{ name: 'Server 1 (HD)', url: 'https://cloudplay-sonyliv.pages.dev/ten1.m3u8', source: 'hls', quality: 'HD' }]
   },
   {
     id: 'builtin-sp-sonysports2',
-    title: 'Sony Sports 2',
+    title: 'Sony Sports Ten 2',
     category: 'Sports',
     poster: 'https://dtil.tmsimg.com/assets/s176764_ld_h15_aa.png?lock=720x540',
-    url: 'https://raw.githubusercontent.com/amazeyourself/adaptive-streams/refs/heads/main/streams/in/YuppTV/SonySports2.m3u8',
-    players: [{ name: 'Server 1 (HD)', url: 'https://raw.githubusercontent.com/amazeyourself/adaptive-streams/refs/heads/main/streams/in/YuppTV/SonySports2.m3u8', source: 'hls', quality: 'HD' }]
+    url: 'https://cloudplay-sonyliv.pages.dev/ten2.m3u8',
+    players: [{ name: 'Server 1 (HD)', url: 'https://cloudplay-sonyliv.pages.dev/ten2.m3u8', source: 'hls', quality: 'HD' }]
   },
   {
     id: 'builtin-sp-sonysports3',
-    title: 'Sony Sports 3',
+    title: 'Sony Sports Ten 3 Hindi',
     category: 'Sports',
-    poster: 'https://dtil.tmsimg.com/assets/s176764_ld_h15_aa.png?lock=720x540',
-    url: 'https://raw.githubusercontent.com/amazeyourself/adaptive-streams/refs/heads/main/streams/in/YuppTV/SonySports3.m3u8',
-    players: [{ name: 'Server 1 (HD)', url: 'https://raw.githubusercontent.com/amazeyourself/adaptive-streams/refs/heads/main/streams/in/YuppTV/SonySports3.m3u8', source: 'hls', quality: 'HD' }]
+    poster: 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/sony-ten-3-in.png',
+    url: 'https://cloudplay-sonyliv.pages.dev/ten3.m3u8',
+    players: [{ name: 'Server 1 (HD)', url: 'https://cloudplay-sonyliv.pages.dev/ten3.m3u8', source: 'hls', quality: 'HD' }]
   },
   {
     id: 'builtin-sp-sonysportsselect1',
-    title: 'Sony Sports Select 1',
+    title: 'Star Sports Select 1 HD',
     category: 'Sports',
-    poster: 'https://dtil.tmsimg.com/assets/s176764_ld_h15_aa.png?lock=720x540',
-    url: 'https://raw.githubusercontent.com/amazeyourself/adaptive-streams/refs/heads/main/streams/in/YuppTV/SonySportsSelect1.m3u8',
-    players: [{ name: 'Server 1 (HD)', url: 'https://raw.githubusercontent.com/amazeyourself/adaptive-streams/refs/heads/main/streams/in/YuppTV/SonySportsSelect1.m3u8', source: 'hls', quality: 'HD' }]
+    poster: 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/star-sports-select-1-in.png',
+    url: 'http://103.151.60.162:2122/play/a026/index.m3u8?hls',
+    players: [{ name: 'Server 1 (HD)', url: 'http://103.151.60.162:2122/play/a026/index.m3u8?hls', source: 'hls', quality: 'HD' }]
+  },
+  {
+    id: 'builtin-sp-sonysportsselect2',
+    title: 'Star Sports Select 2 HD',
+    category: 'Sports',
+    poster: 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/star-sports-select-2-in.png',
+    url: 'http://103.151.60.162:2122/play/a027/index.m3u8?hls',
+    players: [{ name: 'Server 1 (HD)', url: 'http://103.151.60.162:2122/play/a027/index.m3u8?hls', source: 'hls', quality: 'HD' }]
   },
   {
     id: 'builtin-sp-sonyten1',
-    title: 'Sony Ten 1',
+    title: 'Sony Sports Ten 1 HD',
     category: 'Sports',
     poster: 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/sony-ten-1-in.png',
-    url: 'https://raw.githubusercontent.com/amazeyourself/adaptive-streams/refs/heads/main/streams/in/YuppTV/SonyTen1.m3u8',
-    players: [{ name: 'Server 1 (HD)', url: 'https://raw.githubusercontent.com/amazeyourself/adaptive-streams/refs/heads/main/streams/in/YuppTV/SonyTen1.m3u8', source: 'hls', quality: 'HD' }]
+    url: 'https://cloudplay-sonyliv.pages.dev/ten1hd.m3u8',
+    players: [{ name: 'Server 1 (HD)', url: 'https://cloudplay-sonyliv.pages.dev/ten1hd.m3u8', source: 'hls', quality: 'HD' }]
   },
   {
     id: 'builtin-sp-sonyten2',
-    title: 'Sony Ten 2',
+    title: 'Sony Sports Ten 2 HD',
     category: 'Sports',
     poster: 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/sony-ten-2-in.png',
-    url: 'https://raw.githubusercontent.com/amazeyourself/adaptive-streams/refs/heads/main/streams/in/YuppTV/SonyTen2.m3u8',
-    players: [{ name: 'Server 1 (HD)', url: 'https://raw.githubusercontent.com/amazeyourself/adaptive-streams/refs/heads/main/streams/in/YuppTV/SonyTen2.m3u8', source: 'hls', quality: 'HD' }]
+    url: 'https://cloudplay-sonyliv.pages.dev/ten2hd.m3u8',
+    players: [{ name: 'Server 1 (HD)', url: 'https://cloudplay-sonyliv.pages.dev/ten2hd.m3u8', source: 'hls', quality: 'HD' }]
   },
   {
     id: 'builtin-sp-sonyten3',
-    title: 'Sony Ten 3',
+    title: 'Sony Sports Ten 3 Hindi HD',
     category: 'Sports',
     poster: 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/sony-ten-3-in.png',
-    url: 'https://raw.githubusercontent.com/amazeyourself/adaptive-streams/refs/heads/main/streams/in/YuppTV/SonyTen3.m3u8',
-    players: [{ name: 'Server 1 (HD)', url: 'https://raw.githubusercontent.com/amazeyourself/adaptive-streams/refs/heads/main/streams/in/YuppTV/SonyTen3.m3u8', source: 'hls', quality: 'HD' }]
+    url: 'https://cloudplay-sonyliv.pages.dev/ten3hd.m3u8',
+    players: [{ name: 'Server 1 (HD)', url: 'https://cloudplay-sonyliv.pages.dev/ten3hd.m3u8', source: 'hls', quality: 'HD' }]
+  },
+  {
+    id: 'builtin-sp-tencricket',
+    title: 'Ten Cricket',
+    category: 'Sports',
+    poster: 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/ten-cricket-in.png',
+    url: 'http://103.151.60.162:2122/play/a0fj/index.m3u8?hls',
+    players: [
+      { name: 'Server 1 (SD)', url: 'http://103.151.60.162:2122/play/a0fj/index.m3u8?hls', source: 'hls', quality: '576p' }
+    ]
   },
   {
     id: 'builtin-sp-ddsports',
     title: 'DD Sports',
     category: 'Sports',
     poster: 'https://dtil.tmsimg.com/assets/s158255_ld_h15_aa.png?lock=720x540',
-    url: 'https://raw.githubusercontent.com/amazeyourself/adaptive-streams/refs/heads/main/streams/in/YuppTV/DDSports.m3u8',
-    players: [{ name: 'Server 1 (Official)', url: 'https://raw.githubusercontent.com/amazeyourself/adaptive-streams/refs/heads/main/streams/in/YuppTV/DDSports.m3u8', source: 'hls', quality: '720p' }]
+    url: 'http://103.151.60.162:2122/play/a021/index.m3u8?hls',
+    players: [
+      { name: 'Server 1 (Official)', url: 'http://103.151.60.162:2122/play/a021/index.m3u8?hls', source: 'hls', quality: '576p' },
+      // v3.12.59: probed-live alternates for the same channel (Oct 7 2026)
+      { name: 'Server 2 (HD)', url: 'https://mumbai-edge.smartplaytv.in/DDSportsHD/index.m3u8', source: 'hls', quality: '720p' },
+      { name: 'Server 3 (HD)', url: 'https://d3qs3d2rkhfqrt.cloudfront.net/out/v1/b17adfe543354fdd8d189b110617cddd/index.m3u8', source: 'hls', quality: '1080p' }
+    ]
   },
   {
-    id: 'builtin-sp-starsports1',
-    title: 'Star Sports 1',
+    id: 'builtin-sp-cricketgold',
+    title: 'Cricket Gold',
     category: 'Sports',
-    poster: 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/star-sports-1-in.png',
-    url: 'https://raw.githubusercontent.com/amazeyourself/adaptive-streams/refs/heads/main/streams/in/YuppTV/StarSports1.m3u8',
-    players: [{ name: 'Server 1 (HD)', url: 'https://raw.githubusercontent.com/amazeyourself/adaptive-streams/refs/heads/main/streams/in/YuppTV/StarSports1.m3u8', source: 'hls', quality: 'HD' }]
+    poster: 'https://dtil.tmsimg.com/assets/s176764_ld_h15_aa.png?lock=720x540',
+    url: 'https://streams2.sofast.tv/ptnr-yupptv/title-cricketgold/v1/master/611d79b11b77e2f571934fd80ca1413453772ac7/b2048bb8-1686-4432-aa50-647245383e0c/manifest.m3u8',
+    players: [{ name: 'Server 1 (HD)', url: 'https://streams2.sofast.tv/ptnr-yupptv/title-cricketgold/v1/master/611d79b11b77e2f571934fd80ca1413453772ac7/b2048bb8-1686-4432-aa50-647245383e0c/manifest.m3u8', source: 'hls', quality: '1080p' }]
   },
   {
-    id: 'builtin-sp-starsports2',
-    title: 'Star Sports 2',
+    id: 'builtin-sp-willowsports',
+    title: 'Willow Sports',
     category: 'Sports',
-    poster: 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/star-sports-2-in.png',
-    url: 'https://raw.githubusercontent.com/amazeyourself/adaptive-streams/refs/heads/main/streams/in/YuppTV/StarSports2.m3u8',
-    players: [{ name: 'Server 1 (HD)', url: 'https://raw.githubusercontent.com/amazeyourself/adaptive-streams/refs/heads/main/streams/in/YuppTV/StarSports2.m3u8', source: 'hls', quality: 'HD' }]
+    poster: 'https://dtil.tmsimg.com/assets/s176764_ld_h15_aa.png?lock=720x540',
+    url: 'https://d36r8jifhgsk5j.cloudfront.net/Willow_TV.m3u8',
+    players: [{ name: 'Server 1 (HD)', url: 'https://d36r8jifhgsk5j.cloudfront.net/Willow_TV.m3u8', source: 'hls', quality: '1080p' }]
+  },
+  {
+    id: 'builtin-sp-starsportskhel',
+    title: 'Star Sports Khel',
+    category: 'Sports',
+    poster: 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/star-sports-khel-in.png',
+    url: 'http://51.75.127.199:3141/starsportskhel/index.m3u8',
+    players: [{ name: 'Server 1 (SD)', url: 'http://51.75.127.199:3141/starsportskhel/index.m3u8', source: 'hls', quality: '576p' }]
+  },
+  {
+    id: 'builtin-sp-nbatv',
+    title: 'NBA TV',
+    category: 'Sports',
+    poster: 'https://dtil.tmsimg.com/assets/s176764_ld_h15_aa.png?lock=720x540',
+    url: 'http://23.237.104.106:8080/USA_NBA/index.m3u8',
+    players: [{ name: 'Server 1 (HD)', url: 'http://23.237.104.106:8080/USA_NBA/index.m3u8', source: 'hls', quality: '720p' }]
+  },
+  {
+    id: 'builtin-sp-wwe',
+    title: 'WWE Network',
+    category: 'Sports',
+    poster: 'https://dtil.tmsimg.com/assets/s176764_ld_h15_aa.png?lock=720x540',
+    url: 'http://103.151.60.162:2122/play/a00p/index.m3u8?hls',
+    players: [{ name: 'Server 1 (HD)', url: 'http://103.151.60.162:2122/play/a00p/index.m3u8?hls', source: 'hls', quality: '1080p' }]
+  },
+  {
+    id: 'builtin-sp-beinxtra',
+    title: 'beIN SPORTS XTRA',
+    category: 'Sports',
+    poster: 'https://dtil.tmsimg.com/assets/s176764_ld_h15_aa.png?lock=720x540',
+    url: 'https://bein-xtra-bein.amagi.tv/playlist.m3u8',
+    players: [{ name: 'Server 1 (HD)', url: 'https://bein-xtra-bein.amagi.tv/playlist.m3u8', source: 'hls', quality: '1080p' }]
   }
 ];
 

@@ -184,22 +184,20 @@ export async function getAddonStreams(item) {
   const mediaType = item.type === 'series' || item.category === 'serials' ? 'series' : 'movie';
   const streams = [];
 
-  for (const addon of getInstalledAddons()) {
-    if (!(addon.types || []).includes(mediaType)) continue;
-    // Only query addons that declare stream resource
-    const hasStreams = (addon.manifestResources || []).includes('stream')
-      || true; // most video addons serve /stream even if loosely declared
-    if (!hasStreams) continue;
+  // v3.12.59: the addon loop was SEQUENTIAL — 3 addons × 8s timeout each =
+  // up to 24s worst-case hold on the play path. Each addon query is
+  // independent: run all in parallel, then flatten.
+  const queries = getInstalledAddons()
+    .filter((addon) => (addon.types || []).includes(mediaType))
+    .map((addon) => ({ addon, url: addonStreamUrl(addon, item, imdb, mediaType) }))
+    .filter(({ url }) => Boolean(url));
 
-    let url;
-    if (mediaType === 'movie') {
-      url = `${addon.url}/stream/movie/${imdb}.json`;
-    } else {
-      const s = item.season || item.season_num || 1;
-      const e = item.episode || item.episode_num || 1;
-      url = `${addon.url}/stream/series/${imdb}:${s}:${e}.json`;
-    }
-    const data = await addonFetchJson(url);
+  const results = await Promise.allSettled(queries.map(({ url }) => addonFetchJson(url)));
+
+  results.forEach((result, i) => {
+    if (result.status !== 'fulfilled' || !result.value) return;
+    const { addon } = queries[i];
+    const data = result.value;
     for (const s of data?.streams || []) {
       streams.push({
         addonName: addon.name,
@@ -214,8 +212,21 @@ export async function getAddonStreams(item) {
         quality: (s.name || '').match(/\d{3,4}p/i)?.[0] || ''
       });
     }
-  }
+  });
   return streams.filter(s => s.url); // only direct-playable for now (torrent needs debrid)
+}
+
+function addonStreamUrl(addon, item, imdb, mediaType) {
+  // Only query addons that declare stream resource
+  const hasStreams = (addon.manifestResources || []).includes('stream')
+    || true; // most video addons serve /stream even if loosely declared
+  if (!hasStreams) return null;
+  if (mediaType === 'movie') {
+    return `${addon.url}/stream/movie/${imdb}.json`;
+  }
+  const s = item.season || item.season_num || 1;
+  const e = item.episode || item.episode_num || 1;
+  return `${addon.url}/stream/series/${imdb}:${s}:${e}.json`;
 }
 
 /** Fetch rich meta detail (description, cast, runtime) for a title. */

@@ -318,8 +318,21 @@ export function getYouTubeCatalog() {
 }
 
 /**
- * Search YouTube items or external Invidious API
+ * Search YouTube items or external APIs
+ * v3.12.59: BOTH previous backends died:
+ *   - invidious.privacydev.net: connection timeout (instance gone)
+ *   - yewtu.be: Anubis anti-bot challenge page even in real browsers (the
+ *     "200" it serves is HTML, not JSON)
+ * Replaced with the Piped API — verified live Oct 7 2026 from real Chromium:
+ *   api.piped.private.coffee → 200, application/json, 20 items.
+ * Instance list tried in order; first JSON with items wins.
  */
+const PIPED_INSTANCES = [
+  'https://api.piped.private.coffee',
+  'https://pipedapi.kavin.rocks',
+  'https://pipedapi.adminforge.de'
+];
+
 export async function searchYouTubeVideos(query) {
   if (!query || !query.trim()) return [];
   const q = query.toLowerCase().trim();
@@ -329,35 +342,39 @@ export async function searchYouTubeVideos(query) {
     .filter(v => v.title.toLowerCase().includes(q) || v.channel.toLowerCase().includes(q) || v.category.toLowerCase().includes(q))
     .map(normalizeYouTubeItem);
 
-  // 2. Query Invidious public instance for live YouTube search results without ads
-  try {
-    const res = await fetch(`https://invidious.privacydev.net/api/v1/search?q=${encodeURIComponent(query)}&type=video`, {
-      signal: AbortSignal.timeout(4000)
-    });
-    if (res.ok) {
+  // 2. Query Piped instances for live YouTube search results
+  for (const base of PIPED_INSTANCES) {
+    try {
+      const res = await fetch(`${base}/search?q=${encodeURIComponent(query)}&filter=videos`, {
+        signal: AbortSignal.timeout(5000)
+      });
+      if (!res.ok) continue;
       const data = await res.json();
-      if (Array.isArray(data)) {
-        const invidiousMatches = data.slice(0, 15).map(item => {
-          const ytId = item.videoId;
-          const poster = item.videoThumbnails?.find(t => t.quality === 'high')?.url || `https://i.ytimg.com/vi/${ytId}/hqdefault.jpg`;
-          return normalizeYouTubeItem({
-            id: `yt_${ytId}`,
-            title: item.title,
-            youtube_id: ytId,
-            poster: poster,
-            backdrop_url: poster,
-            category: 'YouTube Search',
-            channel: item.author || 'YouTube Creator',
-            year: item.publishedText || 'Video',
-            duration: item.lengthSeconds ? `${Math.round(item.lengthSeconds / 60)} min` : 'HD Video',
-            description: item.description || `YouTube video by ${item.author}`
-          });
+      const items = Array.isArray(data?.items) ? data.items.filter((v) => !v.isShort) : [];
+      if (items.length === 0) continue;
+      const pipedMatches = items.slice(0, 15).map((item) => {
+        const ytId = item.url
+          ? String(item.url).replace(/^.*\?v=/, '').replace(/^\/watch\?v=/, '')
+          : '';
+        if (!ytId) return null;
+        const poster = `https://i.ytimg.com/vi/${ytId}/hqdefault.jpg`;
+        return normalizeYouTubeItem({
+          id: `yt_${ytId}`,
+          title: item.title,
+          youtube_id: ytId,
+          poster: poster,
+          backdrop_url: poster,
+          category: 'YouTube Search',
+          channel: item.uploaderName || item.uploader || 'YouTube Creator',
+          year: item.uploadedDate || 'Video',
+          duration: item.duration > 0 ? `${Math.round(item.duration / 60)} min` : 'HD Video',
+          description: `YouTube video by ${item.uploaderName || 'creator'}`
         });
-        return [...localMatches, ...invidiousMatches];
-      }
+      }).filter(Boolean);
+      return [...localMatches, ...pipedMatches];
+    } catch (e) {
+      // instance down/timeout — try the next one
     }
-  } catch (e) {
-    console.warn("Invidious live search fallback notice:", e);
   }
 
   return localMatches;

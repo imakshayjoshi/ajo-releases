@@ -104,10 +104,25 @@ export async function getTmdbNowPlaying(limit = 20) {
   try {
     const data = await tmdb('/movie/now_playing', { region: 'IN', language: 'en-US' });
     const list = Array.isArray(data?.results) ? data.results.slice(0, limit) : [];
-    return list.map(toTmdbItem).filter(Boolean);
+    return list.map(r => normalizeTmdb(r, 'movie')).filter(Boolean);
   } catch {
     return [];
   }
+}
+
+/** Fetch trending and new Indian/Bollywood & OTT releases (e.g. Zee5, Netflix, Prime) */
+export async function getTmdbIndianMovies(page = 1) {
+  const key = `indian_movies_${page}`;
+  let cached = cacheGet(key);
+  if (cached) return cached;
+  const data = await tmdb('/discover/movie', {
+    with_original_language: 'hi',
+    sort_by: 'popularity.desc',
+    page
+  });
+  const items = (data?.results || []).map(r => normalizeTmdb(r, 'movie')).filter(Boolean);
+  if (items.length) cacheSet(key, items);
+  return items;
 }
 
 export async function getTmdbTrending(mediaType = 'all', window = 'week') {
@@ -221,6 +236,32 @@ export async function searchTmdb(query, page = 1) {
   return items;
 }
 
+/** Fetch episodes for a TMDB TV series */
+export async function getTmdbEpisodes(tmdbId, season = 1) {
+  if (!tmdbId) return [];
+  const key = `episodes_${tmdbId}_${season}`;
+  let cached = cacheGet(key);
+  if (cached) return cached;
+  const data = await tmdb(`/tv/${tmdbId}/season/${season}`);
+  const rawEps = Array.isArray(data?.episodes) ? data.episodes : [];
+  const items = rawEps.map(ep => ({
+    id: `tmdb-ep-${tmdbId}-${season}-${ep.episode_number}`,
+    episode_number: ep.episode_number,
+    season_number: season,
+    name: ep.name || `Episode ${ep.episode_number}`,
+    title: ep.name || `Episode ${ep.episode_number}`,
+    overview: ep.overview || '',
+    air_date: ep.air_date || '',
+    runtime: ep.runtime ? `${ep.runtime} min` : '45 min',
+    still_path: ep.still_path ? `${TMDB_IMG}/w300${ep.still_path}` : '',
+    poster: ep.still_path ? `${TMDB_IMG}/w300${ep.still_path}` : '',
+    poster_url: ep.still_path ? `${TMDB_IMG}/w300${ep.still_path}` : '',
+    tmdb_id: tmdbId
+  }));
+  if (items.length) cacheSet(key, items);
+  return items;
+}
+
 // ------------------------------------------------------- external ID lookup
 
 /**
@@ -240,15 +281,81 @@ export async function resolveImdbId(tmdbId, mediaType = 'movie') {
 }
 
 /**
+ * Search TMDB for an exact title match (e.g. for PikaShow/upstream catalog items).
+ */
+export async function searchExactMedia(title, type = 'movie', year = null) {
+  if (!title) return null;
+  const cleanTitle = String(title).trim();
+  const endpoint = type === 'series' || type === 'tv' ? '/search/tv' : '/search/movie';
+  const params = { query: cleanTitle };
+  if (year && /^\d{4}$/.test(String(year))) {
+    if (type === 'series' || type === 'tv') params.first_air_date_year = year;
+    else params.year = year;
+  }
+  const data = await tmdb(endpoint, params);
+  const results = Array.isArray(data?.results) ? data.results : [];
+  if (results.length > 0) {
+    return results[0].id;
+  }
+  // If year filtering had no results, search by title alone
+  if (params.year || params.first_air_date_year) {
+    const fallbackData = await tmdb(endpoint, { query: cleanTitle });
+    const fallbackResults = Array.isArray(fallbackData?.results) ? fallbackData.results : [];
+    if (fallbackResults.length > 0) return fallbackResults[0].id;
+  }
+  return null;
+}
+
+/**
  * Enrich an AJO catalog item with its IMDb id (mutates + returns item).
  * Non-blocking friendly: returns the item unchanged on any failure.
  */
 export async function enrichWithImdb(item) {
+  // v3.12.59: PLAY-START BUDGET. This call sits on the critical path of
+  // every play. Previously two sequential TMDB round-trips (search + find)
+  // with NO deadline: a slow TMDB could hold the play button for 16s+.
+  // Now the whole enrichment races a 2.5s timer — losing the race returns
+  // the item unchanged; the missing imdb_id just means fewer mirrors this
+  // click (generateUniversalServers works from tmdb_id too, and the next
+  // play attempt hits the cache).
+  return Promise.race([
+    enrichWithImdbInner(item),
+    new Promise((resolve) => setTimeout(() => resolve(item), 2500))
+  ]);
+}
+
+async function enrichWithImdbInner(item) {
   try {
-    if (!item || item.imdb_id) return item;
-    const tmdbId = Number(item.tmdb_id);
-    if (!Number.isFinite(tmdbId) || tmdbId <= 0) return item;
-    const mediaType = item.type === 'series' || item.category === 'serials' ? 'tv' : 'movie';
+    if (!item) return item;
+    const isSeries = item.type === 'series'
+      || item.category === 'serials'
+      || item.type === 'serial'
+      || item.type === 'tv'
+      || Boolean(item.season_number)
+      || Boolean(item.episode_number)
+      || (typeof item.id === 'string' && item.id.startsWith('tmdb-ep-'));
+    const mediaType = isSeries ? 'tv' : 'movie';
+    let tmdbId = item.tmdb_id;
+    if (!tmdbId && typeof item.id === 'string') {
+      if (item.id.startsWith('tmdb-ep-')) {
+        const parts = item.id.split('-');
+        if (parts[2] && /^\d+$/.test(parts[2])) tmdbId = Number(parts[2]);
+      } else if (item.id.startsWith('tmdb-')) {
+        const parts = item.id.split('-');
+        const candidate = parts[parts.length - 1];
+        if (/^\d+$/.test(candidate)) tmdbId = Number(candidate);
+      }
+    }
+    // If no verified tmdb_id, search TMDB by title!
+    const searchTitle = item.series_title || (item.season_number || item.episode_number ? item.title?.split(' - S')[0] : item.title);
+    if (!tmdbId && searchTitle) {
+      const resolved = await searchExactMedia(searchTitle, mediaType, item.year);
+      if (resolved) {
+        tmdbId = resolved;
+        item.tmdb_id = resolved;
+      }
+    }
+    if (!tmdbId) return item;
     const imdbId = await resolveImdbId(tmdbId, mediaType);
     if (imdbId) item.imdb_id = imdbId;
   } catch {}
