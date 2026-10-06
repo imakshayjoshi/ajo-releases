@@ -566,6 +566,13 @@ public class PlayerActivity extends AppCompatActivity {
         if (player != null && !isLive) {
             resumePositionMs = player.getCurrentPosition();
         }
+        // v3.12.54 FIX: web-embed mode kept playing audio after Home because
+        // only ExoPlayer was released here — the embed WebView was never
+        // paused, and the WifiLock stayed held while backgrounded.
+        if (isWebEmbedMode && webVideoView != null) {
+            try { webVideoView.onPause(); } catch (Exception ignored) {}
+        }
+        releaseWifiLock();
         uiHandler.removeCallbacks(progressRunnable);
         uiHandler.removeCallbacks(firstFrameWatchdog);
         releasePlayer();
@@ -1330,14 +1337,9 @@ public class PlayerActivity extends AppCompatActivity {
         streamUrl = serverQueue.get(currentServerIdx);
         Log.i(TAG, "playCurrentStream [" + (currentServerIdx + 1) + "/" + serverQueue.size() + "]: " + streamUrl);
 
-        // Ensure system media volume is set to maximum and unmuted
-        try {
-            android.media.AudioManager am = (android.media.AudioManager) getSystemService(Context.AUDIO_SERVICE);
-            if (am != null) {
-                int max = am.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC);
-                am.setStreamVolume(android.media.AudioManager.STREAM_MUSIC, max, 0);
-            }
-        } catch (Exception ignored) {}
+        // v3.12.54 FIX (removed): this block FORCED STREAM_MUSIC to max volume
+        // on EVERY mirror switch / failover, stomping the user's remote volume
+        // mid-session. Un-mute at most; never raise volume on their behalf.
 
         if (isWebEmbedUrl(streamUrl)) {
             playInWebEngine(streamUrl);

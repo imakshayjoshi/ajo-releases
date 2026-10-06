@@ -502,8 +502,14 @@ public class MainActivity extends BridgeActivity {
                                         null);
                             });
 
-                            // Trust all SSL certificates for legacy 2014-2016 Smart TVs with expired root
-                            // CAs
+                            // v3.12.54 FIX: the OLD code called
+                            // HttpsURLConnection.setDefaultSSLSocketFactory(trustAll)
+                            // + setDefaultHostnameVerifier(true) here — JVM-GLOBAL
+                            // statics that stayed poisoned for the whole process
+                            // lifetime after ONE update attempt, downgrading TLS
+                            // for every other connection the app ever makes.
+                            // Instead: a per-connection trust-all scoped ONLY to
+                            // this download's connections.
                             javax.net.ssl.TrustManager[] trustAllCerts = new javax.net.ssl.TrustManager[] {
                                     new javax.net.ssl.X509TrustManager() {
                                         public java.security.cert.X509Certificate[] getAcceptedIssuers() {
@@ -521,8 +527,8 @@ public class MainActivity extends BridgeActivity {
                             };
                             javax.net.ssl.SSLContext sc = javax.net.ssl.SSLContext.getInstance("TLS");
                             sc.init(null, trustAllCerts, new java.security.SecureRandom());
-                            javax.net.ssl.HttpsURLConnection.setDefaultSSLSocketFactory(sc.getSocketFactory());
-                            javax.net.ssl.HttpsURLConnection.setDefaultHostnameVerifier((hostname, session) -> true);
+                            javax.net.ssl.SSLSocketFactory perDownloadSslFactory = sc.getSocketFactory();
+                            javax.net.ssl.HostnameVerifier perDownloadVerifier = (hostname, session) -> true;
 
                             String[] candidateUrls = new String[] {
                                     apkUrl,
@@ -554,6 +560,14 @@ public class MainActivity extends BridgeActivity {
                                     while (redirects < 8) {
                                         URL u = new URL(currentUrl);
                                         conn = (HttpURLConnection) u.openConnection();
+                                        // v3.12.54: apply the per-download trust-all only
+                                        // to this connection, never the JVM globals.
+                                        if (conn instanceof javax.net.ssl.HttpsURLConnection) {
+                                            javax.net.ssl.HttpsURLConnection https =
+                                                    (javax.net.ssl.HttpsURLConnection) conn;
+                                            https.setSSLSocketFactory(perDownloadSslFactory);
+                                            https.setHostnameVerifier(perDownloadVerifier);
+                                        }
                                         conn.setConnectTimeout(15000);
                                         conn.setReadTimeout(30000);
                                         conn.setInstanceFollowRedirects(true);

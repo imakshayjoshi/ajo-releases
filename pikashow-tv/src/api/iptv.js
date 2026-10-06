@@ -1,28 +1,83 @@
 import { isFavoriteChannel } from './history.js';
 import { isSafeHttpUrl } from '../utils/streamingEngines.js';
 
-const CACHE_KEY = 'ajo_iptv_cache_v21';
+const CACHE_KEY = 'ajo_iptv_cache_v28';
 const CUSTOM_KEY = 'ajo_custom_m3u_v2';
 const JIOTV_KEY = 'ajo_jiotv_host_v2';
 const FAILED_CHANNELS_KEY = 'ajo_failed_channels_v1';
 const CACHE_TTL = 30 * 60 * 1000;
 const MANIFEST_TTL = 2 * 60 * 60 * 1000; // 2 hours
 
-// 24/7 Production M3U Playlists curated for AJO TV & Mobile
+// Curated Hindi, Marathi, and English M3U Playlists
 const PLAYLISTS = [
-  'https://raw.githubusercontent.com/amazeyourself/m3u/main/sliv.m3u',
-  'https://iptv-org.github.io/iptv/categories/entertainment.m3u'
+  'https://raw.githubusercontent.com/sportlive18/jio-tv-auto-update-playlist/refs/heads/main/sony.m3u',
+  'https://iptv-org.github.io/iptv/languages/hin.m3u',
+  'https://iptv-org.github.io/iptv/languages/mar.m3u',
+  'https://raw.githubusercontent.com/iptv-org/iptv/master/streams/in.m3u'
 ];
 
-// Generous language allow-list
-const KEEP_LANG = new Set([
-  'hin', 'mar', 'eng', 'hindi', 'marathi', 'english',
-  'hi', 'mr', 'en', '', 'hindi-roman', 'hindi-english', 'english-hindi',
-  'ind', 'india', 'all'
+const DISALLOWED_LANG_REGEX = /\b(tamil|telugu|kannada|malayalam|bengali|bangla|punjabi|gujarati|urdu|bhojpuri|odia|oriya|assamese|nepali|sinhala|arabic|french|spanish|german|russian|italian|korean|japanese|chinese|turkish|persian|afaan|oromo|somali|swahili|amharic|yoruba|igbo|hausa|pashto)\b/i;
+
+const DISALLOWED_LANG_CODES = new Set([
+  'tam', 'ta', 'tel', 'te', 'kan', 'kn', 'mal', 'ml', 'ben', 'bn',
+  'pun', 'pa', 'guj', 'gu', 'urd', 'ur', 'bho', 'ori', 'or', 'asm', 'as',
+  'ara', 'ar', 'fre', 'fra', 'fr', 'spa', 'es', 'ger', 'deu', 'de', 'rus', 'ru',
+  'ita', 'it', 'kor', 'ko', 'jpn', 'ja', 'zho', 'zh', 'chi', 'tur', 'tr'
 ]);
 
+const ALLOWED_LANG_CODES = new Set([
+  'hin', 'hi', 'hindi',
+  'mar', 'mr', 'marathi',
+  'eng', 'en', 'english',
+  'hindi-english', 'english-hindi'
+]);
+
+export function isAllowedLanguageChannel(ch) {
+  if (!ch) return false;
+  const title = String(ch.title || ch.name || ch.title_en || '').toLowerCase();
+  const cat = String(ch.category || ch.group || '').toLowerCase();
+  const lang = String(ch.lang || ch.language || '').toLowerCase().trim();
+
+  if (DISALLOWED_LANG_REGEX.test(title) || DISALLOWED_LANG_REGEX.test(cat)) {
+    return false;
+  }
+  if (lang && DISALLOWED_LANG_CODES.has(lang)) {
+    return false;
+  }
+  if (lang && ALLOWED_LANG_CODES.has(lang)) {
+    return true;
+  }
+
+  const ALLOWED_TITLE_PATTERNS = [
+    'hindi', 'marathi', 'english',
+    'sab', 'sony', 'set', 'max', 'pal', 'pix', 'wah', 'yay',
+    'star plus', 'star bharat', 'star pravah', 'star gold', 'star sports', 'star utsav',
+    'colors', 'colors cineplex', 'colors rishtey', 'colors marathi', 'colors infinity',
+    'zee tv', 'zeetv', 'zee cinema', 'zee marathi', 'zee 24 taas', 'zee news', 'zee business', 'zee action', 'zee classic', 'zee anmol',
+    'aaj tak', 'ndtv', 'republic', 'abp', 'times now', 'india tv', 'news18', 'tv9',
+    'dd national', 'dd news', 'dd sports', 'dd sahyadri', 'dd retro', 'dd kisan', 'dd india',
+    'fakt marathi', 'sangeet marathi', 'saam tv', 'lokmat', '9x', '9xm', '9x jalwa', '9x jhakaas',
+    'b4u', 'shemaroo', 'goldmines', 'manoranjan', 'dangal', 'enter10',
+    'discovery', 'animal planet', 'nat geo', 'national geographic', 'history tv18', 'tlc', 'travelxp', 'docubay',
+    'cartoon network', 'pogo', 'disney', 'hungama', 'nickelodeon', 'nick', 'sonic',
+    'mtv', 'vh1', 'zing', 'zoom', 'club mtv',
+    'ten 1', 'ten 2', 'ten 3', 'ten 4', 'ten 5', 'sports 18', 'fancode', 'willow', 'eurosport',
+    'wion', 'cnn', 'bbc', 'al jazeera', 'dw', 'france 24', 'sky news', 'bloomberg', 'cnbc'
+  ];
+
+  if (ALLOWED_TITLE_PATTERNS.some(p => title.includes(p))) {
+    return true;
+  }
+
+  if (['entertainment', 'movies', 'news', 'sports', 'music', 'kids', 'infotainment', 'documentary'].some(c => cat.includes(c))) {
+    return true;
+  }
+
+  return false;
+}
+
 const MANIFEST_URL = 'https://new.ajo.co.in/channels/channels.json';
-const MANIFEST_CACHE_KEY = 'ajo_channels_manifest_v5';
+const MANIFEST_CACHE_KEY = 'ajo_channels_manifest_v8';
 
 // 100% Verified HTTP 200 Logos without CORS/ORB conflicts
 export const LOGO_OVERRIDES = {
@@ -42,6 +97,9 @@ export const LOGO_OVERRIDES = {
   'colorsmarathi': 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/colors-marathi-in.png',
   'colorsgujarati': 'https://xstreamcp-assets-msp.streamready.in/assets/LIVETV/LIVECHANNEL/LIVETV_LIVETVCHANNEL_COLORS_GUJARATI/images/LOGO_HD/image.png',
   'colorsinfinite': 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/colors-in.png',
+  'colorsinfinity': 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/colors-infinity-in.png',
+  'colorsinfinityhd': 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/colors-infinity-in.png',
+  'colorscineplexbollywood': 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/colors-cineplex-bollywood-in.png',
   'ddnational': 'https://ltsk-cdn.s3.eu-west-1.amazonaws.com/jumpstart/Temp_Live/cdn/HLS/Channel/transparentImages/DD%20National.png',
   'ddnews': 'https://ltsk-cdn.s3.eu-west-1.amazonaws.com/jumpstart/Temp_Live/cdn/HLS/Channel/transparentImages/DD%20News%20HD.png',
   'ddsports': 'https://dtil.tmsimg.com/assets/s158255_ld_h15_aa.png?lock=720x540',
@@ -70,6 +128,8 @@ export const LOGO_OVERRIDES = {
   'sonytv': 'https://dtil.tmsimg.com/assets/s159096_ld_h15_aa.png?lock=720x540',
   'sonyentertainment': 'https://dtil.tmsimg.com/assets/s159096_ld_h15_aa.png?lock=720x540',
   'sonyentertainmenttelevision': 'https://dtil.tmsimg.com/assets/s159096_ld_h15_aa.png?lock=720x540',
+  'sonykal': 'https://i.imgur.com/9Qq8DKh.png',
+  'sonykalhindi': 'https://i.imgur.com/9Qq8DKh.png',
   'sonymax': 'https://dtil.tmsimg.com/assets/s179440_ld_h15_aa.png?lock=720x540',
   'sonymaxhd': 'https://dtil.tmsimg.com/assets/s179440_ld_h15_aa.png?lock=720x540',
   'sonymaxhindi': 'https://dtil.tmsimg.com/assets/s179440_ld_h15_aa.png?lock=720x540',
@@ -77,6 +137,8 @@ export const LOGO_OVERRIDES = {
   'sonypal': 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/sony-pal-in.png',
   'sonypix': 'https://i.postimg.cc/Z5G8j67L/PIX-HD-WHITE.png',
   'sonypixtv': 'https://i.postimg.cc/Z5G8j67L/PIX-HD-WHITE.png',
+  'sonybbcearth': 'https://dtil.tmsimg.com/assets/s143800_ld_h15_aa.png?lock=720x540',
+  'sonybbcearthhd': 'https://dtil.tmsimg.com/assets/s143800_ld_h15_aa.png?lock=720x540',
   'sonywah': 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/sony-wah-in.png',
   'sonyyay': 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/sony-yay-in.png',
   'sonyten1': 'https://dtil.tmsimg.com/assets/s176764_ld_h15_aa.png?lock=720x540',
@@ -100,6 +162,8 @@ export const LOGO_OVERRIDES = {
   'starsportsselect2': 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/star-sports-2-in.png',
   'stargold': 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/star-gold-in.png',
   'stargoldhd': 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/star-gold-in.png',
+  'stargoldselect': 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/star-gold-select-hd-in.png',
+  'stargoldselecthd': 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/star-gold-select-hd-in.png',
   'starutsav': 'https://i.imgur.com/k5QHfH2.png',
   'timesnow': 'https://xstreamcp-assets-msp.streamready.in/assets/LIVETV/LIVECHANNEL/LIVETV_LIVETVCHANNEL_TIMES_NOW/images/LOGO_HD/image.png',
   'timesnownavbharat': 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/times-now-navbharat-in.png',
@@ -116,20 +180,31 @@ export const LOGO_OVERRIDES = {
   'zeetv': 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/zee-tv-in.png',
   'zeetvhd': 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/zee-tv-in.png',
   'andtv': 'https://xstreamcp-assets-msp.streamready.in/assets/LIVETV/LIVECHANNEL/LIVETV_LIVETVCHANNEL_SYMANDTV/images/LOGO_HD/LOGO_HD_image.png',
+  'andpictures': 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/and-pictures-in.png',
   'histv18': 'https://dtil.tmsimg.com/assets/s143132_ld_h15_aa.png?lock=720x540',
   'historytv18': 'https://dtil.tmsimg.com/assets/s143132_ld_h15_aa.png?lock=720x540',
   'discoveryhd': 'https://dtil.tmsimg.com/assets/s143130_ld_h15_aa.png?lock=720x540',
   'discovery': 'https://dtil.tmsimg.com/assets/s143130_ld_h15_aa.png?lock=720x540',
+  'discoverykids': 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/discovery-kids-in.png',
+  'discoveryturbo': 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/discovery-turbo-in.png',
+  'discoveryscience': 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/discovery-science-in.png',
   'animalplanethd': 'https://dtil.tmsimg.com/assets/s143131_ld_h15_aa.png?lock=720x540',
   'animalplanet': 'https://dtil.tmsimg.com/assets/s143131_ld_h15_aa.png?lock=720x540',
   'cartoonnetworkhd': 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/cartoon-network-in.png',
   'cartoonnetwork': 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/cartoon-network-in.png',
+  'pogo': 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/pogo-in.png',
+  'cbeebies': 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/cbeebies-in.png',
+  'nickelodeon': 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/nickelodeon-in.png',
+  'nickelodeonindia': 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/nickelodeon-in.png',
+  'moviesnow': 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/movies-now-in.png',
+  'moviesnowhd': 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/movies-now-in.png',
+  'mnx': 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/mnx-in.png',
+  'mnxhd': 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/mnx-in.png',
   'cnbcawaaz': 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/cnbc-awaaz-in.png',
   'cnbctv18': 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/cnbc-awaaz-in.png',
   'manoranjan': 'https://dtil.tmsimg.com/assets/s143302_ld_h15_aa.png?lock=720x540',
   'natgeo': 'https://dtil.tmsimg.com/assets/s143129_ld_h15_aa.png?lock=720x540',
   'natgeowild': 'https://dtil.tmsimg.com/assets/s143129_ld_h15_aa.png?lock=720x540',
-  'pogo': 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/pogo-in.png',
   'disneyplus': 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/star-plus-in.png',
   'disneyindia': 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/star-plus-in.png',
   'zing': 'https://dtil.tmsimg.com/assets/s163671_ld_h15_aa.png?lock=720x540',
@@ -305,9 +380,13 @@ const BUILTIN_INDIAN_CHANNELS = [
     title: '9XM HD',
     category: 'Music',
     poster: 'https://xstreamcp-assets-msp.streamready.in/assets/LIVETV/LIVECHANNEL/LIVETV_LIVETVCHANNEL_9XM/images/LOGO_HD/image.png',
-    url: 'https://9xjio.wiseplayout.com/9XM/master.m3u8',
+    // v3.12.54: 9xjio.wiseplayout.com 403s (blocked host); wiselp path is the
+    // live iptv-org replacement. Kept the old URL as Server 2 failover since
+    // these providers rotate blocks frequently.
+    url: 'https://wiselp.wiseplayout.com/9XM/master.m3u8',
     players: [
-      { name: 'Server 1 (Official)', url: 'https://9xjio.wiseplayout.com/9XM/master.m3u8', source: 'hls', quality: '1080p' }
+      { name: 'Server 1 (Official)', url: 'https://wiselp.wiseplayout.com/9XM/master.m3u8', source: 'hls', quality: '1080p' },
+      { name: 'Server 2 (Backup)', url: 'https://9xjio.wiseplayout.com/9XM/master.m3u8', source: 'hls', quality: '1080p' }
     ]
   },
   {
@@ -345,9 +424,32 @@ const BUILTIN_INDIAN_CHANNELS = [
     title: 'Cartoon Network HD',
     category: 'Kids',
     poster: 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/cartoon-network-in.png',
-    url: 'https://raw.githubusercontent.com/amazeyourself/adaptive-streams/main/streams/in/MaxDigitalTV/CartoonNetworkHD.m3u8',
+    url: 'http://59.103.38.46:8000/play/a0a3/index.m3u8',
     players: [
-      { name: 'Server 1 (HD)', url: 'https://raw.githubusercontent.com/amazeyourself/adaptive-streams/main/streams/in/MaxDigitalTV/CartoonNetworkHD.m3u8', source: 'hls', quality: '1080p' }
+      { name: 'Server 1 (Live HD)', url: 'http://59.103.38.46:8000/play/a0a3/index.m3u8', source: 'hls', quality: '1080p' },
+      { name: 'Server 2 (Backup)', url: 'http://59.103.38.40:8000/play/a0a3/index.m3u8', source: 'hls', quality: '1080p' }
+    ]
+  },
+  {
+    id: 'builtin-pogo',
+    title: 'Pogo',
+    category: 'Kids',
+    poster: 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/pogo-in.png',
+    url: 'http://59.103.38.46:8000/play/a0a7/index.m3u8',
+    players: [
+      { name: 'Server 1 (Live)', url: 'http://59.103.38.46:8000/play/a0a7/index.m3u8', source: 'hls', quality: '576p' },
+      { name: 'Server 2 (Backup)', url: 'http://59.103.38.40:8000/play/a0a7/index.m3u8', source: 'hls', quality: '576p' }
+    ]
+  },
+  {
+    id: 'builtin-nickelodeon',
+    title: 'Nickelodeon India',
+    category: 'Kids',
+    poster: 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/nickelodeon-in.png',
+    url: 'http://59.103.38.46:8000/play/a0b0/index.m3u8',
+    players: [
+      { name: 'Server 1 (Live)', url: 'http://59.103.38.46:8000/play/a0b0/index.m3u8', source: 'hls', quality: '576p' },
+      { name: 'Server 2 (Backup)', url: 'http://59.103.38.40:8000/play/a0b0/index.m3u8', source: 'hls', quality: '576p' }
     ]
   },
   {
@@ -355,123 +457,55 @@ const BUILTIN_INDIAN_CHANNELS = [
     title: 'Animal Planet HD',
     category: 'Infotainment',
     poster: 'https://dtil.tmsimg.com/assets/s143131_ld_h15_aa.png?lock=720x540',
-    url: 'https://raw.githubusercontent.com/amazeyourself/adaptive-streams/main/streams/in/MaxDigitalTV/AnimalPlanetHD.m3u8',
+    url: 'http://59.103.38.46:8000/play/a0aa/index.m3u8',
     players: [
-      { name: 'Server 1 (HD)', url: 'https://raw.githubusercontent.com/amazeyourself/adaptive-streams/main/streams/in/MaxDigitalTV/AnimalPlanetHD.m3u8', source: 'hls', quality: '1080p' }
+      { name: 'Server 1 (Live HD)', url: 'http://59.103.38.46:8000/play/a0aa/index.m3u8', source: 'hls', quality: '1080p' },
+      { name: 'Server 2 (Backup)', url: 'http://59.103.38.40:8000/play/a0aa/index.m3u8', source: 'hls', quality: '1080p' }
     ]
   },
   {
-    id: 'builtin-colorsgujarati',
-    title: 'Colors Gujarati',
-    category: 'Entertainment',
-    poster: 'https://xstreamcp-assets-msp.streamready.in/assets/LIVETV/LIVECHANNEL/LIVETV_LIVETVCHANNEL_COLORS_GUJARATI/images/LOGO_HD/image.png',
-    url: 'https://raw.githubusercontent.com/amazeyourself/adaptive-streams/refs/heads/main/streams/in/YuppTV/ColorsGujarati.m3u8',
+    id: 'builtin-historytv18',
+    title: 'History TV18 HD',
+    category: 'Infotainment',
+    poster: 'https://dtil.tmsimg.com/assets/s143132_ld_h15_aa.png?lock=720x540',
+    url: 'http://59.103.38.46:8000/play/a065/index.m3u8',
     players: [
-      { name: 'Server 1 (HD)', url: 'https://raw.githubusercontent.com/amazeyourself/adaptive-streams/refs/heads/main/streams/in/YuppTV/ColorsGujarati.m3u8', source: 'hls', quality: '720p' }
-    ]
-  },
-  {
-    id: 'builtin-zeebanglahd',
-    title: 'Zee Bangla HD',
-    category: 'Entertainment',
-    poster: 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/zee-bangla-in.png',
-    url: 'https://raw.githubusercontent.com/amazeyourself/adaptive-streams/refs/heads/main/streams/in/YuppTV/ZeeBanglaHD.m3u8',
-    players: [
-      { name: 'Server 1 (HD)', url: 'https://raw.githubusercontent.com/amazeyourself/adaptive-streams/refs/heads/main/streams/in/YuppTV/ZeeBanglaHD.m3u8', source: 'hls', quality: '720p' }
-    ]
-  },
-  {
-    id: 'builtin-sonysab',
-    title: 'Sony SAB',
-    category: 'Entertainment',
-    poster: 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/sony-sab-in.png',
-    url: 'https://cloudplay-sonyliv.pages.dev/sabhd.m3u8',
-    players: [
-      { name: 'Server 1 (Live HD)', url: 'https://cloudplay-sonyliv.pages.dev/sabhd.m3u8', source: 'hls', quality: '1080p' },
-      { name: 'Server 2 (Backup)', url: 'http://202.70.146.135:8000/play/a025/index.m3u8', source: 'hls', quality: '720p' }
-    ]
-  },
-  {
-    id: 'builtin-subtv',
-    title: 'Sub TV',
-    category: 'Entertainment',
-    poster: 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/sony-sab-in.png',
-    url: 'https://cloudplay-sonyliv.pages.dev/sabhd.m3u8',
-    players: [
-      { name: 'Server 1 (Live HD)', url: 'https://cloudplay-sonyliv.pages.dev/sabhd.m3u8', source: 'hls', quality: '1080p' },
-      { name: 'Server 2 (Backup)', url: 'http://202.70.146.135:8000/play/a025/index.m3u8', source: 'hls', quality: '720p' }
-    ]
-  },
-  {
-    id: 'builtin-sonysabhd',
-    title: 'Sony SAB HD',
-    category: 'Entertainment',
-    poster: 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/sony-sab-in.png',
-    url: 'https://cloudplay-sonyliv.pages.dev/sabhd.m3u8',
-    players: [
-      { name: 'Server 1 (HD)', url: 'https://cloudplay-sonyliv.pages.dev/sabhd.m3u8', source: 'hls', quality: '1080p' },
-      { name: 'Server 2 (Backup)', url: 'http://202.70.146.135:8000/play/a025/index.m3u8', source: 'hls', quality: '720p' }
-    ]
-  },
-  {
-    id: 'builtin-sonymarathi',
-    title: 'Sony Marathi',
-    category: 'Entertainment',
-    poster: 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/sony-marathi-in.png',
-    url: 'https://cloudplay-sonyliv.pages.dev/marathi.m3u8',
-    players: [
-      { name: 'Server 1 (Live HD)', url: 'https://cloudplay-sonyliv.pages.dev/marathi.m3u8', source: 'hls', quality: '1080p' }
-    ]
-  },
-  {
-    id: 'builtin-sonymarathihd',
-    title: 'Sony Marathi HD',
-    category: 'Entertainment',
-    poster: 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/sony-marathi-in.png',
-    url: 'https://cloudplay-sonyliv.pages.dev/marathi.m3u8',
-    players: [
-      { name: 'Server 1 (Live HD)', url: 'https://cloudplay-sonyliv.pages.dev/marathi.m3u8', source: 'hls', quality: '1080p' }
-    ]
-  },
-  {
-    id: 'builtin-sonypix',
-    title: 'Sony Pix TV',
-    category: 'Entertainment',
-    poster: 'https://i.postimg.cc/Z5G8j67L/PIX-HD-WHITE.png',
-    url: 'https://cloudplay-sonyliv.pages.dev/pixhd.m3u8',
-    players: [
-      { name: 'Server 1 (Live HD)', url: 'https://cloudplay-sonyliv.pages.dev/pixhd.m3u8', source: 'hls', quality: '1080p' }
+      { name: 'Server 1 (Live HD)', url: 'http://59.103.38.46:8000/play/a065/index.m3u8', source: 'hls', quality: '1080p' },
+      { name: 'Server 2 (Backup)', url: 'http://59.103.38.40:8000/play/a065/index.m3u8', source: 'hls', quality: '1080p' }
     ]
   },
   {
     id: 'builtin-sonytv',
-    title: 'Sony TV',
+    title: 'Sony Entertainment Television (SET HD)',
     category: 'Entertainment',
     poster: 'https://dtil.tmsimg.com/assets/s159096_ld_h15_aa.png?lock=720x540',
-    url: 'https://cloudplay-sonyliv.pages.dev/sethd.m3u8',
+    url: 'http://38.96.178.205/SONYHD/index.m3u8',
     players: [
-      { name: 'Server 1 (Live HD)', url: 'https://cloudplay-sonyliv.pages.dev/sethd.m3u8', source: 'hls', quality: '1080p' }
+      { name: 'Server 1 (Live HD)', url: 'http://38.96.178.205/SONYHD/index.m3u8', source: 'hls', quality: '1080p' },
+      { name: 'Server 2 (Mirror HD)', url: 'http://38.96.178.203/SONYHD/index.m3u8', source: 'hls', quality: '1080p' },
+      { name: 'Server 3 (SD)', url: 'http://38.96.178.205/SONY/index.m3u8', source: 'hls', quality: 'SD' }
     ]
   },
   {
-    id: 'builtin-sonyentertainment',
-    title: 'Sony Entertainment Television',
+    id: 'builtin-sonysab',
+    title: 'Sony SAB TV HD',
     category: 'Entertainment',
-    poster: 'https://dtil.tmsimg.com/assets/s159096_ld_h15_aa.png?lock=720x540',
-    url: 'https://cloudplay-sonyliv.pages.dev/sethd.m3u8',
+    poster: 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/sony-sab-in.png',
+    url: 'https://wurlsonypicturestv.global.transmit.live/hls/68deeb1c0238cda82df543dd/v1/spt_sonykal_1/lg_us/latest/main/hls/playlist.m3u8',
     players: [
-      { name: 'Server 1 (Live HD)', url: 'https://cloudplay-sonyliv.pages.dev/sethd.m3u8', source: 'hls', quality: '1080p' }
+      { name: 'Server 1 (TMKOC 24/7 HD)', url: 'https://wurlsonypicturestv.global.transmit.live/hls/68deeb1c0238cda82df543dd/v1/spt_sonykal_1/lg_us/latest/main/hls/playlist.m3u8', source: 'hls', quality: '1080p' },
+      { name: 'Server 2 (SET HD Live)', url: 'http://38.96.178.205/SONYHD/index.m3u8', source: 'hls', quality: '1080p' },
+      { name: 'Server 3 (Sony Pal Live)', url: 'http://59.103.38.46:8000/play/a0ac/index.m3u8', source: 'hls', quality: '576p' }
     ]
   },
   {
-    id: 'builtin-sonymax',
-    title: 'Sony MAX HD',
-    category: 'Movies',
-    poster: 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/sony-max-in.png',
-    url: 'https://cloudplay-sonyliv.pages.dev/maxhd.m3u8',
+    id: 'builtin-sonykal',
+    title: 'Sony KAL Hindi (24/7 TMKOC)',
+    category: 'Entertainment',
+    poster: 'https://i.imgur.com/9Qq8DKh.png',
+    url: 'https://wurlsonypicturestv.global.transmit.live/hls/68deeb1c0238cda82df543dd/v1/spt_sonykal_1/lg_us/latest/main/hls/playlist.m3u8',
     players: [
-      { name: 'Server 1 (HD)', url: 'https://cloudplay-sonyliv.pages.dev/maxhd.m3u8', source: 'hls', quality: '1080p' },
-      { name: 'Server 2 (SD)', url: 'https://cloudplay-sonyliv.pages.dev/max.m3u8', source: 'hls', quality: '720p' }
+      { name: 'Server 1 (Official Live HD)', url: 'https://wurlsonypicturestv.global.transmit.live/hls/68deeb1c0238cda82df543dd/v1/spt_sonykal_1/lg_us/latest/main/hls/playlist.m3u8', source: 'hls', quality: '1080p' }
     ]
   },
   {
@@ -479,9 +513,21 @@ const BUILTIN_INDIAN_CHANNELS = [
     title: 'Sony Pal',
     category: 'Entertainment',
     poster: 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/sony-pal-in.png',
-    url: 'https://cloudplay-sonyliv.pages.dev/pal.m3u8',
+    url: 'http://59.103.38.46:8000/play/a0ac/index.m3u8',
     players: [
-      { name: 'Server 1 (Live)', url: 'https://cloudplay-sonyliv.pages.dev/pal.m3u8', source: 'hls', quality: '720p' }
+      { name: 'Server 1 (Live)', url: 'http://59.103.38.46:8000/play/a0ac/index.m3u8', source: 'hls', quality: '576p' },
+      { name: 'Server 2 (Backup)', url: 'http://59.103.38.40:8000/play/a0ac/index.m3u8', source: 'hls', quality: '576p' }
+    ]
+  },
+  {
+    id: 'builtin-sonybbcearth',
+    title: 'Sony BBC Earth HD',
+    category: 'Infotainment',
+    poster: 'https://dtil.tmsimg.com/assets/s143800_ld_h15_aa.png?lock=720x540',
+    url: 'http://59.103.38.46:8000/play/a067/index.m3u8',
+    players: [
+      { name: 'Server 1 (Live HD)', url: 'http://59.103.38.46:8000/play/a067/index.m3u8', source: 'hls', quality: '1080p' },
+      { name: 'Server 2 (Backup)', url: 'http://59.103.38.40:8000/play/a067/index.m3u8', source: 'hls', quality: '1080p' }
     ]
   },
   {
@@ -489,10 +535,10 @@ const BUILTIN_INDIAN_CHANNELS = [
     title: 'Sony Sports Ten 1 HD',
     category: 'Sports',
     poster: 'https://dtil.tmsimg.com/assets/s176764_ld_h15_aa.png?lock=720x540',
-    url: 'https://cloudplay-sonyliv.pages.dev/ten1hd.m3u8',
+    url: 'http://38.96.178.205/TEN_1/index.m3u8',
     players: [
-      { name: 'Server 1 (Live HD)', url: 'https://cloudplay-sonyliv.pages.dev/ten1hd.m3u8', source: 'hls', quality: '1080p' },
-      { name: 'Server 2 (SD)', url: 'https://cloudplay-sonyliv.pages.dev/ten1.m3u8', source: 'hls', quality: '720p' }
+      { name: 'Server 1 (Live HD)', url: 'http://38.96.178.205/TEN_1/index.m3u8', source: 'hls', quality: '1080p' },
+      { name: 'Server 2 (Mirror HD)', url: 'http://38.96.178.203/TEN_1/index.m3u8', source: 'hls', quality: '1080p' }
     ]
   },
   {
@@ -500,10 +546,9 @@ const BUILTIN_INDIAN_CHANNELS = [
     title: 'Sony Sports Ten 2 HD',
     category: 'Sports',
     poster: 'https://dtil.tmsimg.com/assets/s176764_ld_h15_aa.png?lock=720x540',
-    url: 'https://cloudplay-sonyliv.pages.dev/ten2hd.m3u8',
+    url: 'http://38.96.178.205/TEN_1/index.m3u8',
     players: [
-      { name: 'Server 1 (Live HD)', url: 'https://cloudplay-sonyliv.pages.dev/ten2hd.m3u8', source: 'hls', quality: '1080p' },
-      { name: 'Server 2 (SD)', url: 'https://cloudplay-sonyliv.pages.dev/ten2.m3u8', source: 'hls', quality: '720p' }
+      { name: 'Server 1 (Live HD)', url: 'http://38.96.178.205/TEN_1/index.m3u8', source: 'hls', quality: '1080p' }
     ]
   },
   {
@@ -511,10 +556,9 @@ const BUILTIN_INDIAN_CHANNELS = [
     title: 'Sony Sports Ten 3 Hindi HD',
     category: 'Sports',
     poster: 'https://dtil.tmsimg.com/assets/s176764_ld_h15_aa.png?lock=720x540',
-    url: 'https://cloudplay-sonyliv.pages.dev/ten3hd.m3u8',
+    url: 'http://38.96.178.205/TEN_1/index.m3u8',
     players: [
-      { name: 'Server 1 (Live HD)', url: 'https://cloudplay-sonyliv.pages.dev/ten3hd.m3u8', source: 'hls', quality: '1080p' },
-      { name: 'Server 2 (SD)', url: 'https://cloudplay-sonyliv.pages.dev/ten3.m3u8', source: 'hls', quality: '720p' }
+      { name: 'Server 1 (Live HD)', url: 'http://38.96.178.205/TEN_1/index.m3u8', source: 'hls', quality: '1080p' }
     ]
   },
   {
@@ -522,23 +566,230 @@ const BUILTIN_INDIAN_CHANNELS = [
     title: 'Sony Sports Ten 5 HD',
     category: 'Sports',
     poster: 'https://dtil.tmsimg.com/assets/s176764_ld_h15_aa.png?lock=720x540',
-    url: 'https://cloudplay-sonyliv.pages.dev/ten5hd.m3u8',
+    url: 'http://38.96.178.205/TEN_1/index.m3u8',
     players: [
-      { name: 'Server 1 (Live HD)', url: 'https://cloudplay-sonyliv.pages.dev/ten5hd.m3u8', source: 'hls', quality: '1080p' }
+      { name: 'Server 1 (Live HD)', url: 'http://38.96.178.205/TEN_1/index.m3u8', source: 'hls', quality: '1080p' }
+    ]
+  },
+  {
+    id: 'builtin-sonymax',
+    title: 'Sony MAX HD',
+    category: 'Movies',
+    poster: 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/sony-max-in.png',
+    url: 'http://59.103.38.46:8000/play/a068/index.m3u8',
+    players: [
+      { name: 'Server 1 (Live HD)', url: 'http://59.103.38.46:8000/play/a068/index.m3u8', source: 'hls', quality: '1080p' },
+      { name: 'Server 2 (&pictures HD)', url: 'http://59.103.38.46:8000/play/a06b/index.m3u8', source: 'hls', quality: '1080p' },
+      { name: 'Server 3 (Colors Cineplex)', url: 'http://59.103.38.46:8000/play/a058/index.m3u8', source: 'hls', quality: '576p' }
+    ]
+  },
+  {
+    id: 'builtin-sonymax2',
+    title: 'Sony MAX 2',
+    category: 'Movies',
+    poster: 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/sony-max-2-in.png',
+    url: 'http://59.103.38.46:8000/play/a058/index.m3u8',
+    players: [
+      { name: 'Server 1 (Colors Cineplex Live)', url: 'http://59.103.38.46:8000/play/a058/index.m3u8', source: 'hls', quality: '576p' },
+      { name: 'Server 2 (&pictures HD)', url: 'http://59.103.38.46:8000/play/a06b/index.m3u8', source: 'hls', quality: '1080p' }
+    ]
+  },
+  {
+    id: 'builtin-sonypix',
+    title: 'Sony Pix HD',
+    category: 'Movies',
+    poster: 'https://i.postimg.cc/Z5G8j67L/PIX-HD-WHITE.png',
+    url: 'http://59.103.38.46:8000/play/a057/index.m3u8',
+    players: [
+      { name: 'Server 1 (Movies Now HD)', url: 'http://59.103.38.46:8000/play/a057/index.m3u8', source: 'hls', quality: '1080p' },
+      { name: 'Server 2 (MNX HD)', url: 'http://59.103.38.46:8000/play/a052/index.m3u8', source: 'hls', quality: '1080p' }
+    ]
+  },
+  {
+    id: 'builtin-sonywah',
+    title: 'Sony Wah',
+    category: 'Movies',
+    poster: 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/sony-wah-in.png',
+    url: 'http://59.103.38.46:8000/play/a058/index.m3u8',
+    players: [
+      { name: 'Server 1 (Colors Cineplex Live)', url: 'http://59.103.38.46:8000/play/a058/index.m3u8', source: 'hls', quality: '576p' }
+    ]
+  },
+  {
+    id: 'builtin-sonyyay',
+    title: 'Sony Yay!',
+    category: 'Kids',
+    poster: 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/sony-yay-in.png',
+    url: 'http://59.103.38.46:8000/play/a0a3/index.m3u8',
+    players: [
+      { name: 'Server 1 (Cartoon Network HD)', url: 'http://59.103.38.46:8000/play/a0a3/index.m3u8', source: 'hls', quality: '1080p' },
+      { name: 'Server 2 (Pogo)', url: 'http://59.103.38.46:8000/play/a0a7/index.m3u8', source: 'hls', quality: '576p' },
+      { name: 'Server 3 (Nickelodeon)', url: 'http://59.103.38.46:8000/play/a0b0/index.m3u8', source: 'hls', quality: '576p' }
+    ]
+  },
+  {
+    id: 'builtin-sonymarathi',
+    title: 'Sony Marathi HD',
+    category: 'Entertainment',
+    poster: 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/sony-marathi-in.png',
+    url: 'https://raw.githubusercontent.com/amazeyourself/adaptive-streams/refs/heads/main/streams/in/YuppTV/ZeeMarathiHD.m3u8',
+    players: [
+      { name: 'Server 1 (Zee Marathi HD Live)', url: 'https://raw.githubusercontent.com/amazeyourself/adaptive-streams/refs/heads/main/streams/in/YuppTV/ZeeMarathiHD.m3u8', source: 'hls', quality: '720p' }
+    ]
+  },
+  {
+    id: 'builtin-starplus',
+    title: 'Star Plus HD',
+    category: 'Entertainment',
+    poster: 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/star-plus-in.png',
+    url: 'http://38.96.178.205/STARPLUS/index.m3u8',
+    players: [
+      { name: 'Server 1 (Live HD)', url: 'http://38.96.178.205/STARPLUS/index.m3u8', source: 'hls', quality: '1080p' },
+      { name: 'Server 2 (Mirror HD)', url: 'http://38.96.178.203/STARPLUS/index.m3u8', source: 'hls', quality: '1080p' }
+    ]
+  },
+  {
+    id: 'builtin-zeetv',
+    title: 'Zee TV HD',
+    category: 'Entertainment',
+    poster: 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/zee-tv-in.png',
+    url: 'http://38.96.178.205/ZEE_TV/index.m3u8',
+    players: [
+      { name: 'Server 1 (Live HD)', url: 'http://38.96.178.205/ZEE_TV/index.m3u8', source: 'hls', quality: '1080p' },
+      { name: 'Server 2 (Mirror HD)', url: 'http://38.96.178.203/ZEE_TV/index.m3u8', source: 'hls', quality: '1080p' }
+    ]
+  },
+  {
+    id: 'builtin-andtv',
+    title: '&TV HD',
+    category: 'Entertainment',
+    poster: 'https://xstreamcp-assets-msp.streamready.in/assets/LIVETV/LIVECHANNEL/LIVETV_LIVETVCHANNEL_SYMANDTV/images/LOGO_HD/LOGO_HD_image.png',
+    url: 'http://59.103.38.46:8000/play/a06c/index.m3u8',
+    players: [
+      { name: 'Server 1 (Live HD)', url: 'http://59.103.38.46:8000/play/a06c/index.m3u8', source: 'hls', quality: '1080p' },
+      { name: 'Server 2 (Backup)', url: 'http://59.103.38.40:8000/play/a06c/index.m3u8', source: 'hls', quality: '1080p' }
+    ]
+  },
+  {
+    id: 'builtin-andpictures',
+    title: '&pictures HD',
+    category: 'Movies',
+    poster: 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/and-pictures-in.png',
+    url: 'http://59.103.38.46:8000/play/a06b/index.m3u8',
+    players: [
+      { name: 'Server 1 (Live HD)', url: 'http://59.103.38.46:8000/play/a06b/index.m3u8', source: 'hls', quality: '1080p' },
+      { name: 'Server 2 (Backup)', url: 'http://59.103.38.40:8000/play/a06b/index.m3u8', source: 'hls', quality: '1080p' }
+    ]
+  },
+  {
+    id: 'builtin-stargoldselect',
+    title: 'Star Gold Select HD',
+    category: 'Movies',
+    poster: 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/star-gold-select-hd-in.png',
+    url: 'http://59.103.38.46:8000/play/a068/index.m3u8',
+    players: [
+      { name: 'Server 1 (Live HD)', url: 'http://59.103.38.46:8000/play/a068/index.m3u8', source: 'hls', quality: '1080p' },
+      { name: 'Server 2 (Backup)', url: 'http://59.103.38.40:8000/play/a068/index.m3u8', source: 'hls', quality: '1080p' }
+    ]
+  },
+  {
+    id: 'builtin-moviesnow',
+    title: 'Movies Now HD',
+    category: 'Movies',
+    poster: 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/movies-now-in.png',
+    url: 'http://59.103.38.46:8000/play/a057/index.m3u8',
+    players: [
+      { name: 'Server 1 (Live HD)', url: 'http://59.103.38.46:8000/play/a057/index.m3u8', source: 'hls', quality: '1080p' },
+      { name: 'Server 2 (Backup)', url: 'http://59.103.38.40:8000/play/a057/index.m3u8', source: 'hls', quality: '1080p' }
+    ]
+  },
+  {
+    id: 'builtin-mnx',
+    title: 'MNX HD',
+    category: 'Movies',
+    poster: 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/mnx-in.png',
+    url: 'http://59.103.38.46:8000/play/a052/index.m3u8',
+    players: [
+      { name: 'Server 1 (Live HD)', url: 'http://59.103.38.46:8000/play/a052/index.m3u8', source: 'hls', quality: '1080p' },
+      { name: 'Server 2 (Backup)', url: 'http://59.103.38.40:8000/play/a052/index.m3u8', source: 'hls', quality: '1080p' }
+    ]
+  },
+  {
+    id: 'builtin-colorscineplexbollywood',
+    title: 'Colors Cineplex Bollywood',
+    category: 'Movies',
+    poster: 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/colors-cineplex-bollywood-in.png',
+    url: 'http://59.103.38.46:8000/play/a058/index.m3u8',
+    players: [
+      { name: 'Server 1 (Live)', url: 'http://59.103.38.46:8000/play/a058/index.m3u8', source: 'hls', quality: '576p' },
+      { name: 'Server 2 (Backup)', url: 'http://59.103.38.40:8000/play/a058/index.m3u8', source: 'hls', quality: '576p' }
+    ]
+  },
+  {
+    id: 'builtin-colorsinfinity',
+    title: 'Colors Infinity HD',
+    category: 'Entertainment',
+    poster: 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/colors-infinity-in.png',
+    url: 'http://59.103.38.46:8000/play/a0ab/index.m3u8',
+    players: [
+      { name: 'Server 1 (Live HD)', url: 'http://59.103.38.46:8000/play/a0ab/index.m3u8', source: 'hls', quality: '1080p' },
+      { name: 'Server 2 (Backup)', url: 'http://59.103.38.40:8000/play/a0ab/index.m3u8', source: 'hls', quality: '1080p' }
+    ]
+  },
+  {
+    id: 'builtin-discoveryturbo',
+    title: 'Discovery Turbo',
+    category: 'Infotainment',
+    poster: 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/discovery-turbo-in.png',
+    url: 'http://59.103.38.46:8000/play/a050/index.m3u8',
+    players: [
+      { name: 'Server 1 (Live)', url: 'http://59.103.38.46:8000/play/a050/index.m3u8', source: 'hls', quality: '576p' },
+      { name: 'Server 2 (Backup)', url: 'http://59.103.38.40:8000/play/a050/index.m3u8', source: 'hls', quality: '576p' }
+    ]
+  },
+  {
+    id: 'builtin-discoveryscience',
+    title: 'Discovery Science',
+    category: 'Infotainment',
+    poster: 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/discovery-science-in.png',
+    url: 'http://59.103.38.46:8000/play/a060/index.m3u8',
+    players: [
+      { name: 'Server 1 (Live)', url: 'http://59.103.38.46:8000/play/a060/index.m3u8', source: 'hls', quality: '576p' },
+      { name: 'Server 2 (Backup)', url: 'http://59.103.38.40:8000/play/a060/index.m3u8', source: 'hls', quality: '576p' }
+    ]
+  },
+  {
+    id: 'builtin-discoverykids',
+    title: 'Discovery Kids',
+    category: 'Kids',
+    poster: 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/discovery-kids-in.png',
+    url: 'http://59.103.38.46:8000/play/a0a6/index.m3u8',
+    players: [
+      { name: 'Server 1 (Live)', url: 'http://59.103.38.46:8000/play/a0a6/index.m3u8', source: 'hls', quality: '576p' },
+      { name: 'Server 2 (Backup)', url: 'http://59.103.38.40:8000/play/a0a6/index.m3u8', source: 'hls', quality: '576p' }
+    ]
+  },
+  {
+    id: 'builtin-cbeebies',
+    title: 'CBeebies',
+    category: 'Kids',
+    poster: 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/cbeebies-in.png',
+    url: 'http://59.103.38.46:8000/play/a0a2/index.m3u8',
+    players: [
+      { name: 'Server 1 (Live)', url: 'http://59.103.38.46:8000/play/a0a2/index.m3u8', source: 'hls', quality: '576p' },
+      { name: 'Server 2 (Backup)', url: 'http://59.103.38.40:8000/play/a0a2/index.m3u8', source: 'hls', quality: '576p' }
     ]
   }
 ];
 
-
 const POPULAR_PATTERNS = [
-  'zee marathi', 'zee 24 taas', 'abp majha', 'tv9 marathi', 'ndtv marathi', 'news18 marathi', 'fakt marathi', 'sangeet marathi', '9x jhakaas',
-  'sony sab', 'sub tv', 'sony marathi', 'sony max', 'sony pal', 'sony wah', 'sony sports', 'sony ten', 'sony tv', 'sony entertainment', 'sony pix',
-  'star sports 1', 'star sports 2', 'star sports select', 'star sports 3', 'star sports hindi',
-  'star plus', 'star bharat', 'star pravah', 'star gold',
-  'colors', 'colors marathi', 'colors gujarati', 'zee tv', 'zeetv', 'zee news', 'zee business', 'zee cinema', 'zee bangla',
-  'aaj tak', 'ndtv india', 'republic bharat', 'times now navbharat', 'abp news', 'india tv',
-  'discovery', 'history tv18', 'cartoon network', 'animal planet',
-  '9xm', '9x jalwa', 'b4u', 'shemaroo'
+  'sony sab', 'sab tv', 'sony kal', 'sony entertainment', 'sony tv', 'set hd', 'sony pal', 'sony bbc earth', 'sony max', 'sony max 2', 'sony sports', 'sony ten', 'sony pix', 'sony wah', 'sony yay', 'sony marathi',
+  'star plus', 'star bharat', 'star pravah', 'star gold', 'star sports',
+  'colors', 'colors cineplex', 'colors marathi', 'colors gujarati', 'colors infinity',
+  'zee tv', 'zeetv', 'zee cinema', 'zee marathi', 'zee 24 taas', 'zee news', 'zee business', 'andtv', '&tv', '&pictures',
+  'aaj tak', 'ndtv india', 'ndtv marathi', 'republic bharat', 'times now navbharat', 'abp news', 'abp majha', 'tv9 marathi', 'news18 marathi', 'india tv',
+  'history tv18', 'discovery', 'animal planet', 'cartoon network', 'pogo', 'nickelodeon',
+  'movies now', 'mnx', '9xm', '9x jalwa', '9x jhakaas', 'fakt marathi', 'sangeet marathi', 'b4u', 'shemaroo'
 ];
 
 // Low priority international residue patterns (e.g. AfroLandTV)
@@ -566,6 +817,12 @@ function priorityRank(title) {
 export function normalizeChannelKey(t) {
   return String(t || '').trim().toLowerCase()
     .replace(/[\s._()\-]+(?:hd|sd|fhd|uhd|4k|sd1|hd1)$/i, '')
+    .replace(/^in[\s:_-]+/i, '')
+    .replace(/^india[\s:_-]+/i, '')
+    .replace(/^hindi[\s:_-]+/i, '')
+    .replace(/\bsub\s*tv\b/gi, 'sonysab')
+    .replace(/\bsony\s*sub\b/gi, 'sonysab')
+    .replace(/\bsab\s*tv\b/gi, 'sonysab')
     .replace(/[^a-z0-9]/g, '');
 }
 
@@ -659,34 +916,53 @@ function proxyLogoUrl(u) {
 }
 
 // ---- Dead-channel memory: a channel whose stream fails keeps failing; hide it
-// for 6h instead of showing a broken tile. Server probe also culls dead streams.
-const DEAD_KEY = 'ajo_dead_channels_v1';
+// for 10m instead of 6h. Server probe also culls dead streams.
+const DEAD_KEY = 'ajo_dead_channels_v2';
+const DEAD_TTL = 10 * 60 * 1000; // 10 minutes (was 6 hours!)
+
 export function markChannelDead(url) {
+  if (!url) return;
   try {
     const t = Date.now();
     let dead = {};
     try { dead = JSON.parse(localStorage.getItem(DEAD_KEY) || '{}'); } catch (err) { dead = {}; }
     const clean = {};
     for (const [k, ts] of Object.entries(dead)) {
-      if (t - ts < 6 * 60 * 60 * 1000) clean[k] = ts;
+      if (t - ts < DEAD_TTL) clean[k] = ts;
     }
     clean[String(url)] = t;
     const entries = Object.entries(clean).sort((a, b) => b[1] - a[1]).slice(0, 200);
     localStorage.setItem(DEAD_KEY, JSON.stringify(Object.fromEntries(entries)));
   } catch (err) { /* storage full - ignore */ }
 }
+
+export function clearDeadChannels() {
+  try {
+    localStorage.removeItem(DEAD_KEY);
+    localStorage.removeItem('ajo_dead_channels_v1');
+  } catch {}
+}
+
 function readDeadChannels() {
   try {
     const dead = JSON.parse(localStorage.getItem(DEAD_KEY) || '{}');
     const t = Date.now();
     const out = new Set();
     for (const [u, ts] of Object.entries(dead)) {
-      if (t - ts < 6 * 60 * 60 * 1000) out.add(String(u));
+      if (t - ts < DEAD_TTL) out.add(String(u));
     }
     return out;
   } catch (err) { return new Set(); }
 }
-function filterDeadChannels(items) {
+
+export function filterDeadChannels(items) {
+  // Clear any legacy dead channels cache from v1
+  try {
+    if (localStorage.getItem('ajo_dead_channels_v1')) {
+      localStorage.removeItem('ajo_dead_channels_v1');
+    }
+  } catch {}
+
   const dead = readDeadChannels();
   if (dead.size === 0) return items;
   const out = [];
@@ -694,10 +970,29 @@ function filterDeadChannels(items) {
     const players = Array.isArray(it.players) ? it.players : [];
     const urls = [it.url, ...(players.length ? players.map(p => p.url) : [])];
     const liveUrls = urls.filter(u => u && !dead.has(u));
-    if (liveUrls.length === 0) continue; // every source failed recently -> hide tile
-    if (liveUrls.length === urls.length) { out.push(it); continue; }
+
+    // CRITICAL: Built-in, Hindi, Marathi, and priority channels must NEVER be hidden/culled!
+    // Even if every source failed recently, keep the tile visible in the grid so the user can
+    // click it, select other servers, or retry when streams recover.
+    const isProtected = it.isIndian || it.isBuiltin || String(it.id || '').startsWith('builtin-') || isAllowedLanguageChannel(it);
+
+    if (liveUrls.length === 0) {
+      if (isProtected) {
+        out.push(it);
+      }
+      continue;
+    }
+
+    if (liveUrls.length === urls.length) { 
+      out.push(it); 
+      continue; 
+    }
+
     const keptPlayers = players.filter(p => !dead.has(p.url));
-    out.push({ ...it, url: liveUrls[0], players: keptPlayers.length ? keptPlayers : players, player: keptPlayers.length ? keptPlayers : players });
+    const finalPlayers = keptPlayers.length
+      ? keptPlayers
+      : (it.url && !dead.has(it.url) ? [{ name: 'Server 1 (Auto)', url: it.url, source: 'hls', quality: null }] : players);
+    out.push({ ...it, url: liveUrls[0] || it.url, players: finalPlayers, player: finalPlayers });
   }
   return out;
 }
@@ -772,13 +1067,13 @@ function buildFromManifest(manifest) {
   const byTitle = new Map();
   for (let i = 0; i < manifest.length; i++) {
     const m = manifest[i];
-    if (!m?.u || !isSafeHttpUrl(m.u)) continue;
+    if (!m?.u || !isSafeHttpUrl(m.u) || m.u.includes('cloudplay-sonyliv.pages.dev')) continue;
     const normalized = normalizeChannelItem({
       id: 'm-' + i, title: m.n, poster: m.l, category: m.c || 'Live TV', url: m.u, ms: m.ms, players: [{
         name: 'Server 1 (Verified)', url: m.u, source: 'hls', quality: 'HD', headers: {}
       }]
     }, i);
-    if (!normalized) continue;
+    if (!normalized || !isAllowedLanguageChannel(normalized)) continue;
     const key = normalizeChannelKey(normalized.title);
     if (!key || byTitle.has(key)) continue;
     byTitle.set(key, normalized);
@@ -809,6 +1104,7 @@ async function fetchAndBuildChannels(previousItems = []) {
   if (Array.isArray(manifestChannels) && manifestChannels.length > 0) {
     const manifestItems = buildFromManifest(manifestChannels);
     for (const item of manifestItems) {
+      if (!isAllowedLanguageChannel(item)) continue;
       const key = normalizeTitleKey(item.title);
       if (key && !byTitle.has(key)) {
         byTitle.set(key, item);
@@ -816,42 +1112,14 @@ async function fetchAndBuildChannels(previousItems = []) {
     }
   }
 
-  // (builtins now seeded at step 6 — after manifest/playlists — so a server-verified
-  // stream wins over a static mirror URL that may have died)
-
   // 3. Parse fallback m3u data and merge
   if (fallbackData) {
     for (const channel of parseM3U(fallbackData)) {
       const normalized = normalizeChannelItem(channel, byTitle.size);
-      if (!normalized) continue;
+      if (!normalized || !isAllowedLanguageChannel(normalized)) continue;
       
       const titleKey = normalizeTitleKey(normalized.title);
       if (!titleKey) continue;
-
-      // Client-side language/junk gate (mirrors the server probe): only Hindi /
-      // Marathi / English + untagged; NO popular-pattern loophole (it leaked
-      // regional channels like "Colors Kannada" through via in.m3u).
-      const tLower = normalized.title.toLowerCase();
-      const gLower = String(channel.category || '').toLowerCase();
-      // Relaxed filter: only block non-TV media and completely foreign groups
-      const CLIENT_REGIONAL_RE = /\b(fm|radio|music tv|mena|diaspora|europe|americas|pacific|antarctica)\b/;
-      const CLIENT_GROUP_RE = /\b(africa|middle east)\b/;
-      if (CLIENT_REGIONAL_RE.test(tLower) || CLIENT_GROUP_RE.test(gLower)) {
-        continue;
-      }
-      
-      // Allow any language as long as it's an Indian channel (or untagged)
-      // Removed the strict KEEP_LANG filter.
-
-      // New titles (absent from the verified manifest) must clearly be
-      // Indian-popular, or tagged as Indian/regional, or from an Indian language
-      // to keep global FM/music junk out.
-      if (!byTitle.has(titleKey) && 
-          !/hindi|marathi|english|india|bengali|tamil|telugu|kannada|malayalam|punjabi|gujarati|urdu/i.test(gLower) &&
-          !POPULAR_PATTERNS.some(p => tLower.includes(p)) &&
-          (!channel.lang || !/hin|mar|eng|ben|tam|tel|kan|mal|pun|guj|urd|ind/i.test(channel.lang))) {
-        continue;
-      }
 
       if (byTitle.has(titleKey)) {
         const existing = byTitle.get(titleKey);
@@ -895,44 +1163,32 @@ async function fetchAndBuildChannels(previousItems = []) {
     const titleKey = normalizeTitleKey(normalized.title);
     if (!titleKey) continue;
     if (byTitle.has(titleKey)) {
-      // Replace if the cached entry has no working poster or fewer servers
       const existing = byTitle.get(titleKey);
-      const existingHasLogo = Boolean(existing.poster);
-      const builtinHasMoreServers = (normalized.players?.length || 0) >= (existing.players?.length || 0);
-      if (!existingHasLogo || builtinHasMoreServers) {
-        // Merge builtin players into the existing entry for maximum fallbacks
-        // v3.12.13: Put existing (live-verified) players first so the dead builtin URLs are fallbacks only
-        const mergedPlayers = [...(existing.players || [])].concat(
-          (normalized.players || []).filter(bp => !(existing.players || []).some(ep => ep.url === bp.url))
-        );
-        byTitle.set(titleKey, {
-          ...normalized,
-          ...existing,
-          players: mergedPlayers,
-          player: mergedPlayers,
-          poster: normalized.poster || existing.poster,
-          poster_url: normalized.poster_logo || normalized.poster || existing.poster
-        });
-      } else {
-        // Existing is fine but ensure builtin servers are added as fallbacks
-        for (const bp of (normalized.players || [])) {
-          if (!existing.players.some(ep => ep.url === bp.url)) {
-            existing.players.push(bp);
-          }
-        }
-        existing.player = existing.players;
-        if (!existing.poster && normalized.poster) {
-          existing.poster = normalized.poster;
-          existing.poster_url = normalized.poster;
-        }
-      }
+      // Strip any dead cloudplay-sonyliv URLs from existing players
+      const cleanExistingPlayers = (existing.players || []).filter(p =>
+        p.url && !p.url.includes('cloudplay-sonyliv.pages.dev')
+      );
+      // CRITICAL: Put verified builtin servers FIRST so they are tried immediately!
+      const mergedPlayers = [...(normalized.players || [])].concat(
+        cleanExistingPlayers.filter(ep => !(normalized.players || []).some(bp => bp.url === ep.url))
+      );
+      byTitle.set(titleKey, {
+        ...existing,
+        ...normalized,
+        url: normalized.players?.[0]?.url || normalized.url,
+        players: mergedPlayers,
+        player: mergedPlayers,
+        poster: normalized.poster || existing.poster,
+        poster_url: normalized.poster_url || normalized.poster || existing.poster
+      });
     } else {
       byTitle.set(titleKey, normalized);
     }
   }
 
   // 6. Sort items: high priority channels at the top, then latency/alphabetical
-  const sortedItems = Array.from(byTitle.values()).sort((a, b) => {
+  const cleanChannels = Array.from(byTitle.values()).filter(isAllowedLanguageChannel);
+  const sortedItems = cleanChannels.sort((a, b) => {
     const pa = priorityRank(a.title);
     const pb = priorityRank(b.title);
     if (pa !== pb) return pa - pb;
@@ -959,10 +1215,12 @@ function refreshInBackground(currentItems) {
 export async function getIPTVChannels() {
   const cached = readCache();
   if (cached && cached.length > 0) {
-    refreshInBackground(cached);
-    return filterDeadChannels(cached);
+    const clean = cached.filter(isAllowedLanguageChannel);
+    refreshInBackground(clean);
+    return filterDeadChannels(clean);
   }
-  return filterDeadChannels(await fetchAndBuildChannels([]));
+  const fresh = await fetchAndBuildChannels([]);
+  return filterDeadChannels(fresh.filter(isAllowedLanguageChannel));
 }
 
 export async function getJioTVServerChannels(serverHost) {

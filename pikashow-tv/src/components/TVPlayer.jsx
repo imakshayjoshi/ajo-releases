@@ -780,7 +780,10 @@ export function TVPlayer({
         bingeCountdownRef.current = null;
       }
     }
-  }, [isLive, episodes, onSelectEpisode]);
+  }, [isLive, episodes, onSelectEpisode, currentEpisodeIndex]);
+  // v3.12.54 FIX: currentEpisodeIndex was missing from the deps, so after the
+  // first auto-advance the closure kept the stale index — binge mode fired
+  // once, then either never advanced again or replayed the same episode.
 
   // Play / Pause Toggle
   const togglePlayPause = useCallback(() => {

@@ -8,7 +8,12 @@
  * Endpoint: http://srv1370827.hstgr.cloud:3003/health.json
  */
 
-const HEALTH_URL = 'http://srv1370827.hstgr.cloud:3003/health.json';
+const HEALTH_URL = 'https://new.ajo.co.in/health.json';
+// v3.12.54 FIX: was http://srv1370827.hstgr.cloud:3003/health.json — the app runs
+// on a https://localhost WebView origin with allowMixedContent=false, so the
+// browser silently BLOCKED that mixed-content fetch: mirror ranking was dead
+// code and the app always used default server order. Same VPS, now served
+// through the TLS proxy (traefik -> 127.0.0.1:3003, CORS open).
 const CACHE_KEY = 'ajo_mirror_health';
 const CACHE_TTL = 10 * 60 * 1000; // matches VPS refresh cadence
 
