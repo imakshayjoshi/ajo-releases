@@ -6,19 +6,23 @@
   "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
   "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
   "phone": {
-    "version": "3.3.44",
-    "versionCode": 201,
+    "version": "3.3.45",
+    "versionCode": 202,
     "packageId": "com.ajo.phone",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "↩️ Rolled back to the classic AJO Phone you know. The 4.0 rebuild is withdrawn.",
-      "Everything back the way it was"
+      "🔐 Cast security hardening (ported from AJO TV): unpaired devices can no longer cast, switch tabs, or rewrite your watchlist",
+      "📺 9XM channel fixed + mirror health over HTTPS",
+      "🛡️ Clear Cache no longer wipes your watch history, favorites and pairing — cache only",
+      "🔥 ShortTV section removed (source permanently dead)",
+      "⚡ Playback: faster failover on dead streams (16s → 8s timeout budget per server)"
     ],
     "size_mb": "3.5 MB",
-    "sha256": "a49077144c15aaa7c70ba14b7c295405c3efd2a86e9e0b67303100db2971151e"
+    "sha256": "55fe33768e5ac235df769f64a8540bd24edf11eb9e24f51a5e25eb902f43f8a6",
+    "releaseDate": "2026-10-07"
   },
   "tv": {
     "version": "3.12.60",
@@ -37,18 +41,22 @@
     "sha256": "54f02d220848c3149ec17811e2d5e2f2ffaaefe5cb2346ca24445678ce33779d"
   },
   "android_tv": {
-    "version": "3.12.51",
-    "versionCode": 201,
+    "version": "3.12.52",
+    "versionCode": 202,
     "packageId": "com.ajo.androidtv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "↩️ Rolled back to the classic AJO TV you love. The 4.0 rebuild is withdrawn.",
-      "Your channels, settings and favorites are right where you left them"
+      "🏏 Sports rebuilt: 16 verified-live channels (Sony Ten 1-3, Star Sports Select, Ten Cricket, Cricket Gold, Willow, NBA TV, WWE, beIN)",
+      "🔐 Cast security hardening: unpaired devices can no longer cast, switch tabs, or rewrite your watchlist",
+      "🛡️ Clear Cache no longer wipes user data — cache keys only",
+      "📺 9XM fixed + HTTPS mirror health",
+      "⚡ Faster failover on dead streams"
     ],
     "size_mb": "7.0 MB",
-    "sha256": "5507cfd83ad6f5f72655fec8b1096f62fb11198986ed93a8023a0d3d566937ac"
+    "sha256": "93403616371f5e8ec00e3f1d240fb30e4f75f1ed6daabb57b7fcc7f64a112d0a",
+    "releaseDate": "2026-10-07"
   }
 }
