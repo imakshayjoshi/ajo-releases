@@ -1,8 +1,8 @@
 {
   "schemaVersion": 2,
-  "version": "3.12.51",
-  "versionCode": 201,
-  "releaseDate": "2026-10-01",
+  "version": "3.12.52",
+  "versionCode": 202,
+  "releaseDate": "2026-10-06",
   "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
   "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
   "phone": {
@@ -21,19 +21,20 @@
     "sha256": "a49077144c15aaa7c70ba14b7c295405c3efd2a86e9e0b67303100db2971151e"
   },
   "tv": {
-    "version": "3.12.51",
-    "versionCode": 201,
+    "version": "3.12.52",
+    "versionCode": 202,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "↩️ Rolled back to the classic AJO TV you love. The 4.0 rebuild is withdrawn.",
-      "Your channels, settings and favorites are right where you left them"
+      "✨ Smoother streaming — no more random buffering pauses every few minutes",
+      "📶 WiFi stays at full speed while videos play (Fire TV power-save fix)",
+      "⏱️ Faster recovery when a stream hiccups — playback resumes in 3s instead of 5s"
     ],
     "size_mb": "6.9 MB",
-    "sha256": "181cdf5995651b28e7c3593fc365b58f054d1b83d8428624c967c8a370f0dcd0"
+    "sha256": "9acdbf3bcab779b11405ad1fcb57cca99cce366cc01467854415c7d4789534c0"
   },
   "android_tv": {
     "version": "3.12.51",

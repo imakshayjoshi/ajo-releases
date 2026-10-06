@@ -588,6 +588,7 @@ public class PlayerActivity extends AppCompatActivity {
         super.onDestroy();
         if (activeInstance == this) activeInstance = null;
         saveLastPlaybackPosition();
+        releaseWifiLock();
         uiHandler.removeCallbacksAndMessages(null);
         if (autoPlayAttemptRunnable != null) {
             uiHandler.removeCallbacks(autoPlayAttemptRunnable);
@@ -1423,6 +1424,9 @@ public class PlayerActivity extends AppCompatActivity {
     private void playInWebEngine(String url) {
         isWebEmbedMode = true;
         releasePlayer();
+        // v3.12.52: MainActivity paused when this activity is on top, so its
+        // WifiLock is gone — hold our own while the embed WebView streams.
+        acquireWifiLock();
 
         if (aspectRatioFrameLayout != null) {
             aspectRatioFrameLayout.setVisibility(View.GONE);
@@ -1445,6 +1449,9 @@ public class PlayerActivity extends AppCompatActivity {
 
     private void playInNativeExoPlayer(String url) {
         isWebEmbedMode = false;
+        // ExoPlayer now holds its own wake+wifi lock via setWakeMode, so the
+        // web-engine WifiLock is no longer needed here.
+        releaseWifiLock();
         uiHandler.removeCallbacks(webLoadWatchdog);
         if (webVideoView != null) {
             webVideoView.stopLoading();
@@ -1491,7 +1498,11 @@ public class PlayerActivity extends AppCompatActivity {
                         /* minBufferMs= */ isLive ? 3500 : 25000,
                         /* maxBufferMs= */ isLive ? 15000 : 50000,
                         /* bufferForPlaybackMs= */ isLive ? 1000 : 2500,
-                        /* bufferForPlaybackAfterRebufferMs= */ isLive ? 2000 : 5000)
+                        // v3.12.52: 5000 -> 3000. After a mid-playback stall the
+                        // app used to sit on the spinner for a full 5s of buffer
+                        // before resuming — felt like a second stall. 3s resumes
+                        // visibly faster without risking immediate re-stall.
+                        /* bufferForPlaybackAfterRebufferMs= */ isLive ? 2000 : 3000)
                 // v3.12.44 FIX (the whole-stick freeze): cap the buffer to the
                 // device's RAM class. Without setTargetBufferBytes ExoPlayer uses
                 // its default (C.LENGTH_UNSET -> derived from bitrate*maxBuffer,
@@ -1519,6 +1530,12 @@ public class PlayerActivity extends AppCompatActivity {
                 )
                 .build();
 
+        // v3.12.52 FIX (periodic rebuffering): Fire OS micro-sleeps the WiFi
+        // radio during playback even with KEEP_SCREEN_ON held. Each power-save
+        // window collapses throughput, the buffer drains, and the spinner
+        // comes back every few minutes. WAKE_MODE_LOCAL holds a wake+wifi
+        // lock exactly while playWhenReady is true, and releases on pause.
+        exo.setWakeMode(C.WAKE_MODE_LOCAL);
         exo.setHandleAudioBecomingNoisy(true);
         exo.addListener(new PlayerEventListener());
         // Feed the freeze detector with real rendered-video-frame counts.
@@ -1732,8 +1749,12 @@ public class PlayerActivity extends AppCompatActivity {
                 // v3.9.0: reduced from 120s; v3.10.0: 15s was aborting
                 // legitimately large 4K segments mid-read on slower pipes
                 // (callTimeout covers the whole body read, not just connect),
-                // causing repeated rebuffers. 30s still fails over briskly.
-                .callTimeout(30, TimeUnit.SECONDS)
+                // causing repeated rebuffers. v3.12.52: 30s -> 60s. On throttled
+                // ISP lanes a single 1080p/4K HLS segment can take 30-45s; a
+                // 30s abort forced a full fetch-retry cycle that showed as the
+                // spinner returning "every now and then". 60s keeps one slow
+                // segment alive instead of killing it and restarting.
+                .callTimeout(60, TimeUnit.SECONDS)
                 .followRedirects(true)
                 .followSslRedirects(true)
                 .retryOnConnectionFailure(true)
@@ -1750,6 +1771,32 @@ public class PlayerActivity extends AppCompatActivity {
             }
             player = null;
         }
+    }
+
+    // v3.12.52: WiFi radio lock for the embed-WebView streaming path (ExoPlayer
+    // holds its own via setWakeMode). Fire OS power-save otherwise micro-sleeps
+    // the radio mid-stream and the buffer drains every few minutes.
+    private android.net.wifi.WifiManager.WifiLock wifiLock = null;
+
+    private void acquireWifiLock() {
+        try {
+            if (wifiLock == null) {
+                wifiLock = ((android.net.wifi.WifiManager)
+                        getApplicationContext()
+                        .getSystemService(android.content.Context.WIFI_SERVICE))
+                        .createWifiLock(android.net.wifi.WifiManager.WIFI_MODE_FULL_HIGH_PERF, "ajo:player:wifi");
+                wifiLock.setReferenceCounted(false);
+            }
+            if (!wifiLock.isHeld()) wifiLock.acquire();
+        } catch (Exception e) {
+            Log.w(TAG, "WifiLock acquire failed", e);
+        }
+    }
+
+    private void releaseWifiLock() {
+        try {
+            if (wifiLock != null && wifiLock.isHeld()) wifiLock.release();
+        } catch (Exception ignored) {}
     }
 
     private void failoverToNextServer() {

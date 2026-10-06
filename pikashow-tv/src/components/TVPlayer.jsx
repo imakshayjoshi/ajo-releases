@@ -538,7 +538,10 @@ export function TVPlayer({
           highBufferWatchdogPeriod: 2,
           nudgeOffset: 0.2,
           nudgeMaxRetry: 5,
-          fragLoadingTimeOut: 15000,
+          // v3.12.52: 15s -> 20s. A 1080p/4K fragment on a throttled pipe can
+          // legitimately take >15s; aborting mid-read forced a fetch-retry
+          // cycle that surfaced as the spinner returning every few minutes.
+          fragLoadingTimeOut: 20000,
           manifestLoadingTimeOut: 15000,
           levelLoadingTimeOut: 15000,
           fragLoadingMaxRetry: 4,
@@ -1025,8 +1028,9 @@ export function TVPlayer({
           </div>
           <button
             onClick={() => {
-              if (onNextEpisode && bingeCountdown.nextItem) {
-                onNextEpisode(bingeCountdown.nextItem);
+              const nextIdx = currentEpisodeIndex + 1;
+              if (nextIdx < episodes.length && onSelectEpisode) {
+                onSelectEpisode(episodes[nextIdx], nextIdx);
               }
             }}
             style={{

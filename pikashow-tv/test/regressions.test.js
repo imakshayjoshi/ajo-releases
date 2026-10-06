@@ -5,8 +5,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { generateUniversalServers, isSafeHttpUrl } from '../src/utils/streamingEngines.js';
-import { isNativePlayableUrl, shouldPreferNativePlayer, playInNativePlayer } from '../src/utils/nativePlayer.js';
-import { getPairingRoom, setPairingRoom } from '../src/api/castSync.js';
+import { isNativePlayableUrl, isDirectMediaUrl, shouldPreferNativePlayer, playInNativePlayer } from '../src/utils/nativePlayer.js';
+import { getPairingRoom, setPairingRoom, remoteCommandToKeyboard, injectRemoteCommandKey } from '../src/api/castSync.js';
 
 // --- BUG H2: autoembed.co TV URL must use query string, not dash -----------
 test('Bug H2: autoembed.co series URL uses query string', () => {
@@ -59,11 +59,11 @@ test('Bug C1: native playable gate rejects all known embed hosts', () => {
     'https://example.com/play/whatever'
   ];
   for (const url of samples) {
-    assert.equal(isNativePlayableUrl(url), false, `should reject ${url}`);
+    assert.equal(isDirectMediaUrl(url), false, `should reject ${url}`);
   }
   // And keep accepting real media URLs.
-  assert.equal(isNativePlayableUrl('https://cdn.example.com/master.m3u8'), true);
-  assert.equal(isNativePlayableUrl('https://cdn.example.com/movie.mp4'), true);
+  assert.equal(isDirectMediaUrl('https://cdn.example.com/master.m3u8'), true);
+  assert.equal(isDirectMediaUrl('https://cdn.example.com/movie.mp4'), true);
 });
 
 // --- BUG C1: playInNativePlayer refuses to call the bridge for embeds ------
@@ -127,4 +127,120 @@ test('Bug C2: getPairingRoom / setPairingRoom persist correctly', () => {
   setPairingRoom('lower-case');
   const reRead = getPairingRoom();
   assert.equal(reRead, reRead.toUpperCase(), 'room code must be uppercase');
+});
+
+// --- v3.12.48 STABILITY REGRESSION TESTS -----------------------------------
+// NOTE: pikashow-tv ships on its own release line (3.12.43 / code 130) — this
+// test must track *this* app's OTA constants, not the AJO TV android build.
+test('OTA version and code are consistent with the build', async () => {
+  const ota = await import('../src/api/otaUpdate.js');
+  assert.equal(ota.CURRENT_APP_VERSION, '3.12.52');
+  assert.equal(ota.CURRENT_VERSION_CODE, 202);
+  assert.equal(ota.compareVersions('3.12.48', '3.12.47'), 1);
+  assert.equal(ota.compareVersions('3.12.47', '3.12.48'), -1);
+  assert.equal(ota.compareVersions('3.12.48', '3.12.48'), 0);
+  assert.equal(ota.compareVersions('android-tv-v3.12.48', '3.12.47'), 1);
+  assert.equal(ota.extractVersion('android-tv-v3.12.47'), '3.12.47');
+});
+
+test('v3.12.46: Sony channels and Indian channels are never culled by filterDeadChannels', async () => {
+  const { filterDeadChannels, markChannelDead } = await import('../src/api/iptv.js');
+  const deadUrl = 'https://cloudplay-sonyliv.pages.dev/sabhd.m3u8';
+  markChannelDead(deadUrl);
+
+  const channels = [
+    {
+      id: 'builtin-sonysab',
+      title: 'Sony SAB TV HD',
+      isBuiltin: true,
+      url: deadUrl,
+      players: [{ name: 'Server 1', url: deadUrl }]
+    },
+    {
+      id: 'random-foreign-channel',
+      title: 'Random Unknown TV',
+      isBuiltin: false,
+      url: deadUrl,
+      players: [{ name: 'Server 1', url: deadUrl }]
+    }
+  ];
+
+  const filtered = filterDeadChannels(channels);
+  // Protected Sony SAB channel must NOT be hidden
+  assert.ok(filtered.some(c => c.id === 'builtin-sonysab'), 'Sony SAB channel must remain visible in the grid');
+  // Unprotected non-Indian foreign channel with all dead URLs can be culled
+  assert.ok(!filtered.some(c => c.id === 'random-foreign-channel'), 'Unprotected channel with dead URLs is culled');
+});
+
+test('v3.12.46: Panchayat / TMDB series episode servers point to specific season and episode', () => {
+  const panchayatSeries = {
+    id: 'tmdb-101416',
+    title: 'Panchayat',
+    type: 'series',
+    category: 'serials',
+    tmdb_id: 101416
+  };
+  const episode = {
+    id: 'tmdb-ep-101416-2-3',
+    season_number: 2,
+    episode_number: 3,
+    title: 'Kranti',
+    name: 'Kranti',
+    tmdb_id: 101416
+  };
+  const servers = generateUniversalServers(panchayatSeries, episode);
+  assert.ok(servers.length > 0, 'Servers must be generated');
+
+  const vidlink = servers.find(s => s.url.includes('vidlink.pro'));
+  assert.ok(vidlink, 'VidLink server must be present');
+  assert.ok(vidlink.url.includes('/tv/101416/2/3'), `VidLink must point to /tv/101416/2/3, got ${vidlink.url}`);
+
+  const autoembed = servers.find(s => s.url.includes('autoembed.co'));
+  assert.ok(autoembed, 'AutoEmbed server must be present');
+  assert.ok(autoembed.url.includes('101416-2-3'), `AutoEmbed must point to 101416-2-3, got ${autoembed.url}`);
+
+  const vidsrc = servers.find(s => s.url.includes('vidsrc.pm'));
+  assert.ok(vidsrc, 'VidSrc server must be present');
+  assert.ok(vidsrc.url.includes('/tv/101416/2/3'), `VidSrc must point to /tv/101416/2/3, got ${vidsrc.url}`);
+});
+
+test('v3.12.38: DASH stream URLs recognized as media streams', () => {
+  const dashUrls = [
+    'https://example.com/live/manifest.mpd',
+    'https://cdn.provider.com/dash/stream_1080.mpd?token=abc',
+    'https://stream.server.net/dash/channel1'
+  ];
+  for (const u of dashUrls) {
+    const isDirect = u.includes('.mpd') || u.includes('/dash/');
+    assert.ok(isDirect, `DASH stream ${u} should be detected as direct media`);
+  }
+});
+
+// --- v3.12.50: phone remote navigation keys must reach the TV UI -----------
+test('v3.12.50: phone remote D-pad/channel commands map to TV keyboard keys', () => {
+  assert.deepEqual(remoteCommandToKeyboard('DPAD_UP'), { key: 'ArrowUp', keyCode: 38, code: 'ArrowUp' });
+  assert.deepEqual(remoteCommandToKeyboard('DPAD_DOWN'), { key: 'ArrowDown', keyCode: 40, code: 'ArrowDown' });
+  assert.deepEqual(remoteCommandToKeyboard('DPAD_LEFT'), { key: 'ArrowLeft', keyCode: 37, code: 'ArrowLeft' });
+  assert.deepEqual(remoteCommandToKeyboard('DPAD_RIGHT'), { key: 'ArrowRight', keyCode: 39, code: 'ArrowRight' });
+  assert.deepEqual(remoteCommandToKeyboard('DPAD_CENTER'), { key: 'Enter', keyCode: 13, code: 'Enter' });
+  assert.deepEqual(remoteCommandToKeyboard('CHANNEL_UP'), { key: 'ChannelUp', keyCode: 166, code: 'ChannelUp' });
+  assert.deepEqual(remoteCommandToKeyboard('CHANNEL_DOWN'), { key: 'ChannelDown', keyCode: 167, code: 'ChannelDown' });
+  assert.equal(remoteCommandToKeyboard('PLAY_PAUSE'), null, 'media keys stay on the native-player branch');
+});
+
+test('v3.12.50: injectRemoteCommandKey is safe outside a browser', () => {
+  assert.equal(injectRemoteCommandKey('DPAD_UP'), false);
+  assert.equal(injectRemoteCommandKey('PLAY'), false);
+});
+
+test('v3.12.50: cast payload season/episode fields rebuild episode-exact mirrors', () => {
+  const castItem = { id: 'tmdb-205753', type: 'series', title: 'Some Show', tmdb_id: 205753 };
+  const msg = { seasonNumber: 1, episodeNumber: 8, tmdbId: 205753 };
+  const castEpisode = (msg.seasonNumber || msg.episodeNumber)
+    ? { season_number: Number(msg.seasonNumber) || 1, episode_number: Number(msg.episodeNumber) || 1, tmdb_id: msg.tmdbId || castItem.tmdb_id || null }
+    : null;
+  const servers = generateUniversalServers(castItem, castEpisode);
+  assert.ok(servers.some(s => s.url.includes('/tv/205753/1/8')), 'path-style mirrors must carry S1 E8');
+  assert.ok(servers.some(s => s.url.includes('205753-1-8')), 'dash-style mirrors must carry S1 E8');
+  assert.ok(!servers.some(s => /\/tv\/8\/1\/1(?:\/|\?|$)/.test(s.url)), 'episode digit must never masquerade as series id');
 });

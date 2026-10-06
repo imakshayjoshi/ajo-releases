@@ -750,6 +750,13 @@ public class MainActivity extends BridgeActivity {
         // focus back for the D-pad.
         resumeWebView(true);
         enableImmersiveMode();
+        // v3.12.52 FIX (periodic rebuffering on embed sources): Fire OS
+        // power-saves the WiFi radio while the WebView (hls.js / iframe)
+        // streams — KEEP_SCREEN_ON alone does not stop it. Acquire a
+        // WIFI_MODE_FULL_HIGH_PERF lock whenever the app is foregrounded and
+        // the web pipeline may be feeding a <video>, release it on pause.
+        // WAKE_LOCK permission already declared in the manifest.
+        acquireWifiLock();
     }
 
     @Override
@@ -764,6 +771,31 @@ public class MainActivity extends BridgeActivity {
                 getBridge().getWebView().onPause();
             } catch (Exception ignored) {}
         }
+        releaseWifiLock();
+    }
+
+    // v3.12.52: keeps the WiFi radio out of power-save while the app streams.
+    private android.net.wifi.WifiManager.WifiLock wifiLock = null;
+
+    private void acquireWifiLock() {
+        try {
+            if (wifiLock == null) {
+                wifiLock = ((android.net.wifi.WifiManager)
+                        getApplicationContext()
+                        .getSystemService(android.content.Context.WIFI_SERVICE))
+                        .createWifiLock(android.net.wifi.WifiManager.WIFI_MODE_FULL_HIGH_PERF, "ajo:wifi");
+                wifiLock.setReferenceCounted(false);
+            }
+            if (!wifiLock.isHeld()) wifiLock.acquire();
+        } catch (Exception e) {
+            Log.w(TAG, "WifiLock acquire failed", e);
+        }
+    }
+
+    private void releaseWifiLock() {
+        try {
+            if (wifiLock != null && wifiLock.isHeld()) wifiLock.release();
+        } catch (Exception ignored) {}
     }
 
     @Override
