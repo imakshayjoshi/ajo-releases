@@ -3,7 +3,11 @@ import { MediaCard } from './MediaCard';
 
 const PAGE_SIZE = 30;
 
-export function MediaGridView({ title, items = [], isLive = false, onSelectItem }) {
+// v3.12.57 PERF: content-derived stable key (see MediaRail) + React.memo.
+const stableKey = (item) =>
+  item.id ?? `${(item.title_en || item.title || item.name || 'untitled').toString().toLowerCase().slice(0, 60)}-${item.source || item.provider || 'cat'}`;
+
+export const MediaGridView = React.memo(function MediaGridView({ title, items = [], isLive = false, onSelectItem }) {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const sentinelRef = useRef(null);
@@ -11,15 +15,25 @@ export function MediaGridView({ title, items = [], isLive = false, onSelectItem 
   // Extract unique categories
   const categories = useMemo(() => {
     const set = new Set(['All']);
+    if (isLive) {
+      set.add('Marathi (मराठी)');
+    }
     items.forEach((item) => {
       if (item.category) set.add(item.category);
     });
     return Array.from(set);
-  }, [items]);
+  }, [items, isLive]);
 
   // Filter items by category
   const filteredItems = useMemo(() => {
     if (selectedCategory === 'All') return items;
+    if (selectedCategory === 'Marathi (मराठी)') {
+      return items.filter(item => {
+        const cat = (item.category || '').toLowerCase();
+        const title = (item.title || item.name || '').toLowerCase();
+        return cat.includes('marathi') || title.includes('marathi') || title.includes('majha') || title.includes('taas') || title.includes('jhakaas') || title.includes('lokmat') || title.includes('saam') || title.includes('pravah') || title.includes('sahyadri');
+      });
+    }
     return items.filter((item) => item.category === selectedCategory);
   }, [items, selectedCategory]);
 
@@ -78,7 +92,7 @@ export function MediaGridView({ title, items = [], isLive = false, onSelectItem 
       <div className="tv-grid">
         {visibleItems.map((item, idx) => (
           <MediaCard
-            key={item.id || idx}
+            key={stableKey(item)}
             item={item}
             isLive={isLive}
             onClick={onSelectItem}
@@ -92,5 +106,5 @@ export function MediaGridView({ title, items = [], isLive = false, onSelectItem 
       )}
     </div>
   );
-}
+});
 

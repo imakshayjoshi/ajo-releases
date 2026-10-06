@@ -51,9 +51,22 @@ function createLiveChannelBadge(t = 'TV', _cat = 'Live') {
 }
 
 const VOD_FALLBACK_POSTER =
-  'data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%22200%22%20height%3D%22300%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Crect%20width%3D%22100%25%22%20height%3D%22100%25%22%20fill%3D%22%23151c2c%22%2F%3E%3Ctext%20x%3D%2250%25%22%20y%3D%2250%25%22%20fill%3D%22%2364748b%22%20dominant-baseline%3D%22middle%22%20text-anchor%3D%22middle%22%20font-family%3D%22sans-serif%22%20font-size%3D%2214%22%3ENo%20Poster%3C%2Ftext%3E%3C%2Fsvg%3E';
+  'data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%22200%22%20height%3D%22300%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Crect%20width%3D%22100%25%22%20height%3D%22100%25%22%20fill%3D%22%23151c2c%22%2F%3E%3Ctext%20x%3D%2250%25%22%20y%3D%2250%25%22%20fill%3D%22%2364748b%22%20dominant-baseline%3D%22middle%22%20text-anchor%3D%22middle%22%20font-family%3D%22sans-serif%22%20font-size%3D%22%3C%2Ftext%3E%3C%2Fsvg%3E';
 
-export function MediaCard({ item, onClick, isLive = false }) {
+// v3.12.57 PERF: badges were built + encodeURIComponent'd per card per render
+// (~300 encodes per state tick on the Live tab). Cache by title|category, cap
+// 500 entries so it can never grow unbounded on huge custom playlists.
+const _badgeCache = new Map();
+function cachedLiveBadge(t, cat) {
+  const k = t + '|' + cat;
+  if (_badgeCache.has(k)) return _badgeCache.get(k);
+  if (_badgeCache.size > 500) _badgeCache.clear();
+  const badge = createLiveChannelBadge(t, cat);
+  _badgeCache.set(k, badge);
+  return badge;
+}
+
+export const MediaCard = React.memo(function MediaCard({ item, onClick, isLive = false }) {
   if (!item) return null;
 
   const title = typeof item.title_en === 'string' && item.title_en
@@ -91,7 +104,7 @@ export function MediaCard({ item, onClick, isLive = false }) {
   }
 
   const fallbackPoster = isLive
-    ? createLiveChannelBadge(title, category)
+    ? cachedLiveBadge(title, category)
     : VOD_FALLBACK_POSTER;
 
   return (
@@ -100,13 +113,15 @@ export function MediaCard({ item, onClick, isLive = false }) {
       className="tv-card"
       onClick={() => onClick && onClick(item)}
     >
-      <div style={{ position: 'relative', width: '100%', overflow: 'hidden', borderRadius: '8px' }}>
+      <div className="tv-card-media">
         <img
           src={poster || fallbackPoster}
           alt={title}
           className={isLive ? 'tv-card-poster tv-card-live-poster' : 'tv-card-poster'}
           loading="lazy"
           onError={(e) => {
+            if (e.target.dataset.fallbackTried) return;
+            e.target.dataset.fallbackTried = 'true';
             e.target.src = fallbackPoster;
           }}
         />
@@ -151,4 +166,4 @@ export function MediaCard({ item, onClick, isLive = false }) {
       </div>
     </div>
   );
-}
+});

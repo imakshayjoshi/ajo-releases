@@ -86,43 +86,49 @@ export default function App() {
   // Load all catalogs on startup
   const loadData = useCallback(async () => {
     setLoading(true);
-    try {
-      const [bolly, holly, serials, sports, trending, popMovies, popTv, newReleases] = await Promise.allSettled([
-        getBollywoodCatalog(),
-        getHollywoodCatalog(),
-        getSerialsCatalog(),
-        getLiveSportsEvents(),
-        getTmdbTrending('all', 'week'),
-        getTmdbCatalog('movie', 'popular'),
-        getTmdbCatalog('tv', 'popular'),
-        getTmdbNowPlaying(20)
-      ]);
-
-      if (bolly.status === 'fulfilled') setBollywoodItems(bolly.value || []);
-      if (holly.status === 'fulfilled') setHollywoodItems(holly.value || []);
-      if (serials.status === 'fulfilled') setSeriesItems(serials.value || []);
-      if (sports.status === 'fulfilled') setSportsItems(sports.value || []);
-      if (newReleases.status === 'fulfilled') setNowPlaying(newReleases.value || []);
-      if (trending.status === 'fulfilled') setTmdbTrending(trending.value || []);
-      if (popMovies.status === 'fulfilled') setTmdbMovies(popMovies.value || []);
-      if (popTv.status === 'fulfilled') setTmdbSeries(popTv.value || []);
-      
-      
-      // Addon catalogs (only loads when addons are installed — no-op otherwise)
-      getAddonCatalogs().then(cats => {
-        const items = cats.flatMap(c => c.items);
-        setAddonCatalogItems(items.slice(0, 30));
+    // v3.12.57 PERF: first paint used to wait for the SLOWEST of 8 parallel
+    // fetches (Promise.allSettled + finally) — one hung API held the whole UI
+    // hostage behind a spinner. Now every source paints its own rail as it
+    // resolves; the shell (header + nav + skeletons) is interactive
+    // immediately.
+    const jobs = [
+      ['bolly', getBollywoodCatalog()],
+      ['holly', getHollywoodCatalog()],
+      ['serials', getSerialsCatalog()],
+      ['sports', getLiveSportsEvents()],
+      ['trending', getTmdbTrending('all', 'week')],
+      ['popMovies', getTmdbCatalog('movie', 'popular')],
+      ['popTv', getTmdbCatalog('tv', 'popular')],
+      ['newReleases', getTmdbNowPlaying(20)],
+      // v3.12.57: these two used to START only after the 8 above settled — a
+      // pure waterfall that always rendered their rails last. They depend on
+      // nothing (getWatchHistory is a sync localStorage read), so run them
+      // alongside.
+      ['addons', getAddonCatalogs()],
+      ['because', getBecauseYouWatched(getWatchHistory() || [])],
+    ];
+    for (const [key, p] of jobs) {
+      p.then((v) => {
+        switch (key) {
+          case 'bolly': setBollywoodItems(v || []); break;
+          case 'holly': setHollywoodItems(v || []); break;
+          case 'serials': setSeriesItems(v || []); break;
+          case 'sports': setSportsItems(v || []); break;
+          case 'newReleases': setNowPlaying(v || []); break;
+          case 'trending': setTmdbTrending(v || []); break;
+          case 'popMovies': setTmdbMovies(v || []); break;
+          case 'popTv': setTmdbSeries(v || []); break;
+          case 'addons': {
+            const items = (v || []).flatMap((c) => c.items);
+            setAddonCatalogItems(items.slice(0, 30));
+            break;
+          }
+          case 'because': setBecauseYouWatched(v || []); break;
+        }
       }).catch(() => {});
-      // "Because you watched" personalization from watch history
-      getBecauseYouWatched(getWatchHistory() || []).then(recs => {
-        setBecauseYouWatched(recs || []);
-      }).catch(() => {});
-      setContinueWatching(getWatchHistory() || []);
-    } catch (err) {
-      console.error('Error loading catalogs:', err);
-    } finally {
-      setLoading(false);
     }
+    setContinueWatching(getWatchHistory() || []);
+    setLoading(false);
   }, []);
 
   const lastLaunchedItemRef = useRef(null);
@@ -257,13 +263,18 @@ export default function App() {
       ? episodes[episodeIndex]
       : (resolvedItem.season_number || resolvedItem.episode_number ? resolvedItem : null);
     let allServers = generateUniversalServers(resolvedItem, episodeInfo);
-    // VPS health ranking: healthy mirrors first, dead ones last
-    try {
-      allServers = await getRankedServers(allServers);
-    } catch {}
+    // v3.12.57 PERF: server health ranking and Stremio addon streams are
+    // INDEPENDENT — they used to run strictly in series (enrich -> rank ->
+    // addons), adding 2-3 sequential round-trips to EVERY play on the stick.
+    // Now both run in parallel; each has its own catch so one failing can't
+    // block the other.
+    const [ranked, addonStreams] = await Promise.all([
+      getRankedServers(allServers).catch(() => allServers),
+      getAddonStreams(resolvedItem).catch(() => []),
+    ]);
+    allServers = ranked;
     // Stremio addon streams: append direct-playable URLs from installed addons
-    try {
-      const addonStreams = await getAddonStreams(resolvedItem);
+    {
       for (const s of addonStreams) {
         allServers.push({
           id: `addon-${s.addonName}-${allServers.length}`,
@@ -274,7 +285,7 @@ export default function App() {
           provider: s.addonName
         });
       }
-    } catch {}
+    }
 
     let selectedSrv = server;
     if (episodeInfo && selectedSrv) {
@@ -361,17 +372,14 @@ export default function App() {
   // PLAY_MEDIA (play the exact item+server the phone sent), REMOTE_COMMAND
   // (play/pause/seek/back), NAV_TAB and UNPAIR.
   // v3.9.0 PERF: lazy-load castSync only when needed
-  useEffect(() => {
-    let unsubscribe = null;
-    import('./api/castSync').then(({ castEngine, ensureTvRole, injectRemoteCommandKey }) => {
-      // v3.11.1: ALWAYS run as the TV-side cast peer with a persisted room
-      // code (regardless of UA/display-mode detection) or phones can never
-      // pair — the engine drops every inbound message if the room/role is
-      // wrong, and this used to fail silently on some Fire TV WebViews.
-      const bootRoom = new URLSearchParams(window.location.search).get('room');
-      ensureTvRole(bootRoom || undefined);
-      unsubscribe = castEngine.subscribe((msg) => {
-        try {
+  // v3.12.57 PERF: this effect depended on handleBack, whose identity changes
+  // on EVERY tab switch and modal open/close — so the whole import ->
+  // ensureTvRole -> subscribe chain tore down and re-ran on every navigation,
+  // churning the cast engine's reconnect logic mid-browsing. Subscribe ONCE;
+  // the handler stays current through a ref.
+  const castHandlerRef = useRef(null);
+  castHandlerRef.current = (msg) => {
+    try {
           if (msg.type === 'PLAY_MEDIA' && msg.item) {
             const castItem = msg.item;
             // v3.12.50: the phone sends season/episode as top-level payload fields —
@@ -449,13 +457,28 @@ export default function App() {
               setWatchlist(merged);
             }).catch(() => {});
           }
-        } catch (err) {
-          console.warn('[AJO-CAST] handler error:', err);
-        }
+            } catch (err) {
+      console.warn('[AJO-CAST] handler error:', err);
+    }
+  };
+
+  // v3.12.57: subscribe exactly once; the handler reads fresh state through
+  // castHandlerRef.current, reassigned on every render above.
+  useEffect(() => {
+    let unsubscribe = null;
+    import('./api/castSync').then(({ castEngine, ensureTvRole }) => {
+      // v3.11.1: ALWAYS run as the TV-side cast peer with a persisted room
+      // code (regardless of UA/display-mode detection) or phones can never
+      // pair — the engine drops every inbound message if the room/role is
+      // wrong, and this used to fail silently on some Fire TV WebViews.
+      const bootRoom = new URLSearchParams(window.location.search).get('room');
+      ensureTvRole(bootRoom || undefined);
+      unsubscribe = castEngine.subscribe((msg) => {
+        if (castHandlerRef.current) castHandlerRef.current(msg);
       });
     }).catch(() => {});
     return () => { if (unsubscribe) unsubscribe(); };
-  }, [handleBack]);
+  }, []);
 
   // Spatial Navigation Hook
   const hasAnyModal = Boolean(selectedItem || activePlayback || otaPrompt);

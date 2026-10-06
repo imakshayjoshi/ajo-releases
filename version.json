@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "version": "3.12.56",
-  "versionCode": 206,
+  "version": "3.12.57",
+  "versionCode": 207,
   "releaseDate": "2026-10-07",
   "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
   "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
@@ -21,22 +21,22 @@
     "sha256": "a49077144c15aaa7c70ba14b7c295405c3efd2a86e9e0b67303100db2971151e"
   },
   "tv": {
-    "version": "3.12.56",
-    "versionCode": 206,
+    "version": "3.12.57",
+    "versionCode": 207,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "▶️ Continue Watching is safe now — switching servers mid-watch no longer restarts the episode from 0",
-      "📺 Series binge mode keeps auto-playing every next episode, not just the first",
-      "⏯️ Blocked autoplay no longer leaves an infinite spinner — recovers instantly",
-      "🔗 Some direct streams that failed to load now play fine (CORS fix)",
-      "💥 Failed direct streams fail over to the next server instantly instead of hanging"
+      "⚡ Remote navigation is dramatically faster — the app no longer rescans every card on each keypress",
+      "🚀 App opens instantly with rails appearing as they load, instead of waiting on the slowest server",
+      "🎬 Movies and episodes start faster — server health check and stream lookup now run in parallel",
+      "🖼️ Posters no longer show the wrong image or get stuck after browsing categories",
+      "🔍 Search results can no longer be overwritten by a slower older request"
     ],
     "size_mb": "6.9 MB",
-    "sha256": "0147fb1c5f4ee2f2d8265027f39818a44244fe93bea0efab45542484d95ac870"
+    "sha256": "d14116e3bed2124d04bcae35c307191285e4113eae313325a618f8407e5554fd"
   },
   "android_tv": {
     "version": "3.12.51",

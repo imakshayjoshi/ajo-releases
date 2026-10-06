@@ -7,6 +7,18 @@ import { useEffect, useRef, useCallback } from 'react';
  */
 export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelector = null }) {
   const lastFocusedRef = useRef(null);
+  // v3.12.57 PERF: cache the focusable set. Previously EVERY D-pad keypress
+  // re-ran a full-document querySelectorAll + getComputedStyle + parent-chain
+  // walk per candidate, plus O(n) Array.includes scans — on the Live TV grid
+  // that was 300-700 elements of forced style resolution per keypress: the
+  // direct cause of remote lag that worsened the longer you browsed. Now the
+  // set is built once and invalidated by DOM mutations (MutationObserver) or
+  // modal/tab changes; membership checks are O(1) via Set.
+  const navCacheRef = useRef({ els: null, elSet: null });
+  const invalidateNavCache = useCallback(() => {
+    navCacheRef.current.els = null;
+    navCacheRef.current.elSet = null;
+  }, []);
 
   // Fast check if an element is focusable and visible without triggering reflow.
   // offsetParent is null for position:fixed and position:sticky elements, so
@@ -36,6 +48,11 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
   };
 
   const getFocusableElements = useCallback((container = document) => {
+    // v3.12.57: serve from cache when the container is the whole document
+    // (the modal path re-scans on purpose — it passes a specific container).
+    if (container === document && navCacheRef.current.els) {
+      return navCacheRef.current.els;
+    }
     const raw = container.querySelectorAll(
       'button:not([disabled]), [tabindex="0"]:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), .tv-card, .tv-nav-pill, .tv-hero, .tv-cat-btn, .tv-btn-primary, .tv-btn-secondary, .tv-player-btn, .tv-drawer-item, [data-focusable="true"]'
     );
@@ -45,23 +62,28 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
         result.push(raw[i]);
       }
     }
+    if (container === document) {
+      navCacheRef.current = { els: result, elSet: new Set(result) };
+    }
     return result;
   }, []);
 
   const findNextElement = useCallback((current, direction, elements) => {
     if (!current || elements.length === 0) return elements[0] || null;
+    // v3.12.57: O(1) membership checks (was Array.includes — O(n) per sibling).
+    const elSet = elements.__navSet || (elements.__navSet = new Set(elements));
 
     // 1. FAST-PATH: Intra-rail horizontal navigation (O(1) sibling traversal)
     if (direction === 'ArrowRight') {
       let sibling = current.nextElementSibling;
       while (sibling) {
-        if (elements.includes(sibling)) return sibling;
+        if (elSet.has(sibling)) return sibling;
         sibling = sibling.nextElementSibling;
       }
     } else if (direction === 'ArrowLeft') {
       let sibling = current.previousElementSibling;
       while (sibling) {
-        if (elements.includes(sibling)) return sibling;
+        if (elSet.has(sibling)) return sibling;
         sibling = sibling.previousElementSibling;
       }
     }
@@ -363,6 +385,22 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
     window.addEventListener('keydown', handleKeyDown, true);
     return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [onBack, isModalOpen, modalSelector, getFocusableElements, findNextElement]);
+
+  // v3.12.57 PERF: invalidate the focusable cache whenever the DOM gains or
+  // loses nodes (rails load, modals open, cards unmount). MutationObserver
+  // callback only flips a flag — the (expensive) rebuild happens lazily on
+  // the next keypress that needs it.
+  useEffect(() => {
+    if (typeof MutationObserver !== 'function') return;
+    const mo = new MutationObserver(() => { navCacheRef.current.els = null; });
+    try {
+      mo.observe(document.body, { childList: true, subtree: true });
+    } catch { /* body not ready in SSR-ish contexts */ }
+    return () => mo.disconnect();
+  }, []);
+  // Modal open/close changes which elements are navigable — drop the cache so
+  // the next keypress rebuilds for the new container.
+  useEffect(() => { invalidateNavCache(); }, [isModalOpen, modalSelector, invalidateNavCache]);
 
   const focusInitial = useCallback((selector = '.tv-card, .tv-nav-pill') => {
     setTimeout(() => {

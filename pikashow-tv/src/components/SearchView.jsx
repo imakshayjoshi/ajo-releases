@@ -14,6 +14,11 @@ export function SearchView({ onSelectItem }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
+  // v3.12.57 FIX: out-of-order response guard. A slow EARLIER request could
+  // resolve after a newer one and clobber the correct results (type "av" then
+  // "avatar" -> "av" results shown for "avatar"). Only the newest request
+  // may write state.
+  const reqSeqRef = React.useRef(0);
 
   // Debounced search
   useEffect(() => {
@@ -25,10 +30,13 @@ export function SearchView({ onSelectItem }) {
 
     setIsSearching(true);
     const timer = setTimeout(() => {
+      const id = ++reqSeqRef.current;
       searchAllMedia(query).then((items) => {
+        if (reqSeqRef.current !== id) return; // superseded by a newer query
         setResults(items);
         setIsSearching(false);
       }).catch(() => {
+        if (reqSeqRef.current !== id) return;
         setIsSearching(false);
       });
     }, 300);
