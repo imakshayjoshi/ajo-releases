@@ -1,5 +1,5 @@
-export const CURRENT_APP_VERSION = '3.12.52';
-export const CURRENT_VERSION_CODE = 202;
+export const CURRENT_APP_VERSION = '3.12.53';
+export const CURRENT_VERSION_CODE = 203;
 const MANIFEST_SOURCES = [
   'https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/version.json',
   'https://cdn.jsdelivr.net/gh/imakshayjoshi/ajo-releases@main/version.json',
@@ -44,18 +44,23 @@ export async function checkForAppUpdates(appType = 'tv') {
 
   for (const sourceUrl of MANIFEST_SOURCES) {
     try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 3500);
+      // v3.12.53 FIX (silent OTA death): custom headers like Cache-Control /
+      // Pragma are NOT CORS-safelisted, so every manifest fetch triggered a
+      // CORS preflight that raw.githubusercontent / githack / jsdelivr /
+      // api.github all reject (403 / missing allow-headers) — every source
+      // failed silently and the app always said "no update". The ?t= cache
+      // buster plus fetch cache mode handle freshness without any headers.
+      // AbortController is also feature-detected: pre-Chromium-66 Fire OS 5
+      // WebViews throw on it and would kill every source the same way.
+      const supportsAbort = typeof AbortController !== 'undefined';
+      const controller = supportsAbort ? new AbortController() : null;
+      const timer = supportsAbort ? setTimeout(() => controller.abort(), 3500) : null;
       const url = sourceUrl + (sourceUrl.includes('?') ? '&' : '?') + 't=' + Date.now();
       const response = await fetch(url, {
         cache: 'no-cache',
-        headers: {
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache'
-        },
-        signal: controller.signal
+        ...(supportsAbort ? { signal: controller.signal } : {})
       });
-      clearTimeout(timer);
+      if (timer) clearTimeout(timer);
       if (response.ok) {
         const data = await response.json();
         if (data && data.assets && data.tag_name) {
