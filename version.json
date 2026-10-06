@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "version": "3.12.54",
-  "versionCode": 204,
+  "version": "3.12.55",
+  "versionCode": 205,
   "releaseDate": "2026-10-07",
   "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
   "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
@@ -21,21 +21,22 @@
     "sha256": "a49077144c15aaa7c70ba14b7c295405c3efd2a86e9e0b67303100db2971151e"
   },
   "tv": {
-    "version": "3.12.54",
-    "versionCode": 204,
+    "version": "3.12.55",
+    "versionCode": 205,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "🚀 Smart server ranking now works — dead streams get skipped before you tap play",
-      "🔇 Volume no longer jumps to max when the app auto-switches servers",
-      "▶️ Series auto-play works past the first episode again",
-      "🔒 Security hardening + 9XM channel fix"
+      "🛡️ Crash guard: dead black screens after renderer crashes now auto-recover to next server",
+      "⏱️ Stuck loading screens now fail over to the next server instead of hanging forever",
+      "🧠 Live channels no longer burn CPU in an infinite retry loop on dead sources",
+      "🖼️ Poster cache no longer wiped every time you press Home — faster grid after returning",
+      "🔒 More security + memory hardening"
     ],
     "size_mb": "6.9 MB",
-    "sha256": "54271da729737bbe07439acb990f0ff35b5bcf0aa3fd5a72b62320b32ec7a725"
+    "sha256": "fa89fe5395449aea7b6aacaf1e75eeba532ac6aff8cccb82cca6cf85990981d5"
   },
   "android_tv": {
     "version": "3.12.51",

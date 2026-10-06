@@ -868,6 +868,11 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onTrimMemory(int level) {
         super.onTrimMemory(level);
+        // v3.12.55 FIX: same as PlayerActivity — UI_HIDDEN fires on every Home
+        // press; wiping the cache there nukes the poster grid for no reason.
+        if (level < android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW) {
+            return;
+        }
         if (getBridge() != null && getBridge().getWebView() != null) {
             try {
                 getBridge().getWebView().clearCache(false);

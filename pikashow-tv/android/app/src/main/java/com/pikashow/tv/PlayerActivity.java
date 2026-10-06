@@ -231,12 +231,25 @@ public class PlayerActivity extends AppCompatActivity {
         @Override
         public void run() {
             if (!isWebEmbedMode) return;
-            Log.w(TAG, "WEB_EMBED_TIMEOUT: embed taking long to load, dismissing spinner.");
+            Log.w(TAG, "WEB_EMBED_TIMEOUT: embed never finished loading — failing over to next mirror.");
             bufferSpinner.setVisibility(View.GONE);
+            // v3.12.55 FIX: this watchdog used to ONLY hide the spinner, so a
+            // dead mirror or a hung Cloudflare interstitial left an eternal
+            // black WebView — no failover, ever. onPageFinished removes this
+            // callback, so reaching here means the page never finished: that
+            // is precisely the dead-mirror case. Switch mirrors.
+            failoverToNextServer();
         }
     };
     private long resumePositionMs = C.TIME_UNSET;
     private Runnable autoPlayAttemptRunnable = null;
+
+    // v3.12.55: capped live resyncs. A dead live origin used to loop
+    // prepare -> error -> prepare forever (decoder re-init churn, CPU burn,
+    // eternal spinner). After MAX_LIVE_RESYNC attempts, fail over to the
+    // next mirror even for live.
+    private int liveResyncAttempts = 0;
+    private static final int MAX_LIVE_RESYNC_ATTEMPTS = 3;
 
     // ---- FREEZE DETECTION (fix): audio-plays-but-picture-frozen on Fire OS.
     // The first-frame watchdog cannot catch this because the first frame DOES
@@ -410,11 +423,23 @@ public class PlayerActivity extends AppCompatActivity {
                     + "ms on server " + (currentServerIdx + 1) + "/" + serverQueue.size());
 
             if (isLive) {
-                // For live channels, re-sync to live edge once before any failover
+                // For live channels, re-sync to live edge a bounded number of
+                // times before failing over. v3.12.55: this used to resync once
+                // and never re-arm — a channel that still rendered nothing got
+                // an eternal spinner (freeze detector is gated on first frame).
+                liveResyncAttempts++;
+                if (liveResyncAttempts > MAX_LIVE_RESYNC_ATTEMPTS) {
+                    Log.w(TAG, "Live first-frame failed after " + MAX_LIVE_RESYNC_ATTEMPTS
+                            + " resyncs — failing over to next mirror.");
+                    failoverToNextServer();
+                    return;
+                }
                 if (player != null) {
                     try {
                         player.seekToDefaultPosition();
                         player.prepare();
+                        // Re-arm: give the resync another full window to render.
+                        uiHandler.postDelayed(this, FIRST_FRAME_TIMEOUT_MS);
                     } catch (Exception ignored) {}
                 }
                 return;
@@ -469,6 +494,21 @@ public class PlayerActivity extends AppCompatActivity {
 
         parseIntentData(intent);
         if (serverQueue.isEmpty()) return;
+
+        // v3.12.55 FIX: singleTop + finishing race. exitPlayer() nulls
+        // webVideoView then finish()es; an intent arriving in that window
+        // would route playCurrentStream -> playInWebEngine with a null
+        // WebView: nothing loads, spinner, black screen. If the web view is
+        // gone but the new stream needs it, rebuild the whole UI (buildUi
+        // recreates the WebView).
+        boolean newStreamNeedsWeb = false;
+        for (String u : serverQueue) {
+            if (isWebEmbedUrl(u)) { newStreamNeedsWeb = true; break; }
+        }
+        if (newStreamNeedsWeb && webVideoView == null) {
+            Log.w(TAG, "onNewIntent: webVideoView was null but embed stream requested — rebuilding UI");
+            setContentView(buildUi());
+        }
 
         softwareDecoderRetryDone = false;
         resumePositionMs = C.TIME_UNSET;
@@ -607,6 +647,13 @@ public class PlayerActivity extends AppCompatActivity {
             try {
                 webVideoView.stopLoading();
                 webVideoView.loadUrl("about:blank");
+                // v3.12.55 FIX: destroy() while still attached to the layout is
+                // the documented misuse — on several Fire OS builds it leaves
+                // window/surface references that pin the Activity in memory.
+                // Detach first.
+                if (webVideoView.getParent() instanceof android.view.ViewGroup) {
+                    ((android.view.ViewGroup) webVideoView.getParent()).removeView(webVideoView);
+                }
                 webVideoView.destroy();
             } catch (Exception ignored) {}
             webVideoView = null;
@@ -729,6 +776,29 @@ public class PlayerActivity extends AppCompatActivity {
             @Override
             public void onReceivedSslError(WebView view, SslErrorHandler handler, SslError error) {
                 handler.proceed();
+            }
+
+            // v3.12.55 FIX (render-crash guard): renderer OOM on 1GB sticks
+            // turned this embed WebView into a dead black surface — the spinner
+            // was already hidden by the watchdog, the freeze detector skips
+            // web-embed mode, and only a manual Back escaped. MainActivity got
+            // this guard in v3.12.44; the embed player (the thing most likely
+            // to OOM) never did. Embed crashes are usually the mirror's ad-
+            // heavy page — fail over to the next mirror, not just black.
+            @Override
+            public boolean onRenderProcessGone(WebView view, android.webkit.RenderProcessGoneDetail detail) {
+                Log.w(TAG, "EMBED_RENDER_GONE (crashed=" + (detail != null && detail.didCrash())
+                        + "), rebuilding: removing dead WebView and failing over.");
+                try {
+                    if (view.getParent() instanceof android.view.ViewGroup) {
+                        ((android.view.ViewGroup) view.getParent()).removeView(view);
+                    }
+                } catch (Exception ignored) {}
+                try { view.destroy(); } catch (Exception ignored) {}
+                if (webVideoView == view) webVideoView = null;
+                uiHandler.removeCallbacks(webLoadWatchdog);
+                uiHandler.post(() -> failoverToNextServer());
+                return true;
             }
 
             @Override
@@ -1336,6 +1406,7 @@ public class PlayerActivity extends AppCompatActivity {
 
         streamUrl = serverQueue.get(currentServerIdx);
         Log.i(TAG, "playCurrentStream [" + (currentServerIdx + 1) + "/" + serverQueue.size() + "]: " + streamUrl);
+        liveResyncAttempts = 0; // v3.12.55: fresh counter per mirror
 
         // v3.12.54 FIX (removed): this block FORCED STREAM_MUSIC to max volume
         // on EVERY mirror switch / failover, stomping the user's remote volume
@@ -1864,7 +1935,17 @@ public class PlayerActivity extends AppCompatActivity {
 
             if (isLive) {
                 // Live channels: re-sync to live broadcast edge without burning through server queue
-                Log.w(TAG, "Live channel error (" + error.errorCode + "), resyncing to live broadcast...");
+                // v3.12.55: capped — a dead origin used to churn prepare->error
+                // forever (decoder re-init loop, CPU burn). Fail over after N.
+                liveResyncAttempts++;
+                if (liveResyncAttempts > MAX_LIVE_RESYNC_ATTEMPTS) {
+                    Log.w(TAG, "Live error loop exceeded " + MAX_LIVE_RESYNC_ATTEMPTS
+                            + " resyncs — failing over to next mirror.");
+                    failoverToNextServer();
+                    return;
+                }
+                Log.w(TAG, "Live channel error (" + error.errorCode + "), resyncing to live broadcast (attempt "
+                        + liveResyncAttempts + ")...");
                 if (player != null) {
                     try {
                         player.seekToDefaultPosition();
@@ -2247,6 +2328,11 @@ public class PlayerActivity extends AppCompatActivity {
             try {
                 webVideoView.stopLoading();
                 webVideoView.loadUrl("about:blank");
+                // v3.12.55 FIX: detach before destroy (same as onDestroy) —
+                // attached destroy() pins the Activity on some Fire OS builds.
+                if (webVideoView.getParent() instanceof android.view.ViewGroup) {
+                    ((android.view.ViewGroup) webVideoView.getParent()).removeView(webVideoView);
+                }
                 webVideoView.destroy();
             } catch (Exception ignored) {}
             webVideoView = null;
@@ -2300,6 +2386,13 @@ public class PlayerActivity extends AppCompatActivity {
     @Override
     public void onTrimMemory(int level) {
         super.onTrimMemory(level);
+        // v3.12.55 FIX: TRIM_MEMORY_UI_HIDDEN fires on EVERY backgrounding —
+        // clearing the WebView cache there destroyed the poster cache on every
+        // Home press (slow grids on return, re-downloads, MORE memory churn on
+        // 1GB sticks). Only clear when the system is actually running low.
+        if (level < android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW) {
+            return;
+        }
         if (webVideoView != null) {
             try {
                 webVideoView.clearCache(false);
