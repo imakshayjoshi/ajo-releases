@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "version": "3.12.55",
-  "versionCode": 205,
+  "version": "3.12.56",
+  "versionCode": 206,
   "releaseDate": "2026-10-07",
   "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
   "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
@@ -21,22 +21,22 @@
     "sha256": "a49077144c15aaa7c70ba14b7c295405c3efd2a86e9e0b67303100db2971151e"
   },
   "tv": {
-    "version": "3.12.55",
-    "versionCode": 205,
+    "version": "3.12.56",
+    "versionCode": 206,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "🛡️ Crash guard: dead black screens after renderer crashes now auto-recover to next server",
-      "⏱️ Stuck loading screens now fail over to the next server instead of hanging forever",
-      "🧠 Live channels no longer burn CPU in an infinite retry loop on dead sources",
-      "🖼️ Poster cache no longer wiped every time you press Home — faster grid after returning",
-      "🔒 More security + memory hardening"
+      "▶️ Continue Watching is safe now — switching servers mid-watch no longer restarts the episode from 0",
+      "📺 Series binge mode keeps auto-playing every next episode, not just the first",
+      "⏯️ Blocked autoplay no longer leaves an infinite spinner — recovers instantly",
+      "🔗 Some direct streams that failed to load now play fine (CORS fix)",
+      "💥 Failed direct streams fail over to the next server instantly instead of hanging"
     ],
     "size_mb": "6.9 MB",
-    "sha256": "fa89fe5395449aea7b6aacaf1e75eeba532ac6aff8cccb82cca6cf85990981d5"
+    "sha256": "0147fb1c5f4ee2f2d8265027f39818a44244fe93bea0efab45542484d95ac870"
   },
   "android_tv": {
     "version": "3.12.51",

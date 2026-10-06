@@ -257,10 +257,21 @@ export function TVPlayer({
         resumePositionRef.current = progress.currentTime;
       }
     } catch {}
+    // v3.12.56 FIX: binge auto-advance fired exactly once per app-session and
+    // then silently died: bingeFiredRef was set true when the countdown fired
+    // and NEVER reset on episode change (the guard then blocked every later
+    // countdown). Reset both the ref and any in-flight countdown when the
+    // episode changes.
+    bingeFiredRef.current = false;
+    if (bingeCountdownRef.current) {
+      clearInterval(bingeCountdownRef.current);
+      bingeCountdownRef.current = null;
+    }
+    setBingeCountdown(null);
     return () => {
       if (osdTimerRef.current) clearTimeout(osdTimerRef.current);
     };
-  }, [item, pingOsd]);
+  }, [item, currentEpisodeIndex, pingOsd]);
 
   // BINGE: countdown ticker — fires next episode at 0
   useEffect(() => {
@@ -570,7 +581,23 @@ export function TVPlayer({
               resumePositionRef.current = null;
             }
           }).catch(err => {
-            console.warn('TV Autoplay notification:', err);
+            // v3.12.56 FIX: autoplay-blocked start was a SILENT dead end —
+            // the catch only logged, isBuffering stayed true forever, and
+            // neither watchdog escalates while readyState>=3-paused. Muted
+            // autoplay is always allowed: retry muted; if even that fails,
+            // this app runs inside Android where the native player has no
+            // autoplay policy — hand off instead of spinning forever.
+            if (err && (err.name === 'NotAllowedError' || err.name === 'AbortError')) {
+              try { video.muted = true; } catch {}
+              video.play().then(() => {
+                setIsPlaying(true);
+                setIsBuffering(false);
+              }).catch(() => {
+                if (!handOffToNative('Starting in hardware player...')) {
+                  handleFailover('Could not start playback');
+                }
+              });
+            }
           });
         });
   
@@ -667,15 +694,37 @@ export function TVPlayer({
           try { video.currentTime = resumePositionRef.current; } catch {}
           resumePositionRef.current = null;
         }
-      }).catch(err => console.warn(err));
+      }).catch(err => {
+        // v3.12.56: same autoplay dead-end guard as the hls branch.
+        if (err && (err.name === 'NotAllowedError' || err.name === 'AbortError')) {
+          try { video.muted = true; } catch {}
+          video.play().then(() => {
+            setIsPlaying(true);
+            setIsBuffering(false);
+          }).catch(() => {
+            if (!handOffToNative('Starting in hardware player...')) {
+              handleFailover('Could not start playback');
+            }
+          });
+        } else {
+          console.warn('Direct play error:', err);
+        }
+      });
     }
 
     // Periodic progress save (every 5s) so Continue Watching is accurate
     // even if the app crashes or power dies mid-watch.
     progressSaverRef.current = setInterval(() => {
       try {
-        if (video.currentTime > 5 && video.duration > 0 && !isLive) {
-          saveProgress(item, video.currentTime, video.duration);
+        // v3.12.56 FIX: (a) never save while PAUSED (used to rewrite history
+        // + trigger a full App re-render every 5s even when nothing played);
+        // (b) never save a REGRESSED position (a fresh failover pipeline used
+        // to overwrite a 40-min resume with ~0 before the seek completed).
+        if (video.paused) return;
+        const pos = video.currentTime;
+        const floorPos = (resumePositionRef.current ?? 0) - 1;
+        if (pos > 5 && video.duration > 0 && !isLive && pos >= floorPos) {
+          saveProgress(item, pos, video.duration);
         }
       } catch {}
     }, 5000);
@@ -724,6 +773,16 @@ export function TVPlayer({
       if (stallWatchdogRef.current) { clearInterval(stallWatchdogRef.current); stallWatchdogRef.current = null; }
       if (blackScreenWatchdogRef.current) { clearInterval(blackScreenWatchdogRef.current); blackScreenWatchdogRef.current = null; }
       if (embedWatchdogRef.current) { clearTimeout(embedWatchdogRef.current); embedWatchdogRef.current = null; }
+      // v3.12.56 FIX (resume-point preservation, was real DATA LOSS): this
+      // teardown runs on every streamUrl change — a mid-watch server failover
+      // or manual server switch destroyed the resume point: new pipeline
+      // started at 0, and 5s later progressSaver OVERWROTE a 40-minute
+      // Continue-Watching entry with ~0. Stash the current position before
+      // tearing down so the new pipeline resumes exactly here.
+      const v = videoRef.current;
+      if (v && v.currentTime > 5 && v.duration > 0 && !isLive) {
+        resumePositionRef.current = v.currentTime;
+      }
       // v3.12.37: CRITICAL — progressSaverRef and bingeCountdownRef were never
       // cleared here, causing interval accumulation that exhausted Fire TV RAM.
       if (progressSaverRef.current) { clearInterval(progressSaverRef.current); progressSaverRef.current = null; }
@@ -917,7 +976,6 @@ export function TVPlayer({
         className="tv-player-video"
         playsInline
         autoPlay
-        crossOrigin="anonymous"
         style={videoStyle}
         onWaiting={() => setIsBuffering(true)}
         onPlaying={() => {
@@ -926,6 +984,14 @@ export function TVPlayer({
         }}
         onCanPlay={() => setIsBuffering(false)}
         onTimeUpdate={handleTimeUpdate}
+        // v3.12.56 FIX: (a) crossOrigin="anonymous" was FORCING a CORS check
+        // on direct <video> sources — mirrors that don't send
+        // Access-Control-Allow-Origin (most free-streaming CDNs) failed to
+        // load where they'd play fine without the attribute; hls.js never
+        // needed it (it fetches via XHR). (b) There was NO onError at all on
+        // the video element: a failed direct stream sat in a spinner until
+        // the 8s stall watchdog detour. Fail over immediately now.
+        onError={() => handleFailover('Direct stream failed')}
       />
 
       {/* Buffering Spinner */}
