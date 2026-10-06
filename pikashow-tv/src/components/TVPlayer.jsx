@@ -727,7 +727,11 @@ export function TVPlayer({
           saveProgress(item, pos, video.duration);
         }
       } catch {}
-    }, 5000);
+    }, 30000); // v3.12.58: was 5s. Every tick stringified the FULL history
+    // (~120KB: whole item objects with players/descriptions/posters), fired
+    // the update event, reparsed history, and re-rendered Home — every 5s
+    // while playing, on the Fire TV main thread. 30s keeps crash-safety
+    // without the churn (close/pause also save through other paths).
 
     // Black Screen Detection & Auto-Recovery Watchdog:
     // If audio is progressing (currentTime advancing) but the video plane never

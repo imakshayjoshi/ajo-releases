@@ -744,14 +744,10 @@ export class CastSyncEngine {
       } catch {}
     }
 
-    // 3. Fallback POST to ntfy.sh mirror
-    if (topic && typeof fetch !== 'undefined') {
-      fetch(`https://ntfy.sh/${topic}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify(packet)
-      }).catch(() => {});
-    }
+    // v3.12.50: removed the old ntfy.sh POST "fallback" — nothing ever subscribed
+    // to that topic, so it only ever leaked room/pairing codes to a public mirror
+    // and doubled outbound traffic for zero delivery. MQTT + BroadcastChannel are
+    // the real transports; stale messages are retried via the heartbeat/pair loops.
 
     return true;
   }
@@ -852,6 +848,24 @@ export class CastSyncEngine {
     }
 
     if (this.role === 'tv' && msg.type === 'REMOTE_COMMAND') {
+      // v3.12.50 SELF-HEAL: after a TV reboot (or cleared phone storage) the two
+      // sides can briefly disagree about the session while the phone keeps the
+      // correct room code. The room code is the actual shared secret — PAIR_REQUEST
+      // auto-accepts on it anyway — so adopt the phone's session instead of
+      // silently dropping every remote key for the 30s heartbeat-retry window.
+      if (!this.session && msg.senderDeviceId) {
+        const healedSession = {
+          sessionId: msg.sessionId || `SES-${Date.now()}-AUTO`,
+          phoneDeviceId: msg.senderDeviceId,
+          phoneName: msg.phoneName || 'AJO Phone',
+          tvDeviceId: this.deviceId,
+          tvName: this.deviceName,
+          pairedAt: Date.now()
+        };
+        this.session = healedSession;
+        setStoredSession(healedSession);
+        this.setConnectionState(CONNECTION_STATES.CONNECTED);
+      }
       const isApproved = this.session && (msg.sessionId === this.session.sessionId || msg.senderDeviceId === this.session.phoneDeviceId);
       if (!isApproved) {
         this.broadcast({
@@ -871,6 +885,25 @@ export class CastSyncEngine {
         reason: null,
         timestamp: Date.now()
       });
+    }
+
+    // v3.12.58 SECURITY: every session-bearing message type is now gated on
+    // the TV side — previously ONLY REMOTE_COMMAND checked the session.
+    // PLAY_MEDIA / NAV_TAB / WATCHLIST_SYNC fell straight through to
+    // listeners, so ANY device on the public MQTT topic could cast arbitrary
+    // URLs to the TV, switch tabs, or rewrite the watchlist with no pairing
+    // at all. (The topic name is the room code — the only shared secret —
+    // so this is defense-in-depth: an attacker with the room code can still
+    // pair, but drive-by broadcasts from other topics/devices can't act.)
+    if (this.role === 'tv') {
+      const sessionBearing = msg.type === 'PLAY_MEDIA' || msg.type === 'NAV_TAB' || msg.type === 'WATCHLIST_SYNC';
+      if (sessionBearing) {
+        const approved = this.session
+          && (msg.sessionId === this.session.sessionId || msg.senderDeviceId === this.session.phoneDeviceId);
+        if (!approved) {
+          return; // silently drop: no listener ever sees the forged message
+        }
+      }
     }
 
     for (const listener of this.listeners) {
@@ -897,6 +930,11 @@ export class CastSyncEngine {
 
   destroy() {
     clearTimeout(this.reconnectTimer);
+    // v3.12.58 FIX: heartbeat/pairing timers were never cleared — after
+    // destroy() the socket was gone but timers kept firing into dead state
+    // while connectionState still said CONNECTED.
+    if (this.heartbeatTimer) { clearInterval(this.heartbeatTimer); this.heartbeatTimer = null; }
+    if (this.pairingInterval) { clearInterval(this.pairingInterval); this.pairingInterval = null; }
     if (this.ws) {
       try { this.ws.close(); } catch {}
       this.ws = null;
@@ -956,5 +994,44 @@ export function ensureTvRole(forcedRoom) {
     castEngine.connect();
   }
   return castEngine;
+}
+
+// ---------------------------------------------------------------------------
+// v3.12.50 REMOTE KEY SYNTHESIS
+// The phone remote also sends DPAD_* / CHANNEL_* keys that used to hit the TV
+// switch's `default:` arm and vanish — the on-screen D-pad, Home, and channel
+// zap buttons appeared dead even though the command reached the TV. These
+// helpers re-publish them as real KeyboardEvents so the existing spatial
+// navigation hook and TVPlayer key handlers process them unchanged.
+// ---------------------------------------------------------------------------
+export function remoteCommandToKeyboard(command) {
+  switch (String(command || '').toUpperCase()) {
+    case 'DPAD_UP': return { key: 'ArrowUp', keyCode: 38, code: 'ArrowUp' };
+    case 'DPAD_DOWN': return { key: 'ArrowDown', keyCode: 40, code: 'ArrowDown' };
+    case 'DPAD_LEFT': return { key: 'ArrowLeft', keyCode: 37, code: 'ArrowLeft' };
+    case 'DPAD_RIGHT': return { key: 'ArrowRight', keyCode: 39, code: 'ArrowRight' };
+    case 'DPAD_CENTER': return { key: 'Enter', keyCode: 13, code: 'Enter' };
+    case 'CHANNEL_UP': return { key: 'ChannelUp', keyCode: 166, code: 'ChannelUp' };
+    case 'CHANNEL_DOWN': return { key: 'ChannelDown', keyCode: 167, code: 'ChannelDown' };
+    case 'HOME': return { key: 'Home', keyCode: 3, code: 'Home' };
+    default: return null;
+  }
+}
+
+export function injectRemoteCommandKey(command) {
+  const spec = remoteCommandToKeyboard(command);
+  if (!spec || typeof window === 'undefined' || typeof window.KeyboardEvent !== 'function') return false;
+  try {
+    for (const phase of ['keydown', 'keyup']) {
+      const ev = new window.KeyboardEvent(phase, { key: spec.key, code: spec.code, bubbles: true, cancelable: true });
+      // Legacy keyCode/which are read-only on the prototype — shadow them per event.
+      try { Object.defineProperty(ev, 'keyCode', { get: () => spec.keyCode }); } catch (_) {}
+      try { Object.defineProperty(ev, 'which', { get: () => spec.keyCode }); } catch (_) {}
+      window.dispatchEvent(ev);
+    }
+    return true;
+  } catch (_) {
+    return false;
+  }
 }
 

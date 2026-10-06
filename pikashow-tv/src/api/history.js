@@ -47,7 +47,25 @@ export function saveProgress(item, currentTime, duration) {
     const existingIndex = history.findIndex(h => matchMediaItem(h, item));
 
     const historyEntry = {
-      ...item,
+      // v3.12.58: slim entry. The old code spread the ENTIRE item object —
+      // players arrays, mirror lists, descriptions, backdrop URLs — into
+      // every history row: 30 entries ≈ 120KB serialized on every save and
+      // re-parsed by every history read. Continue Watching only needs these
+      // fields to render + relaunch; generateUniversalServers rebuilds the
+      // mirror list from ids at play time anyway.
+      id: item.id,
+      tmdb_id: item.tmdb_id,
+      imdb_id: item.imdb_id,
+      type: item.type,
+      category: item.category,
+      title: item.title,
+      title_en: item.title_en,
+      name: item.name,
+      series_title: item.series_title,
+      poster_url: item.poster_url,
+      poster: item.poster,
+      season_number: item.season_number,
+      episode_number: item.episode_number,
       currentTime: Math.floor(currentTime),
       duration: Math.floor(duration),
       percentage,

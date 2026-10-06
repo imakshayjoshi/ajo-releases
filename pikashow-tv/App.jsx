@@ -504,6 +504,20 @@ export default function App() {
     return bollywoodItems[0] || hollywoodItems[0] || null;
   }, [bollywoodItems, hollywoodItems]);
 
+  // v3.12.58: true offline state for Home — every catalog source failed
+  // (used to render a blank Home with no explanation or retry).
+  const homeAllEmpty = useMemo(() => (
+    !loading
+    && bollywoodItems.length === 0
+    && hollywoodItems.length === 0
+    && seriesItems.length === 0
+    && tmdbMovies.length === 0
+    && tmdbSeries.length === 0
+    && tmdbTrending.length === 0
+    && nowPlaying.length === 0
+    && continueWatching.length === 0
+  ), [loading, bollywoodItems, hollywoodItems, seriesItems, tmdbMovies, tmdbSeries, tmdbTrending, nowPlaying, continueWatching]);
+
   // v3.9.0 PERF: removed YouTube trailer iframe from hero banner.
   // On Fire TV Stick 4K (1.5GB RAM) the iframe consumed ~150MB (Chromium
   // sub-renderer), competed for GPU with the WebView, and broke D-pad focus.
@@ -600,6 +614,25 @@ export default function App() {
           <div className="tv-center-state">
             <div className="tv-spinner" />
             <p style={{ fontWeight: 700, marginTop: 16 }}>Loading Catalog & Live Channels...</p>
+          </div>
+        ) : activeTab === 'home' && homeAllEmpty ? (
+          // v3.12.58 FIX: offline first-run used to render a blank Home —
+          // no rails, no message, no retry (only the Live tab had one). If
+          // every catalog source failed, say so and offer the retry.
+          <div className="tv-empty-state" style={{ textAlign: 'center', marginTop: 80 }}>
+            <p style={{ color: '#9aa3b2', fontSize: 19, marginBottom: 20 }}>
+              Couldn't load content — check your internet connection.
+            </p>
+            <button
+              className="tv-retry-btn"
+              style={{
+                padding: '12px 34px', fontSize: 18, fontWeight: 700,
+                background: '#e50914', color: '#fff', borderRadius: 8, border: 'none', cursor: 'pointer'
+              }}
+              onClick={() => { loadData(); }}
+            >
+              ↻ Retry
+            </button>
           </div>
         ) : (
           <>

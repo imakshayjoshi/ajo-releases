@@ -15,22 +15,22 @@ import { toggleFavoriteChannel, isFavoriteChannel } from '../api/history';
 export function EPGGuideView({ channels = [], onSelectChannel, onFocusItem }) {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchFilter, setSearchFilter] = useState('');
-  const [channelData, setChannelData] = useState([]);
   const [favRefreshCount, setFavRefreshCount] = useState(0);
+  const [visibleCount, setVisibleCount] = useState(25);
   const [currentTime, setCurrentTime] = useState(new Date());
   const clockRef = useRef(null);
 
   const categories = [
     '⭐ Favorites',
     'All', 
-    'Sports', 
     'Entertainment',
+    'Marathi (मराठी)',
     'Movies', 
+    'Sports', 
     'News', 
     'Kids', 
     'Music', 
-    'Documentary', 
-    'Regional'
+    'Documentary'
   ];
 
   // Update clock every 30 seconds to keep Now/Next fresh
@@ -39,20 +39,19 @@ export function EPGGuideView({ channels = [], onSelectChannel, onFocusItem }) {
     return () => clearInterval(clockRef.current);
   }, []);
 
-  useEffect(() => {
-    getIPTVChannels().then(chs => {
-      const sourceList = chs && chs.length > 0 ? chs : (channels || []);
-      const processed = sourceList.map((ch, idx) => {
-        const epg = getCurrentAndNextProgram(ch);
-        return {
-          ...ch,
-          channelNumber: 100 + idx + 1,
-          epg: epg,
-          is_fav: isFavoriteChannel(ch)
-        };
-      });
-      setChannelData(processed);
-    });
+  const channelData = useMemo(() => {
+    const list = channels && channels.length > 0 ? channels : [];
+    return list.map((ch, idx) => ({
+      ...ch,
+      channelNumber: 100 + idx + 1,
+      // v3.12.58 FIX: epg is no longer baked in here. The old memo deps were
+      // [channels, favRefreshCount] — the 30s clock updated ONLY the header
+      // time, so NOW/NEXT and progress % froze at open and never moved until
+      // the channel list changed. Each visible row now calls
+      // getCurrentAndNextProgram(ch) at render time (only ~25 rows render),
+      // so the guide stays live with the clock.
+      is_fav: isFavoriteChannel(ch)
+    }));
   }, [channels, favRefreshCount]);
 
   const handleToggleFav = (e, ch) => {
@@ -78,17 +77,25 @@ export function EPGGuideView({ channels = [], onSelectChannel, onFocusItem }) {
       const title = (ch.title || '').toLowerCase();
       const target = selectedCategory.toLowerCase();
 
+      if (target.includes('marathi')) return cat.includes('marathi') || title.includes('marathi') || title.includes('majha') || title.includes('taas') || title.includes('jhakaas') || title.includes('lokmat') || title.includes('saam') || title.includes('pravah') || title.includes('sahyadri');
       if (target === 'sports') return cat.includes('sport') || title.includes('sport') || title.includes('cricket') || title.includes('willow') || title.includes('ten') || title.includes('fancode');
       if (target === 'news') return cat.includes('news') || title.includes('news') || title.includes('tak') || title.includes('abp') || title.includes('republic') || title.includes('cnn');
       if (target === 'documentary') return cat.includes('docu') || title.includes('docu') || title.includes('discovery') || title.includes('nat geo') || title.includes('docubay');
       if (target === 'movies') return cat.includes('movie') || title.includes('cinema') || title.includes('max') || title.includes('film') || title.includes('goldmines');
       if (target === 'music') return cat.includes('music') || title.includes('music') || title.includes('9x') || title.includes('mtv') || title.includes('zing');
       if (target === 'kids') return cat.includes('kid') || cat.includes('anim') || title.includes('cartoon') || title.includes('disney') || title.includes('nick');
-      if (target === 'regional') return cat.includes('regional') || title.includes('pravah') || title.includes('marathi') || title.includes('maa') || title.includes('sun');
       if (target === 'entertainment') return cat.includes('entertainment') || title.includes('star') || title.includes('sony') || title.includes('zee') || title.includes('colors');
       return true;
     });
-  }, [channelData, selectedCategory, searchFilter, favRefreshCount]);
+  }, [channelData, selectedCategory, searchFilter]);
+
+  useEffect(() => {
+    setVisibleCount(25);
+  }, [selectedCategory, searchFilter]);
+
+  const visibleChannels = useMemo(() => {
+    return filteredChannels.slice(0, visibleCount);
+  }, [filteredChannels, visibleCount]);
 
   const formatClock = (d) => {
     let h = d.getHours();
@@ -182,10 +189,13 @@ export function EPGGuideView({ channels = [], onSelectChannel, onFocusItem }) {
             </p>
           </div>
         ) : (
-          filteredChannels.map((ch, idx) => {
+          visibleChannels.map((ch, idx) => {
             const isFav = isFavoriteChannel(ch);
-            const currentProg = ch.epg?.current;
-            const nextProg = ch.epg?.next;
+            // v3.12.58: computed per visible row at render time so NOW/NEXT
+            // and progress track the 30s clock instead of freezing at open.
+            const epgNow = getCurrentAndNextProgram(ch);
+            const currentProg = epgNow?.current;
+            const nextProg = epgNow?.next;
             const logo = ch.logo || ch.poster_url || ch.poster;
             const progress = currentProg?.progressPercent || 0;
 
@@ -335,6 +345,27 @@ export function EPGGuideView({ channels = [], onSelectChannel, onFocusItem }) {
           })
         )}
       </div>
+
+      {visibleCount < filteredChannels.length && (
+        <div style={{ textAlign: 'center', margin: '24px 0 40px 0' }}>
+          <button
+            tabIndex={0}
+            className="tv-btn-secondary tv-cat-btn"
+            onClick={() => setVisibleCount(prev => Math.min(prev + 25, filteredChannels.length))}
+            style={{
+              padding: '12px 28px',
+              fontSize: '14px',
+              fontWeight: 800,
+              borderRadius: '24px',
+              background: 'rgba(56, 189, 248, 0.15)',
+              border: '1px solid #38bdf8',
+              color: '#38bdf8'
+            }}
+          >
+            Show More Channels ({filteredChannels.length - visibleCount} remaining)
+          </button>
+        </div>
+      )}
     </div>
   );
 }

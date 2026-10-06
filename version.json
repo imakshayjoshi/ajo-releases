@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "version": "3.12.57",
-  "versionCode": 207,
+  "version": "3.12.58",
+  "versionCode": 208,
   "releaseDate": "2026-10-07",
   "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
   "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
@@ -21,22 +21,21 @@
     "sha256": "a49077144c15aaa7c70ba14b7c295405c3efd2a86e9e0b67303100db2971151e"
   },
   "tv": {
-    "version": "3.12.57",
-    "versionCode": 207,
+    "version": "3.12.58",
+    "versionCode": 208,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "⚡ Remote navigation is dramatically faster — the app no longer rescans every card on each keypress",
-      "🚀 App opens instantly with rails appearing as they load, instead of waiting on the slowest server",
-      "🎬 Movies and episodes start faster — server health check and stream lookup now run in parallel",
-      "🖼️ Posters no longer show the wrong image or get stuck after browsing categories",
-      "🔍 Search results can no longer be overwritten by a slower older request"
+      "🔒 Cast security hardened — only your paired phone can play, navigate, or sync",
+      "📺 TV Guide NOW/NEXT actually updates now — programs and progress were frozen at open",
+      "💾 Smoother playback — history saves no longer re-render the whole app while watching",
+      "📶 Offline shows a clear message + Retry instead of a blank home screen"
     ],
     "size_mb": "6.9 MB",
-    "sha256": "d14116e3bed2124d04bcae35c307191285e4113eae313325a618f8407e5554fd"
+    "sha256": "af05aa446a9e55a8e7c8ea61a95f71379d620f87716bbb036c40c8e6b7ad2318"
   },
   "android_tv": {
     "version": "3.12.51",
