@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "version": "3.12.61",
-  "versionCode": 211,
+  "version": "3.12.62",
+  "versionCode": 212,
   "releaseDate": "2026-10-07",
   "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
   "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
@@ -25,22 +25,22 @@
     "releaseDate": "2026-10-07"
   },
   "tv": {
-    "version": "3.12.61",
-    "versionCode": 211,
+    "version": "3.12.62",
+    "versionCode": 212,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "🛡️ Website redirect fix: the player can no longer be hijacked to google.com or ad portals",
-      "📴 All-servers-dead now shows a Retry screen instead of a black screen",
-      "🚀 Failed mirrors are remembered and skipped automatically",
-      "📡 Live channels: blurry SD server is auto-skipped for the HD one",
-      "📈 Fix silent crash of the anonymous crash/telemetry reporter"
+      "🎛️ D-pad seeking fixed — left/right arrows seek in the player instead of jumping to the bottom control bar",
+      "🎬 2,422-title Movibox catalog — direct HD MP4 streams, no embeds, no ads",
+      "📚 Full TMDB catalog back — routed through our own server (fixes 'only a few titles showing')",
+      "⌨️ Search rebuilt: on-screen QWERTY keyboard, recent searches, results as you type",
+      "📈 Streaming servers ranked by real reliability learned from your watch history"
     ],
-    "size_mb": "6.9 MB",
-    "sha256": "18f6df06f4c3c50521b9cd6cca0f8d0bbad8fc837b1ef741c02581ab0500abc5"
+    "size_mb": "7.0 MB",
+    "sha256": "9690f61e50a217d77b8c64f3b7441b210d8b294d5fe9905371226dd68463f364"
   },
   "android_tv": {
     "version": "3.12.52",
