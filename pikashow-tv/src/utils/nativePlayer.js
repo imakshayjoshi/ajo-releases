@@ -30,6 +30,7 @@ const EMBED_HOST_PATTERNS = [
   /vidjoy\.pro/i,
   /vidsrc\.pro/i,
   /nontongo\.win/i,
+  /videasy\.net/i,
   /vidsrc/i,
   /rivestream\.live/i,
   /apiplayer\.ru/i,
@@ -38,7 +39,7 @@ const EMBED_HOST_PATTERNS = [
   /\/embed(\/|\?|$)/i,
 ];
 
-// v3.12.20: expanded dead host list based on live testing Aug 2026
+// v3.12.22: expanded dead host list based on live testing Sep 2026
 const DEAD_HOST_PATTERNS = [
   /mainsstreaming\.info/i,
   /localhost/i,
@@ -52,6 +53,7 @@ const DEAD_HOST_PATTERNS = [
   /vidsrc\.xyz/i,
   /vidsrc\.to/i,
   /vidsrc\.io/i,
+  /vidsrc\.in/i,
   /v2\.vidsrc\.me/i,
   /smashystream\.com/i,
   /apiplayer\.ru/i,
@@ -192,15 +194,6 @@ export function isNativePlayableUrl(url) {
   for (const pattern of DEAD_HOST_PATTERNS) {
     if (pattern.test(url)) return false;
   }
-  // v3.12.35 FIX (test C1): embed/iframe pages must NEVER reach ExoPlayer —
-  // it tries to decode an HTML page and dies with a source error. Reject the
-  // embed host list AND generic /embed/ + /play/ path shapes (except real
-  // media extensions), not just the dead-host list.
-  for (const pattern of EMBED_HOST_PATTERNS) {
-    if (pattern.test(url)) return false;
-  }
-  if (/\/embed(\/|\?|$)/i.test(url)) return false;
-  if (/\/play(\/|\?|$)/i.test(url) && !DIRECT_MEDIA_EXT_RE.test(url)) return false;
   return true;
 }
 

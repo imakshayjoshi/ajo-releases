@@ -13,9 +13,7 @@ const EMBED_PATTERNS = [
   /autoembed\.cc/i,
   /2embed\.(cc|skin)/i,
   /vidjoy\.pro/i,
-  /vidsrc\.pro/i,
-  /nontongo\.win/i,
-  /vidsrc\.in/i,
+  /videasy\.(net|to)/i,
   /vidsrc\.net/i,
   /vidsrc\.cc/i,
   /vidsrc\.xyz/i,
@@ -90,7 +88,7 @@ function buildApiPlayerMirror(item) {
   };
 }
 
-// v3.12.20: expanded dead host list based on live testing Aug 2026
+// v3.12.22: expanded dead host list based on live testing Sep 2026
 const DEAD_HOSTS = [
   /mainsstreaming\.info/i, /localhost/i, /127\.0\.0\.1/i, /0\.0\.0\.0/i,
   /moviesapi\.club/i, /embed\.su/i, /moviesapi\.online/i,
@@ -99,9 +97,11 @@ const DEAD_HOSTS = [
   /vidsrc\.xyz/i,             // timeout / ECONNRESET
   /vidsrc\.to/i,              // ECONNRESET
   /vidsrc\.io/i,              // ECONNRESET
+  /vidsrc\.in/i,              // timeout 000 Sep 2026
+  /vidsrc\.pro/i,             // redirects to dead embed.su
+  /nontongo\.win/i,           // 403 Forbidden
   /v2\.vidsrc\.me/i,          // ECONNRESET
   /smashystream\.com/i,       // TLS cert error
-  /apiplayer\.ru/i,           // 502 Bad Gateway
   /multiembed\.mov/i,         // 403
   /vidbinge\.dev/i,           // TLS cert error
   /sus\.stream/i,             // ENOTFOUND
@@ -151,46 +151,78 @@ export function generateUniversalServers(item, episodeInfo = null) {
   if (item.url) raw.push({ url: item.url, source: 'm3u8', quality: item.quality, name: item.server_name || 'Direct Stream' });
 
   const imdbId = extractImdbId(item);
-  let tmdbId = item.tmdb_id || (typeof item.id === 'number' && item.id > 0 ? item.id : null);
+  let tmdbId = item.tmdb_id || episodeInfo?.tmdb_id || null;
+  // v3.12.50: 'tmdb-ep-<seriesId>-<season>-<episode>' carries the episode position too.
+  // Previously only the series id was mined, so opening an episode item directly (no
+  // season/episode fields anywhere) silently fell back to S1E1 — the "S2E5 plays S1E1" bug.
+  let idSeason = null;
+  let idEpisode = null;
+  const parseEpisodeId = (id) => {
+    const parts = String(id).split('-');
+    if (parts[2] && /^\d+$/.test(parts[2]) && !tmdbId) tmdbId = Number(parts[2]);
+    if (parts[3] && /^\d+$/.test(parts[3])) idSeason = Number(parts[3]);
+    if (parts[4] && /^\d+$/.test(parts[4])) idEpisode = Number(parts[4]);
+  };
   if (!tmdbId && typeof item.id === 'string') {
-    if (/^\d+$/.test(item.id)) {
-      tmdbId = Number(item.id);
+    if (item.id.startsWith('tmdb-ep-')) {
+      parseEpisodeId(item.id);
     } else if (item.id.startsWith('tmdb-')) {
       const parts = item.id.split('-');
       const candidate = parts[parts.length - 1];
       if (/^\d+$/.test(candidate)) tmdbId = Number(candidate);
     }
   }
+  if (episodeInfo && typeof episodeInfo.id === 'string' && episodeInfo.id.startsWith('tmdb-ep-')) {
+    parseEpisodeId(episodeInfo.id);
+  }
 
   const isSeries = item.category === 'serials'
     || item.type === 'series'
     || item.type === 'serial'
     || item.type === 'tv'
-    || Boolean(episodeInfo);
+    || Boolean(episodeInfo)
+    || Boolean(item.season_number)
+    || Boolean(item.episode_number)
+    || (typeof item.id === 'string' && item.id.startsWith('tmdb-ep-'));
 
-  const season = episodeInfo?.season_num || episodeInfo?.season || 1;
-  const episode = episodeInfo?.episode_num || episodeInfo?.episode || 1;
+  const season = episodeInfo?.season_number
+    || episodeInfo?.season_num
+    || episodeInfo?.season
+    || item.season_number
+    || item.season_num
+    || item.season
+    || idSeason
+    || 1;
+
+  const episode = episodeInfo?.episode_number
+    || episodeInfo?.episode_num
+    || episodeInfo?.episode
+    || item.episode_number
+    || item.episode_num
+    || item.episode
+    || idEpisode
+    || 1;
 
   const targetId = tmdbId || imdbId;
   if (targetId) {
     if (isSeries) {
-      // v3.12.20: reordered series servers — confirmed-alive first, dead removed.
       if (tmdbId) {
+        // 🇮🇳 Multi-Audio & High-Speed Series Servers (AutoEmbed & VidSrc PM first — bypasses VidLink Cloudflare 522 timeout)
         raw.push({
-          url: `https://vidlink.pro/tv/${tmdbId}/${season}/${episode}`,
-          name: 'Server 1: VidLink (Fast 1080p)',
+          url: `https://autoembed.co/tv/tmdb/${tmdbId}-${season}-${episode}?lang=hi`,
+          name: 'Server 1: AutoEmbed (🇮🇳 Hindi Dubbed & Multi / Fast)',
           source: 'embed',
           quality: '1080p'
         });
         raw.push({
           url: `https://vidsrc.pm/embed/tv/${tmdbId}/${season}/${episode}`,
-          name: 'Server 2: VidSrc PM (Fast)',
+          name: 'Server 2: VidSrc PM (⚡ Ultra Fast Mirror)',
           source: 'embed',
           quality: '1080p'
         });
         raw.push({
-          url: `https://autoembed.co/tv/tmdb/${tmdbId}?s=${season}&e=${episode}`,
-          name: 'Server 3: AutoEmbed (Reliable)',
+          url: `https://player.videasy.to/tv/${tmdbId}/${season}/${episode}`,
+          name: 'Server 3: Videasy (Ad-Free HD)',
           source: 'embed',
           quality: '1080p'
         });
@@ -201,26 +233,14 @@ export function generateUniversalServers(item, episodeInfo = null) {
           quality: '1080p'
         });
         raw.push({
-          url: `https://www.nontongo.win/embed/tv/${tmdbId}/${season}/${episode}`,
-          name: 'Server 5: NontonGo (Direct)',
-          source: 'embed',
-          quality: '1080p'
-        });
-        raw.push({
-          url: `https://vidsrc.in/embed/tv/${tmdbId}/${season}/${episode}`,
-          name: 'Server 6: VidSrc IN (HD)',
-          source: 'embed',
-          quality: '1080p'
-        });
-        raw.push({
           url: `https://2embed.skin/embed/tv/${tmdbId}/${season}/${episode}`,
-          name: 'Server 7: 2Embed Skin (Backup)',
+          name: 'Server 5: 2Embed Skin (Backup)',
           source: 'embed',
           quality: '1080p'
         });
         raw.push({
-          url: `https://vidsrc.pro/embed/tv/${tmdbId}/${season}/${episode}`,
-          name: 'Server 8: VidSrc Pro (Full HD)',
+          url: `https://vidlink.pro/tv/${tmdbId}/${season}/${episode}?primaryColor=38bdf8&autoplay=true&audio=hi`,
+          name: 'Server 6: VidLink Pro (Backup Mirror)',
           source: 'embed',
           quality: '1080p'
         });
@@ -228,35 +248,41 @@ export function generateUniversalServers(item, episodeInfo = null) {
       if (imdbId) {
         raw.push({
           url: `https://autoembed.co/tv/imdb/${imdbId}?s=${season}&e=${episode}`,
-          name: 'Server 9: AutoEmbed IMDb (No CF)',
+          name: 'Server 7: AutoEmbed IMDb (Primary)',
+          source: 'embed',
+          quality: '1080p'
+        });
+        raw.push({
+          url: `https://autoembed.co/tv/imdb/${imdbId}-${season}-${episode}?lang=hi`,
+          name: 'Server 8: AutoEmbed IMDb (🇮🇳 Hindi)',
           source: 'embed',
           quality: '1080p'
         });
         raw.push({
           url: `https://www.2embed.cc/embedtv/${imdbId}?s=${season}&e=${episode}`,
-          name: 'Server 10: 2Embed CC (Backup)',
+          name: 'Server 9: 2Embed CC (Backup)',
           source: 'embed',
           quality: '1080p'
         });
       }
     } else {
-      // v3.12.20: reordered movie servers — confirmed-alive first, dead removed.
       if (tmdbId) {
+        // 🇮🇳 Multi-Audio & High-Speed Movie Servers (AutoEmbed & VidSrc PM first — bypasses VidLink Cloudflare 522 timeout)
         raw.push({
-          url: `https://vidlink.pro/movie/${tmdbId}`,
-          name: 'Server 1: VidLink (Fast 1080p)',
+          url: `https://autoembed.co/movie/tmdb/${tmdbId}?lang=hi`,
+          name: 'Server 1: AutoEmbed (🇮🇳 Hindi Dubbed & Multi / Fast)',
           source: 'embed',
           quality: '1080p'
         });
         raw.push({
           url: `https://vidsrc.pm/embed/movie/${tmdbId}`,
-          name: 'Server 2: VidSrc PM (Fast)',
+          name: 'Server 2: VidSrc PM (⚡ Ultra Fast Original)',
           source: 'embed',
           quality: '1080p'
         });
         raw.push({
-          url: `https://autoembed.co/movie/tmdb/${tmdbId}`,
-          name: 'Server 3: AutoEmbed (Reliable)',
+          url: `https://player.videasy.to/movie/${tmdbId}`,
+          name: 'Server 3: Videasy (Ad-Free HD)',
           source: 'embed',
           quality: '1080p'
         });
@@ -267,40 +293,28 @@ export function generateUniversalServers(item, episodeInfo = null) {
           quality: '1080p'
         });
         raw.push({
-          url: `https://www.nontongo.win/embed/movie/${tmdbId}`,
-          name: 'Server 5: NontonGo (Direct)',
-          source: 'embed',
-          quality: '1080p'
-        });
-        raw.push({
-          url: `https://vidsrc.in/embed/movie/${tmdbId}`,
-          name: 'Server 6: VidSrc IN (HD)',
-          source: 'embed',
-          quality: '1080p'
-        });
-        raw.push({
           url: `https://2embed.skin/embed/movie/${tmdbId}`,
-          name: 'Server 7: 2Embed Skin (Backup)',
+          name: 'Server 5: 2Embed Skin (Backup)',
           source: 'embed',
           quality: '1080p'
         });
         raw.push({
-          url: `https://vidsrc.pro/embed/movie/${tmdbId}`,
-          name: 'Server 8: VidSrc Pro (Full HD)',
+          url: `https://vidlink.pro/movie/${tmdbId}?primaryColor=38bdf8&autoplay=true&audio=hi`,
+          name: 'Server 6: VidLink Pro (Backup Mirror)',
           source: 'embed',
           quality: '1080p'
         });
       }
       if (imdbId) {
         raw.push({
-          url: `https://autoembed.co/movie/imdb/${imdbId}`,
-          name: 'Server 9: AutoEmbed IMDb (No CF)',
+          url: `https://autoembed.co/movie/imdb/${imdbId}?lang=hi`,
+          name: 'Server 7: AutoEmbed IMDb (🇮🇳 Hindi)',
           source: 'embed',
           quality: '1080p'
         });
         raw.push({
-          url: `https://www.2embed.cc/embedmovie/${imdbId}`,
-          name: 'Server 10: 2Embed CC (Backup)',
+          url: `https://autoembed.co/movie/imdb/${imdbId}`,
+          name: 'Server 8: AutoEmbed IMDb (Original)',
           source: 'embed',
           quality: '1080p'
         });

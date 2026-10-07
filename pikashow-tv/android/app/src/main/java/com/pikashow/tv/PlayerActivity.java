@@ -220,6 +220,59 @@ public class PlayerActivity extends AppCompatActivity {
     private final List<String> serverQueue = new ArrayList<>();
     private int currentServerIdx = 0;
     private boolean isWebEmbedMode = false;
+    // v3.12.61: host of the embed page currently loaded in webVideoView —
+    // main-frame navigations to unrelated hosts (google.com etc.) are blocked.
+    private String currentEmbedHost = null;
+    // v3.12.61: one-shot low-quality auto-switch for live channels (see
+    // onRenderedFirstFrame). Never retries within the same playback session.
+    private boolean qualityAutoSwitchDone = false;
+    private static final long QUALITY_CHECK_DELAY_MS = 6000L;
+    private final Runnable qualityCheckRunnable = new Runnable() {
+        @Override
+        public void run() {
+            try {
+                if (player == null || !isLive || isWebEmbedMode) return;
+                androidx.media3.common.VideoSize vs = player.getVideoSize();
+                int h = vs == null ? 0 : vs.height;
+                Log.i(TAG, "LIVE_QUALITY_CHECK: decoded height=" + h + "px");
+                // Below 480p on a live mirror = the SD variant. Only hop if
+                // another server actually exists.
+                if (h > 0 && h < 480 && currentServerIdx + 1 < serverQueue.size()) {
+                    qualityAutoSwitchDone = true;
+                    String name = getServerDisplayName(serverQueue.get(currentServerIdx + 1), currentServerIdx + 1);
+                    Toast.makeText(PlayerActivity.this,
+                            "Low quality (" + h + "p) — switching to " + name, Toast.LENGTH_LONG).show();
+                    failoverToNextServer();
+                }
+            } catch (Throwable t) {
+                Log.w(TAG, "qualityCheck error: " + t.getMessage());
+            }
+        }
+    };
+
+    // v3.12.61: allow-list for main-frame navigations from the embed page.
+    // Includes every embed/stream host generateUniversalServers() can emit,
+    // their CDN/video subdomains, plus generic redirect/short-link hosts the
+    // providers use when resolving the actual stream. Suffix-matched, so
+    // s95.upstreamcdn.co matches upstreamcdn.co. When a genuinely new mirror
+    // is added to the app, add its host here (or it will be blocked at the
+    // main frame).
+    private static final String[] ALLOWED_NAV_HOSTS = {
+        "autoembed.co", "vidsrc.pm", "vidsrc.me", "vidsrc.net", "vidsrc.to",
+        "vidsrc.cc", "vidsrc.io", "vidsrc.in", "vidsrc.xyz", "v2.vidsrc.me",
+        "vidlink.pro", "vidjoy.pro", "videasy.net", "videasy.to", "2embed.cc",
+        "2embed.skin", "multiembed.mov", "vidmoly.net", "vidmoly.me",
+        "streamtape.com", "streamtape.net", "upstream.to", "upstreamcdn.co",
+        "dutragun.com", "filemoon.sx", "filemoon.to", "streamvid.net",
+        "streamlare.com", "voe.sx", "apivids.pw", "104.234.181.48.nip.io",
+        "vidssite.pro", "serieson.nu", "111movies.com", "111movies.to",
+        "play2.filmovie.to", "shopifivids.com", "mdy48tnv.com",
+        "apiplayer.ru", "elochkaigolochla.com",
+        // redirect/short-link hops providers use before the real host:
+        "popslinks.in", "akmaaiumm.org", "vidshare.tv",
+        // generic infrastructure that is NOT a portal redirect:
+        "cloudflare.com", "challenges.cloudflare.com"
+    };
 
     private boolean useTextureViewFallback = false;
     private boolean softwareDecoderRetryDone = false;
@@ -756,8 +809,40 @@ public class PlayerActivity extends AppCompatActivity {
                     Log.d(TAG, "AD_BLOCK: blocked navigation to " + url);
                     return true;
                 }
-                // Allow all legitimate navigations and redirects to video players/CDNs
+                // v3.12.61 FIX (the "app turned into google.com" bug): embed
+                // providers redirect the MAIN frame to portals (google.com,
+                // bing.com, casino/scam landing pages) either as popunders
+                // that survive window.open blocking via location.assign, or
+                // as "mirror dead" redirect chains. A player page should only
+                // ever navigate WITHIN the embed/streaming ecosystem.
+                // Allow-list by host: the embed we loaded, its CDN children,
+                // and common short-link/redirect hosts the providers use to
+                // resolve the real stream URL. Everything else: block + log.
+                if (!isAllowedMainFrameHost(url)) {
+                    Log.w(TAG, "NAV_BLOCK: blocked main-frame navigation to " + url);
+                    return true;
+                }
+                // Allow legitimate navigations and redirects to video players/CDNs
                 return false;
+            }
+
+            // v3.12.61: host gate for main-frame navigations. Sub-frames and
+            // resources are never gated (video CDNs live in iframes and XHR).
+            private boolean isAllowedMainFrameHost(String url) {
+                try {
+                    android.net.Uri uri = android.net.Uri.parse(url);
+                    String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase(java.util.Locale.US);
+                    // The current embed origin and any redirect already in
+                    // flight is always allowed.
+                    if (currentEmbedHost != null && host.endsWith(currentEmbedHost)) return true;
+                    // Known-good embed/stream ecosystem hosts (suffix match).
+                    for (String allowed : ALLOWED_NAV_HOSTS) {
+                        if (host.equals(allowed) || host.endsWith("." + allowed)) return true;
+                    }
+                    return false;
+                } catch (Throwable t) {
+                    return true; // parse failure: don't brick navigation
+                }
             }
 
             @Override
@@ -1394,6 +1479,8 @@ public class PlayerActivity extends AppCompatActivity {
     }
 
     private void playCurrentStream() {
+        // v3.12.61: quality auto-switch is one-shot per playback session.
+        qualityAutoSwitchDone = false;
         if (serverQueue.isEmpty()) {
             Toast.makeText(this, "No video stream available", Toast.LENGTH_SHORT).show();
             finish();
@@ -1496,6 +1583,15 @@ public class PlayerActivity extends AppCompatActivity {
 
     private void playInWebEngine(String url) {
         isWebEmbedMode = true;
+        // v3.12.61: remember which embed host we are on so main-frame
+        // navigations can be gated to the streaming ecosystem.
+        try {
+            android.net.Uri u = android.net.Uri.parse(url);
+            String h = u.getHost();
+            currentEmbedHost = h == null ? null : h.toLowerCase(java.util.Locale.US);
+        } catch (Throwable t) {
+            currentEmbedHost = null;
+        }
         releasePlayer();
         // v3.12.52: MainActivity paused when this activity is on top, so its
         // WifiLock is gone — hold our own while the embed WebView streams.
@@ -1996,6 +2092,16 @@ public class PlayerActivity extends AppCompatActivity {
             firstFrameRendered = true;
             uiHandler.removeCallbacks(firstFrameWatchdog);
             bufferSpinner.setVisibility(View.GONE);
+            // v3.12.61: low-quality auto-switch for LIVE channels. Some live
+            // mirrors serve 360p/480p while the next server carries true HD.
+            // The user should not have to know which server is the good one —
+            // measure the decoded size after ABR settles, and if this server
+            // never rises above SD, hop to the next one automatically (once
+            // per playback session so it can never ping-pong).
+            if (isLive && !isWebEmbedMode && !qualityAutoSwitchDone) {
+                uiHandler.removeCallbacks(qualityCheckRunnable);
+                uiHandler.postDelayed(qualityCheckRunnable, QUALITY_CHECK_DELAY_MS);
+            }
         }
 
         @Override

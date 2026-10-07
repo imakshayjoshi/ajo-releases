@@ -96,23 +96,38 @@ export function flush() {
     const q = getQueue();
     if (q.length === 0) return;
     const body = JSON.stringify({ events: q });
-    const ok = navigator.sendBeacon
-      ? navigator.sendBeacon(ENDPOINT, new Blob([body], { type: 'application/json' }))
-      : false;
-    if (!ok) {
-      fetch(ENDPOINT, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body,
-        keepalive: true,
-      }).catch(() => { /* keep queue for next flush */ return; });
-      // Optimistic: only clear on beacon (fire-and-forget) or fetch success
-      // would be ideal; keepalive fetch has no success hook pre-teardown, so
-      // clear optimistically too — worst case a few events resend.
+    // v3.12.61 FIX (silent analytics death): two stacked bugs.
+    //  (a) sendBeacon with a Blob typed 'application/json' is NOT a simple
+    //      request — it triggers a CORS preflight that the Amazon WebView on
+    //      Fire OS 6 either drops silently or blocks; the beacon never lands
+    //      and there is no error to catch. Same failure family as the v3.12.53
+    //      OTA CORS killer.
+    //  (b) The old code cleared the queue right after *queueing* the beacon,
+    //      so every event was destroyed whether or not it was ever delivered.
+    // Fix: beacon as text/plain (CORS-simple, still parsed as JSON server-side
+    // — we sniff the content type), and the queue is only cleared on a real
+    // 2xx response from the fetch path. Beacon is a last-resort fire-and-forget
+    // for page-teardown only.
+    const beaconOk = (typeof navigator.sendBeacon === 'function')
+      && navigator.sendBeacon(ENDPOINT, new Blob([body], { type: 'text/plain;charset=UTF-8' }));
+    if (beaconOk) {
+      // Fire-and-forget: no response handle exists. Accept the risk of a rare
+      // lost batch on teardown (the device also retries on next boot).
       persistQueue([]);
       return;
     }
-    persistQueue([]);
+    fetch(ENDPOINT, {
+      method: 'POST',
+      // text/plain keeps this a CORS-simple request: no preflight, works on
+      // every WebView including old Fire OS Chromium builds.
+      headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+      body,
+      keepalive: true,
+    }).then((res) => {
+      if (res && res.ok) {
+        persistQueue([]); // delivered — now it is safe to clear
+      } // non-2xx: keep the queue, retry on the next flush cycle
+    }).catch(() => { /* network down: keep queue for next flush */ });
   } catch {}
 }
 

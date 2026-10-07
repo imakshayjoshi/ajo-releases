@@ -24,6 +24,7 @@ export function MediaDetailsModal({ item, onClose, onStartPlayback }) {
   const [episodes, setEpisodes] = useState([]);
   const [loadingEpisodes, setLoadingEpisodes] = useState(false);
   const [selectedServer, setSelectedServer] = useState(0);
+  const [selectedSeason, setSelectedSeason] = useState(1);
 
   const title = typeof item.title_en === 'string' && item.title_en
     ? item.title_en
@@ -137,10 +138,39 @@ export function MediaDetailsModal({ item, onClose, onStartPlayback }) {
   }, []);
 
   const handlePlay = (episodeItem = null, episodeIndex = 0, specificServer = null) => {
-    const targetItem = episodeItem || item;
-    const srv = specificServer || (selectedServer < filteredServers.length ? (filteredServers[selectedServer] || null) : null);
+    const effectiveEpisode = episodeItem || (isSeries && episodes.length > 0 ? episodes[0] : null);
+    const effectiveIndex = episodeItem ? episodeIndex : 0;
+
+    let targetItem = item;
+    if (effectiveEpisode) {
+      const sNum = effectiveEpisode.season_number || effectiveEpisode.season_num || effectiveEpisode.season || selectedSeason || 1;
+      const eNum = effectiveEpisode.episode_number || effectiveEpisode.episode_num || effectiveEpisode.episode || (effectiveIndex + 1);
+      targetItem = {
+        ...item,
+        ...effectiveEpisode,
+        title: `${title} - S${sNum}E${eNum}${effectiveEpisode.name && !effectiveEpisode.name.startsWith('Episode') ? `: ${effectiveEpisode.name}` : ''}`,
+        series_title: title,
+        season: sNum,
+        season_number: sNum,
+        episode: eNum,
+        episode_number: eNum,
+        type: 'series',
+        category: item.category || 'serials',
+        tmdb_id: item.tmdb_id || effectiveEpisode.tmdb_id,
+        imdb_id: item.imdb_id || effectiveEpisode.imdb_id
+      };
+    }
+
+    let srv = specificServer;
+    if (!srv && effectiveEpisode) {
+      const epServers = generateUniversalServers(targetItem, effectiveEpisode);
+      srv = epServers[selectedServer] || epServers[0] || null;
+    } else if (!srv) {
+      srv = selectedServer < filteredServers.length ? (filteredServers[selectedServer] || null) : null;
+    }
+
     if (onStartPlayback) {
-      onStartPlayback(targetItem, srv, episodes, episodeIndex);
+      onStartPlayback(targetItem, srv, episodes, effectiveIndex);
     }
   };
 
@@ -226,18 +256,7 @@ export function MediaDetailsModal({ item, onClose, onStartPlayback }) {
             <button
               className="tv-btn-secondary"
               tabIndex={0}
-              onClick={() => {
-                const srv = filteredServers[selectedServer] || servers[0];
-                const streamUrl = srv?.url || srv?.src || '';
-                if (!streamUrl) return;
-                const fallbacks = filteredServers
-                  .filter((_, i) => i !== selectedServer)
-                  .map((s) => s?.url)
-                  .filter(Boolean);
-                if (!playInNativePlayer(streamUrl, title, false, fallbacks)) {
-                  handlePlay();
-                }
-              }}
+              onClick={() => handlePlay()}
               style={{ borderColor: 'rgba(56, 189, 248, 0.4)', color: '#38bdf8' }}
             >
               <Tv size={18} />
@@ -374,7 +393,7 @@ export function MediaDetailsModal({ item, onClose, onStartPlayback }) {
                     onClick={() => handlePlay(ep, idx)}
                     style={{ padding: '8px 16px', fontSize: '0.85rem', whiteSpace: 'nowrap' }}
                   >
-                    Episode {String(ep.episode || idx + 1)}
+                    Episode {String(ep.episode_number || ep.episode || idx + 1)}
                   </button>
                 ))}
               </div>

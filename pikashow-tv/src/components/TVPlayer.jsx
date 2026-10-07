@@ -13,9 +13,11 @@ import {
   AlertCircle,
   RefreshCw,
   Maximize,
-  Radio
+  Radio,
+  WifiOff
 } from 'lucide-react';
 import { generateUniversalServers, isEmbedUrl, detectStreamType } from '../utils/streamingEngines';
+import { markMirrorFailed, deprioritizeFailedMirrors } from '../api/mirrorFailures';
 import { getCurrentAndNextProgram } from '../api/epg';
 import {
   hasNativePlayer,
@@ -116,14 +118,25 @@ export function TVPlayer({
   // accepts real stream URLs, and the legacy WebView cannot composite MSE video.
   // So put directly playable sources first and leave the embeds at the bottom.
   const orderedServers = useMemo(() => {
-    if (!shouldPreferNativePlayer() || allServers.length < 2) return allServers;
-    const playable = allServers.filter((srv) => isNativePlayableUrl(srv?.url));
-    if (playable.length === 0) return allServers;
-    const rest = allServers.filter((srv) => !isNativePlayableUrl(srv?.url));
-    return [...playable, ...rest];
+    let list = allServers;
+    if (shouldPreferNativePlayer() && list.length >= 2) {
+      const playable = list.filter((srv) => isNativePlayableUrl(srv?.url));
+      if (playable.length > 0) {
+        const rest = list.filter((srv) => !isNativePlayableUrl(srv?.url));
+        list = [...playable, ...rest];
+      }
+    }
+    // v3.12.61: mirrors with recent failures sort to the back, so a title
+    // whose Server 1 died last night doesn't open on the same dead mirror
+    // again. Applied after the native-playable ordering. Downstream
+    // (activeServer, failover chain, server drawer) all read this one list.
+    return deprioritizeFailedMirrors(list);
   }, [allServers]);
 
   const [currentServerIndex, setCurrentServerIndex] = useState(0);
+  // v3.12.61: terminal failure state — persistent, with Retry. Replaces the
+  // 3.5s auto-clearing "Stream offline" toast that left a dead black player.
+  const [allServersDead, setAllServersDead] = useState(null); // { reason, at }
 
   // Match requested server prop to currentServerIndex
   useEffect(() => {
@@ -153,6 +166,9 @@ export function TVPlayer({
   const [currentAudio, setCurrentAudio] = useState(0);
   const [errorMessage, setErrorMessage] = useState(null);
   const [nativeActive, setNativeActive] = useState(false);
+  // v3.12.61: retry bookkeeping for the terminal dead state.
+  const retryCountRef = useRef(0);
+  const [streamEpoch, setStreamEpoch] = useState(0);
   // v3.10.1: embed mirrors are preflighted by the native bridge before the
   // iframe mounts, so a provider's server-error page (Vercel 500 etc.) is
   // skipped before the user ever sees it.
@@ -322,6 +338,10 @@ export function TVPlayer({
   // Auto failover to next server if current server fails
   const handleFailover = useCallback((reason = 'Stream connection error') => {
     trackFailover(reason); // v3.12.59: analytics funnel
+    // v3.12.61: remember this server failed this session — retries and the
+    // native handoff must never land on a mirror we already burned.
+    const failedUrl = orderedServers[currentServerIndex]?.url;
+    if (failedUrl) markMirrorFailed(failedUrl);
     if (orderedServers.length > 1 && currentServerIndex < orderedServers.length - 1) {
       const nextIdx = currentServerIndex + 1;
       const nextName = orderedServers[nextIdx]?.name || `Server ${nextIdx + 1}`;
@@ -345,14 +365,37 @@ export function TVPlayer({
         if (failedUrl) markChannelDead(failedUrl);
       }
       trackPlaybackError(reason); // v3.12.59: analytics funnel
-      setErrorMessage('Stream offline. Please select another server or channel.');
+      // v3.12.61 FIX (black screen after "all servers dead"): the terminal
+      // message contained no 'Failed'/'Error' keyword, so the 3.5s auto-clear
+      // effect wiped it, leaving a silent dead black player. Now the terminal
+      // state is explicit, persistent, and offers a retry that skips dead
+      // mirrors (failure memory below).
+      setAllServersDead({ reason, at: Date.now() });
       setIsBuffering(false);
     }
   }, [orderedServers, currentServerIndex]);
 
+  // v3.12.61: Retry from the terminal dead state. Reorders so failed mirrors
+  // (marked during this session) sort last, then restarts from the best
+  // surviving server. A retry of the SAME dead list would loop instantly.
+  const retryFromDead = useCallback(() => {
+    setAllServersDead(null);
+    const retryCount = (retryCountRef.current || 0) + 1;
+    retryCountRef.current = retryCount;
+    // Reset native-handoff + embed flags so the pipeline effect rebuilds.
+    nativeHandoffDoneRef.current = false;
+    nativeActiveRef.current = false;
+    setNativeActive(false);
+    setErrorMessage(`Retrying (attempt ${retryCount})...`);
+    setTimeout(() => setErrorMessage(null), 2500);
+    // Force the pipeline effect to re-run: the stream change (via the
+    // re-ordered list) re-arms watchdogs and re-attaches the player.
+    setCurrentServerIndex(0);
+    setStreamEpoch((e) => e + 1);
+  }, []);
+
   // Toggle Video Engine (HLS.js vs Native Android HTML5 Video)
-  const toggleEngine = useCallback(() => {
-    const nextEngine = videoEngine === 'hls' ? 'native' : 'hls';
+  const toggleEngine = useCallback(() => {    const nextEngine = videoEngine === 'hls' ? 'native' : 'hls';
     setVideoEngine(nextEngine);
     setErrorMessage(`Switched Video Engine to: ${nextEngine === 'hls' ? 'HLS.js' : 'Native TV Player'}`);
     setTimeout(() => setErrorMessage(null), 2500);
@@ -481,7 +524,10 @@ export function TVPlayer({
     if (nativeActiveRef.current) return;
     setEmbedReady(true);
     setErrorMessage(null);
-  }, [streamUrl]);
+    // v3.12.61: any stream change leaves the terminal dead state — we are
+    // either retrying or moved to a different server/channel.
+    if (allServersDead) setAllServersDead(null);
+  }, [streamUrl, streamEpoch]);
 
   // Video & Hls.js Pipeline Setup
   useEffect(() => {
@@ -822,7 +868,7 @@ export function TVPlayer({
         video.load();
       }
     };
-  }, [streamUrl, isLive, videoEngine, nativeActive, handOffToNative, handleFailover]);
+  }, [streamUrl, isLive, videoEngine, nativeActive, handOffToNative, handleFailover, streamEpoch]);
 
   // Auto-clear transient error messages after 3.5s
   useEffect(() => {
@@ -1102,6 +1148,73 @@ export function TVPlayer({
             handleFailover('Embed mirror connection error');
           }}
         />
+      )}
+
+      {/* v3.12.61: terminal "all servers dead" state — persistent, actionable.
+          Replaces the 3.5s auto-clearing toast that left a dead black player
+          with no path out except force-closing the app. */}
+      {allServersDead && (
+        <div style={{
+          position: 'absolute',
+          top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(4, 8, 16, 0.92)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 18,
+          zIndex: 300
+        }}>
+          <WifiOff size={56} color="#f87171" />
+          <div style={{ fontSize: 26, fontWeight: 800, color: '#fff' }}>
+            All servers failed
+          </div>
+          <div style={{ fontSize: 16, color: '#94a3b8', maxWidth: 520, textAlign: 'center' }}>
+            {allServersDead.reason || 'Every mirror timed out or refused the connection.'}
+            <br />Mirrors recover constantly — a retry usually works.
+          </div>
+          <div style={{ display: 'flex', gap: 16, marginTop: 8 }}>
+            <button
+              className="tv-player-btn"
+              tabIndex={0}
+              onClick={retryFromDead}
+              style={{
+                background: '#ef4444',
+                border: 'none',
+                borderRadius: 10,
+                padding: '14px 32px',
+                color: '#fff',
+                fontSize: 18,
+                fontWeight: 800,
+                cursor: 'pointer'
+              }}
+            >
+              ⟳ Retry All Servers
+            </button>
+            {orderedServers.length > 1 && (
+              <button
+                className="tv-player-btn"
+                tabIndex={0}
+                onClick={() => { setShowDrawer('servers'); setAllServersDead(null); }}
+                style={{
+                  background: 'rgba(255,255,255,0.08)',
+                  border: '1px solid rgba(255,255,255,0.25)',
+                  borderRadius: 10,
+                  padding: '14px 32px',
+                  color: '#e2e8f0',
+                  fontSize: 18,
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+              >
+                Pick a Server ({orderedServers.length})
+              </button>
+            )}
+          </div>
+          <div style={{ fontSize: 13, color: '#64748b', marginTop: 6 }}>
+            Press Back to exit the player
+          </div>
+        </div>
       )}
 
       {/* Binge-Watching Next Episode Countdown Floating Card */}

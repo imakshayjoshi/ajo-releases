@@ -2,6 +2,12 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import './utils/nativePlayer'; // Force execution of side-effects to bind window.__ajoEmbedPreflightResult
+import { CURRENT_APP_VERSION } from './api/otaUpdate';
+// v3.12.61 FIX: analytics version tagging — appVersion() reads
+// window.__ajoAnalyticsVersion, which was never set, so every event from
+// every device reported the hardcoded fallback '3.12.59'. Set it once at
+// bundle load so version filters on the ingest side actually work.
+window.__ajoAnalyticsVersion = CURRENT_APP_VERSION;
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
