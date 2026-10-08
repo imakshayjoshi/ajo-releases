@@ -1,64 +1,64 @@
 {
   "schemaVersion": 2,
-  "version": "3.12.62",
-  "versionCode": 212,
-  "releaseDate": "2026-10-07",
+  "version": "3.12.64",
+  "versionCode": 214,
+  "releaseDate": "2026-10-08",
   "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
   "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
   "phone": {
-    "version": "3.3.45",
-    "versionCode": 202,
+    "version": "3.3.46",
+    "versionCode": 214,
     "packageId": "com.ajo.phone",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "🔐 Cast security hardening (ported from AJO TV): unpaired devices can no longer cast, switch tabs, or rewrite your watchlist",
-      "📺 9XM channel fixed + mirror health over HTTPS",
-      "🛡️ Clear Cache no longer wipes your watch history, favorites and pairing — cache only",
-      "🔥 ShortTV section removed (source permanently dead)",
-      "⚡ Playback: faster failover on dead streams (16s → 8s timeout budget per server)"
+      "🎬 Movibox catalog — direct HD MP4 streams, no embeds, no ads",
+      "📡 Live TV rebuilt with the Elite Streams channel feed and safer auto-failover",
+      "📚 Full TMDB catalog — routed through AJO's own server, fixes missing posters and thin search",
+      "⌨️ Search upgraded: QWERTY layout, recent searches, Movibox results first",
+      "⚡ Failed servers remembered and skipped for 12 hours, plus a Retry All Servers screen"
     ],
-    "size_mb": "3.5 MB",
-    "sha256": "55fe33768e5ac235df769f64a8540bd24edf11eb9e24f51a5e25eb902f43f8a6",
-    "releaseDate": "2026-10-07"
+    "size_mb": "3.3 MB",
+    "sha256": "9bf3b98fb64995822be6fd950acd799e08b80e1bdc61cc06153559a16c7535e7",
+    "releaseDate": "2026-10-08"
   },
   "tv": {
-    "version": "3.12.62",
-    "versionCode": 212,
+    "version": "3.12.64",
+    "versionCode": 214,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "🎛️ D-pad seeking fixed — left/right arrows seek in the player instead of jumping to the bottom control bar",
-      "🎬 2,422-title Movibox catalog — direct HD MP4 streams, no embeds, no ads",
+      "📡 Live TV merged with the Elite Streams feed — MovieBox-style channel wall, categories, logos",
+      "🔐 Premium channels with ClearKey DRM now play natively (jio, hotstar, zee, yupp feeds)",
+      "🎬 2,328-title Movibox catalog — direct HD MP4 streams, no embeds, no ads",
       "📚 Full TMDB catalog back — routed through our own server (fixes 'only a few titles showing')",
-      "⌨️ Search rebuilt: on-screen QWERTY keyboard, recent searches, results as you type",
-      "📈 Streaming servers ranked by real reliability learned from your watch history"
+      "⌨️ Search rebuilt: QWERTY keyboard, recent searches, results as you type"
     ],
     "size_mb": "7.0 MB",
-    "sha256": "9690f61e50a217d77b8c64f3b7441b210d8b294d5fe9905371226dd68463f364"
+    "sha256": "d8bce01f506ad99e2e3dec9d18f7bf8956ac5fd7108b8482484a16fa13bbde00"
   },
   "android_tv": {
-    "version": "3.12.52",
-    "versionCode": 202,
+    "version": "3.12.64",
+    "versionCode": 214,
     "packageId": "com.ajo.androidtv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "🏏 Sports rebuilt: 16 verified-live channels (Sony Ten 1-3, Star Sports Select, Ten Cricket, Cricket Gold, Willow, NBA TV, WWE, beIN)",
-      "🔐 Cast security hardening: unpaired devices can no longer cast, switch tabs, or rewrite your watchlist",
-      "🛡️ Clear Cache no longer wipes user data — cache keys only",
-      "📺 9XM fixed + HTTPS mirror health",
-      "⚡ Faster failover on dead streams"
+      "📡 Live TV rebuilt with the Elite Streams channel feed and MovieBox-style channel wall",
+      "🎬 Movibox catalog — direct HD MP4 streams, no embeds, no ads",
+      "📚 Full TMDB catalog — routed through AJO's own server, fixes thin catalog and search",
+      "⌨️ Search upgraded: QWERTY layout, recent searches, Movibox results first",
+      "⚡ Failed servers remembered and skipped for 12 hours, plus a Retry All Servers screen"
     ],
     "size_mb": "7.0 MB",
-    "sha256": "93403616371f5e8ec00e3f1d240fb30e4f75f1ed6daabb57b7fcc7f64a112d0a",
-    "releaseDate": "2026-10-07"
+    "sha256": "6032c1fc23c6bab3c3592a7e18dd9e1e4040009c80be733200a909ab1a930ec0",
+    "releaseDate": "2026-10-08"
   }
 }
