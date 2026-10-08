@@ -1,64 +1,62 @@
 {
   "schemaVersion": 2,
-  "version": "3.12.64",
-  "versionCode": 214,
+  "version": "3.12.65",
+  "versionCode": 215,
   "releaseDate": "2026-10-08",
   "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
   "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
   "phone": {
-    "version": "3.3.46",
-    "versionCode": 214,
+    "version": "3.3.47",
+    "versionCode": 215,
     "packageId": "com.ajo.phone",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "🎬 Movibox catalog — direct HD MP4 streams, no embeds, no ads",
-      "📡 Live TV rebuilt with the Elite Streams channel feed and safer auto-failover",
-      "📚 Full TMDB catalog — routed through AJO's own server, fixes missing posters and thin search",
-      "⌨️ Search upgraded: QWERTY layout, recent searches, Movibox results first",
-      "⚡ Failed servers remembered and skipped for 12 hours, plus a Retry All Servers screen"
+      "📚 Full catalog pages now include 30 TMDB pages plus the complete Movibox library",
+      "🎬 Movies tab now includes all Movibox movies with direct HD playback",
+      "📺 Series tab now includes all Movibox series",
+      "🔎 Popular franchise search works across TMDB and Movibox"
     ],
     "size_mb": "3.3 MB",
-    "sha256": "9bf3b98fb64995822be6fd950acd799e08b80e1bdc61cc06153559a16c7535e7",
+    "sha256": "cd1570aa24dbc50a9f4901c8a9c20d223df5f131696a5292be99da9e0a874703",
     "releaseDate": "2026-10-08"
   },
   "tv": {
-    "version": "3.12.64",
-    "versionCode": 214,
+    "version": "3.12.65",
+    "versionCode": 215,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "📡 Live TV merged with the Elite Streams feed — MovieBox-style channel wall, categories, logos",
-      "🔐 Premium channels with ClearKey DRM now play natively (jio, hotstar, zee, yupp feeds)",
-      "🎬 2,328-title Movibox catalog — direct HD MP4 streams, no embeds, no ads",
-      "📚 Full TMDB catalog back — routed through our own server (fixes 'only a few titles showing')",
-      "⌨️ Search rebuilt: QWERTY keyboard, recent searches, results as you type"
+      "📚 Movies and Series tabs now load 30 TMDB pages each instead of one page",
+      "🎬 Full Movibox catalog merged into Movies and Series tabs",
+      "🔎 James Bond, Mission: Impossible, and other popular franchises are searchable across all sources",
+      "⚡ Catalog fills in batches while the app stays usable"
     ],
     "size_mb": "7.0 MB",
-    "sha256": "d8bce01f506ad99e2e3dec9d18f7bf8956ac5fd7108b8482484a16fa13bbde00"
+    "sha256": "f4b3cee9c1891d7ac6d5339fa0a7b55640254ed87edc01453da9f54c3858a3e9"
   },
   "android_tv": {
-    "version": "3.12.64",
-    "versionCode": 214,
+    "version": "3.12.65",
+    "versionCode": 215,
     "packageId": "com.ajo.androidtv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "📡 Live TV rebuilt with the Elite Streams channel feed and MovieBox-style channel wall",
-      "🎬 Movibox catalog — direct HD MP4 streams, no embeds, no ads",
-      "📚 Full TMDB catalog — routed through AJO's own server, fixes thin catalog and search",
-      "⌨️ Search upgraded: QWERTY layout, recent searches, Movibox results first",
-      "⚡ Failed servers remembered and skipped for 12 hours, plus a Retry All Servers screen"
+      "📚 Movies and Series tabs now load 30 TMDB pages each instead of one page",
+      "🎬 Full Movibox catalog merged into Movies and Series tabs",
+      "🔎 Popular franchise search works across all sources",
+      "⚡ Catalog fills in batches while the app stays usable"
     ],
     "size_mb": "7.0 MB",
-    "sha256": "6032c1fc23c6bab3c3592a7e18dd9e1e4040009c80be733200a909ab1a930ec0",
+    "sha256": "917d14295ddea2ad085919aa854c7ef97e23bb476822da236206fcc171889d19",
     "releaseDate": "2026-10-08"
   }
 }
+
