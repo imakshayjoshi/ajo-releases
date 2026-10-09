@@ -42,7 +42,7 @@
     "minimumVersionCode": 1,
     "changelog": "v3.12.73: Movies & series fix (movibox CDN referer gate handled natively + VPS proxy) and live thumbnail repairs.",
     "size_mb": 7.0,
-    "sha256": "a601592fc0b9e84d255c63d9dea72cd9955dbc71291417548aeb7278d692758a",
+    "sha256": "ee500fb91fb6ff2da07b40eeafb134970203b590e786736dd8666c09a700bda2",
     "releaseDate": "2026-10-09",
     "size": 7345801
   },
