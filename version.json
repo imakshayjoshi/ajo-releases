@@ -1,45 +1,34 @@
 {
   "schemaVersion": 2,
-  "version": "3.12.72",
-  "versionCode": 222,
+  "version": "3.12.73",
+  "versionCode": 223,
   "releaseDate": "2026-10-09",
   "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
   "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
   "phone": {
-    "version": "3.3.47",
-    "versionCode": 215,
+    "version": "3.3.48",
+    "versionCode": 216,
     "packageId": "com.ajo.phone",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
-    "changelog": [
-      "Full catalog pages now include 30 TMDB pages plus the complete Movibox library",
-      "Movies tab now includes all Movibox movies with direct HD playback",
-      "Series tab now includes all Movibox series",
-      "Popular franchise search works across TMDB and Movibox"
-    ],
-    "size_mb": "3.3 MB",
-    "sha256": "cd1570aa24dbc50a9f4901c8a9c20d223df5f131696a5292be99da9e0a874703",
+    "changelog": "v3.3.48: Movies fixed \u2014 movibox streams routed through VPS proxy (CDN rejects headerless video requests).",
+    "size_mb": 3.3,
+    "sha256": "f4c432437a4ef0b4e4840c6f58191573e00d454be14d81f1ef4f68fcc386c9db",
     "releaseDate": "2026-10-08"
   },
   "tv": {
-    "version": "3.12.72",
-    "versionCode": 222,
+    "version": "3.12.73",
+    "versionCode": 223,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
-    "changelog": [
-      "Live TV buffering fixed at the root: live streams now start with a real buffer cushion (was 1 second) and hold 15-30s of stream — plays through WiFi jitter instead of stalling",
-      "Live video capped to 720p on Fire sticks — 1080p needs 4-5Mbps the relays can't sustain, which caused the constant rebuffer loop",
-      "Runtime stream probe: the app now tests every channel's stream on load (cached 30 min) and hides dead ones — 35 dead channels auto-purged",
-      "Source hiccups now recover in ~1.5s via live-edge resync instead of cycling through dead servers",
-      "More dead Star/Sony relays purged (mislabeled Kannada feeds, Ten 4)"
-    ],
-    "size_mb": "7.0 MB",
-    "sha256": "88817d25351839c1b5aad071b5e080aa6f328968b592a7f5d0f6db87ff9ce574",
+    "changelog": "v3.12.73: Movies & series fixed \u2014 movibox CDN hotlink gate (429) handled: native player now sends Referer/UA headers; web/phone playback streams through the VPS proxy. Live channel thumbnails fixed \u2014 dead Sony logos repaired, logos served via image proxy with retry. Live channel playback untouched.",
+    "size_mb": 7.0,
+    "sha256": "6e2dc11f6d2c34bdfbe719e181511383f093fe2376c92261791740af00c27c26",
     "size": 7312122,
     "releaseDate": "2026-10-09"
   },
@@ -63,11 +52,6 @@
     "releaseDate": "2026-10-09",
     "size": 7345801
   },
-  "changelog": [
-    "Live TV buffering fixed at the root: live streams now start with a real buffer cushion (was 1 second) and hold 15-30s of stream — plays through WiFi jitter instead of stalling",
-    "Live video capped to 720p on Fire sticks — 1080p needs 4-5Mbps the relays can't sustain, which caused the constant rebuffer loop",
-    "Runtime stream probe: the app now tests every channel's stream on load (cached 30 min) and hides dead ones — 35 dead channels auto-purged",
-    "Source hiccups now recover in ~1.5s via live-edge resync instead of cycling through dead servers",
-    "More dead Star/Sony relays purged (mislabeled Kannada feeds, Ten 4)"
-  ]
+  "changelog": "v3.12.73: Movies & series fixed \u2014 movibox CDN hotlink gate (429) handled: native player now sends Referer/UA headers; web/phone playback streams through the VPS proxy. Live channel thumbnails fixed \u2014 dead Sony logos repaired, logos served via image proxy with retry. Live channel playback untouched.",
+  "sha256": "6e2dc11f6d2c34bdfbe719e181511383f093fe2376c92261791740af00c27c26"
 }
