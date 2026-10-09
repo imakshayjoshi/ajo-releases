@@ -33,21 +33,15 @@
     "releaseDate": "2026-10-09"
   },
   "android_tv": {
-    "version": "3.12.66",
-    "versionCode": 216,
+    "version": "3.12.73",
+    "versionCode": 223,
     "packageId": "com.ajo.androidtv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
-    "changelog": [
-      "TV focus system: live channel thumbnails now get a clear scale + white/gold halo on Fire TV and Android TV",
-      "Live TV rebuilt as a category rail + responsive 10/8/7-column channel wall",
-      "Focused tiles scroll into view while navigating",
-      "Search tab now focuses the search input so typed queries land immediately",
-      "Fixed duplicate live channel ids that caused rendering errors"
-    ],
-    "size_mb": "7.0 MB",
+    "changelog": "v3.12.73: Movies & series fix (movibox CDN referer gate handled natively + VPS proxy) and live thumbnail repairs.",
+    "size_mb": 7.0,
     "sha256": "a601592fc0b9e84d255c63d9dea72cd9955dbc71291417548aeb7278d692758a",
     "releaseDate": "2026-10-09",
     "size": 7345801
