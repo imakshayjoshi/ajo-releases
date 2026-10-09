@@ -47,6 +47,19 @@ export function LiveView({ channels, onSelectItem, loading }) {
     const observer = new MutationObserver(() => {
       const el = document.activeElement;
       if (root.contains(el)) {
+        // v3.12.68: scrollIntoView({inline:'nearest'}) was a no-op for the
+        // horizontally-overflowing grid ancestor; scroll the page scroller
+        // directly so the focused row is always visible.
+        const scroller = el.closest('.tv-main-content') || document.querySelector('.tv-main-content');
+        if (scroller) {
+          const er = el.getBoundingClientRect();
+          const sr = scroller.getBoundingClientRect();
+          if (er.bottom > sr.bottom - 24) {
+            scroller.scrollTop += (er.bottom - sr.bottom + 24);
+          } else if (er.top < sr.top + 24) {
+            scroller.scrollTop -= (sr.top + 24 - er.top);
+          }
+        }
         el.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'instant' });
       }
     });

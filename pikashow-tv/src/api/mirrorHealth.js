@@ -91,8 +91,18 @@ export function rankServersByHealth(servers, health) {
 
 /**
  * Convenience: fetch health (cached) and rank a server list in one call.
+ * v3.12.68: filter out hosts the native player has marked dead (apiplayer.ru,
+ * etc.). The health service can report them 200 (a Cloudflare interstitial
+ * also returns 200) while PlayerActivity rejects them — that mismatch made
+ * the app hand the player a first server it could never play.
  */
 export async function getRankedServers(servers) {
   const health = await getMirrorHealth();
-  return rankServersByHealth(servers, health);
+  let ranked = rankServersByHealth(servers, health);
+  try {
+    const { isNativePlayableUrl } = await import('../utils/nativePlayer.js');
+    const playable = ranked.filter((s) => isNativePlayableUrl(s?.url));
+    if (playable.length > 0) ranked = [...playable, ...ranked.filter((s) => !playable.includes(s))];
+  } catch {}
+  return ranked;
 }

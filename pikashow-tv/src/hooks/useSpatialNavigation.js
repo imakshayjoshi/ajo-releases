@@ -275,7 +275,15 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
     // v3.10.0 FIX: the modal's real scroller is .tv-modal-body (the
     // .tv-modal-scroll class never existed), and the player drawer scrolls
     // independently — include both so focused items scroll into view.
-    const scroller = el.closest('.tv-main-content, .tv-modal-body, .tv-player-drawer, .tv-modal-scroll, .live-grid-scroll, .live-cat-rail') || document.querySelector('.tv-main-content');
+    // v3.12.68 FIX (live channels vertical scroll): the previous selector
+    // matched .live-grid-scroll FIRST for every live card, but that container
+    // has no height constraint on TV (scrollHeight == clientHeight), so the
+    // scroller never moved and focused rows below the fold stayed offscreen.
+    // Live cards must scroll the real page scroller (.tv-main-content).
+    const isLiveCard = el.closest && el.closest('.live-channel-grid, .live-cat-rail');
+    const scroller = isLiveCard
+      ? (el.closest('.tv-main-content') || document.querySelector('.tv-main-content'))
+      : (el.closest('.tv-main-content, .tv-modal-body, .tv-player-drawer, .tv-modal-scroll, .live-grid-scroll, .live-cat-rail') || document.querySelector('.tv-main-content'));
     if (scroller) {
       try {
         const er = el.getBoundingClientRect();

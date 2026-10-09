@@ -516,11 +516,19 @@ export function TVPlayer({
     if (!streamUrl) return;
     if (nativeHandoffDoneRef.current === streamUrl) return;
     if (!shouldPreferNativePlayer()) return;
-    if (!isNativePlayableUrl(streamUrl)) return;
+    // v3.12.68: a dead-listed first server (e.g. apiplayer.ru ranked #1 by
+    // mirror health) used to fall through to the web embed watchdog, which
+    // burned 4 failovers and then reported "no valid stream". Skip straight
+    // to the first native-playable mirror instead.
+    if (!isNativePlayableUrl(streamUrl)) {
+      const nextIdx = orderedServers.findIndex((s, i) => i > currentServerIndex && isNativePlayableUrl(s?.url));
+      if (nextIdx > -1) setCurrentServerIndex(nextIdx);
+      return;
+    }
 
     nativeHandoffDoneRef.current = streamUrl;
     handOffToNative('▶ Opening in hardware player...');
-  }, [streamUrl, handOffToNative]);
+  }, [streamUrl, handOffToNative, orderedServers, currentServerIndex]);
 
   // v3.12.16: Embed mirrors mount immediately so video player starts right away
   useEffect(() => {
