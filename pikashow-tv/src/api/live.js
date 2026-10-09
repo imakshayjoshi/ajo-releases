@@ -228,6 +228,8 @@ export function isPopularLiveChannel(raw) {
   if (/bangla|bengali|ananda|aath|kannada|gujarati|asmita|telugu|tamil|malayalam|punjabi|bhojpuri|bihar jharkhand|madhya pradesh|chhattisgarh|delhi ncr haryana|up uk|rajasthan news|gujarat|odia|assam/.test(name)) return false;
   // Foreign/geo variants and non-Indian Pluto/other-region feeds
   if (/al jazeera|czech|romania|russia|español|espanol|pluto tv|mbc bollywood|afroland|nagaland|travelxp russia|south flix|zee one\b/.test(name)) return false;
+  // v3.12.71: Spanish/European league feeds leaking into Sports via iptv-org sports.m3u
+  if (/movistar|liga de campeones|deportes|plus\+|gol|teledeporte|liga/.test(name)) return false;
   // Regional state channels (not Hindi/Marathi/English national news)
   if (/news18 kerala|news18 punjab|news18 rajasthan|news18 uttar pradesh|zee punjab|zee uttar pradesh|zee rajasthan|zee cinemalu|zee cinema apac/.test(name)) return false;
   // Language guard: non Hindi/Marathi/English channels are out even if brand matches
