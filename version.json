@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "version": "3.12.71",
-  "versionCode": 221,
+  "version": "3.12.72",
+  "versionCode": 222,
   "releaseDate": "2026-10-09",
   "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
   "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
@@ -24,23 +24,23 @@
     "releaseDate": "2026-10-08"
   },
   "tv": {
-    "version": "3.12.71",
-    "versionCode": 221,
+    "version": "3.12.72",
+    "versionCode": 222,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "Sports tab fixed: it was showing 900+ raw international channels with dead relays — now it runs the same popular-only, verified-stream gate as Live TV (29 channels)",
-      "Star Sports Select 1/2 now play probed-live servers directly — first frame in ~1s on stick, no server cycling",
-      "Sony Sports sources replaced: cloudplay-sonyliv is dead (404) — all Ten 1/2/3/5 feeds now use the live sliv workers",
-      "Star Sports Khel and Ten Cricket sources replaced with working streams",
-      "Missing Sports-tab thumbnails repaired (Star Sports Select, Ten Cricket, Star Sports Khel)"
+      "Live TV buffering fixed at the root: live streams now start with a real buffer cushion (was 1 second) and hold 15-30s of stream — plays through WiFi jitter instead of stalling",
+      "Live video capped to 720p on Fire sticks — 1080p needs 4-5Mbps the relays can't sustain, which caused the constant rebuffer loop",
+      "Runtime stream probe: the app now tests every channel's stream on load (cached 30 min) and hides dead ones — 35 dead channels auto-purged",
+      "Source hiccups now recover in ~1.5s via live-edge resync instead of cycling through dead servers",
+      "More dead Star/Sony relays purged (mislabeled Kannada feeds, Ten 4)"
     ],
     "size_mb": "7.0 MB",
-    "sha256": "69f783b0a87f84bb3b4281c3e45f1be83c4f30cffac1e5d05e6d35d6727fd532",
-    "size": 7311238,
+    "sha256": "88817d25351839c1b5aad071b5e080aa6f328968b592a7f5d0f6db87ff9ce574",
+    "size": 7312122,
     "releaseDate": "2026-10-09"
   },
   "android_tv": {
@@ -64,10 +64,10 @@
     "size": 7345801
   },
   "changelog": [
-    "Sports tab fixed: it was showing 900+ raw international channels with dead relays — now it runs the same popular-only, verified-stream gate as Live TV (29 channels)",
-    "Star Sports Select 1/2 now play probed-live servers directly — first frame in ~1s on stick, no server cycling",
-    "Sony Sports sources replaced: cloudplay-sonyliv is dead (404) — all Ten 1/2/3/5 feeds now use the live sliv workers",
-    "Star Sports Khel and Ten Cricket sources replaced with working streams",
-    "Missing Sports-tab thumbnails repaired (Star Sports Select, Ten Cricket, Star Sports Khel)"
+    "Live TV buffering fixed at the root: live streams now start with a real buffer cushion (was 1 second) and hold 15-30s of stream — plays through WiFi jitter instead of stalling",
+    "Live video capped to 720p on Fire sticks — 1080p needs 4-5Mbps the relays can't sustain, which caused the constant rebuffer loop",
+    "Runtime stream probe: the app now tests every channel's stream on load (cached 30 min) and hides dead ones — 35 dead channels auto-purged",
+    "Source hiccups now recover in ~1.5s via live-edge resync instead of cycling through dead servers",
+    "More dead Star/Sony relays purged (mislabeled Kannada feeds, Ten 4)"
   ]
 }

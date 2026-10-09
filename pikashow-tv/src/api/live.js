@@ -144,7 +144,12 @@ const DEAD_STREAM_URL_SUBSTRINGS = [
   '/play/a019/index.m3u8', // Star Sports 2 alt — 404 (probed)
   '/play/a01n/index.m3u8', // Star Gold alt — 404 (probed)
   '/live/star-sports-3/index.m3u8', // Star Sports 3 English — 404 (probed)
-  'adaptive-streams/refs/heads/main/streams/gb/YuppTV/UtsavBharat.m3u8' // 200 text/plain, not a stream
+  'adaptive-streams/refs/heads/main/streams/gb/YuppTV/UtsavBharat.m3u8', // 200 text/plain, not a stream
+  // v3.12.72: probed dead — mislabeled Kannada Star relays + dead Ten 4
+  '/live/star-sports-1-kannada/index.m3u8', // 404 (probed)
+  '/live/star-sports-2-kannada/index.m3u8', // 404 (probed)
+  'cloudplay-sonyliv.pages.dev/ten4', // 404 (probed)
+  'cdn.buzogezapimuyoku.cc/live/sony-ten-4/index.m3u8' // 404 (probed)
 ];
 
 export function isDeadStreamUrl(url) {
@@ -326,4 +331,66 @@ export function groupByCategory(channels) {
     groups.get(cat).push(ch);
   }
   return groups;
+}
+
+/**
+ * v3.12.72: runtime liveness probe. The static dead-list can't keep up with
+ * relays that die mid-week; this fetches each channel's manifest on the Live
+ * tab load (bounded, cached 30 min) and drops channels whose primary AND all
+ * failover players return non-stream responses.
+ */
+const LIVE_PROBE_CACHE_KEY = 'ajo_live_probe_v1';
+const LIVE_PROBE_TTL = 30 * 60 * 1000;
+const LIVE_PROBE_CONCURRENCY = 8;
+
+async function probeManifestUrl(url, timeoutMs = 6000) {
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), timeoutMs);
+    const res = await fetch(url, { signal: ctrl.signal, cache: 'no-store', mode: 'cors' });
+    clearTimeout(t);
+    if (!res.ok) return false;
+    const ct = String(res.headers.get('content-type') || '').toLowerCase();
+    return ct.includes('mpegurl') || ct.includes('mp4') || ct.includes('octet') || ct.includes('mpeg');
+  } catch {
+    return false;
+  }
+}
+
+export async function probeLiveChannels(channels) {
+  const out = [...channels];
+  const urls = new Set();
+  for (const ch of out) {
+    for (const p of (ch.players || [])) if (p?.url) urls.add(p.url);
+    if (ch.url) urls.add(ch.url);
+  }
+  let verdicts = {};
+  try {
+    const raw = localStorage.getItem(LIVE_PROBE_CACHE_KEY);
+    if (raw) {
+      const data = JSON.parse(raw);
+      if (Date.now() - data.savedAt < LIVE_PROBE_TTL) verdicts = data.verdicts || {};
+    }
+  } catch {}
+  const toProbe = [...urls].filter((u) => !(u in verdicts));
+  const queue = [...toProbe];
+  const workers = Array.from({ length: LIVE_PROBE_CONCURRENCY }, async () => {
+    while (queue.length) {
+      const u = queue.shift();
+      verdicts[u] = await probeManifestUrl(u);
+    }
+  });
+  await Promise.allSettled(workers);
+  try {
+    localStorage.setItem(LIVE_PROBE_CACHE_KEY, JSON.stringify({ savedAt: Date.now(), verdicts }));
+  } catch {}
+  return out.filter((ch) => {
+    const players = (ch.players && ch.players.length ? ch.players : [{ url: ch.url }]);
+    const alive = players.some((p) => {
+      const u = p?.url || p;
+      const v = verdicts[u];
+      return v === undefined ? !isDeadStreamUrl(u) : v;
+    });
+    return alive;
+  });
 }

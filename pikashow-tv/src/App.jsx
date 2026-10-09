@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { getBollywoodCatalog, getHollywoodCatalog, getSerialsCatalog, getLiveBroadcasts } from './api/pikashow';
-import { getLiveChannels, isPopularLiveChannel, classifyLiveChannel, hasWorkingPlayer, applyLiveSourceOverride } from './api/live';
+import { getLiveChannels, isPopularLiveChannel, classifyLiveChannel, hasWorkingPlayer, applyLiveSourceOverride, probeLiveChannels } from './api/live';
 import { LiveView } from './components/LiveView';
 import { getLiveSportsEvents } from './api/sports';
 import { getWatchHistory, saveProgress, getWatchProgress, sweepStaleCacheKeys } from './api/history';
@@ -233,7 +233,19 @@ export default function App() {
         if (pa !== pb) return pa - pb;
         return String(a.title_en || a.title || '').localeCompare(String(b.title_en || b.title || ''));
       });
+      // v3.12.72: runtime liveness probe — the static dead-list can't keep up
+      // with relays that 404 mid-week. Probe unique manifest URLs (30 min cache)
+      // and drop channels with zero live players. Renders the pre-probe wall
+      // first, then re-renders the pruned set so the tab never blocks on this.
       setLiveItems(sorted);
+      probeLiveChannels(sorted)
+        .then((alive) => {
+          if (alive.length && alive.length < sorted.length) {
+            console.info('[live] runtime probe dropped ' + (sorted.length - alive.length) + ' dead channels');
+          }
+          setLiveItems(alive.length ? alive : sorted);
+        })
+        .catch(() => {});
     } catch (e) {
       console.error('Error loading live TV:', e);
       setLiveItems(legacy.status === 'fulfilled' ? legacy.value : []);
