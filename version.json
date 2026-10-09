@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "version": "3.12.65",
-  "versionCode": 215,
+  "version": "3.12.66",
+  "versionCode": 216,
   "releaseDate": "2026-10-08",
   "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
   "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
@@ -14,49 +14,59 @@
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "📚 Full catalog pages now include 30 TMDB pages plus the complete Movibox library",
-      "🎬 Movies tab now includes all Movibox movies with direct HD playback",
-      "📺 Series tab now includes all Movibox series",
-      "🔎 Popular franchise search works across TMDB and Movibox"
+      "\ud83d\udcda Full catalog pages now include 30 TMDB pages plus the complete Movibox library",
+      "\ud83c\udfac Movies tab now includes all Movibox movies with direct HD playback",
+      "\ud83d\udcfa Series tab now includes all Movibox series",
+      "\ud83d\udd0e Popular franchise search works across TMDB and Movibox"
     ],
     "size_mb": "3.3 MB",
     "sha256": "cd1570aa24dbc50a9f4901c8a9c20d223df5f131696a5292be99da9e0a874703",
     "releaseDate": "2026-10-08"
   },
   "tv": {
-    "version": "3.12.65",
-    "versionCode": 215,
+    "version": "3.12.66",
+    "versionCode": 216,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "📚 Movies and Series tabs now load 30 TMDB pages each instead of one page",
-      "🎬 Full Movibox catalog merged into Movies and Series tabs",
-      "🔎 James Bond, Mission: Impossible, and other popular franchises are searchable across all sources",
-      "⚡ Catalog fills in batches while the app stays usable"
+      "TV focus system: live channel thumbnails now get a clear scale + white/gold halo on Fire TV and Android TV",
+      "Live TV rebuilt as a category rail + responsive 10/8/7-column channel wall",
+      "Focused tiles scroll into view while navigating",
+      "Search tab now focuses the search input so typed queries land immediately",
+      "Fixed duplicate live channel ids that caused rendering errors"
     ],
     "size_mb": "7.0 MB",
-    "sha256": "f4b3cee9c1891d7ac6d5339fa0a7b55640254ed87edc01453da9f54c3858a3e9"
+    "sha256": "0b63a17eccdf9a022b2589dedaf2ba6ec64a4077e1c901d01096386fa2b34e49",
+    "size": 7300035,
+    "releaseDate": "2026-10-09"
   },
   "android_tv": {
-    "version": "3.12.65",
-    "versionCode": 215,
+    "version": "3.12.66",
+    "versionCode": 216,
     "packageId": "com.ajo.androidtv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "📚 Movies and Series tabs now load 30 TMDB pages each instead of one page",
-      "🎬 Full Movibox catalog merged into Movies and Series tabs",
-      "🔎 Popular franchise search works across all sources",
-      "⚡ Catalog fills in batches while the app stays usable"
+      "TV focus system: live channel thumbnails now get a clear scale + white/gold halo on Fire TV and Android TV",
+      "Live TV rebuilt as a category rail + responsive 10/8/7-column channel wall",
+      "Focused tiles scroll into view while navigating",
+      "Search tab now focuses the search input so typed queries land immediately",
+      "Fixed duplicate live channel ids that caused rendering errors"
     ],
     "size_mb": "7.0 MB",
-    "sha256": "917d14295ddea2ad085919aa854c7ef97e23bb476822da236206fcc171889d19",
-    "releaseDate": "2026-10-08"
-  }
+    "sha256": "a601592fc0b9e84d255c63d9dea72cd9955dbc71291417548aeb7278d692758a",
+    "releaseDate": "2026-10-09",
+    "size": 7345801
+  },
+  "changelog": [
+    "TV focus system: live channel thumbnails now get a clear scale + halo on Fire TV and Android TV",
+    "Live TV rebuilt as a category rail + 10/8/7-column channel wall with scroll-into-view",
+    "Search tab now focuses the input so typed queries actually land",
+    "Fixed duplicate live channel ids that caused rendering errors"
+  ]
 }
-
