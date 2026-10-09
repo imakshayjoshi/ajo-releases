@@ -33,6 +33,7 @@ import android.widget.ProgressBar;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.Toast;
+import org.json.JSONObject;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -50,6 +51,11 @@ import androidx.media3.datasource.DefaultDataSource;
 import androidx.media3.datasource.DefaultHttpDataSource;
 import androidx.media3.datasource.HttpDataSource;
 import androidx.media3.datasource.okhttp.OkHttpDataSource;
+import androidx.media3.exoplayer.drm.DefaultDrmSessionManager;
+import androidx.media3.exoplayer.drm.DrmSessionManager;
+import androidx.media3.exoplayer.drm.DrmSessionManagerProvider;
+import androidx.media3.exoplayer.drm.FrameworkMediaDrm;
+import androidx.media3.exoplayer.drm.LocalMediaDrmCallback;
 import androidx.media3.exoplayer.DefaultLoadControl;
 import androidx.media3.exoplayer.DefaultRenderersFactory;
 import androidx.media3.exoplayer.ExoPlayer;
@@ -215,6 +221,11 @@ public class PlayerActivity extends AppCompatActivity {
     private int currentAudioTrackIndex = 0;
 
     private boolean isLive = false;
+    // v3.12.64: ClearKey DRM (jio/zee/hotstar live channels from the Elite
+    // Streams feed merge). drmKeyPairs: [["<kid hex>","<key hex>"], ...].
+    private java.util.List<String[]> drmKeyPairs = null;
+    // per-stream headers passed from the web layer (Cookie/UA/Referer/Origin)
+    private java.util.Map<String, String> streamHeaders = null;
     private String streamUrl = "";
     private String streamTitle = "";
     private final List<String> serverQueue = new ArrayList<>();
@@ -599,6 +610,40 @@ public class PlayerActivity extends AppCompatActivity {
                 }
             } catch (Exception e) {
                 Log.w(TAG, "Failed parsing fallbacks: " + e.getMessage());
+            }
+        }
+
+        // v3.12.64: ClearKey DRM payload for live channels — {"keys":
+        // [["<kid hex>","<key hex>"],...], "headers": {...}} (Elite Streams
+        // pattern: LocalMediaDrmCallback + CLEARKEY_UUID).
+        String drmJson = intent.getStringExtra("drm");
+        if (!TextUtils.isEmpty(drmJson)) {
+            try {
+                JSONObject drm = new JSONObject(drmJson);
+                JSONArray keys = drm.optJSONArray("keys");
+                if (keys != null && keys.length() > 0) {
+                    drmKeyPairs = new ArrayList<>();
+                    for (int i = 0; i < keys.length(); i++) {
+                        JSONArray pair = keys.optJSONArray(i);
+                        if (pair != null && pair.length() >= 2
+                                && isHexKey(pair.optString(0)) && isHexKey(pair.optString(1))) {
+                            drmKeyPairs.add(new String[]{pair.optString(0), pair.optString(1)});
+                        }
+                    }
+                }
+                JSONObject hdrs = drm.optJSONObject("headers");
+                if (hdrs != null) {
+                    streamHeaders = new HashMap<>();
+                    java.util.Iterator<String> it = hdrs.keys();
+                    while (it.hasNext()) {
+                        String k = it.next();
+                        String v = hdrs.optString(k);
+                        if (!TextUtils.isEmpty(k) && !TextUtils.isEmpty(v)) streamHeaders.put(k, v);
+                    }
+                }
+                if (drmKeyPairs == null) Log.w(TAG, "drm extra had no valid key pairs");
+            } catch (Exception e) {
+                Log.w(TAG, "Failed parsing drm extra: " + e.getMessage());
             }
         }
 
@@ -1518,6 +1563,13 @@ public class PlayerActivity extends AppCompatActivity {
             String host = Uri.parse(url).getHost();
             if (host == null) return headers;
             String lower = host.toLowerCase(java.util.Locale.US);
+            // v3.12.62: movibox direct-MP4 CDN — signs URLs per-request but
+            // ALSO gates them on the movibox Referer (bare = 429).
+            if (lower.contains("hakunaymatata.com") || lower.contains("aoneroom.com")
+                    || lower.contains("macdn")) {
+                headers.put("Referer", "https://movibox.xyz/");
+                return headers;
+            }
             // Mirror-specific origins. Keep in sync with EMBED_PATTERNS in
             // streamingEngines.js so any new provider added there gets a header
             // here too.
@@ -1653,25 +1705,36 @@ public class PlayerActivity extends AppCompatActivity {
                         .build();
 
         DefaultTrackSelector trackSelector = new DefaultTrackSelector(this);
-        trackSelector.setParameters(trackSelector.buildUponParameters()
-                .setPreferredVideoMimeType(MimeTypes.VIDEO_H264)
-                .setMaxVideoSize(1920, 1080)
-                .setMaxVideoFrameRate(60)
-                .setExceedVideoConstraintsIfNecessary(true)
-                .setTunnelingEnabled(false)
-                .setForceLowestBitrate(false));
+        androidx.media3.exoplayer.trackselection.DefaultTrackSelector.Parameters.Builder trackParams =
+                trackSelector.buildUponParameters()
+                        .setPreferredVideoMimeType(MimeTypes.VIDEO_H264)
+                        .setMaxVideoFrameRate(60)
+                        .setExceedVideoConstraintsIfNecessary(true)
+                        .setTunnelingEnabled(false)
+                        .setForceLowestBitrate(false);
+        // v3.12.72: live on Fire sticks rides marginal 2.4GHz WiFi — the relays
+        // deliver ~2-3Mbps while a 1080p rendition needs 4-5Mbps. Capping live
+        // to 720p on Fire TV hardware starts ABR in a sustainable band instead
+        // of climbing to 1080p, starving, and resync-looping. VOD keeps 1080p.
+        if (isLive && detectFireTv()) {
+            trackParams.setMaxVideoSize(1280, 720);
+        } else {
+            trackParams.setMaxVideoSize(1920, 1080);
+        }
+        trackSelector.setParameters(trackParams);
 
         DefaultLoadControl loadControl = new DefaultLoadControl.Builder()
                 .setAllocator(new androidx.media3.exoplayer.upstream.DefaultAllocator(true, 64 * 1024))
                 .setBufferDurationsMs(
-                        /* minBufferMs= */ isLive ? 3500 : 25000,
-                        /* maxBufferMs= */ isLive ? 15000 : 50000,
-                        /* bufferForPlaybackMs= */ isLive ? 1000 : 2500,
-                        // v3.12.52: 5000 -> 3000. After a mid-playback stall the
-                        // app used to sit on the spinner for a full 5s of buffer
-                        // before resuming — felt like a second stall. 3s resumes
-                        // visibly faster without risking immediate re-stall.
-                        /* bufferForPlaybackAfterRebufferMs= */ isLive ? 2000 : 3000)
+                        /* minBufferMs= */ isLive ? 15000 : 25000,
+                        /* maxBufferMs= */ isLive ? 30000 : 50000,
+                        // v3.12.72: live playback used to START with 1s of buffer and
+                        // resume with 2s — on stick WiFi that guarantees the
+                        // play -> starve -> rebuffer -> error -> resync chain that
+                        // looks like dead-server cycling. A real cushion up front
+                        // plays through WiFi jitter instead of amplifying it.
+                        /* bufferForPlaybackMs= */ isLive ? 4000 : 2500,
+                        /* bufferForPlaybackAfterRebufferMs= */ isLive ? 5000 : 3000)
                 // v3.12.44 FIX (the whole-stick freeze): cap the buffer to the
                 // device's RAM class. Without setTargetBufferBytes ExoPlayer uses
                 // its default (C.LENGTH_UNSET -> derived from bitrate*maxBuffer,
@@ -1689,7 +1752,7 @@ public class PlayerActivity extends AppCompatActivity {
                 .setTrackSelector(trackSelector)
                 .setLoadControl(loadControl)
                 .setBandwidthMeter(bandwidthMeter)
-                .setMediaSourceFactory(new DefaultMediaSourceFactory(buildDataSourceFactory()))
+                .setMediaSourceFactory(new DefaultMediaSourceFactory(buildDataSourceFactory(streamUrl)))
                 .setAudioAttributes(
                         new androidx.media3.common.AudioAttributes.Builder()
                                 .setUsage(C.USAGE_MEDIA)
@@ -1761,7 +1824,7 @@ public class PlayerActivity extends AppCompatActivity {
     }
 
     private MediaSource buildMediaSource(String url) {
-        DataSource.Factory dataSourceFactory = buildDataSourceFactory();
+        DataSource.Factory dataSourceFactory = buildDataSourceFactory(url);
         Uri uri = Uri.parse(url);
 
         MediaItem.Builder itemBuilder = new MediaItem.Builder().setUri(uri);
@@ -1770,6 +1833,18 @@ public class PlayerActivity extends AppCompatActivity {
                     new MediaItem.LiveConfiguration.Builder()
                             .setMinPlaybackSpeed(1.0f)
                             .setMaxPlaybackSpeed(1.0f)
+                            .build());
+        }
+        // v3.12.64: ClearKey DRM — jio/zee live channels. Elite Streams
+        // pattern: LocalMediaDrmCallback with the JWK-set response built
+        // from hex kid:key pairs, CLEARKEY_UUID session manager. The
+        // MediaItem drm config alone isn't enough — media3 needs the
+        // session manager provider set on the media source factory path,
+        // so we attach it via a wrapper below.
+        if (drmKeyPairs != null && !drmKeyPairs.isEmpty()) {
+            itemBuilder.setDrmConfiguration(
+                    new MediaItem.DrmConfiguration.Builder(C.CLEARKEY_UUID)
+                            .setForceSessionsForAudioAndVideoTracks(true)
                             .build());
         }
 
@@ -1792,8 +1867,12 @@ public class PlayerActivity extends AppCompatActivity {
         boolean looksLikeDash = lower.contains(".mpd") || lower.contains("/dash/");
         if (looksLikeDash) {
             itemBuilder.setMimeType(MimeTypes.APPLICATION_MPD);
-            return new androidx.media3.exoplayer.dash.DashMediaSource.Factory(dataSourceFactory)
-                    .createMediaSource(itemBuilder.build());
+            androidx.media3.exoplayer.dash.DashMediaSource.Factory dashFactory =
+                    new androidx.media3.exoplayer.dash.DashMediaSource.Factory(dataSourceFactory);
+            if (drmKeyPairs != null && !drmKeyPairs.isEmpty()) {
+                dashFactory.setDrmSessionManagerProvider(buildClearKeyProvider());
+            }
+            return dashFactory.createMediaSource(itemBuilder.build());
         }
 
         DefaultExtractorsFactory extractorsFactory = new DefaultExtractorsFactory()
@@ -1809,6 +1888,68 @@ public class PlayerActivity extends AppCompatActivity {
 
     private static volatile OkHttpClient sharedOkHttpClient = null;
 
+    // ------------------------------------------------- v3.12.64 ClearKey DRM
+
+    private static boolean isHexKey(String s) {
+        if (s == null) return false;
+        String c = s.replace(" ", "").replace("-", "");
+        if (c.length() != 32) return false;
+        for (int i = 0; i < c.length(); i++) {
+            char ch = c.charAt(i);
+            boolean ok = (ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F');
+            if (!ok) return false;
+        }
+        return true;
+    }
+
+    private static byte[] hexToBytes(String hex) {
+        String c = hex.replace(" ", "").replace("-", "");
+        byte[] data = new byte[c.length() / 2];
+        for (int i = 0; i < data.length; i++) {
+            data[i] = (byte) ((Character.digit(c.charAt(i * 2), 16) << 4)
+                    + Character.digit(c.charAt(i * 2 + 1), 16));
+        }
+        return data;
+    }
+
+    /**
+     * Elite Streams' exact ClearKey recipe: a local JWK-set response served
+     * by LocalMediaDrmCallback, on a DefaultDrmSessionManager with
+     * CLEARKEY_UUID. Feed channels carry hex kid:key pairs (KODIPROP
+     * license_key format); each pair becomes one JWK.
+     */
+    private DrmSessionManagerProvider buildClearKeyProvider() {
+        try {
+            JSONArray keysArray = new JSONArray();
+            for (String[] pair : drmKeyPairs) {
+                String kidB64 = android.util.Base64.encodeToString(hexToBytes(pair[0]),
+                        android.util.Base64.URL_SAFE | android.util.Base64.NO_PADDING | android.util.Base64.NO_WRAP);
+                String keyB64 = android.util.Base64.encodeToString(hexToBytes(pair[1]),
+                        android.util.Base64.URL_SAFE | android.util.Base64.NO_PADDING | android.util.Base64.NO_WRAP);
+                JSONObject keyObj = new JSONObject();
+                keyObj.put("kty", "oct");
+                keyObj.put("k", keyB64);
+                keyObj.put("kid", kidB64);
+                keysArray.put(keyObj);
+            }
+            JSONObject root = new JSONObject();
+            root.put("keys", keysArray);
+            root.put("type", "temporary");
+            byte[] response = root.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            LocalMediaDrmCallback callback = new LocalMediaDrmCallback(response);
+            final DefaultDrmSessionManager sessionManager =
+                    new DefaultDrmSessionManager.Builder()
+                            .setUuidAndExoMediaDrmProvider(C.CLEARKEY_UUID, FrameworkMediaDrm.DEFAULT_PROVIDER)
+                            .setMultiSession(true)
+                            .build(callback);
+            return mediaItem -> sessionManager;
+        } catch (Exception e) {
+            Log.e(TAG, "ClearKey provider build failed: " + e.getMessage());
+            return null;
+        }
+    }
+
+
     private static synchronized OkHttpClient getSharedOkHttpClient() throws Exception {
         if (sharedOkHttpClient == null) {
             sharedOkHttpClient = buildPermissiveOkHttpClient();
@@ -1817,8 +1958,42 @@ public class PlayerActivity extends AppCompatActivity {
     }
 
     private DataSource.Factory buildDataSourceFactory() {
+        return buildDataSourceFactory(null);
+    }
+
+    /**
+     * v3.12.73 FIX (movies/series not streaming): the native ExoPlayer pipeline
+     * sent bare requests — no Referer, generic UA only. The movibox direct-MP4
+     * CDN (bcdnxw.hakunaymatata.com, Tengine/Alibaba OSS) 429s EVERY request
+     * without a browser UA + movibox Referer, so every direct-MP4 server died
+     * in ~200ms and the app burned its failover queue into slow embed mirrors
+     * ("loads forever, then buffers"). buildEmbedHeaders() already carried the
+     * full Referer map but was only applied to the WebView embed path. Merge
+     * those same headers into the ExoPlayer DataSource per URL. Live channel
+     * playback is untouched: live streams never match the movibox hosts, and
+     * per-channel streamHeaders still override.
+     */
+    private DataSource.Factory buildDataSourceFactory(String url) {
         Map<String, String> defaultHeaders = new HashMap<>();
         defaultHeaders.put("Accept", "*/*");
+        // v3.12.64: per-channel headers from the live feed (jio Cookie,
+        // hotstar UA/Origin, yupp referer). buildEmbedHeaders already
+        // handles mirror Referers; streamHeaders come from the intent.
+        if (streamHeaders != null && !streamHeaders.isEmpty()) {
+            for (Map.Entry<String, String> e : streamHeaders.entrySet()) {
+                if (e.getKey() != null && e.getValue() != null) defaultHeaders.put(e.getKey(), e.getValue());
+            }
+        }
+        // v3.12.73: same Referer/Origin/UA map the WebView embed path uses —
+        // WITHOUT it every direct MP4/HLS mirror that hotlink-gates (movibox
+        // CDN = the #1 VOD source) returns 429/403 to ExoPlayer.
+        if (url != null && !url.isEmpty()) {
+            try {
+                for (Map.Entry<String, String> e : buildEmbedHeaders(url).entrySet()) {
+                    if (e.getKey() != null && e.getValue() != null) defaultHeaders.put(e.getKey(), e.getValue());
+                }
+            } catch (Throwable ignored) {}
+        }
 
         HttpDataSource.Factory httpFactory;
         try {

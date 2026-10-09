@@ -295,6 +295,35 @@ public class MainActivity extends BridgeActivity {
                     playStreamWithFallbacksAndPosition(url, title, isLive, fallbacksJson, 0L);
                 }
 
+                /**
+                 * v3.12.64: live channels with ClearKey DRM + per-channel
+                 * headers (jio Cookie, hotstar UA). drmJson:
+                 * {"keys":[["kidhex","keyhex"],...],"headers":{...}}
+                 */
+                @JavascriptInterface
+                public void playStreamWithDrm(final String url, final String title, final boolean isLive, final String fallbacksJson, final String drmJson) {
+                    if (url == null || url.isEmpty()) return;
+                    runOnUiThread(() -> {
+                        try {
+                            Intent intent = new Intent(MainActivity.this, PlayerActivity.class);
+                            intent.putExtra("url", url);
+                            intent.putExtra("title", title == null ? "Live Channel" : title);
+                            intent.putExtra("isLive", isLive);
+                            if (fallbacksJson != null && !fallbacksJson.isEmpty()) {
+                                intent.putExtra("fallbacks", fallbacksJson);
+                            }
+                            if (drmJson != null && !drmJson.isEmpty()) {
+                                intent.putExtra("drm", drmJson);
+                            }
+                            startActivity(intent);
+                            releaseWebVideoDecoder();
+                        } catch (Exception e) {
+                            resumeWebView(true);
+                            Toast.makeText(MainActivity.this, "Native Player error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                        }
+                    });
+                }
+
                 @JavascriptInterface
                 public void playStreamWithFallbacksAndPosition(final String url, final String title, final boolean isLive, final String fallbacksJson, final long startPositionMs) {
                     if (url == null || url.isEmpty()) return;

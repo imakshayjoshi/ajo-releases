@@ -1,6 +1,9 @@
 const HLS_PATTERNS = [/\.m3u8(?:$|\?)/i, /\/getm3u8\//i, /\/getstream\//i, /\/live\//i, /\/playlist/i];
 const DASH_PATTERNS = [/\.mpd(?:$|\?)/i];
-const VIDEO_PATTERNS = [/\.(mp4|m4v|webm|mkv)(?:$|\?)/i];
+// v3.12.73: our own VPS movibox range proxy serves progressive MP4s — classify
+// as direct video so the web <video> pipeline picks them (they carry no .mp4
+// extension in the path, only inside the ?url= query param).
+const VIDEO_PATTERNS = [/\.(mp4|m4v|webm|mkv)(?:$|\?)/i, /\/movibox\/stream/i];
 
 // v3.12.20 FIX: purged dead providers, reordered by reliability.
 // Confirmed alive (Aug 2026): VidLink, VidSrc PM, AutoEmbed, VidJoy,

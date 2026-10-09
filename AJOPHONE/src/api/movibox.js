@@ -88,36 +88,8 @@ export function normalizeMovibox(raw) {
 }
 
 /**
- * v3.12.73 (movies/series fix): the movibox CDN (bcdnx.hakunaymatata.com)
- * hotlink-gates — 429 for every request without browser UA + movibox
- * Referer. The native ExoPlayer path now sends those headers itself
- * (PlayerActivity buildDataSourceFactory). But the WebView <video> element
- * (phone / web fallback / non-native devices) cannot send custom headers,
- * so raw CDN URLs die there too. Route those through the VPS range proxy
- * (/movibox/stream — same server that signs the play URLs).
- */
-const STREAM_PROXY = 'https://new.ajo.co.in/movibox/stream?url=';
-const DIRECT_CDN_HOSTS = /hakunaymatata\.com|aoneroom\.com|macdn\.com/i;
-export function moviboxProxyUrl(url) {
-  if (!url || typeof url !== 'string') return url;
-  if (DIRECT_CDN_HOSTS.test(url)) return STREAM_PROXY + encodeURIComponent(url);
-  return url;
-}
-export function hasNativePlayerBridge() {
-  try {
-    return typeof window !== 'undefined'
-      && window.AndroidNativePlayer
-      && typeof window.AndroidNativePlayer.playStream === 'function';
-  } catch {
-    return false;
-  }
-}
-
-/**
  * Resolve fresh signed stream URLs for a movibox title.
  * Returns [{resolution, url, format}] sorted best-first, or [].
- * On devices WITHOUT the native bridge the URLs come back proxied so the
- * <video> element can actually stream them.
  */
 export async function getMoviboxStreams(item, episodeInfo = null) {
   try {
@@ -130,11 +102,15 @@ export async function getMoviboxStreams(item, episodeInfo = null) {
     if (item.detailPath) q.set('detailPath', item.detailPath);
     const data = await fetchJson(`${PLAY_URL}?${q.toString()}`, 12000);
     if (!data || !Array.isArray(data.streams)) return [];
-    const useProxy = !hasNativePlayerBridge();
+    // v3.12.73 (movies fix): the movibox CDN hotlink-gates — 429 without
+    // browser UA + movibox Referer, and a <video> element can't send custom
+    // headers. Route through the VPS range proxy which adds them.
+    const DIRECT_CDN = /hakunaymatata\.com|aoneroom\.com|macdn\.com/i;
+    const STREAM_PROXY = 'https://new.ajo.co.in/movibox/stream?url=';
     return data.streams
       .filter((s) => s.url && !s.vipLocked)
       .sort((a, b) => Number(b.resolution || 0) - Number(a.resolution || 0))
-      .map((s) => (useProxy ? { ...s, url: moviboxProxyUrl(s.url) } : s));
+      .map((s) => (DIRECT_CDN.test(s.url) ? { ...s, url: STREAM_PROXY + encodeURIComponent(s.url) } : s));
   } catch {
     return [];
   }

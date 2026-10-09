@@ -153,10 +153,21 @@ export function LiveView({ channels, onSelectItem, loading }) {
                     loading="lazy"
                     decoding="async"
                     onError={(e) => {
+                      // v3.12.73 (thumbnails fix): first failure — retry the same
+                      // logo through the VPS image proxy (covers devices that
+                      // can't reach the logo CDN, and hotlink-gated hosts).
+                      // Second failure — clean fallback tile.
+                      const img = e.currentTarget;
+                      const orig = img.dataset.logoSrc || img.getAttribute('src') || '';
+                      if (orig && !img.dataset.proxyTried && !orig.startsWith('https://new.ajo.co.in/channels/logo')) {
+                        img.dataset.proxyTried = '1';
+                        img.dataset.logoSrc = orig;
+                        img.src = 'https://new.ajo.co.in/channels/logo?u=' + encodeURIComponent(orig);
+                        return;
+                      }
                       // v3.12.70: dead feed logo (e.g. sonypicturesnetworks 403) —
                       // swap to a clean fallback tile. No user data is written here;
                       // DOM nodes are created with fixed literal classes/text only.
-                      const img = e.currentTarget;
                       const box = img.parentElement;
                       if (!box) return;
                       const fallback = document.createElement('div');

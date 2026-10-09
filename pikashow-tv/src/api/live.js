@@ -16,7 +16,7 @@
  */
 
 const LIVE_URL = 'https://new.ajo.co.in/live/channels.json';
-const CACHE_KEY = 'ajo_live_channels_v3';
+const CACHE_KEY = 'ajo_live_channels_v4';
 const TTL = 10 * 60 * 1000; // 10 min client cache (server refreshes 15 min)
 
 /**
@@ -95,7 +95,13 @@ const LOGO_REPAIRS = [
   [/\bsony pix hd\b/i, 'sony-pix-hd-in.png'],
   [/\bsony pix\b/i, 'sony-pix-in.png'],
   [/\bsony marathi hd\b/i, 'sony-marathi-in.png'],
-  [/\bsony marathi\b/i, 'sony-marathi-in.png']
+  [/\bsony marathi\b/i, 'sony-marathi-in.png'],
+  // v3.12.73: channels that still slipped through on 403 sonypicturesnetworks logos
+  [/\bsony aath\b/i, 'sony-aath-in.png'],
+  [/\bsony sports ten 4 tamil\b/i, 'sony-ten-4-in.png'],
+  [/\bsony sports ten 4 telugu\b/i, 'sony-ten-4-in.png'],
+  [/\bsony sports ten 4\b/i, 'sony-ten-4-in.png'],
+  [/\bset hd\b/i, 'sony-entertainment-television-hd-in.png']
 ];
 
 function repairLiveLogo(name, logo) {
@@ -105,6 +111,33 @@ function repairLiveLogo(name, logo) {
     if (re.test(name)) return `https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/${file}`;
   }
   return logo || '';
+}
+
+// v3.12.73 (live thumbnails fix): serve feed logos through our VPS image
+// proxy. Some devices resolve/route specific CDNs badly (the stick already
+// needed the TMDB image proxy for the same reason), and the proxy also
+// normalizes spec-invalid CORS from jio/xstreamcp/amagi logo servers.
+const LOGO_PROXY = 'https://new.ajo.co.in/channels/logo?u=';
+const LOGO_PROXY_HOSTS = [
+  'd229kpbsb5jevy.cloudfront.net',
+  'xstreamcp-assets-msp.streamready.in',
+  'amagi.tv',
+  'jiotvimages.cdn.jio.com',
+  'jiotv.cdn.jio.com',
+  'jiotv.catchup.cdn.jio.com'
+];
+function proxyLiveLogo(logo) {
+  if (!logo) return logo;
+  try {
+    const h = new URL(logo).hostname;
+    if (LOGO_PROXY_HOSTS.some((host) => h === host || h.endsWith('.' + host))) {
+      return LOGO_PROXY + encodeURIComponent(logo);
+    }
+  } catch { /* invalid url — keep as-is */ }
+  return logo;
+}
+function safeLiveLogo(name, logo) {
+  return proxyLiveLogo(repairLiveLogo(name, logo));
 }
 
 /**
@@ -279,8 +312,8 @@ export function normalizeLiveChannel(raw) {
     title: name,
     title_en: name,
     name,
-    poster: repairLiveLogo(name, raw.logo),
-    logo: repairLiveLogo(name, raw.logo),
+    poster: safeLiveLogo(name, raw.logo),
+    logo: safeLiveLogo(name, raw.logo),
     // v3.12.69: name-based classification — the feed's own category is
     // unreliable (news channels arrive tagged Sports).
     category: classifyLiveChannel(name),
