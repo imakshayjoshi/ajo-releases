@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { getBollywoodCatalog, getHollywoodCatalog, getSerialsCatalog, getLiveBroadcasts } from './api/pikashow';
-import { getLiveChannels } from './api/live';
+import { getLiveChannels, isPopularLiveChannel, classifyLiveChannel } from './api/live';
 import { LiveView } from './components/LiveView';
 import { getLiveSportsEvents } from './api/sports';
 import { getWatchHistory, saveProgress, getWatchProgress, sweepStaleCacheKeys } from './api/history';
@@ -186,8 +186,15 @@ export default function App() {
     // iptv-org list fills gaps. Both are normalized to the same shape.
     const [merged, legacy] = await Promise.allSettled([getLiveChannels(), getLiveBroadcasts()]);
     try {
+      // v3.12.69: strict popular-only curation on BOTH sources. The legacy
+      // iptv-org path previously passed its permissive language filter,
+      // re-adding ~900 junk/foreign channels on top of the aggregator.
       const agg = merged.status === 'fulfilled' ? merged.value : [];
-      const old = legacy.status === 'fulfilled' ? legacy.value : [];
+      const oldRaw = legacy.status === 'fulfilled' ? legacy.value : [];
+      const old = oldRaw.filter((ch) => isPopularLiveChannel({
+        name: ch.title_en || ch.title || ch.name,
+        lang: ch.lang || '',
+      })).map((ch) => ({ ...ch, category: classifyLiveChannel(ch.title_en || ch.title || ch.name) }));
       const seen = new Map();
       const seenIds = new Set();
       const push = (ch, fallbackSource) => {
@@ -203,7 +210,25 @@ export default function App() {
       };
       for (const ch of agg) push(ch, 'ajo-live');
       for (const ch of old) push(ch, 'legacy-live');
-      setLiveItems(Array.from(seen.values()));
+      // v3.12.69: sort popular-first so the wall opens on Sony/Star/Zee/Colors
+      // instead of whatever order the feeds merged in.
+      const popularityRank = (ch) => {
+        const n = String(ch.title_en || ch.title || ch.name || '').toLowerCase();
+        if (n.includes('sony sports') || n.includes('star sports') || n.includes('ten 1') || n.includes('ten 2') || n.includes('ten 3')) return 0;
+        if (n.includes('sony') || n.includes('star plus') || n.includes('star bharat') || n.includes('star pravah')) return 1;
+        if (n.includes('colors')) return 2;
+        if (n.includes('zee')) return 3;
+        if (n.includes('aaj tak') || n.includes('ndtv') || n.includes('republic') || n.includes('abp')) return 4;
+        if (n.includes('discovery') || n.includes('national geographic') || n.includes('history') || n.includes('animal planet') || n.includes('epic')) return 5;
+        return 9;
+      };
+      const sorted = Array.from(seen.values()).sort((a, b) => {
+        const pa = popularityRank(a);
+        const pb = popularityRank(b);
+        if (pa !== pb) return pa - pb;
+        return String(a.title_en || a.title || '').localeCompare(String(b.title_en || b.title || ''));
+      });
+      setLiveItems(sorted);
     } catch (e) {
       console.error('Error loading live TV:', e);
       setLiveItems(legacy.status === 'fulfilled' ? legacy.value : []);

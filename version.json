@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "version": "3.12.68",
-  "versionCode": 218,
+  "version": "3.12.69",
+  "versionCode": 219,
   "releaseDate": "2026-10-09",
   "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
   "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
@@ -24,21 +24,24 @@
     "releaseDate": "2026-10-08"
   },
   "tv": {
-    "version": "3.12.68",
-    "versionCode": 218,
+    "version": "3.12.69",
+    "versionCode": 219,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "Fixed live channel vertical scrolling — focused rows now stay on screen as you arrow down through the channel wall",
-      "Fixed movie playback failing with 'no valid stream' — dead-listed mirrors ranked #1 by health checks are now skipped for playable ones",
-      "Movie play now hands off to the hardware player immediately instead of burning 4 web-embed failover cycles"
+      "Live TV rebuilt around a popular-only keep-list: Star, Sony (all incl. sports), ESPN, Colors, Zee families",
+      "News limited to Hindi, Marathi, and English channels",
+      "Discovery, Epic, Animal Planet, National Geographic, and History TV kept; junk FAST channels removed",
+      "Entertainment, movies, and series limited to Marathi, Hindi, and English",
+      "Channel wall now opens popular-first: sports, then Sony/Star/Colors/Zee, then news, then infotainment",
+      "Categories cleaned up from 15 fragmented groups to 5: Sports, News, Entertainment, Movies, Kids"
     ],
     "size_mb": "7.0 MB",
-    "sha256": "1b04d192348cf52da0651f88445000198042a063a3f955af7aeade25b3830353",
-    "size": 7304616,
+    "sha256": "48307d06f4d292a8a271bfba0d459f9be456923a891cd068c90656cd0e93227c",
+    "size": 7307281,
     "releaseDate": "2026-10-09"
   },
   "android_tv": {
@@ -62,8 +65,11 @@
     "size": 7345801
   },
   "changelog": [
-    "Fixed live channel vertical scrolling — focused rows now stay on screen as you arrow down through the channel wall",
-    "Fixed movie playback failing with 'no valid stream' — dead-listed mirrors ranked #1 by health checks are now skipped for playable ones",
-    "Movie play now hands off to the hardware player immediately instead of burning 4 web-embed failover cycles"
+    "Live TV rebuilt around a popular-only keep-list: Star, Sony (all incl. sports), ESPN, Colors, Zee families",
+    "News limited to Hindi, Marathi, and English channels",
+    "Discovery, Epic, Animal Planet, National Geographic, and History TV kept; junk FAST channels removed",
+    "Entertainment, movies, and series limited to Marathi, Hindi, and English",
+    "Channel wall now opens popular-first: sports, then Sony/Star/Colors/Zee, then news, then infotainment",
+    "Categories cleaned up from 15 fragmented groups to 5: Sports, News, Entertainment, Movies, Kids"
   ]
 }
