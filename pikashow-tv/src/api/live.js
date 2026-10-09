@@ -16,7 +16,7 @@
  */
 
 const LIVE_URL = 'https://new.ajo.co.in/live/channels.json';
-const CACHE_KEY = 'ajo_live_channels_v2';
+const CACHE_KEY = 'ajo_live_channels_v3';
 const TTL = 10 * 60 * 1000; // 10 min client cache (server refreshes 15 min)
 
 /**
@@ -61,6 +61,160 @@ export const KEEP_CHANNEL_PATTERNS = [
   'colors marathi', 'colours', 'rishtey', 'utv movies', 'utv action',
   'hindi cinema', 'bollywood', 'marathi', 'sony pix'
 ];
+
+/**
+ * v3.12.70: the Sony feed logos point at sonypicturesnetworks.com which 403s
+ * hotlinking. Repair the known-dead ones to the tv-logos mirror (all probe 200
+ * image/png). Anything else that fails gets a fallback tile client-side.
+ */
+const LOGO_REPAIRS = [
+  [/\bset hd\b|\bsony entertainment television\b.*\bhd\b/i, 'sony-entertainment-television-hd-in.png'],
+  [/\bsony sab hd\b/i, 'sony-sab-hd-in.png'],
+  [/\bsony sab\b/i, 'sony-sab-in.png'],
+  [/\bsony pal hd\b/i, 'sony-pal-hd-in.png'],
+  [/\bsony pal\b/i, 'sony-pal-in.png'],
+  [/\bsony wah hd\b/i, 'sony-wah-hd-in.png'],
+  [/\bsony wah\b/i, 'sony-wah-in.png'],
+  [/\bsony max 2 hd\b|\bsony max2 hd\b/i, 'sony-max-2-hd-in.png'],
+  [/\bsony max 2\b|\bsony max2\b/i, 'sony-max-2-in.png'],
+  [/\bsony max hd\b/i, 'sony-max-hd-in.png'],
+  [/\bsony max\b/i, 'sony-max-in.png'],
+  [/\bsony sports ten 1 hd\b|\bsony ten 1 hd\b/i, 'sony-ten-1-hd-in.png'],
+  [/\bsony sports ten 1\b|\bsony ten 1\b/i, 'sony-ten-1-in.png'],
+  [/\bsony sports ten 2 hd\b|\bsony ten 2 hd\b/i, 'sony-ten-2-hd-in.png'],
+  [/\bsony sports ten 2\b|\bsony ten 2\b/i, 'sony-ten-2-in.png'],
+  [/\bsony sports ten 3 hd\b|\bsony ten 3 hd\b/i, 'sony-ten-3-hd-in.png'],
+  [/\bsony sports ten 3\b|\bsony ten 3\b/i, 'sony-ten-3-in.png'],
+  [/\bsony sports ten 4 hd\b|\bsony ten 4 hd\b/i, 'sony-ten-4-hd-in.png'],
+  [/\bsony sports ten 4\b|\bsony ten 4\b/i, 'sony-ten-4-in.png'],
+  [/\bsony sports ten 5 hd\b|\bsony ten 5 hd\b|\bsony six hd\b/i, 'sony-ten-5-hd-in.png'],
+  [/\bsony sports ten 5\b|\bsony ten 5\b|\bsony six\b/i, 'sony-ten-5-in.png'],
+  [/\bsony yay\b/i, 'sony-yay-in.png'],
+  [/\bsony bbc earth hd\b/i, 'sony-bbc-earth-hd-in.png'],
+  [/\bsony bbc earth\b/i, 'sony-bbc-earth-in.png'],
+  [/\bsony pix hd\b/i, 'sony-pix-hd-in.png'],
+  [/\bsony pix\b/i, 'sony-pix-in.png'],
+  [/\bsony marathi hd\b/i, 'sony-marathi-in.png'],
+  [/\bsony marathi\b/i, 'sony-marathi-in.png']
+];
+
+function repairLiveLogo(name, logo) {
+  if (!name) return logo || '';
+  if (logo && !/sonypicturesnetworks\.com/i.test(logo)) return logo;
+  for (const [re, file] of LOGO_REPAIRS) {
+    if (re.test(name)) return `https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/${file}`;
+  }
+  return logo || '';
+}
+
+/**
+ * v3.12.70: streams probed live right now. The old 51.75.127.199 relay farm is
+ * dead (connection refused on every Star/Sony path), so any channel whose ONLY
+ * player lives there gets dropped from the wall instead of failing at play time.
+ */
+export const DEAD_STREAM_HOST_PATTERNS = [
+  /(^|\.)51\.75\.127\.199$/i,
+  /(^|\.)38\.96\.178\.203$/i,
+  /(^|\.)59\.103\.38\.40$/i,
+  /(^|\.)59\.103\.38\.46$/i,
+  /(^|\.)202\.70\.146\.135$/i,
+  /(^|\.)tvsen5\.aynascope\.net$/i,
+  /(^|\.)tvsen5\.aynaott\.com$/i
+];
+
+/**
+ * v3.12.70: known-live HD mirrors for channels whose primary feed is dead.
+ * Applied after merge so legacy iptv entries get a working server first.
+ */
+export const LIVE_SOURCE_OVERRIDES = [
+  { match: /star sports 1(?!.*(hindi|tamil|telugu))/i, url: 'https://cdn.buzogezapimuyoku.cc/live/star-sports-1-hindi-hd/index.m3u8', label: 'Server 1 (Verified HD)' },
+  { match: /star sports 2(?!.*(hindi|tamil|telugu|english))/i, url: 'http://103.151.60.162:2122/play/a00v/index.m3u8?hls', label: 'Server 1 (Verified HD)' },
+  { match: /star gold hd/i, url: 'http://103.185.24.134:3001/Star-Gold/index.m3u8', label: 'Server 1 (Verified HD)' },
+  { match: /star gold 2 hd/i, url: 'http://103.151.60.162:2122/play/a01v/index.m3u8?hls', label: 'Server 1 (Verified HD)' },
+  { match: /star pravah hd/i, url: 'https://da86m1sqpm3o0.cloudfront.net/28072023/smil:starpravah.smil/chunklist_b1928000.m3u8', label: 'Server 1 (Verified HD)' },
+  { match: /star sports select 1/i, url: 'http://103.151.60.162:2122/play/a026/index.m3u8?hls', label: 'Server 1 (Verified HD)' },
+  { match: /star sports select 2/i, url: 'http://103.151.60.162:2122/play/a027/index.m3u8?hls', label: 'Server 1 (Verified HD)' },
+  { match: /star plus hd/i, url: 'http://38.96.178.205/STARPLUS/index.m3u8', label: 'Server 1 (Verified HD)' }
+];
+
+const DEAD_STREAM_URL_SUBSTRINGS = [
+  '/play/a029/index.m3u8', // Star Sports 3 playlist path — 404 (probed)
+  '/play/a032/index.m3u8', // Star Kiran — 404 (probed)
+  '/play/a01a/index.m3u8', // Star Sports 1 alt — 404 (probed)
+  '/play/a019/index.m3u8', // Star Sports 2 alt — 404 (probed)
+  '/play/a01n/index.m3u8', // Star Gold alt — 404 (probed)
+  '/live/star-sports-3/index.m3u8', // Star Sports 3 English — 404 (probed)
+  'adaptive-streams/refs/heads/main/streams/gb/YuppTV/UtsavBharat.m3u8' // 200 text/plain, not a stream
+];
+
+export function isDeadStreamUrl(url) {
+  if (!url) return true;
+  try {
+    const h = new URL(url).hostname;
+    if (DEAD_STREAM_HOST_PATTERNS.some((p) => p.test(h))) return true;
+    return DEAD_STREAM_URL_SUBSTRINGS.some((x) => String(url).includes(x));
+  } catch { return true; }
+}
+
+export function hasWorkingPlayer(ch) {
+  const players = Array.isArray(ch.players) && ch.players.length
+    ? ch.players.map((p) => p?.url || p)
+    : [ch.url];
+  return players.some((u) => u && !isDeadStreamUrl(u));
+}
+
+/**
+ * v3.12.70: verified-live primary URLs. The wall merged playlists put dead
+ * relays first (51.75.127.199), so every Star channel opened on a dead server
+ * and burned a failover before playing. These reorder the player list so the
+ * probed-live HD feed is Server 1. Channels with no live feed are dropped by
+ * hasWorkingPlayer after the reorder.
+ */
+export const VERIFIED_LIVE_URLS = new Set([
+  'https://cdn.buzogezapimuyoku.cc/live/star-sports-1-hindi-hd/index.m3u8',
+  'https://cdn.buzogezapimuyoku.cc/live/star-sports-2-hindi-hd/index.m3u8',
+  'http://103.151.60.162:2122/play/a00v/index.m3u8?hls',
+  'https://cdn.buzogezapimuyoku.cc/live/star-sports-select-hd1/index.m3u8',
+  'https://cdn.buzogezapimuyoku.cc/live/star-sports-select-hd2/index.m3u8',
+  'https://cdn.buzogezapimuyoku.cc/live/star-bharat-hd/index.m3u8',
+  'https://cdn.buzogezapimuyoku.cc/live/star-plus-hd/index.m3u8',
+  'http://103.185.24.134:3001/Star-Gold/index.m3u8',
+  'http://103.151.60.162:2122/play/a01v/index.m3u8?hls',
+  'https://da86m1sqpm3o0.cloudfront.net/28072023/smil:starpravah.smil/chunklist_b1928000.m3u8',
+  'http://103.151.60.162:2122/play/a026/index.m3u8?hls',
+  'http://103.151.60.162:2122/play/a027/index.m3u8?hls',
+  'http://38.96.178.205/STARPLUS/index.m3u8'
+]);
+
+export function applyLiveSourceOverride(ch) {
+  const title = String(ch.title_en || ch.title || ch.name || '');
+  const players = Array.isArray(ch.players) && ch.players.length
+    ? [...ch.players]
+    : [{ name: 'Server 1 (Auto)', url: ch.url, source: 'hls' }];
+
+  // Drop known-dead hosts/paths outright.
+  const livePlayers = players.filter((p) => !isDeadStreamUrl(p?.url || p));
+
+  // Exact-match overrides win (verified URL for that exact title).
+  for (const o of LIVE_SOURCE_OVERRIDES) {
+    if (o.match.test(title)) {
+      const verified = { name: o.label, url: o.url, source: 'hls', quality: 'HD' };
+      const rest = livePlayers.filter((p) => (p?.url || p) !== o.url);
+      const next = [verified, ...rest];
+      return { ...ch, url: o.url, players: next, player: next };
+    }
+  }
+
+  // Otherwise, promote any probed-live URL to Server 1.
+  const firstLiveIdx = livePlayers.findIndex((p) => VERIFIED_LIVE_URLS.has(p?.url || p));
+  if (firstLiveIdx > 0) {
+    const [best] = livePlayers.splice(firstLiveIdx, 1);
+    const next = [best, ...livePlayers];
+    return { ...ch, url: best?.url || best, players: next, player: next };
+  }
+  const next = livePlayers.length ? livePlayers : players;
+  return { ...ch, players: next, player: next, url: next[0]?.url || next[0] || ch.url };
+}
 
 export function isPopularLiveChannel(raw) {
   if (!raw) return false;
@@ -118,8 +272,8 @@ export function normalizeLiveChannel(raw) {
     title: name,
     title_en: name,
     name,
-    poster: raw.logo || '',
-    logo: raw.logo || '',
+    poster: repairLiveLogo(name, raw.logo),
+    logo: repairLiveLogo(name, raw.logo),
     // v3.12.69: name-based classification — the feed's own category is
     // unreliable (news channels arrive tagged Sports).
     category: classifyLiveChannel(name),

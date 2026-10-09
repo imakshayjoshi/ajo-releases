@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { getBollywoodCatalog, getHollywoodCatalog, getSerialsCatalog, getLiveBroadcasts } from './api/pikashow';
-import { getLiveChannels, isPopularLiveChannel, classifyLiveChannel } from './api/live';
+import { getLiveChannels, isPopularLiveChannel, classifyLiveChannel, hasWorkingPlayer, applyLiveSourceOverride } from './api/live';
 import { LiveView } from './components/LiveView';
 import { getLiveSportsEvents } from './api/sports';
 import { getWatchHistory, saveProgress, getWatchProgress, sweepStaleCacheKeys } from './api/history';
@@ -209,7 +209,12 @@ export default function App() {
         seen.set(nameKey, ch.id ? ch : { ...ch, id, source: ch.source || fallbackSource });
       };
       for (const ch of agg) push(ch, 'ajo-live');
-      for (const ch of old) push(ch, 'legacy-live');
+      // v3.12.70: drop channels whose every player sits on a dead host, and
+      // swap in the probed-live HD mirror for Star channels where one exists.
+      for (const ch of old) {
+        if (!hasWorkingPlayer(ch)) continue;
+        push(applyLiveSourceOverride(ch), 'legacy-live');
+      }
       // v3.12.69: sort popular-first so the wall opens on Sony/Star/Zee/Colors
       // instead of whatever order the feeds merged in.
       const popularityRank = (ch) => {

@@ -146,7 +146,29 @@ export function LiveView({ channels, onSelectItem, loading }) {
             >
               <div className="tv-card-media tv-card-live-media">
                 {ch.logo ? (
-                  <img className="live-logo" src={ch.logo} alt="" loading="lazy" decoding="async" />
+                  <img
+                    className="live-logo"
+                    src={ch.logo}
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                    onError={(e) => {
+                      // v3.12.70: dead feed logo (e.g. sonypicturesnetworks 403) —
+                      // swap to a clean fallback tile. No user data is written here;
+                      // DOM nodes are created with fixed literal classes/text only.
+                      const img = e.currentTarget;
+                      const box = img.parentElement;
+                      if (!box) return;
+                      const fallback = document.createElement('div');
+                      fallback.className = 'live-logo live-logo-fallback';
+                      fallback.setAttribute('aria-hidden', 'true');
+                      fallback.textContent = '📺';
+                      const badge = document.createElement('span');
+                      badge.className = 'tv-badge-live';
+                      badge.textContent = 'LIVE';
+                      box.replaceChildren(fallback, badge);
+                    }}
+                  />
                 ) : (
                   <div className="live-logo live-logo-fallback" aria-hidden="true">📺</div>
                 )}

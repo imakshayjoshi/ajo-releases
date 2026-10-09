@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "version": "3.12.69",
-  "versionCode": 219,
+  "version": "3.12.70",
+  "versionCode": 220,
   "releaseDate": "2026-10-09",
   "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
   "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
@@ -24,24 +24,23 @@
     "releaseDate": "2026-10-08"
   },
   "tv": {
-    "version": "3.12.69",
-    "versionCode": 219,
+    "version": "3.12.70",
+    "versionCode": 220,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "Live TV rebuilt around a popular-only keep-list: Star, Sony (all incl. sports), ESPN, Colors, Zee families",
-      "News limited to Hindi, Marathi, and English channels",
-      "Discovery, Epic, Animal Planet, National Geographic, and History TV kept; junk FAST channels removed",
-      "Entertainment, movies, and series limited to Marathi, Hindi, and English",
-      "Channel wall now opens popular-first: sports, then Sony/Star/Colors/Zee, then news, then infotainment",
-      "Categories cleaned up from 15 fragmented groups to 5: Sports, News, Entertainment, Movies, Kids"
+      "Star channels fixed: every surviving Star channel now opens on a probed-live HD server instead of a dead relay",
+      "Dead Star entries dropped (Star Sports 3, Star Bharat UK, regional Maa/Jalsha/Vijay/Suvarna variants)",
+      "Sony channel logos repaired — the Sony CDN 403s hotlinking, so they now load from the verified tv-logos mirror",
+      "Any remaining dead logo now falls back to a clean channel tile instead of an empty frame",
+      "Channel wall trimmed from 205 to 185 after removing dead-stream hosts"
     ],
     "size_mb": "7.0 MB",
-    "sha256": "6070decf8ae25fb42c61dd2a079e146a7bbdaa81d54f1052df33655b6a7b320e",
-    "size": 7308174,
+    "sha256": "1e10f2631c6983015239263dcd35dd5bc65fb2352a15d36f70e454b31eb28ca5",
+    "size": 7311018,
     "releaseDate": "2026-10-09"
   },
   "android_tv": {
@@ -65,11 +64,10 @@
     "size": 7345801
   },
   "changelog": [
-    "Live TV rebuilt around a popular-only keep-list: Star, Sony (all incl. sports), ESPN, Colors, Zee families",
-    "News limited to Hindi, Marathi, and English channels",
-    "Discovery, Epic, Animal Planet, National Geographic, and History TV kept; junk FAST channels removed",
-    "Entertainment, movies, and series limited to Marathi, Hindi, and English",
-    "Channel wall now opens popular-first: sports, then Sony/Star/Colors/Zee, then news, then infotainment",
-    "Categories cleaned up from 15 fragmented groups to 5: Sports, News, Entertainment, Movies, Kids"
+    "Star channels fixed: every surviving Star channel now opens on a probed-live HD server instead of a dead relay",
+    "Dead Star entries dropped (Star Sports 3, Star Bharat UK, regional Maa/Jalsha/Vijay/Suvarna variants)",
+    "Sony channel logos repaired — the Sony CDN 403s hotlinking, so they now load from the verified tv-logos mirror",
+    "Any remaining dead logo now falls back to a clean channel tile instead of an empty frame",
+    "Channel wall trimmed from 205 to 185 after removing dead-stream hosts"
   ]
 }
