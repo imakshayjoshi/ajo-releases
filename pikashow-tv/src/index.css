@@ -585,6 +585,121 @@ html, body, #root {
   touch-action: pan-x pan-y;
 }
 
+/* v3.12.67: Provider Catalog — the scoped-search + filter + sort pattern
+   from the reference site, adapted for D-pad TV focus. */
+.provider-catalog-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+  padding: 0 0 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.provider-catalog-titles {
+  min-width: 240px;
+}
+
+.provider-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.provider-back-btn:hover,
+.provider-back-btn:focus {
+  color: #ffffff;
+}
+
+.provider-catalog-sub {
+  margin: 4px 0 0;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.provider-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 12px;
+}
+
+.provider-search-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--bg-card);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  padding: 0 14px;
+  min-width: 280px;
+  height: 42px;
+}
+
+.provider-search-box svg {
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.provider-search-input {
+  border: none;
+  background: transparent;
+  outline: none;
+  color: #ffffff;
+  font-size: 0.95rem;
+  font-weight: 500;
+  width: 100%;
+  height: 100%;
+  flex: none;
+}
+
+.provider-search-input::placeholder {
+  color: rgba(255, 255, 255, 0.35);
+  font-weight: 400;
+}
+
+.provider-search-box:focus-within {
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.25);
+}
+
+.provider-sort-select {
+  height: 42px;
+  background: var(--bg-card);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  color: #ffffff;
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 0 12px;
+  outline: none;
+  cursor: pointer;
+}
+
+.provider-sort-select:focus {
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.25);
+}
+
+.provider-bar {
+  margin-top: 12px;
+}
+
+.provider-chip {
+  font-size: 0.8rem;
+}
+
 .tv-category-bar::-webkit-scrollbar {
   display: none;
 }
@@ -1019,4 +1134,248 @@ html, body, #root {
   background: rgba(30, 41, 59, 0.98) !important;
   z-index: 30 !important;
   outline: none !important;
+}
+
+/* ============================================================
+   v3.12.66 Live TV channel wall — TV-first focus system
+   ============================================================ */
+
+.live-view-shell {
+  display: flex;
+  min-height: calc(100vh - 132px);
+  background:
+    radial-gradient(circle at 12% 0%, rgba(24, 37, 62, 0.9), transparent 42%),
+    radial-gradient(circle at 100% 100%, rgba(9, 14, 24, 0.98), transparent 55%);
+}
+
+.live-cat-rail {
+  width: 232px;
+  flex: 0 0 232px;
+  padding: 14px 12px;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  max-height: calc(100vh - 132px);
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.live-cat-rail::-webkit-scrollbar { display: none; }
+
+.live-cat-btn {
+  width: 100%;
+  min-height: 48px; /* Fire TV minimum comfortable target */
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px;
+  font-size: 0.98rem;
+  font-weight: 700;
+  text-align: left;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  transition: transform 160ms var(--ease-out-quick), background 160ms ease,
+              box-shadow 160ms var(--ease-out-quick), color 160ms ease;
+}
+
+.live-cat-btn.active {
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.24), rgba(2, 132, 199, 0.16));
+  border-color: rgba(56, 189, 248, 0.75);
+  color: #ffffff;
+}
+
+.live-cat-btn:focus {
+  transform: scale(1.04);
+  background: rgba(15, 23, 42, 0.98);
+  border-color: #f2f4f8;
+  color: #ffffff;
+  box-shadow: var(--focus-ring);
+  z-index: 30;
+}
+
+.live-cat-name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.live-cat-count {
+  flex: 0 0 auto;
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #71809a;
+}
+
+.live-cat-btn.active .live-cat-count,
+.live-cat-btn:focus .live-cat-count { color: var(--accent-cyan); }
+
+.live-grid-scroll {
+  flex: 1;
+  min-width: 0;
+  padding: 12px 30px 30px 26px;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.live-grid-scroll::-webkit-scrollbar { display: none; }
+
+.live-grid-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 4px 0 18px;
+}
+
+.live-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ff3b30;
+  box-shadow: 0 0 12px #ff3b30;
+  animation: live-pulse 2s ease-in-out 1.2s infinite;
+}
+
+.live-grid-title {
+  margin: 0;
+  font-size: 1.32rem;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: -0.01em;
+}
+
+.live-grid-count {
+  margin-left: 10px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #71809a;
+}
+
+.live-channel-grid {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(132px, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+/* Channel cards override the poster-card proportions: logo tiles, not posters. */
+.tv-card.live-channel-card,
+.tv-card-live.live-channel-card {
+  width: 100%;
+  min-height: 150px;
+  padding: 14px 10px 11px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: linear-gradient(165deg, rgba(20, 29, 46, 0.96), rgba(10, 15, 25, 0.98));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.tv-card-live-media.live-card-media {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.07);
+  overflow: visible;
+}
+
+.live-logo {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 5px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.04);
+  transition: filter 160ms ease, transform 160ms var(--ease-out-quick);
+}
+
+.live-logo-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 27px;
+  background: rgba(56, 189, 248, 0.14);
+}
+
+.live-channel-card:focus {
+  transform: scale(1.09);
+  border-color: #f2f4f8;
+  background: linear-gradient(165deg, rgba(27, 39, 62, 0.99), rgba(12, 18, 31, 1));
+  box-shadow: var(--focus-ring), 0 0 0 1px rgba(255, 255, 255, 0.15);
+  z-index: 40;
+  will-change: transform;
+}
+
+.live-channel-card:focus .live-logo {
+  filter: drop-shadow(0 7px 16px rgba(0, 0, 0, 0.7)) saturate(1.12);
+  transform: scale(1.03);
+}
+
+.live-card-info {
+  padding: 0;
+  width: 100%;
+  text-align: center;
+  gap: 3px;
+}
+
+.live-card-info .tv-card-title {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.25;
+}
+
+.live-card-meta {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #71809a;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.live-channel-card .tv-badge-live {
+  position: absolute;
+  top: -5px;
+  right: -7px;
+  padding: 2px 6px;
+  font-size: 0.58rem;
+}
+
+/* Fire TV / smaller TV screens: 8 columns keeps targets comfortably large. */
+@media (max-width: 1600px) {
+  .live-channel-grid { grid-template-columns: repeat(8, minmax(140px, 1fr)); }
+}
+
+@media (max-width: 1280px) {
+  .live-channel-grid { grid-template-columns: repeat(7, minmax(136px, 1fr)); }
+}
+
+@media (max-width: 960px) {
+  .live-view-shell { flex-direction: column; }
+  .live-cat-rail {
+    width: 100%;
+    flex: 0 0 auto;
+    max-height: none;
+    flex-direction: row;
+    overflow-x: auto;
+    overflow-y: hidden;
+    border-right: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  .live-cat-btn { width: auto; min-height: 44px; }
+  .live-channel-grid { grid-template-columns: repeat(4, minmax(130px, 1fr)); }
 }

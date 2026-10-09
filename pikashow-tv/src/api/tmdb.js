@@ -12,11 +12,32 @@
  * Rate limit: ~50 req/s is fine; we cache aggressively in localStorage.
  */
 
-const TMDB_API = 'https://api.themoviedb.org/3';
+const TMDB_API = (() => {
+  // v3.12.62: the Fire TV stick's DNS/route to api.themoviedb.org is broken
+  // (curl 000s; every other CDN works), which silently gutted the catalog to
+  // the thin local list. Route TMDB through our VPS proxy on the same origin
+  // that already serves health.json + channels (traefik -> ajo-tmdb :3005,
+  // IPv6-first with retry — see /root/ajo-tmdb-proxy.py on 72.60.220.246).
+  // A global switch lets tests or a fixed-stick future flip it back.
+  try {
+    if (typeof window !== 'undefined' && window.__AJO_USE_DIRECT_TMDB) {
+      return 'https://api.themoviedb.org/3';
+    }
+  } catch {}
+  return 'https://new.ajo.co.in/tmdb';
+})();
+const TMDB_IMG = (() => {
+  try {
+    if (typeof window !== 'undefined' && window.__AJO_USE_DIRECT_TMDB) {
+      return 'https://image.tmdb.org/t/p';
+    }
+  } catch {}
+  // posters through the same proxy (traefik /tmdbimg -> :3005 -> image.tmdb.org)
+  return 'https://new.ajo.co.in/tmdbimg/t/p';
+})();
 // Primary key extracted from FilmPlus; fallback = phone's existing public key
 const TMDB_KEYS = ['5b458cad0b474d21129c717626038657', '4e44d9029b1270a757cddc766a1bcb63'];
 const TMDB_KEY = TMDB_KEYS[0];
-const TMDB_IMG = 'https://image.tmdb.org/t/p';
 
 const CACHE_PREFIX = 'ajo_tmdb_';
 const CACHE_TTL = 6 * 60 * 60 * 1000; // 6h
@@ -143,6 +164,32 @@ export async function getTmdbCatalog(kind = 'movie', list = 'popular', page = 1)
   const items = (data?.results || []).map(r => normalizeTmdb(r, kind)).filter(Boolean);
   if (items.length) cacheSet(key, items);
   return items;
+}
+
+/**
+ * v3.12.65: deep catalog loader. getTmdbCatalog() returns ONE page (20
+ * titles), so the Movies/Series tabs were stuck at "a few" even though TMDB
+ * has the full library behind page 2..N. This walks `maxPages` pages in
+ * batches and calls onPage after every batch so the grid fills progressively
+ * instead of waiting for every request.
+ */
+export async function getTmdbCatalogDeep(kind = 'movie', maxPages = 30, onPage = null) {
+  const all = [];
+  const BATCH = 5;
+  for (let start = 1; start <= maxPages; start += BATCH) {
+    const pages = [];
+    for (let page = start; page < Math.min(start + BATCH, maxPages + 1); page += 1) pages.push(page);
+    const groups = await Promise.allSettled(
+      pages.map((page) => getTmdbCatalog(kind, 'popular', page))
+    );
+    for (const group of groups) {
+      if (group.status === 'fulfilled' && Array.isArray(group.value)) all.push(...group.value);
+    }
+    if (onPage) {
+      try { onPage(all.slice()); } catch {}
+    }
+  }
+  return all;
 }
 
 /**

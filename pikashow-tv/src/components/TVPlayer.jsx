@@ -263,10 +263,14 @@ export function TVPlayer({
   // v3.10.0: let App.handleBack know the drawer is open so the global Back
   // handler closes the drawer (via TVPlayer's own handler) instead of
   // tearing down the whole player and losing the resume position.
+  // v3.12.62: the flag must be EXPLICITLY false when no drawer is open
+  // (not just truthy when open) — useSpatialNavigation keys off
+  // `__ajoPlayerDrawerOpen === false` to know "player mounted, D-pad belongs
+  // to the player, do NOT steal the key for focus movement".
   useEffect(() => {
     window.__ajoPlayerDrawerOpen = Boolean(showDrawer);
     return () => {
-      if (window.__ajoPlayerDrawerOpen) window.__ajoPlayerDrawerOpen = false;
+      window.__ajoPlayerDrawerOpen = undefined;
     };
   }, [showDrawer]);
 
@@ -999,10 +1003,15 @@ export function TVPlayer({
       const navHandled = e.defaultPrevented;
 
       // Left / Right keys for seeking
-      if (!showDrawer && !isLive && !navHandled) {
+      // v3.12.62: player owns the D-pad while fullscreen (spatial nav is
+      // inert — see useSpatialNavigation). preventDefault + stopPropagation
+      // so nothing else (focus, scroll) reacts to the seek key.
+      if (!showDrawer && !navHandled) {
         if (key === 'ArrowLeft' || keyCode === 21 || keyCode === 37) {
+          if (!isLive) { e.preventDefault(); e.stopPropagation(); }
           handleSeek(-10);
         } else if (key === 'ArrowRight' || keyCode === 22 || keyCode === 39) {
+          if (!isLive) { e.preventDefault(); e.stopPropagation(); }
           handleSeek(10);
         }
       }

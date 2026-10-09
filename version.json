@@ -1,8 +1,8 @@
 {
   "schemaVersion": 2,
-  "version": "3.12.66",
-  "versionCode": 216,
-  "releaseDate": "2026-10-08",
+  "version": "3.12.67",
+  "versionCode": 217,
+  "releaseDate": "2026-10-09",
   "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
   "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
   "phone": {
@@ -14,33 +14,33 @@
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "\ud83d\udcda Full catalog pages now include 30 TMDB pages plus the complete Movibox library",
-      "\ud83c\udfac Movies tab now includes all Movibox movies with direct HD playback",
-      "\ud83d\udcfa Series tab now includes all Movibox series",
-      "\ud83d\udd0e Popular franchise search works across TMDB and Movibox"
+      "Full catalog pages now include 30 TMDB pages plus the complete Movibox library",
+      "Movies tab now includes all Movibox movies with direct HD playback",
+      "Series tab now includes all Movibox series",
+      "Popular franchise search works across TMDB and Movibox"
     ],
     "size_mb": "3.3 MB",
     "sha256": "cd1570aa24dbc50a9f4901c8a9c20d223df5f131696a5292be99da9e0a874703",
     "releaseDate": "2026-10-08"
   },
   "tv": {
-    "version": "3.12.66",
-    "versionCode": 216,
+    "version": "3.12.67",
+    "versionCode": 217,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
     "changelog": [
-      "TV focus system: live channel thumbnails now get a clear scale + white/gold halo on Fire TV and Android TV",
-      "Live TV rebuilt as a category rail + responsive 10/8/7-column channel wall",
-      "Focused tiles scroll into view while navigating",
-      "Search tab now focuses the search input so typed queries land immediately",
-      "Fixed duplicate live channel ids that caused rendering errors"
+      "Provider catalog UI: scoped search bar that switches to 'Search on Movibox...' when filtered",
+      "Provider chips: All Sources / Movibox / TMDB Discover, auto-detected from catalog data",
+      "Genre chips on Movies and Series tabs: Action, Crime, Drama, Comedy, and more",
+      "Sort dropdown: Most Popular / Newest / A-Z",
+      "Home breadcrumb back button on catalog screens"
     ],
     "size_mb": "7.0 MB",
-    "sha256": "0b63a17eccdf9a022b2589dedaf2ba6ec64a4077e1c901d01096386fa2b34e49",
-    "size": 7300035,
+    "sha256": "cb6e2879e807a6391cea8ed06209f3f91054f38cd5e29b130c03703518535bc1",
+    "size": 7303728,
     "releaseDate": "2026-10-09"
   },
   "android_tv": {
@@ -64,9 +64,10 @@
     "size": 7345801
   },
   "changelog": [
-    "TV focus system: live channel thumbnails now get a clear scale + halo on Fire TV and Android TV",
-    "Live TV rebuilt as a category rail + 10/8/7-column channel wall with scroll-into-view",
-    "Search tab now focuses the input so typed queries actually land",
-    "Fixed duplicate live channel ids that caused rendering errors"
+    "Provider catalog UI: scoped search bar that switches to 'Search on Movibox...' when filtered",
+    "Provider chips: All Sources / Movibox / TMDB Discover, auto-detected from catalog data",
+    "Genre chips on Movies and Series tabs: Action, Crime, Drama, Comedy, and more",
+    "Sort dropdown: Most Popular / Newest / A-Z",
+    "Home breadcrumb back button on catalog screens"
   ]
 }

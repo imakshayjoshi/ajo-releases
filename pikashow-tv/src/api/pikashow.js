@@ -312,12 +312,14 @@ export async function searchAllMedia(query) {
   const clean = String(query || '').trim().toLowerCase();
   if (!clean) return [];
 
-  const [catalog, live, tmdbRes, ytRes] = await Promise.allSettled([
+  const [catalog, live, tmdbRes, ytRes, moviboxRes] = await Promise.allSettled([
     loadCatalog(),
     getLiveBroadcasts(),
     import('./tmdb.js').then(m => m.searchTmdb(clean)),
     // v3.12.60: YouTube search results in global search (Piped-backed).
-    import('./youtube.js').then(m => m.searchYouTubeVideos(clean)).catch(() => [])
+    import('./youtube.js').then(m => m.searchYouTubeVideos(clean)).catch(() => []),
+    // v3.12.62: movibox catalog search (direct-MP4 source, highest quality).
+    import('./movibox.js').then(m => m.searchMovibox(clean)).catch(() => [])
   ]);
 
   const localItems = [
@@ -326,6 +328,7 @@ export async function searchAllMedia(query) {
   ];
   const tmdbItems = tmdbRes.status === 'fulfilled' && Array.isArray(tmdbRes.value) ? tmdbRes.value : [];
   const ytItems = ytRes.status === 'fulfilled' && Array.isArray(ytRes.value) ? ytRes.value : [];
+  const moviboxItems = moviboxRes.status === 'fulfilled' && Array.isArray(moviboxRes.value) ? moviboxRes.value : [];
 
   const matchedLocal = localItems.filter((item) => {
     return `${item.title} ${item.category || ''}`.toLowerCase().includes(clean);
@@ -334,7 +337,9 @@ export async function searchAllMedia(query) {
   const seen = new Set();
   const results = [];
 
-  for (const item of [...tmdbItems, ...ytItems, ...matchedLocal]) {
+  // v3.12.62: movibox FIRST — direct MP4s beat embed mirrors on speed and
+  // quality when the title exists there.
+  for (const item of [...moviboxItems, ...tmdbItems, ...ytItems, ...matchedLocal]) {
     const key = (item.title || '').toLowerCase().trim() + ':' + (item.type || 'movie');
     if (!key || seen.has(key)) continue;
     seen.add(key);

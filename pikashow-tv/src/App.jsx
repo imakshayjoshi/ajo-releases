@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { getBollywoodCatalog, getHollywoodCatalog, getSerialsCatalog, getLiveBroadcasts } from './api/pikashow';
+import { getLiveChannels } from './api/live';
+import { LiveView } from './components/LiveView';
 import { getLiveSportsEvents } from './api/sports';
 import { getWatchHistory, saveProgress, getWatchProgress, sweepStaleCacheKeys } from './api/history';
 import { initAnalytics, trackTabView, trackContentOpen, trackSearchQuery } from './api/analytics';
 import { checkForAppUpdates } from './api/otaUpdate';
-import { getTmdbTrending, getTmdbCatalog, getTmdbNowPlaying, getBecauseYouWatched } from './api/tmdb';
+import { getTmdbTrending, getTmdbCatalog, getTmdbCatalogDeep, getTmdbNowPlaying, getBecauseYouWatched } from './api/tmdb';
 import { getRankedServers } from './api/mirrorHealth';
 import { getAddonCatalogs, getAddonStreams } from './api/stremio';
 import { GoogleTVHeader } from './components/GoogleTVHeader';
@@ -17,7 +19,7 @@ import { EPGGuideView } from './components/EPGGuideView';
 import { TVPlayer } from './components/TVPlayer';
 import { AmbientBackdrop } from './components/AmbientBackdrop';
 import { useSpatialNavigation } from './hooks/useSpatialNavigation';
-import { shouldPreferNativePlayer, playInNativePlayer, isNativePlaybackActive, nativePlayerControl, setNativePlaybackActive } from './utils/nativePlayer';
+import { shouldPreferNativePlayer, playInNativePlayer, playInNativePlayerWithDrm, isNativePlaybackActive, nativePlayerControl, setNativePlaybackActive } from './utils/nativePlayer';
 import { generateUniversalServers } from './utils/streamingEngines';
 // v3.9.0 PERF: castSync lazy-loaded — the 27KB module was parsed eagerly on
 // every startup even though cast is only used when a phone is actually paired.
@@ -34,6 +36,7 @@ export default function App() {
   const [sportsItems, setSportsItems] = useState([]);
   const [continueWatching, setContinueWatching] = useState([]);
   const [tmdbTrending, setTmdbTrending] = useState([]);
+  const [moviboxItems, setMoviboxItems] = useState([]);
   const [tmdbMovies, setTmdbMovies] = useState([]);
   const [tmdbSeries, setTmdbSeries] = useState([]);
   const [nowPlaying, setNowPlaying] = useState([]);
@@ -66,7 +69,7 @@ export default function App() {
   // closing it returns the user to the exact same spot instead of dumping
   // focus on the Home pill or the first card in the DOM.
   const lastFocusedBeforeOverlayRef = useRef(null);
-  const prevTabRef = useRef('home');
+  const prevTabRef = useRef(null);
 
   const rememberFocus = useCallback(() => {
     try {
@@ -107,12 +110,18 @@ export default function App() {
       ['popMovies', getTmdbCatalog('movie', 'popular')],
       ['popTv', getTmdbCatalog('tv', 'popular')],
       ['newReleases', getTmdbNowPlaying(20)],
+      // v3.12.65: the browse tabs were one-page catalogs. Walk 30 TMDB
+      // pages (600 titles each side) and paint every batch as it lands.
+      ['deepMovies', getTmdbCatalogDeep('movie', 30, (items) => setTmdbMovies(items))],
+      ['deepTv', getTmdbCatalogDeep('tv', 30, (items) => setTmdbSeries(items))],
       // v3.12.57: these two used to START only after the 8 above settled — a
       // pure waterfall that always rendered their rails last. They depend on
       // nothing (getWatchHistory is a sync localStorage read), so run them
       // alongside.
       ['addons', getAddonCatalogs()],
       ['because', getBecauseYouWatched(getWatchHistory() || [])],
+      // v3.12.62: movibox rail — direct-MP4 source, no embeds.
+      ['movibox', import('./api/movibox').then((m) => m.getMoviboxCatalog()).then((items) => items.filter(Boolean))],
     ];
     for (const [key, p] of jobs) {
       p.then((v) => {
@@ -131,6 +140,12 @@ export default function App() {
             break;
           }
           case 'because': setBecauseYouWatched(v || []); break;
+          case 'movibox': {
+            import('./api/movibox').then((m) => {
+              setMoviboxItems((v || []).map(m.normalizeMovibox).filter(Boolean));
+            }).catch(() => {});
+            break;
+          }
         }
       }).catch(() => {});
     }
@@ -166,11 +181,32 @@ export default function App() {
   // 1.2s after first paint so the Home tab renders instantly on low-RAM Fire
   // TV sticks; the Live TV tab forces an immediate load when opened.
   const loadLiveTV = useCallback(async () => {
+    // v3.12.64: two sources merged — the AJO live aggregator (Elite Streams'
+    // feeds, health-checked on the VPS) wins name collisions; the legacy
+    // iptv-org list fills gaps. Both are normalized to the same shape.
+    const [merged, legacy] = await Promise.allSettled([getLiveChannels(), getLiveBroadcasts()]);
     try {
-      const items = await getLiveBroadcasts();
-      setLiveItems(items || []);
+      const agg = merged.status === 'fulfilled' ? merged.value : [];
+      const old = legacy.status === 'fulfilled' ? legacy.value : [];
+      const seen = new Map();
+      const seenIds = new Set();
+      const push = (ch, fallbackSource) => {
+        const nameKey = String(ch.title_en || ch.title || ch.name || '').toLowerCase().trim();
+        if (!nameKey) return;
+        let id = String(ch.id || ch.name || nameKey).trim();
+        // v3.12.66: duplicate ids (e.g. DisneyJunior.in@SD) broke React keys.
+        // Keep the FIRST copy — feed order is trust order — and de-dupe by
+        // title at the same time.
+        if (seenIds.has(id) || seen.has(nameKey)) return;
+        seenIds.add(id);
+        seen.set(nameKey, ch.id ? ch : { ...ch, id, source: ch.source || fallbackSource });
+      };
+      for (const ch of agg) push(ch, 'ajo-live');
+      for (const ch of old) push(ch, 'legacy-live');
+      setLiveItems(Array.from(seen.values()));
     } catch (e) {
       console.error('Error loading live TV:', e);
+      setLiveItems(legacy.status === 'fulfilled' ? legacy.value : []);
     } finally {
       setLiveLoaded(true);
     }
@@ -245,6 +281,8 @@ export default function App() {
       // Fire TV / legacy Android TV: go straight to the native ExoPlayer activity with fallbacks
       if (url && shouldPreferNativePlayer()) {
         const title = item.title_en || item.title || item.name || 'Live Channel';
+        // v3.12.64: aggregator channels may carry ClearKey DRM + headers
+        if (playInNativePlayerWithDrm(url, title, true, allServers, item.drm, item.headers)) return;
         if (playInNativePlayer(url, title, true, allServers)) return;
       }
 
@@ -272,6 +310,26 @@ export default function App() {
       ? episodes[episodeIndex]
       : (resolvedItem.season_number || resolvedItem.episode_number ? resolvedItem : null);
     let allServers = generateUniversalServers(resolvedItem, episodeInfo);
+    // v3.12.62: movibox titles carry direct-MP4 streams (360p..1080p, no
+    // embeds, no ads). Resolve them at play time (URLs are signed per
+    // request) and put them FIRST — the embed mirrors stay as fallback.
+    try {
+      if (resolvedItem?.moviboxId) {
+        const { getMoviboxStreams } = await import('./api/movibox');
+        const streams = await getMoviboxStreams(resolvedItem, episodeInfo);
+        const moviboxServers = streams.map((s, i) => ({
+          id: `movibox-${s.resolution}-${i}`,
+          name: `Movibox ${s.resolution}p${Number(s.resolution) >= 1080 ? ' HD' : ''}`,
+          url: s.url,
+          source: 'mp4',
+          quality: `${s.resolution}p`,
+          provider: 'movibox'
+        }));
+        if (moviboxServers.length > 0) {
+          allServers = [...moviboxServers, ...allServers];
+        }
+      }
+    } catch {}
     // v3.12.57 PERF: server health ranking and Stremio addon streams are
     // INDEPENDENT — they used to run strictly in series (enrich -> rank ->
     // addons), adding 2-3 sequential round-trips to EVERY play on the stick.
@@ -504,7 +562,13 @@ export default function App() {
     if (prevTabRef.current === activeTab) return;
     prevTabRef.current = activeTab;
     if (!selectedItem && !activePlayback) {
-      focusInitial('.tv-nav-pill.active, .tv-hero, .tv-card');
+      // v3.12.66: Search is a TYPE-FIRST screen. Focus the input, not the
+      // nav pill — otherwise physical-keyboard/remote typing goes nowhere.
+      if (activeTab === 'search') {
+        focusInitial('.tv-search-input, .tv-nav-pill.active');
+      } else {
+        focusInitial('.tv-nav-pill.active, .tv-hero, .tv-card');
+      }
     }
   }, [activeTab, selectedItem, activePlayback, focusInitial]);
 
@@ -524,18 +588,20 @@ export default function App() {
     && tmdbSeries.length === 0
     && tmdbTrending.length === 0
     && nowPlaying.length === 0
+    && moviboxItems.length === 0
     && continueWatching.length === 0
-  ), [loading, bollywoodItems, hollywoodItems, seriesItems, tmdbMovies, tmdbSeries, tmdbTrending, nowPlaying, continueWatching]);
+  ), [loading, bollywoodItems, hollywoodItems, seriesItems, tmdbMovies, tmdbSeries, tmdbTrending, nowPlaying, moviboxItems, continueWatching]);
 
   // v3.9.0 PERF: removed YouTube trailer iframe from hero banner.
   // On Fire TV Stick 4K (1.5GB RAM) the iframe consumed ~150MB (Chromium
   // sub-renderer), competed for GPU with the WebView, and broke D-pad focus.
 
-  // All Movies combined (upstream catalog + TMDB popular, strictly movies only)
+  // All Movies combined (upstream catalog + Movibox + TMDB deep pages)
   const allMovies = useMemo(() => {
     const seen = new Set();
     const merged = [];
-    for (const item of [...bollywoodItems, ...hollywoodItems, ...tmdbMovies]) {
+    // Movibox first: its direct MP4 streams are the highest-quality source.
+    for (const item of [...moviboxItems, ...bollywoodItems, ...hollywoodItems, ...tmdbMovies]) {
       if (item.type === 'series' || item.type === 'serial' || item.category === 'serials' || item.category === 'Web Series') continue;
       const key = String(item.title_en || item.title || '').toLowerCase().trim();
       if (!key || seen.has(key)) continue;
@@ -543,13 +609,13 @@ export default function App() {
       merged.push(item);
     }
     return merged;
-  }, [bollywoodItems, hollywoodItems, tmdbMovies]);
+  }, [moviboxItems, bollywoodItems, hollywoodItems, tmdbMovies]);
 
-  // Series: upstream + TMDB, strictly episodic/series only
+  // Series: upstream + Movibox + TMDB, strictly episodic/series only
   const allSeries = useMemo(() => {
     const seen = new Set();
     const merged = [];
-    for (const item of [...seriesItems, ...tmdbSeries]) {
+    for (const item of [...moviboxItems, ...seriesItems, ...tmdbSeries]) {
       if (item.type === 'movie' && !item.episodes?.length) continue;
       const key = String(item.title_en || item.title || '').toLowerCase().trim();
       if (!key || seen.has(key)) continue;
@@ -557,7 +623,7 @@ export default function App() {
       merged.push(item);
     }
     return merged;
-  }, [seriesItems, tmdbSeries]);
+  }, [moviboxItems, seriesItems, tmdbSeries]);
 
   return (
     <div className="tv-app">
@@ -761,6 +827,15 @@ export default function App() {
                   />
                 )}
 
+                {/* v3.12.62: Movibox rail — direct-MP4 playback, no embeds */}
+                {moviboxItems.length > 0 && (
+                  <MediaRail
+                    title="🎬 Movibox — Full Catalog, Direct HD"
+                    items={moviboxItems.slice(0, 40)}
+                    onSelectItem={handleItemClick}
+                  />
+                )}
+
                 {/* v3.11.0: Recently released movies (TMDB now_playing, India region) */}
                 {nowPlaying.length > 0 && (
                   <MediaRail
@@ -935,10 +1010,9 @@ export default function App() {
                     onSelectChannel={handleItemClick}
                   />
                 ) : (
-                  <MediaGridView
-                    title="🔴 All Live Channels"
-                    items={liveItems}
-                    isLive={true}
+                  <LiveView
+                    channels={liveItems}
+                    loading={!liveLoaded}
                     onSelectItem={handleItemClick}
                   />
                 )}

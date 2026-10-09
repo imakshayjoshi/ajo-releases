@@ -90,7 +90,7 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
 
     // 2. FAST-PATH: Inter-rail vertical navigation
     if (direction === 'ArrowDown' || direction === 'ArrowUp') {
-      const currentRail = current.closest('.tv-rail, .tv-header, .tv-hero, .tv-modal-card');
+      const currentRail = current.closest('.tv-rail, .tv-header, .tv-hero, .tv-modal-card, .live-cat-rail, .live-channel-grid');
 
       // v3.9: header <-> content in ONE press. Previously the rail-walk only
       // visited rail SIBLINGS — the header isn't one — so every ArrowUp from
@@ -275,7 +275,7 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
     // v3.10.0 FIX: the modal's real scroller is .tv-modal-body (the
     // .tv-modal-scroll class never existed), and the player drawer scrolls
     // independently — include both so focused items scroll into view.
-    const scroller = el.closest('.tv-main-content, .tv-modal-body, .tv-player-drawer, .tv-modal-scroll') || document.querySelector('.tv-main-content');
+    const scroller = el.closest('.tv-main-content, .tv-modal-body, .tv-player-drawer, .tv-modal-scroll, .live-grid-scroll, .live-cat-rail') || document.querySelector('.tv-main-content');
     if (scroller) {
       try {
         const er = el.getBoundingClientRect();
@@ -319,6 +319,16 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
 
       // 2. D-Pad Directional Navigation
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(key) || [19, 20, 21, 22, 37, 38, 39, 40].includes(keyCode)) {
+        // v3.12.62 FIX (seeking jumped to the bottom control bar): while the
+        // player is fullscreen and NO drawer is open, the D-pad belongs to
+        // the PLAYER (seek ±10s, OSD, channel drawer) — spatial navigation
+        // was stealing the key first, focusing the player's bottom control
+        // bar, and the seek never fired. Only when the player's own drawer
+        // (channels/servers/audio/EPG) is open does nav resume inside it.
+        if (isModalOpen && window.__ajoPlayerDrawerOpen !== undefined) {
+          // player is mounted; nav allowed ONLY inside the open drawer
+          if (!window.__ajoPlayerDrawerOpen) return;
+        }
         // Normalize keyCode to direction string FIRST so `dir` is available
         // for the INPUT/TEXTAREA guard below (v3.12.4 TDZ fix).
         let dir = key;
@@ -419,6 +429,8 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
           }
           lastFocusedRef.current = el;
         } catch (_) {}
+      } else {
+        console.warn('[AJO] focusInitial: no element for', selector);
       }
     }, 40);
   }, []);

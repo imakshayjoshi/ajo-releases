@@ -230,6 +230,50 @@ export function nativePlayerControl(cmd, arg = 0) {
   }
 }
 
+/**
+ * v3.12.64: live channel with ClearKey DRM + per-channel headers.
+ * drm: {type:'clearkey', keys:[[kidHex,keyHex],...]}, headers:{...} — both
+ * from the VPS live aggregator (jio/zee/hotstar feeds). Falls back to the
+ * plain native path when the bridge is old or the channel is not DRM'd.
+ */
+export function playInNativePlayerWithDrm(url, title, isLive, fallbackUrls, drm, headers) {
+  const api = bridge();
+  if (!api || !url) return false;
+  if (!isNativePlayableUrl(url)) return false;
+  const hasDrm = drm && Array.isArray(drm.keys) && drm.keys.length > 0;
+  const hasHeaders = headers && Object.keys(headers).length > 0;
+  if (!hasDrm && !hasHeaders) {
+    return playInNativePlayer(url, title, isLive, fallbackUrls);
+  }
+  try {
+    const nativeFallbacks = Array.isArray(fallbackUrls)
+      ? fallbackUrls
+          .map(u => typeof u === 'string' ? u : u?.url)
+          .filter(u => u && u !== url && isNativePlayableUrl(u))
+      : [];
+    const payload = {};
+    if (hasDrm) payload.keys = drm.keys;
+    if (hasHeaders) payload.headers = headers;
+    const drmJson = JSON.stringify(payload);
+    if (typeof api.playStreamWithDrm === 'function') {
+      api.playStreamWithDrm(
+        String(url),
+        String(title || 'Live Channel'),
+        Boolean(isLive),
+        nativeFallbacks.length ? JSON.stringify(nativeFallbacks) : '',
+        drmJson
+      );
+      nativePlaybackActive = true;
+      return true;
+    }
+    // Old bridge: drop the DRM info and play what we can
+    return playInNativePlayer(url, title, isLive, fallbackUrls);
+  } catch (error) {
+    console.warn('Native DRM player launch failed:', error);
+    return playInNativePlayer(url, title, isLive, fallbackUrls);
+  }
+}
+
 /** Mark native playback state (used by the player lifecycle bridges). */
 export function setNativePlaybackActive(active) {
   nativePlaybackActive = Boolean(active);
