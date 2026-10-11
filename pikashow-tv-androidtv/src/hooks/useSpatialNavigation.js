@@ -413,6 +413,25 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
           e.preventDefault();
           focusAndScroll(next);
           lastFocusedRef.current = next;
+        } else if (dir === 'ArrowLeft' || dir === 'ArrowRight') {
+          // v3.12.79 ColorOS elastic edge: at the end of a rail, stretch the
+          // track 16px along the swipe vector, then snap back on release.
+          const track = current.closest && current.closest('.tv-rail-track, .tv-provider-row');
+          if (track) {
+            e.preventDefault();
+            const amt = dir === 'ArrowRight' ? '-16px' : '16px';
+            track.style.setProperty('--stretch', amt);
+            const onUp = (ev) => {
+              const kc = ev.keyCode;
+              if (kc === 21 || kc === 22 || kc === 37 || kc === 39) {
+                track.style.setProperty('--stretch', '0px');
+                window.removeEventListener('keyup', onUp, true);
+              }
+            };
+            window.addEventListener('keyup', onUp, true);
+            // Safety: clear even if keyup is missed (remote repeat quirks).
+            setTimeout(() => track.style.setProperty('--stretch', '0px'), 600);
+          }
         }
       }
 

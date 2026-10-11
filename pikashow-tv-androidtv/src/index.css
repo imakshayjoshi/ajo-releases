@@ -40,13 +40,22 @@
      clipping (tiles snap to a hard edge instead of bleeding off screen). */
   --focus-scale: scale(1.05);
 
-  /* Radii */
+  /* Radii — v3.12.79 ColorOS 17 "Fluid Design": 24px cards, 12px pills */
+  --radius-pill: 12px;
   --radius-xs: 8px;
   --radius-sm: 12px;
   --radius-md: 18px;
+  --radius-card: 24px;
   --radius-lg: 24px;
   --radius-xl: 28px;
   --radius-full: 9999px;
+
+  /* ColorOS 17 Fluid Design tokens */
+  --fluid-glass: rgba(16, 16, 24, 0.85);
+  --fluid-glass-border: rgba(255, 255, 255, 0.09);
+  --fluid-ease: cubic-bezier(0.3, 1.45, 0.5, 1); /* elastic overshoot → settle */
+  --glow-a: rgba(45, 212, 191, 0.55);  /* luminous aura start */
+  --glow-b: rgba(56, 189, 248, 0.45);  /* luminous aura end (teal→sky) */
 
   /* Typography */
   --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -82,34 +91,54 @@ html, body, #root {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  background: linear-gradient(180deg, #0d0d16 0%, #08080f 50%, #060610 100%);
+  /* ColorOS ambient: soft radial glows over the base gradient (static, zero GPU cost) */
+  background:
+    radial-gradient(ellipse 70% 55% at 18% 0%, rgba(45, 212, 191, 0.07), transparent 60%),
+    radial-gradient(ellipse 60% 50% at 88% 100%, rgba(56, 189, 248, 0.05), transparent 60%),
+    linear-gradient(180deg, #0d0d16 0%, #08080f 50%, #060610 100%);
   position: relative;
   overflow: hidden;
 }
 
 /* ============================================
-   TOP NAVIGATION BAR (MovieBox TV Style)
+   FLOATING CAPSULE NAV (ColorOS 17 Fluid Design)
+   v3.12.79: top header replaced by a floating,
+   translucent pill anchored bottom-center.
+   `.tv-header` class + DOM order (nav before
+   <main>) are preserved so the spatial-nav
+   engine's rail-walk is untouched.
    ============================================ */
 
 .tv-header {
-  height: 68px;
-  min-height: 68px;
-  padding: 0 32px;
+  position: fixed;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  background: linear-gradient(180deg, rgba(8, 8, 15, 0.98) 0%, rgba(8, 8, 15, 0.92) 100%);
-  border-bottom: 1px solid rgba(45, 212, 191, 0.06);
+  gap: 6px;
+  padding: 7px 10px;
+  border-radius: var(--radius-full);
+  /* frosted glass at ~0.85 alpha */
+  background: var(--fluid-glass);
+  backdrop-filter: blur(18px) saturate(1.5);
+  -webkit-backdrop-filter: blur(18px) saturate(1.5);
+  border: 1px solid var(--fluid-glass-border);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
   z-index: 100;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  transition: box-shadow 0.25s ease;
+}
+
+/* soft radial glow pools behind the capsule whenever it holds focus */
+.tv-header:focus-within {
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55),
+              0 0 48px rgba(45, 212, 191, 0.22),
+              0 0 96px rgba(56, 189, 248, 0.12);
 }
 
 .tv-logo-section {
   display: flex;
   align-items: center;
-  gap: 10px;
   flex-shrink: 0;
 }
 
@@ -117,31 +146,49 @@ html, body, #root {
   background: linear-gradient(135deg, #2DD4BF 0%, #14B8A6 50%, #0D9488 100%);
   color: #08080f;
   font-weight: 900;
-  font-size: 1rem;
-  padding: 5px 12px;
-  border-radius: var(--radius-sm);
-  letter-spacing: 1.5px;
+  font-size: 0.78rem;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  letter-spacing: 1.2px;
   text-transform: uppercase;
-  box-shadow: 0 2px 12px rgba(45, 212, 191, 0.35);
+  box-shadow: 0 2px 10px rgba(45, 212, 191, 0.35);
 }
 
-.tv-logo-title {
-  font-size: 1.1rem;
-  font-weight: 700;
-  letter-spacing: 0.3px;
-  color: var(--text-secondary);
-}
+.tv-logo-title { display: none; }
 
 .tv-nav-pills {
+  position: relative; /* indicator positions against this */
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   min-width: 0;
   flex-wrap: nowrap;
 }
 
+/* Sliding indicator — glides between pills on D-pad, no hard cuts.
+   transform/opacity only: GPU-composited, no layout. */
+.tv-nav-indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: var(--accent-gold-dim);
+  border: 1.5px solid rgba(45, 212, 191, 0.3);
+  opacity: 0;
+  pointer-events: none;
+  transition: transform 0.32s cubic-bezier(0.3, 1.3, 0.4, 1),
+              width 0.32s cubic-bezier(0.3, 1.3, 0.4, 1),
+              opacity 0.18s ease;
+  will-change: transform;
+}
+
+.tv-nav-indicator.visible { opacity: 1; }
+
 .tv-nav-pill {
-  padding: 7px 16px;
+  position: relative;
+  z-index: 1; /* above the sliding indicator */
+  padding: 8px 16px;
   border-radius: var(--radius-full);
   background: transparent;
   color: var(--text-secondary);
@@ -149,7 +196,9 @@ html, body, #root {
   font-weight: 600;
   border: 1.5px solid transparent;
   cursor: pointer;
-  transition: all 0.18s ease-out;
+  transition: transform 0.28s var(--fluid-ease),
+              color 0.18s ease,
+              box-shadow 0.25s ease;
   display: flex;
   align-items: center;
   gap: 7px;
@@ -158,36 +207,29 @@ html, body, #root {
 }
 
 .tv-nav-pill.active {
-  background: var(--accent-gold-dim);
   color: var(--accent-gold);
-  border-color: rgba(45, 212, 191, 0.25);
   font-weight: 700;
 }
 
+/* focused item grows 5% with an expanded luminous aura */
 .tv-nav-pill:focus {
-  background: rgba(45, 212, 191, 0.2);
   color: #ffffff;
-  border-color: var(--accent-gold);
-  box-shadow: var(--focus-ring);
-  transform: scale(1.06);
+  transform: scale(1.05);
+  animation: luminous-focus 3s linear infinite;
 }
 
-.tv-header-info {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  color: var(--text-muted);
-  font-size: 0.88rem;
-  font-weight: 600;
-  flex-shrink: 0;
-}
+.tv-header-info { display: none; }
 
 @media (max-width: 1360px) {
   .tv-logo-title { display: none; }
-  .tv-nav-pill { padding: 6px 12px; font-size: 0.78rem; }
+  .tv-nav-pill { padding: 7px 13px; font-size: 0.8rem; }
 }
+/* v3.12.79: keep pills readable on the 960px Lumio viewport — the capsule
+   shrinks gaps, never the label size below 0.75rem (elders). */
 @media (max-width: 1000px) {
-  .tv-header-info { display: none; }
+  .tv-header { gap: 4px; padding: 6px 8px; bottom: 14px; }
+  .tv-nav-pill { padding: 7px 11px; font-size: 0.75rem; gap: 5px; }
+  .tv-logo-badge { font-size: 0.7rem; padding: 4px 8px; }
 }
 
 /* ============================================
@@ -207,7 +249,7 @@ html, body, #root {
 
 .tv-subtab {
   padding: 6px 18px;
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-pill);
   background: transparent;
   color: var(--text-secondary);
   font-size: 0.82rem;
@@ -215,7 +257,9 @@ html, body, #root {
   border: 1.5px solid rgba(255, 255, 255, 0.06);
   cursor: pointer;
   white-space: nowrap;
-  transition: all 0.15s ease-out;
+  transition: transform 0.28s var(--fluid-ease),
+              background 0.15s ease, color 0.15s ease,
+              box-shadow 0.25s ease, border-color 0.15s ease;
 }
 
 .tv-subtab.active {
@@ -227,9 +271,9 @@ html, body, #root {
 }
 
 .tv-subtab:focus {
-  border-color: var(--accent-gold);
-  box-shadow: var(--focus-ring);
-  transform: scale(1.05);
+  border-color: transparent;
+  animation: luminous-focus 3s linear infinite;
+  transform: scale(1.08);
   color: #ffffff;
 }
 
@@ -241,7 +285,9 @@ html, body, #root {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 0 40px 48px;
+  /* v3.12.79: extra top air (no more top bar) and bottom clearance so the
+     floating capsule never covers the last row of content. */
+  padding: 24px 40px 120px;
   scroll-behavior: auto;
   overscroll-behavior-x: none;
   -webkit-overflow-scrolling: touch;
@@ -480,10 +526,12 @@ html, body, #root {
   gap: 10px;
   padding: 10px 20px;
   background: var(--bg-card);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-pill);
   border: 1.5px solid rgba(255, 255, 255, 0.06);
   cursor: pointer;
-  transition: all 0.18s cubic-bezier(0.2, 0, 0, 1);
+  transition: transform 0.28s var(--fluid-ease),
+              box-shadow 0.25s ease, border-color 0.18s ease,
+              background 0.18s ease;
   min-width: fit-content;
 }
 
@@ -571,6 +619,13 @@ html, body, #root {
   scroll-behavior: smooth;
   -webkit-overflow-scrolling: touch;
   touch-action: pan-x pan-y;
+  /* v3.12.79 ColorOS elastic rebound: at the row edge the track stretches
+     16px along the swipe vector (JS sets --stretch), then snaps back on
+     release with a rubber-band ease. transform-only, GPU-composited. */
+  --stretch: 0px;
+  transform: translateX(var(--stretch));
+  transition: transform 0.45s var(--fluid-ease);
+  will-change: transform;
 }
 
 .tv-rail-track::-webkit-scrollbar {
@@ -587,7 +642,7 @@ html, body, #root {
   display: flex;
   flex-direction: column;
   background: var(--bg-card);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-card); /* ColorOS: 24dp cards */
   overflow: hidden;
   border: 2px solid transparent;
   cursor: pointer;
@@ -595,17 +650,20 @@ html, body, #root {
   /* v3.12.77 ColorOS: soft resting shadow so cards read as touchable
      surfaces, not flat rectangles */
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
-  transition: transform 0.2s cubic-bezier(0.2, 0, 0, 1),
+  /* v3.12.79 elastic rebound: overshoot past the focus scale, then dampen
+     and settle — rubber-band, single GPU-composited transform. */
+  transition: transform 0.38s var(--fluid-ease),
               border-color 0.2s ease,
-              box-shadow 0.2s ease;
+              box-shadow 0.3s ease;
 }
 
+/* Luminous focus state: no static border — a live aura whose gradient angle
+   rotates on an internal 3s clock, plus a soft radial glow pooled behind
+   the card. box-shadow/opacity only; no repaint of the poster layer. */
 .tv-card:focus {
-  transform: var(--focus-scale);
-  border-color: var(--accent-gold);
-  box-shadow: 0 0 0 3px rgba(45, 212, 191, 0.75),
-              0 12px 40px rgba(45, 212, 191, 0.28),
-              0 4px 16px rgba(0, 0, 0, 0.4);
+  transform: scale(1.08);
+  border-color: transparent;
+  animation: luminous-focus 3s linear infinite;
   z-index: 10;
   background: var(--bg-card-hover);
 }
@@ -619,8 +677,10 @@ html, body, #root {
   transition: transform 0.3s ease;
 }
 
+/* v3.12.79: poster stays still on focus — the luminous aura carries the
+   focus signal now; the old inner zoom fought the card's elastic settle. */
 .tv-card:focus .tv-card-poster {
-  transform: scale(1.03);
+  transform: none;
 }
 
 .tv-card-live-poster {
@@ -668,6 +728,89 @@ html, body, #root {
   box-shadow: 0 0 8px rgba(229, 9, 20, 0.4);
   animation: tv-live-pulse 2s ease-in-out infinite;
 }
+
+/* v3.12.79 ColorOS 17 Luminous Focus State — a live, rotating aura.
+   The gradient angle cycles on a 3s clock so the focused element pulses
+   with a real-time glow instead of a static border. box-shadow only —
+   GPU-composited, no layout thrash on the Lumio panel. */
+@keyframes luminous-focus {
+  0%   { box-shadow: 0 0 0 3px var(--glow-a), 0 6px 24px var(--glow-a), 0 0 48px var(--glow-b); }
+  25%  { box-shadow: 0 0 0 3px var(--glow-b), 0 6px 28px var(--glow-b), 0 0 56px var(--glow-a); }
+  50%  { box-shadow: 0 0 0 4px var(--glow-a), 0 8px 32px var(--glow-a), 0 0 64px var(--glow-b); }
+  75%  { box-shadow: 0 0 0 3px var(--glow-b), 0 6px 28px var(--glow-b), 0 0 56px var(--glow-a); }
+  100% { box-shadow: 0 0 0 3px var(--glow-a), 0 6px 24px var(--glow-a), 0 0 48px var(--glow-b); }
+}
+
+/* v3.12.79 ColorOS 17 elastic rebound — used by JS focus handling and as a
+   CSS fallback. Overshoot to 1.12x, dampen back, settle at 1.08x. */
+@keyframes elastic-rebound {
+  0%   { transform: scale(1); }
+  45%  { transform: scale(1.12); }
+  70%  { transform: scale(1.05); }
+  100% { transform: scale(1.08); }
+}
+
+/* v3.12.79 ColorOS 17 "Aqua Dynamics" Status Island — top-right pill.
+   Non-focusable during playback, glass blur, condensed rings throb while a
+   state is active. GPU-only: opacity/transform/blur. */
+.aqua-island {
+  position: fixed;
+  top: 18px;
+  right: 24px;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px;
+  border-radius: var(--radius-full);
+  background: var(--fluid-glass);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  backdrop-filter: blur(14px) saturate(1.4);
+  border: 1px solid var(--fluid-glass-border);
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  pointer-events: none; /* non-focusable by default — never steals D-pad */
+  opacity: 0.9;
+  transition: opacity 0.3s ease, transform 0.3s var(--fluid-ease);
+}
+.aqua-island.active { color: var(--accent-gold); opacity: 1; }
+.aqua-island.expanded { transform: scale(1.04); }
+
+.aqua-island-ring {
+  position: absolute;
+  inset: -2px;
+  border-radius: var(--radius-full);
+  border: 1.5px solid rgba(45, 212, 191, 0.4);
+  opacity: 0;
+  pointer-events: none;
+}
+.aqua-island.active .aqua-island-ring { animation: aqua-throb 2.2s ease-out infinite; }
+
+@keyframes aqua-throb {
+  0%   { opacity: 0.7; transform: scale(1); }
+  70%  { opacity: 0;   transform: scale(1.18); }
+  100% { opacity: 0;   transform: scale(1.18); }
+}
+
+.aqua-island-card {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  min-width: 180px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  background: var(--fluid-glass);
+  -webkit-backdrop-filter: blur(18px) saturate(1.5);
+  backdrop-filter: blur(18px) saturate(1.5);
+  border: 1px solid var(--fluid-glass-border);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.aqua-island-row { display: flex; align-items: center; gap: 8px; font-size: 0.74rem; }
 
 @keyframes tv-live-pulse {
   0%, 100% { opacity: 1; }
@@ -740,12 +883,12 @@ html, body, #root {
   position: relative;
   border: none;
   padding: 0;
-  border-radius: 20px;
+  border-radius: var(--radius-card);
   overflow: hidden;
   background: var(--bg-card);
   cursor: pointer;
   min-height: 150px;
-  transition: transform 0.18s cubic-bezier(0.2, 0, 0, 1), box-shadow 0.18s ease;
+  transition: transform 0.34s var(--fluid-ease), box-shadow 0.3s ease;
   text-align: left;
 }
 
@@ -837,8 +980,8 @@ html, body, #root {
 }
 
 .tv-hero-grid-tile:focus {
-  transform: scale(1.04);
-  box-shadow: var(--focus-ring);
+  transform: scale(1.05);
+  animation: luminous-focus 3s linear infinite;
   z-index: 20;
   outline: none;
 }
@@ -887,14 +1030,16 @@ html, body, #root {
 .tv-cat-btn {
   padding: 8px 18px;
   background: var(--bg-card);
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-pill);
   border: 1.5px solid rgba(255, 255, 255, 0.06);
   color: var(--text-secondary);
   font-size: 0.82rem;
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
-  transition: all 0.15s ease;
+  transition: transform 0.28s var(--fluid-ease),
+              background 0.15s ease, color 0.15s ease,
+              box-shadow 0.25s ease, border-color 0.15s ease;
 }
 
 .tv-cat-btn:focus,

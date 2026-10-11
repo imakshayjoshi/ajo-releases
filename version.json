@@ -33,16 +33,16 @@
     "releaseDate": "2026-10-09"
   },
   "android_tv": {
-    "version": "3.12.78",
-    "versionCode": 228,
+    "version": "3.12.79",
+    "versionCode": 229,
     "packageId": "com.ajo.androidtv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
-    "changelog": "Player overhaul: LEFT/RIGHT D-pad now SEEKS (tap = \u00b110s, HOLD = continuous scan), web embed controls hidden so only our OSD shows, seek bar + timestamp always visible above buttons, dead-title 404 failover (auto-tries next server instead of the Content-not-found wall), provider strip (Netflix/Prime) now scrolls with D-pad, Kids row fixed (Doraemon plays), OSD no longer overlaps or clips off-screen, unmute-on-start. Audio boost defaults to 300% (streams were too quiet); system music volume raised on start.",
+    "changelog": "SEEK FIXED: embed video now captured to native ExoPlayer (cross-origin iframe was blocking JS seek). Real D-pad seek \u00b110s, seek bar + timestamp. Audio boosted at stream via LoudnessEnhancer (device volume never touched). ColorOS 17 fluid design: floating capsule nav, luminous focus glow, elastic rebound. Status island removed per user.",
     "size_mb": 7.02,
-    "sha256": "58a91428a74f8eaf9b175bb421b021c5cc7e4fe62a51d1a07582167746e2c77b",
+    "sha256": "0431ff0a1a01b5defff0a7effd2d7e2e85ff819a4f71532f12709e6a48a17591",
     "releaseDate": "2026-10-09",
     "size": 7345801
   },

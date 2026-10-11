@@ -1,6 +1,6 @@
 {
   "name": "ajo-tv",
-  "version": "3.12.78",
+  "version": "3.12.79",
   "private": true,
   "description": "AJO Android TV and Fire TV client",
   "type": "module",

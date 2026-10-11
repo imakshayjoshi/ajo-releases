@@ -404,6 +404,12 @@ public class PlayerActivity extends AppCompatActivity {
     private boolean isSafeColorMode = false;
     private int audioBoostLevel = 3; // v3.12.78: default to 300% — users complained streams were too quiet
     private int currentAudioTrackIndex = 0;
+    // v3.12.79: stream-level amplification. NEVER touches device volume.
+    private android.media.audiofx.LoudnessEnhancer loudnessEnhancer;
+    // v3.12.79: set once we capture the embed's direct stream into ExoPlayer.
+    private boolean nativeStreamCaptured = false;
+    // v3.12.79: Referer/Origin for the captured direct stream (CDN requires it).
+    private Map<String, String> capturedStreamHeaders = null;
 
     private boolean isLive = false;
     private String streamUrl = "";
@@ -967,7 +973,35 @@ public class PlayerActivity extends AppCompatActivity {
                                 "text/plain", "utf-8",
                                 new java.io.ByteArrayInputStream(new byte[0]));
                     }
+                    // v3.12.79: capture the embed's REAL video stream and route it
+                    // to ExoPlayer. The embed player sits in a cross-origin iframe,
+                    // so JS seek injection is a no-op — that's why "seek doesn't
+                    // work". Playing the direct stream natively fixes seek/audio.
+                    if (isWebEmbedMode && !isLive && !nativeStreamCaptured && isDirectVideoStream(url)) {
+                        nativeStreamCaptured = true;
+                        final String direct = url;
+                        final Map<String, String> reqHeaders = new HashMap<>();
+                        try {
+                            if (request.getRequestHeaders() != null) reqHeaders.putAll(request.getRequestHeaders());
+                        } catch (Throwable ignored) {}
+                        Log.d(TAG, "CAPTURED direct stream -> ExoPlayer: " + direct);
+                        uiHandler.post(() -> playInNativeExoPlayer(direct, reqHeaders));
+                    }
                     return super.shouldInterceptRequest(view, request);
+                }
+
+                private boolean isDirectVideoStream(String url) {
+                    if (url == null) return false;
+                    String l = url.toLowerCase();
+                    // HLS / DASH manifests and progressive files. Exclude the
+                    // embed page's own assets and thumbnail/poster images.
+                    boolean manifest = l.contains(".m3u8") || l.contains(".mpd")
+                            || l.contains("/playlist") || l.contains("master.m3u8");
+                    boolean progressive = l.contains(".mp4") || l.contains(".mkv")
+                            || l.contains(".webm") || l.contains(".ts?") || l.endsWith(".ts");
+                    boolean notImage = !(l.contains(".jpg") || l.contains(".jpeg")
+                            || l.contains(".png") || l.contains(".webp") || l.contains(".gif"));
+                    return (manifest || progressive) && notImage;
                 }
 
                 @Override
@@ -2096,17 +2130,9 @@ public class PlayerActivity extends AppCompatActivity {
     }
 
     private void unmuteWebVideo(boolean showFeedback) {
-        // v3.12.78: crank the SYSTEM music stream too — the web embed's JS
-        // volume is capped at 1.0, so we boost the Android audio channel as
-        // well. Users reported streams too quiet even at max embed volume.
-        try {
-            android.media.AudioManager am = (android.media.AudioManager) getSystemService(AUDIO_SERVICE);
-            if (am != null) {
-                int max = am.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC);
-                int target = (int) (max * 0.9f);
-                am.setStreamVolume(android.media.AudioManager.STREAM_MUSIC, target, 0);
-            }
-        } catch (Exception ignored) {}
+        // v3.12.79: NEVER touch device volume (AudioManager/STREAM_MUSIC) —
+        // Akkshay's rule: keep device sound as-is, fix audio at the stream.
+        // Web embeds are boosted in-page only (volume=1.0 is the JS max).
         if (isWebEmbedMode && webVideoView != null) {
             simulateTouchToUnmute();
             webVideoView.evaluateJavascript(
@@ -2195,9 +2221,21 @@ public class PlayerActivity extends AppCompatActivity {
     }
 
     public void applyAudioBoost() {
+        // v3.12.79: LoudnessEnhancer on the ExoPlayer audio session —
+        // amplifies the STREAM signal itself, never the device volume.
         if (player != null) {
-            float exoVol = audioBoostLevel == 1 ? 1.0f : audioBoostLevel == 2 ? 1.5f : 2.0f;
-            player.setVolume(exoVol);
+            player.setVolume(1.0f);
+            try {
+                int sessionId = player.getAudioSessionId();
+                if (sessionId != 0) {
+                    if (loudnessEnhancer != null) { try { loudnessEnhancer.release(); } catch (Exception ignored) {} }
+                    loudnessEnhancer = new android.media.audiofx.LoudnessEnhancer(sessionId);
+                    loudnessEnhancer.setTargetGain(audioBoostLevel == 1 ? 0 : audioBoostLevel == 2 ? 600 : 1000); // mB: 0/6dB/10dB
+                    loudnessEnhancer.setEnabled(audioBoostLevel > 1);
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "LoudnessEnhancer failed", e);
+            }
         }
         if (isWebEmbedMode && webVideoView != null) {
             webVideoView.evaluateJavascript(
@@ -2214,7 +2252,6 @@ public class PlayerActivity extends AppCompatActivity {
                 + "}catch(e){}"
                 + "})();", null);
         }
-        // System TV hardware master volume is intentionally left untouched under user remote control.
     }
 
     private void cycleAudioBoost() {
@@ -2462,6 +2499,8 @@ public class PlayerActivity extends AppCompatActivity {
 
     private void playInWebEngine(String url) {
         isWebEmbedMode = true;
+        nativeStreamCaptured = false; // reset so the next embed can be captured
+        capturedStreamHeaders = null;
         releasePlayer();
 
         if (aspectRatioFrameLayout != null) {
@@ -2473,6 +2512,7 @@ public class PlayerActivity extends AppCompatActivity {
             return;
         }
         if (webVideoView != null) {
+            webVideoView.setAlpha(1f); // restore opacity for web-embed mode
             webVideoView.setVisibility(View.VISIBLE);
             Map<String, String> headers = buildEmbedHeaders(url);
             webVideoView.loadUrl(url, headers);
@@ -2491,16 +2531,31 @@ public class PlayerActivity extends AppCompatActivity {
     }
 
     private void playInNativeExoPlayer(String url) {
+        playInNativeExoPlayer(url, null);
+    }
+
+    private void playInNativeExoPlayer(String url, Map<String, String> headers) {
         isWebEmbedMode = false;
         uiHandler.removeCallbacks(webLoadWatchdog);
         if (webVideoView != null) {
             webVideoView.stopLoading();
             webVideoView.loadUrl("about:blank");
             webVideoView.setVisibility(View.GONE);
+            webVideoView.setAlpha(0f);
         }
         if (aspectRatioFrameLayout != null) {
             aspectRatioFrameLayout.setVisibility(View.VISIBLE);
+            aspectRatioFrameLayout.bringToFront();
         }
+        // v3.12.79: captured streams come FROM a WebView, which composites a
+        // black layer over the SurfaceView's separate surface — TextureView
+        // renders in-view so it shows on top. Force it for the handoff.
+        useTextureViewFallback = true;
+        if (surfaceView != null) {
+            surfaceView.setVisibility(View.VISIBLE);
+        }
+        if (headers != null) capturedStreamHeaders = headers;
+        streamUrl = url;
         initializeExoPlayer();
     }
 
@@ -2703,6 +2758,18 @@ public class PlayerActivity extends AppCompatActivity {
                     if (e.getKey() != null && e.getValue() != null) defaultHeaders.put(e.getKey(), e.getValue());
                 }
             } catch (Throwable ignored) {}
+        }
+        // v3.12.79: a captured embed stream carries its own Referer/Origin —
+        // the CDN 403s the segment requests without them.
+        if (capturedStreamHeaders != null) {
+            for (Map.Entry<String, String> e : capturedStreamHeaders.entrySet()) {
+                String k = e.getKey();
+                if (k != null && e.getValue() != null
+                        && (k.equalsIgnoreCase("Referer") || k.equalsIgnoreCase("Origin")
+                            || k.equalsIgnoreCase("User-Agent") || k.equalsIgnoreCase("Accept"))) {
+                    defaultHeaders.put(k, e.getValue());
+                }
+            }
         }
 
         HttpDataSource.Factory httpFactory;
@@ -3171,6 +3238,21 @@ public class PlayerActivity extends AppCompatActivity {
         }
 
         if (event.getAction() == KeyEvent.ACTION_DOWN) {
+            // v3.12.78: SEEK FIRST. If we're in web-embed mode (AutoEmbed),
+            // LEFT/RIGHT must seek the video — never let the WebView or a
+            // focused OSD button eat them. This was the "seek doesn't work"
+            // Akkshay reported: the keys were intercepted by the embed.
+            if (isWebEmbedMode && !isLive
+                    && (keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
+                        || keyCode == KeyEvent.KEYCODE_MEDIA_REWIND || keyCode == KeyEvent.KEYCODE_MEDIA_FAST_FORWARD)) {
+                if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_MEDIA_REWIND) {
+                    seekRelative(-SEEK_STEP_MS);
+                } else {
+                    seekRelative(SEEK_STEP_MS);
+                }
+                showOsd();
+                return true;
+            }
             // Intercept media and navigation keys so WebView cannot consume or block them
             if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER
                     || keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER || keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE
