@@ -33,18 +33,18 @@
     "releaseDate": "2026-10-09"
   },
   "android_tv": {
-    "version": "3.12.80",
-    "versionCode": 230,
+    "version": "3.12.81",
+    "versionCode": 231,
     "packageId": "com.ajo.androidtv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
-    "changelog": "v3.12.80: Player controls collapsed into ONE small corner Options icon — LEFT/RIGHT now always seek (the pause/play strip no longer traps navigation), DOWN closes the panel, UP/MENU opens it. OTT icons fixed — all provider logos re-pointed to live TMDB images (probed 200) with a brand-color fallback tile so no icon ever renders empty. Movies/Series categories un-mixed — type now comes from the item itself, not the feed bucket. Addon catalogs load in parallel. Cache-clear now also sweeps provider/live/mirror keys.",
+    "changelog": "v3.12.81: D-pad navigation fixed — focus no longer jumps to the wrong place on Settings. The Settings cards now walk cleanly up/down between sections, and 'Check for Updates' is reachable with the remote. (Carries v3.12.80 too: corner Options icon so LEFT/RIGHT always seek, OTT logos fixed with live images + fallback tiles, Movies/Series categories un-mixed.)",
     "size_mb": 7.0,
-    "sha256": "1ab3de931f4bf3d0f08432c2f8d3e0182c4afa269369b5ad2fae8b203e79f818",
+    "sha256": "d1870289fa35cbe8952b624b969850afce0452e685bdf9969dbd0d1ebe91564f",
     "releaseDate": "2026-10-11",
-    "size": 7364533
+    "size": 7365268
   },
   "changelog": "v3.12.73: Movies & series fixed \u2014 movibox CDN hotlink gate (429) handled: native player now sends Referer/UA headers; web/phone playback streams through the VPS proxy. Live channel thumbnails fixed \u2014 dead Sony logos repaired, logos served via image proxy with retry. Live channel playback untouched.",
   "sha256": "6e2dc11f6d2c34bdfbe719e181511383f093fe2376c92261791740af00c27c26"

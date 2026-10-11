@@ -152,6 +152,17 @@ html, body, #root {
   letter-spacing: 1.2px;
   text-transform: uppercase;
   box-shadow: 0 2px 10px rgba(45, 212, 191, 0.35);
+  border: 2px solid transparent;
+  cursor: default;
+  font-family: inherit;
+}
+
+/* v3.12.81: subtle focus ring when D-pad lands on the logo (it's now a
+   focusable button so the header zone walk can stop here deliberately). */
+.tv-logo-badge:focus {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 0 0 3px rgba(45, 212, 191, 0.45), 0 2px 10px rgba(45, 212, 191, 0.35);
 }
 
 .tv-logo-title { display: none; }

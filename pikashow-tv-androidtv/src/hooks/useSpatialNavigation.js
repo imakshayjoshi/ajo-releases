@@ -51,6 +51,75 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
   const findNextElement = useCallback((current, direction, elements) => {
     if (!current || elements.length === 0) return elements[0] || null;
 
+    // v3.12.81: header fast-paths. The header holds TWO focus zones — the
+    // logo badge (far left) and the nav pills — but the nav engine treats it
+    // as one rail, so a mis-aimed ArrowUp from content landed on the logo and
+    // the next ArrowRight had to cross the entire pill row (the "focus jumps
+    // to bottom nav / random tab" Akkshay hit). Move cleanly within the header.
+    const inHeaderZone = current.closest('.tv-header');
+    if (inHeaderZone) {
+      if (current.closest('.tv-logo-section')) {
+        // Logo: RIGHT → first nav pill; DOWN falls through to content below.
+        if (direction === 'ArrowRight') {
+          const pill = document.querySelector('.tv-header .tv-nav-pill.active') || document.querySelector('.tv-header .tv-nav-pill');
+          if (pill) return pill;
+        }
+      } else if (current.closest('.tv-nav-pills')) {
+        // Pills: LEFT past the first pill → logo; RIGHT past last → stay.
+        const pills = Array.from(document.querySelectorAll('.tv-header .tv-nav-pill'));
+        const idx = pills.indexOf(current);
+        if (direction === 'ArrowLeft' && idx <= 0) {
+          const logo = document.querySelector('.tv-header .tv-logo-badge');
+          if (logo) return logo;
+        }
+        if (direction === 'ArrowLeft' && idx > 0) return pills[idx - 1];
+        if (direction === 'ArrowRight' && idx >= 0 && idx < pills.length - 1) return pills[idx + 1];
+      }
+    }
+
+    // v3.12.81: Settings tab fast-paths. The settings cards aren't registered
+    // rails, so ArrowUp used to fall into the 2D scan and land on the logo
+    // (leftmost header element) instead of the Settings pill directly above —
+    // the "can't reach Check for Updates, jumps to bottom nav" report.
+    const settingsCard = current.closest('.tv-settings-card');
+    if (settingsCard && (direction === 'ArrowUp' || direction === 'ArrowDown')) {
+      if (direction === 'ArrowDown') {
+        // Next card's first focusable (sibling walk), else stay.
+        let nxt = settingsCard.nextElementSibling;
+        while (nxt) {
+          if (nxt.classList && nxt.classList.contains('tv-settings-card')) {
+            const els = getFocusableElements(nxt);
+            if (els.length > 0) return els[0];
+          }
+          nxt = nxt.nextElementSibling;
+        }
+        return current; // bottom of settings — don't fly to nowhere
+      }
+      // ArrowUp: previous card, else the active header pill.
+      let prv = settingsCard.previousElementSibling;
+      while (prv) {
+        if (prv.classList && prv.classList.contains('tv-settings-card')) {
+          const els = getFocusableElements(prv);
+          if (els.length > 0) return els[0];
+        }
+        prv = prv.previousElementSibling;
+      }
+      const pill = document.querySelector('.tv-header .tv-nav-pill.active') || document.querySelector('.tv-header .tv-nav-pill');
+      if (pill) return pill;
+    }
+
+    // v3.12.79: Live TV grid horizontal edges. LEFT at the leftmost grid
+    // column → category rail (and back). Without this, LEFT/RIGHT fell to the
+    // 2D scan which sometimes picked the toolbar and made focus feel jumpy.
+    if (direction === 'ArrowLeft' && current.closest('.live-channel-grid')) {
+      const rail = document.querySelector('.live-cat-rail .live-cat-btn.active') || document.querySelector('.live-cat-rail .live-cat-btn');
+      if (rail) return rail;
+    }
+    if (direction === 'ArrowRight' && current.closest('.live-cat-rail')) {
+      const firstCard = document.querySelector('.live-channel-grid .tv-card-live');
+      if (firstCard) return firstCard;
+    }
+
     // 1. FAST-PATH: Intra-rail horizontal navigation (O(1) sibling traversal)
     if (direction === 'ArrowRight') {
       let sibling = current.nextElementSibling;
@@ -111,9 +180,16 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
           const firstCard = document.querySelector('.live-channel-grid .tv-card-live');
           if (firstCard) return firstCard;
         }
+        // v3.12.79: edge guards so focus never escapes the live area and jumps
+        // to the toolbar/header when there's genuinely no adjacent channel.
+        // DOWN on the last grid row (or bottom rail item) → stay put.
+        if (direction === 'ArrowDown' && (current.closest('.live-channel-grid') || current.closest('.live-cat-rail'))) {
+          // The 2D fallback below may still find a lower channel; only if it
+          // finds NOTHING do we stop here (see the post-fallback guard).
+        }
         // Grid vertical movement is handled by the 2D fallback below.
       }
-      const currentRail = current.closest('.tv-rail, .tv-header, .tv-hero, .tv-modal-card, .live-toolbar, .live-cat-rail, .live-channel-grid');
+      const currentRail = current.closest('.tv-rail, .tv-header, .tv-hero, .tv-modal-card, .live-toolbar, .live-cat-rail, .live-channel-grid, .tv-settings-card');
 
       // v3.9: header <-> content in ONE press. Previously the rail-walk only
       // visited rail SIBLINGS — the header isn't one — so every ArrowUp from
@@ -223,11 +299,25 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
       y: currentRect.top + currentRect.height / 2,
     };
 
+    // v3.12.79: constrain the live-area scan so DOWN from the grid/rail can't
+    // leap to the toolbar or bottom nav — only other channels/category items
+    // are valid targets. Stops the "focus jumps here and there" report.
+    const inLiveGridOrRail = current.closest('.live-channel-grid, .live-cat-rail');
+    let liveGridEls = null;
+    if (inLiveGridOrRail && (direction === 'ArrowDown' || direction === 'ArrowUp')) {
+      const scope = current.closest('.live-view-shell');
+      if (scope) {
+        liveGridEls = Array.from(scope.querySelectorAll('.live-channel-grid .tv-card-live, .live-cat-rail .live-cat-btn'))
+          .filter((el) => el !== current && !el.disabled && el.offsetParent !== null);
+      }
+    }
+    const scanEls = liveGridEls || elements;
+
     let bestCandidate = null;
     let minDistance = Infinity;
 
-    for (let i = 0; i < elements.length; i++) {
-      const el = elements[i];
+    for (let i = 0; i < scanEls.length; i++) {
+      const el = scanEls[i];
       if (el === current) continue;
       const rect = el.getBoundingClientRect();
       const center = {
@@ -283,6 +373,10 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
         }
       }
     }
+
+    // v3.12.79: in the live area, pressing DOWN with no channel below stays
+    // put — never escapes to the toolbar/header (the focus-jump bug).
+    if (!bestCandidate && inLiveGridOrRail && direction === 'ArrowDown') return current;
 
     return bestCandidate;
   }, [getFocusableElements]);
@@ -400,10 +494,19 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
         if (!current || current === document.body || !elements.includes(current)) {
           if (elements.length > 0) {
             e.preventDefault();
-            const target = lastFocusedRef.current && elements.includes(lastFocusedRef.current)
+            let target = lastFocusedRef.current && elements.includes(lastFocusedRef.current)
               ? lastFocusedRef.current
-              : elements[0];
-            focusAndScroll(target);
+              : null;
+            if (!target) {
+              // v3.12.81: prefer the ACTIVE nav pill over elements[0]. The
+              // header logo badge is now focusable, so elements[0] is the
+              // far-left logo — snapping there on focus loss (e.g. the
+              // "Check for Updates" button disabling itself after a check)
+              // is exactly the "focus jumps to a random place" feel.
+              target = document.querySelector('.tv-header .tv-nav-pill.active');
+              if (!target || !elements.includes(target)) target = null;
+            }
+            focusAndScroll(target || elements[0]);
           }
           return;
         }

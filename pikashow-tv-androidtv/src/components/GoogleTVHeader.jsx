@@ -58,7 +58,9 @@ export function GoogleTVHeader({ activeTab, onSelectTab, activeSubTab, onSelectS
     <>
       <header className="tv-header">
         <div className="tv-logo-section">
-          <div className="tv-logo-badge">AJO TV</div>
+          {/* v3.12.81: focusable so D-pad can land on it deliberately from the
+              first pill; sits in the header zone (fast-path in spatial nav). */}
+          <button className="tv-logo-badge" tabIndex={0} aria-label="AJO TV home">AJO TV</button>
           <div className="tv-logo-title">Cinema & Live</div>
         </div>
 
