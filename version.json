@@ -40,9 +40,9 @@
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
-    "changelog": "SEEK FIXED: embed video now captured to native ExoPlayer (cross-origin iframe was blocking JS seek). Real D-pad seek \u00b110s, seek bar + timestamp. Audio boosted at stream via LoudnessEnhancer (device volume never touched). ColorOS 17 fluid design: floating capsule nav, luminous focus glow, elastic rebound. Status island removed per user.",
+    "changelog": "SEEK FIXED: embed video now captured to native ExoPlayer (cross-origin iframe was blocking JS seek). Real D-pad seek \u00b110s, seek bar + timestamp. Audio boosted at stream via LoudnessEnhancer (device volume never touched). ColorOS 17 fluid design: floating capsule nav, luminous focus glow, elastic rebound. Status island removed per user. OSD nav fixed: LEFT/RIGHT slide between Pause/Unmute/-10s buttons when controls are open (seek only when hidden). Buttons use ColorOS 12px pill radius + elastic focus.",
     "size_mb": 7.02,
-    "sha256": "0431ff0a1a01b5defff0a7effd2d7e2e85ff819a4f71532f12709e6a48a17591",
+    "sha256": "c5559b905a263c75880df73422d97e9db3447e953381914a95c409bdce11de03",
     "releaseDate": "2026-10-09",
     "size": 7345801
   },

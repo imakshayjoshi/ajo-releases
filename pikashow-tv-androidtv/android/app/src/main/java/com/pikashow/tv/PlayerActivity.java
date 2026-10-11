@@ -1577,12 +1577,12 @@ public class PlayerActivity extends AppCompatActivity {
 
         GradientDrawable normalBg = new GradientDrawable();
         normalBg.setColor(Color.parseColor("#441e293b"));
-        normalBg.setCornerRadius(14);
+        normalBg.setCornerRadius(12); // ColorOS 17: 12dp pills
         normalBg.setStroke(2, Color.parseColor("#44ffffff"));
 
         GradientDrawable focusedBg = new GradientDrawable();
         focusedBg.setColor(Color.parseColor("#2dd4bf"));
-        focusedBg.setCornerRadius(14);
+        focusedBg.setCornerRadius(12); // ColorOS 17: 12dp pills
         focusedBg.setStroke(3, Color.WHITE);
 
         btn.setBackground(normalBg);
@@ -1590,7 +1590,9 @@ public class PlayerActivity extends AppCompatActivity {
             if (hasFocus) {
                 btn.setBackground(focusedBg);
                 btn.setTextColor(Color.BLACK);
-                btn.animate().scaleX(1.06f).scaleY(1.06f).setDuration(120).start();
+                // ColorOS elastic rebound: overshoot then settle, luminous glow.
+                btn.animate().scaleX(1.12f).scaleY(1.12f).setDuration(120).withEndAction(() ->
+                    btn.animate().scaleX(1.08f).scaleY(1.08f).setDuration(140).start()).start();
                 showOsd();
             } else {
                 btn.setBackground(normalBg);
@@ -3238,11 +3240,10 @@ public class PlayerActivity extends AppCompatActivity {
         }
 
         if (event.getAction() == KeyEvent.ACTION_DOWN) {
-            // v3.12.78: SEEK FIRST. If we're in web-embed mode (AutoEmbed),
-            // LEFT/RIGHT must seek the video — never let the WebView or a
-            // focused OSD button eat them. This was the "seek doesn't work"
-            // Akkshay reported: the keys were intercepted by the embed.
-            if (isWebEmbedMode && !isLive
+            // v3.12.79: SEEK only when the OSD is hidden. When the OSD button
+            // strip is open, LEFT/RIGHT must move between Pause/Unmute/-10s —
+            // eating them here trapped the user (reported by Akkshay).
+            if (isWebEmbedMode && !isLive && !isOsdVisible
                     && (keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
                         || keyCode == KeyEvent.KEYCODE_MEDIA_REWIND || keyCode == KeyEvent.KEYCODE_MEDIA_FAST_FORWARD)) {
                 if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_MEDIA_REWIND) {
@@ -3385,18 +3386,19 @@ public class PlayerActivity extends AppCompatActivity {
                 currentFocus.performClick();
                 return true;
             }
-            // v3.12.77: LEFT/RIGHT while the OSD is up should SEEK, not just
-            // slide focus between buttons — that was the reported "right arrow
-            // does nothing" dead end. First press seeks; OSD stays up so the
-            // user sees the position change on the bar.
-            if (!isLive && (keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_MEDIA_REWIND)) {
-                if (event.getRepeatCount() > 0) { startHoldSeek(-1); }
-                else { seekRelative(-SEEK_STEP_MS); updateSeekBarFromPlayer(); }
-                return true;
-            }
-            if (!isLive && (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT || keyCode == KeyEvent.KEYCODE_MEDIA_FAST_FORWARD)) {
-                if (event.getRepeatCount() > 0) { startHoldSeek(1); }
-                else { seekRelative(SEEK_STEP_MS); updateSeekBarFromPlayer(); }
+            // v3.12.79: when the OSD button strip is open, LEFT/RIGHT slide
+            // focus between buttons (Pause/Unmute/-10s/...). The earlier
+            // "LEFT/RIGHT always seek" change trapped focus on one button —
+            // the user couldn't reach Pause at all. Seek now only happens
+            // when the OSD is hidden (handled in dispatchKeyEvent).
+            if (!isLive && (keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
+                    || keyCode == KeyEvent.KEYCODE_MEDIA_REWIND || keyCode == KeyEvent.KEYCODE_MEDIA_FAST_FORWARD)) {
+                View target = (keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_MEDIA_REWIND)
+                        ? currentFocus.focusSearch(View.FOCUS_LEFT)
+                        : currentFocus.focusSearch(View.FOCUS_RIGHT);
+                if (target != null && target instanceof TextView && target != currentFocus) {
+                    target.requestFocus();
+                }
                 return true;
             }
             return super.onKeyDown(keyCode, event);
