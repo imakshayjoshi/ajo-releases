@@ -33,18 +33,18 @@
     "releaseDate": "2026-10-09"
   },
   "android_tv": {
-    "version": "3.12.79",
-    "versionCode": 229,
+    "version": "3.12.80",
+    "versionCode": 230,
     "packageId": "com.ajo.androidtv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
-    "changelog": "SEEK FIXED: embed video now captured to native ExoPlayer (cross-origin iframe was blocking JS seek). Real D-pad seek \u00b110s, seek bar + timestamp. Audio boosted at stream via LoudnessEnhancer (device volume never touched). ColorOS 17 fluid design: floating capsule nav, luminous focus glow, elastic rebound. Status island removed per user. OSD nav fixed: LEFT/RIGHT slide between Pause/Unmute/-10s buttons when controls are open (seek only when hidden). Buttons use ColorOS 12px pill radius + elastic focus.",
-    "size_mb": 7.02,
-    "sha256": "c5559b905a263c75880df73422d97e9db3447e953381914a95c409bdce11de03",
-    "releaseDate": "2026-10-09",
-    "size": 7345801
+    "changelog": "v3.12.80: Player controls collapsed into ONE small corner Options icon — LEFT/RIGHT now always seek (the pause/play strip no longer traps navigation), DOWN closes the panel, UP/MENU opens it. OTT icons fixed — all provider logos re-pointed to live TMDB images (probed 200) with a brand-color fallback tile so no icon ever renders empty. Movies/Series categories un-mixed — type now comes from the item itself, not the feed bucket. Addon catalogs load in parallel. Cache-clear now also sweeps provider/live/mirror keys.",
+    "size_mb": 7.0,
+    "sha256": "1ab3de931f4bf3d0f08432c2f8d3e0182c4afa269369b5ad2fae8b203e79f818",
+    "releaseDate": "2026-10-11",
+    "size": 7364533
   },
   "changelog": "v3.12.73: Movies & series fixed \u2014 movibox CDN hotlink gate (429) handled: native player now sends Referer/UA headers; web/phone playback streams through the VPS proxy. Live channel thumbnails fixed \u2014 dead Sony logos repaired, logos served via image proxy with retry. Live channel playback untouched.",
   "sha256": "6e2dc11f6d2c34bdfbe719e181511383f093fe2376c92261791740af00c27c26"

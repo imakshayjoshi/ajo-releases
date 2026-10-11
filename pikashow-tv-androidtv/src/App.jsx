@@ -679,7 +679,14 @@ export default function App() {
     const seen = new Set();
     const merged = [];
     for (const item of [...moviboxItems, ...bollywoodItems, ...hollywoodItems, ...tmdbMovies]) {
-      if (item.type === 'series' || item.type === 'serial' || item.category === 'serials' || item.category === 'Web Series') continue;
+      // v3.12.80: exclude anything series-shaped. Rely on the resolved TYPE
+      // (not category) so a mislabeled 'Web Series' category can't leak a
+      // movie in here, and a series can't slip past because its category
+      // happened to be blank.
+      const cat = String(item.category || '').toLowerCase();
+      if (item.type === 'series' || item.type === 'serial' || item.type === 'tv') continue;
+      if (cat === 'serials' || cat === 'series' || cat === 'web series') continue;
+      if (Array.isArray(item.episodes) && item.episodes.length > 0) continue;
       const key = String(item.title_en || item.title || '').toLowerCase().trim();
       if (!key || seen.has(key)) continue;
       seen.add(key);
@@ -693,7 +700,12 @@ export default function App() {
     const seen = new Set();
     const merged = [];
     for (const item of [...moviboxItems, ...seriesItems, ...tmdbSeries]) {
-      if (item.type === 'movie' && !item.episodes?.length) continue;
+      // v3.12.80: a card with a movie TYPE belongs in Movies even if it came
+      // through the serials pipeline (mixed-up catalog). Only keep genuine
+      // series/episodic entries.
+      const isSeriesShape = item.type === 'series' || item.type === 'serial' || item.type === 'tv'
+        || (Array.isArray(item.episodes) && item.episodes.length > 0);
+      if (!isSeriesShape) continue;
       const key = String(item.title_en || item.title || '').toLowerCase().trim();
       if (!key || seen.has(key)) continue;
       seen.add(key);
@@ -1009,12 +1021,24 @@ export default function App() {
                                   justifyContent: 'flex-start'
                                 }}
                               >
-                                <img
-                                  src={p.logo}
-                                  alt={p.name}
-                                  style={{ width: 36, height: 36, borderRadius: 8, objectFit: 'contain' }}
-                                  onError={(e) => { e.target.style.display = 'none'; }}
-                                />
+                                <span
+                                  style={{
+                                    position: 'relative', width: 36, height: 36, borderRadius: 8,
+                                    background: p.color || '#222', display: 'inline-flex',
+                                    alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0
+                                  }}
+                                >
+                                  <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, color: '#fff', fontSize: '1rem', zIndex: 0 }}>
+                                    {(p.name || '?').trim().charAt(0).toUpperCase()}
+                                  </span>
+                                  <img
+                                    src={p.logo}
+                                    alt=""
+                                    aria-hidden="true"
+                                    style={{ position: 'relative', zIndex: 1, width: 36, height: 36, borderRadius: 8, objectFit: 'contain' }}
+                                    onError={(e) => { e.target.style.display = 'none'; }}
+                                  />
+                                </span>
                                 <span style={{ fontWeight: 800, fontSize: '0.95rem' }}>{p.name}</span>
                               </button>
                             ));
