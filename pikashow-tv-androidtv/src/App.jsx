@@ -9,7 +9,7 @@ import { getTmdbTrending, getTmdbCatalog, getTmdbCatalogDeep, getTmdbNowPlaying,
 import { getRankedServers } from './api/mirrorHealth';
 import { getAddonCatalogs, getAddonStreams } from './api/stremio';
 import { GoogleTVHeader } from './components/GoogleTVHeader';
-import { HeroBanner } from './components/HeroBanner';
+import { HeroGrid } from './components/HeroGrid';
 import { MediaRail } from './components/MediaRail';
 import { MediaGridView } from './components/MediaGridView';
 import { MediaDetailsModal } from './components/MediaDetailsModal';
@@ -767,9 +767,10 @@ export default function App() {
                     {/* ===== TRENDING SUB-TAB (default) ===== */}
                     {activeSubTab === 'trending' && (
                       <>
-                        {/* Auto-Carousel Hero Banner */}
+                        {/* Multi-tile spotlight grid (v3.12.76) — 5 things to
+                            watch visible at once instead of one rotating banner */}
                         {featuredItems.length > 0 && (
-                          <HeroBanner
+                          <HeroGrid
                             items={featuredItems}
                             onPlay={(item) => handleStartPlayback(item)}
                             onSelectInfo={(item) => { rememberFocus(); setSelectedItem(item); }}
@@ -962,13 +963,6 @@ export default function App() {
                     {activeSubTab === 'music' && (
                       <div className="tv-center-state">
                         <p style={{ fontWeight: 700, color: '#8a8a9a' }}>🎵 Music section coming soon</p>
-                      </div>
-                    )}
-
-                    {/* ===== SHORTTV SUB-TAB ===== */}
-                    {activeSubTab === 'shorttv' && (
-                      <div className="tv-center-state">
-                        <p style={{ fontWeight: 700, color: '#8a8a9a' }}>📱 ShortTV section coming soon</p>
                       </div>
                     )}
 

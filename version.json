@@ -33,16 +33,16 @@
     "releaseDate": "2026-10-09"
   },
   "android_tv": {
-    "version": "3.12.75",
-    "versionCode": 225,
+    "version": "3.12.76",
+    "versionCode": 226,
     "packageId": "com.ajo.androidtv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
-    "changelog": "Fix Live TV: vertical scrolling in the channel catalog, D-pad focus to All Channels/TV Guide and the category strip, horizontal scroll on the category strip, UP/DOWN channel zapping (channel list now reaches the native player), popular-only channel curation (~143 channels, was ~1000), TV layout breakpoint for 1080p WebViews.",
+    "changelog": "UI/UX overhaul: soft-teal palette (was amber), multi-tile hero grid on Home (5 picks at once, no rotating banner), live grid no longer clips tiles off the right edge, UP from the grid stops at All Channels/TV Guide instead of jumping to the top nav, channel tiles show initials when a logo fails instead of a bare icon, ShortTV removed, bigger poster cards for readability.",
     "size_mb": 7.02,
-    "sha256": "b258345e172be4a1365b9f80368d2a88847e7239cfe1e73daa6a9c0e5993124f",
+    "sha256": "2b1f64e894ca6f4dab804ac0d932712988ec03f02961fd97e439db555550c09c",
     "releaseDate": "2026-10-09",
     "size": 7345801
   },

@@ -25,6 +25,12 @@ const CATEGORY_ICONS = {
 const ALL = 'All Channels';
 const CATEGORY_ORDER = ['Sports', 'News', 'Entertainment', 'Movies', 'Kids', 'Music', 'Devotional', 'Infotainment', 'Lifestyle', 'Education'];
 
+// v3.12.76 (thumbnails fix): URLs that already failed this session go straight
+// to the fallback tile — previously ch.logo stayed truthy after onError, so any
+// remount (chunked render window, category switch, scrolling) put the broken
+// image back and the tile flickered logo→fallback forever.
+const deadLogoUrls = new Set();
+
 export function LiveView({ channels, onSelectItem, loading }) {
   const [activeCat, setActiveCat] = useState(ALL);
   const gridRef = useRef(null);
@@ -165,7 +171,9 @@ export function LiveView({ channels, onSelectItem, loading }) {
         </header>
 
         <div className="live-channel-grid" role="list">
-          {rendered.map((ch, idx) => (
+          {rendered.map((ch, idx) => {
+            const logoDead = ch.logo && deadLogoUrls.has(ch.logo);
+            return (
             <button
               key={ch.id || `${ch.title}-${idx}`}
               type="button"
@@ -176,7 +184,7 @@ export function LiveView({ channels, onSelectItem, loading }) {
               onClick={() => onSelectItem(ch)}
             >
               <div className="tv-card-media tv-card-live-media">
-                {ch.logo ? (
+                {ch.logo && !logoDead ? (
                   <img
                     className="live-logo"
                     src={ch.logo}
@@ -184,10 +192,9 @@ export function LiveView({ channels, onSelectItem, loading }) {
                     loading="lazy"
                     decoding="async"
                     onError={(e) => {
-                      // v3.12.73 (thumbnails fix): first failure — retry the same
-                      // logo through the VPS image proxy (covers devices that
-                      // can't reach the logo CDN, and hotlink-gated hosts).
-                      // Second failure — clean fallback tile.
+                      // v3.12.73: first failure — retry through the VPS image
+                      // proxy. Second failure — remember the URL as dead (so
+                      // remounts never re-try it) and swap to a fallback tile.
                       const img = e.currentTarget;
                       const orig = img.dataset.logoSrc || img.getAttribute('src') || '';
                       if (orig && !img.dataset.proxyTried && !orig.startsWith('https://new.ajo.co.in/channels/logo')) {
@@ -196,15 +203,16 @@ export function LiveView({ channels, onSelectItem, loading }) {
                         img.src = 'https://new.ajo.co.in/channels/logo?u=' + encodeURIComponent(orig);
                         return;
                       }
-                      // v3.12.70: dead feed logo (e.g. sonypicturesnetworks 403) —
-                      // swap to a clean fallback tile. No user data is written here;
+                      if (orig) deadLogoUrls.add(orig);
+                      const proxied = img.getAttribute('src') || '';
+                      if (proxied) deadLogoUrls.add(proxied);
                       // DOM nodes are created with fixed literal classes/text only.
                       const box = img.parentElement;
                       if (!box) return;
                       const fallback = document.createElement('div');
                       fallback.className = 'live-logo live-logo-fallback';
                       fallback.setAttribute('aria-hidden', 'true');
-                      fallback.textContent = '📺';
+                      fallback.textContent = String(ch.title || ch.name || '📺').replace(/[^A-Za-z0-9 ]/g, '').trim().slice(0, 2).toUpperCase() || '📺';
                       const badge = document.createElement('span');
                       badge.className = 'tv-badge-live';
                       badge.textContent = 'LIVE';
@@ -212,7 +220,7 @@ export function LiveView({ channels, onSelectItem, loading }) {
                     }}
                   />
                 ) : (
-                  <div className="live-logo live-logo-fallback" aria-hidden="true">📺</div>
+                  <div className="live-logo live-logo-fallback" aria-hidden="true">{String(ch.title || ch.name || '📺').replace(/[^A-Za-z0-9 ]/g, '').trim().slice(0, 2).toUpperCase() || '📺'}</div>
                 )}
                 <span className="tv-badge-live">LIVE</span>
               </div>
@@ -224,7 +232,8 @@ export function LiveView({ channels, onSelectItem, loading }) {
                 )}
               </div>
             </button>
-          ))}
+            );
+          })}
         </div>
       </section>
     </div>

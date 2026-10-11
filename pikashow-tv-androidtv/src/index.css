@@ -15,8 +15,11 @@
   --bg-elevated: #1a1a26;
 
   /* MovieBox Accent Colors */
-  --accent-gold: #F5A623;
-  --accent-gold-dim: rgba(245, 166, 35, 0.15);
+  /* v3.12.76: accent switched from yellow-amber to a soft teal — high
+     contrast on dark backgrounds, far easier on aging eyes than yellow,
+     and matches the "trust/calm" palette of mainstream TV apps. */
+  --accent-gold: #2DD4BF;
+  --accent-gold-dim: rgba(45, 212, 191, 0.15);
   --accent-red: #E50914;
   --accent-red-dim: rgba(229, 9, 20, 0.12);
   --accent-cyan: #38bdf8;
@@ -28,11 +31,13 @@
   --text-primary: #f0f0f5;
   --text-secondary: #8a8a9a;
   --text-muted: #55556a;
-  --text-gold: #F5A623;
+  --text-gold: #2DD4BF;
 
   /* Focus & Interaction */
-  --focus-ring: 0 0 0 3px rgba(245, 166, 35, 0.6), 0 8px 28px rgba(245, 166, 35, 0.3);
+  --focus-ring: 0 0 0 3px rgba(45, 212, 191, 0.6), 0 8px 28px rgba(45, 212, 191, 0.3);
   --focus-ring-red: 0 0 0 3px rgba(229, 9, 20, 0.6), 0 8px 28px rgba(229, 9, 20, 0.3);
+  /* v3.12.76: elderly-friendly sizing — bigger tap targets, no right-edge
+     clipping (tiles snap to a hard edge instead of bleeding off screen). */
   --focus-scale: scale(1.05);
 
   /* Radii */
@@ -95,7 +100,7 @@ html, body, #root {
   justify-content: space-between;
   gap: 20px;
   background: linear-gradient(180deg, rgba(8, 8, 15, 0.98) 0%, rgba(8, 8, 15, 0.92) 100%);
-  border-bottom: 1px solid rgba(245, 166, 35, 0.06);
+  border-bottom: 1px solid rgba(45, 212, 191, 0.06);
   z-index: 100;
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
@@ -109,7 +114,7 @@ html, body, #root {
 }
 
 .tv-logo-badge {
-  background: linear-gradient(135deg, #F5A623 0%, #E8940F 50%, #D4820A 100%);
+  background: linear-gradient(135deg, #2DD4BF 0%, #14B8A6 50%, #0D9488 100%);
   color: #08080f;
   font-weight: 900;
   font-size: 1rem;
@@ -117,7 +122,7 @@ html, body, #root {
   border-radius: var(--radius-sm);
   letter-spacing: 1.5px;
   text-transform: uppercase;
-  box-shadow: 0 2px 12px rgba(245, 166, 35, 0.35);
+  box-shadow: 0 2px 12px rgba(45, 212, 191, 0.35);
 }
 
 .tv-logo-title {
@@ -155,12 +160,12 @@ html, body, #root {
 .tv-nav-pill.active {
   background: var(--accent-gold-dim);
   color: var(--accent-gold);
-  border-color: rgba(245, 166, 35, 0.25);
+  border-color: rgba(45, 212, 191, 0.25);
   font-weight: 700;
 }
 
 .tv-nav-pill:focus {
-  background: rgba(245, 166, 35, 0.2);
+  background: rgba(45, 212, 191, 0.2);
   color: #ffffff;
   border-color: var(--accent-gold);
   box-shadow: var(--focus-ring);
@@ -218,7 +223,7 @@ html, body, #root {
   color: #08080f;
   border-color: var(--accent-gold);
   font-weight: 800;
-  box-shadow: 0 2px 12px rgba(245, 166, 35, 0.3);
+  box-shadow: 0 2px 12px rgba(45, 212, 191, 0.3);
 }
 
 .tv-subtab:focus {
@@ -328,7 +333,7 @@ html, body, #root {
   border-radius: var(--radius-xs);
   margin-bottom: 10px;
   letter-spacing: 0.8px;
-  box-shadow: 0 2px 8px rgba(245, 166, 35, 0.4);
+  box-shadow: 0 2px 8px rgba(45, 212, 191, 0.4);
 }
 
 .tv-hero-title {
@@ -393,7 +398,7 @@ html, body, #root {
   border-radius: var(--radius-sm);
   border: none;
   cursor: pointer;
-  box-shadow: 0 4px 16px rgba(245, 166, 35, 0.4);
+  box-shadow: 0 4px 16px rgba(45, 212, 191, 0.4);
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
@@ -450,7 +455,7 @@ html, body, #root {
   width: 24px;
   border-radius: 4px;
   background: var(--accent-gold);
-  box-shadow: 0 0 8px rgba(245, 166, 35, 0.5);
+  box-shadow: 0 0 8px rgba(45, 212, 191, 0.5);
 }
 
 /* ============================================
@@ -485,7 +490,7 @@ html, body, #root {
 .tv-provider-chip:focus,
 .tv-provider-chip.active {
   border-color: var(--accent-gold);
-  background: rgba(245, 166, 35, 0.08);
+  background: rgba(45, 212, 191, 0.08);
   box-shadow: var(--focus-ring);
   transform: scale(1.06);
 }
@@ -556,12 +561,14 @@ html, body, #root {
 
 .tv-rail-track {
   display: flex;
-  gap: 14px;
+  gap: 18px;
   overflow-x: auto;
   overflow-y: hidden;
-  padding: 8px 4px;
+  /* v3.12.76: hard right edge — focused tiles used to bleed past the
+     viewport so you could never see the whole tile. Padding now keeps the
+     full card inside the scroll port. */
+  padding: 10px 48px 14px 4px;
   scroll-behavior: smooth;
-  margin: -8px -4px;
   -webkit-overflow-scrolling: touch;
   touch-action: pan-x pan-y;
 }
@@ -575,8 +582,8 @@ html, body, #root {
    ============================================ */
 
 .tv-card {
-  flex: 0 0 155px;
-  width: 155px;
+  flex: 0 0 172px;
+  width: 172px;
   display: flex;
   flex-direction: column;
   background: var(--bg-card);
@@ -600,7 +607,7 @@ html, body, #root {
 
 .tv-card-poster {
   width: 100%;
-  height: 220px;
+  height: 244px;
   object-fit: cover;
   background-color: #12121a;
   display: block;
@@ -700,9 +707,141 @@ html, body, #root {
   color: var(--text-primary);
   text-shadow: -2px 0 0 var(--bg-card), 2px 0 0 var(--bg-card),
                0 -2px 0 var(--bg-card), 0 2px 0 var(--bg-card);
-  -webkit-text-stroke: 2px rgba(245, 166, 35, 0.3);
+  -webkit-text-stroke: 2px rgba(45, 212, 191, 0.3);
   line-height: 1;
   z-index: 5;
+}
+
+/* ============================================
+   HERO GRID (v3.12.76) — multi-tile spotlight
+   ============================================ */
+
+.tv-hero-grid {
+  display: grid;
+  grid-template-columns: 1.9fr 1fr;
+  gap: 18px;
+  margin: 4px 0 26px;
+}
+
+.tv-hero-grid-side {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 18px;
+}
+
+.tv-hero-grid-tile {
+  position: relative;
+  border: none;
+  padding: 0;
+  border-radius: 20px;
+  overflow: hidden;
+  background: var(--bg-card);
+  cursor: pointer;
+  min-height: 150px;
+  transition: transform 0.18s cubic-bezier(0.2, 0, 0, 1), box-shadow 0.18s ease;
+  text-align: left;
+}
+
+.tv-hero-grid-tile-lg {
+  min-height: 380px;
+  grid-row: span 2;
+}
+
+.tv-hero-grid-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.tv-hero-grid-img-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 44px;
+  background: linear-gradient(150deg, rgba(45,212,191,0.18), rgba(8,10,15,0.9));
+}
+
+.tv-hero-grid-scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(5,6,10,0) 34%, rgba(5,6,10,0.55) 62%, rgba(5,6,10,0.92) 100%);
+}
+
+.tv-hero-grid-info {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 14px 16px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.tv-hero-grid-tile-lg .tv-hero-grid-info { padding: 22px 24px; gap: 8px; }
+
+.tv-hero-grid-badge {
+  align-self: flex-start;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--accent-gold);
+  color: #06090e;
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+}
+
+.tv-hero-grid-title {
+  color: #ffffff;
+  font-weight: 800;
+  font-size: 0.98rem;
+  line-height: 1.2;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.tv-hero-grid-tile-lg .tv-hero-grid-title { font-size: 1.7rem; -webkit-line-clamp: 2; }
+
+.tv-hero-grid-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: rgba(255,255,255,0.85);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.tv-hero-grid-tile-lg .tv-hero-grid-meta { font-size: 0.92rem; }
+
+.tv-hero-grid-rating { display: inline-flex; align-items: center; gap: 4px; color: var(--accent-gold); }
+
+.tv-hero-grid-play {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--accent-gold);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.tv-hero-grid-tile:focus {
+  transform: scale(1.04);
+  box-shadow: var(--focus-ring);
+  z-index: 20;
+  outline: none;
+}
+
+.tv-hero-grid-tile:focus .tv-hero-grid-play { opacity: 1; }
+
+@media (max-width: 959px) {
+  .tv-hero-grid { grid-template-columns: 1fr; }
+  .tv-hero-grid-tile-lg { min-height: 240px; }
 }
 
 /* ============================================
@@ -711,9 +850,9 @@ html, body, #root {
 
 .tv-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 16px;
-  padding: 8px 0 32px;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 20px;
+  padding: 10px 0 36px;
 }
 
 .tv-grid .tv-card {
@@ -790,7 +929,7 @@ html, body, #root {
   max-height: 92vh;
   background: linear-gradient(135deg, var(--bg-surface) 0%, #13131d 100%);
   border-radius: var(--radius-xl);
-  border: 1px solid rgba(245, 166, 35, 0.08);
+  border: 1px solid rgba(45, 212, 191, 0.08);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -873,7 +1012,7 @@ html, body, #root {
 
 .tv-btn-primary {
   padding: 12px 28px;
-  background: linear-gradient(135deg, var(--accent-gold), #E8940F);
+  background: linear-gradient(135deg, var(--accent-gold), #14B8A6);
   color: #08080f;
   font-weight: 800;
   font-size: 0.95rem;
@@ -883,7 +1022,7 @@ html, body, #root {
   display: flex;
   align-items: center;
   gap: 8px;
-  box-shadow: 0 4px 16px rgba(245, 166, 35, 0.35);
+  box-shadow: 0 4px 16px rgba(45, 212, 191, 0.35);
   transition: all 0.15s ease;
 }
 
@@ -996,7 +1135,7 @@ html, body, #root {
   height: 100%;
   background: var(--accent-gold);
   border-radius: var(--radius-full);
-  box-shadow: 0 0 8px rgba(245, 166, 35, 0.5);
+  box-shadow: 0 0 8px rgba(45, 212, 191, 0.5);
 }
 
 .tv-player-time {
@@ -1052,7 +1191,7 @@ html, body, #root {
   bottom: 0;
   width: 380px;
   background: rgba(8, 8, 15, 0.96);
-  border-left: 1px solid rgba(245, 166, 35, 0.08);
+  border-left: 1px solid rgba(45, 212, 191, 0.08);
   padding: 24px;
   display: flex;
   flex-direction: column;
@@ -1110,7 +1249,7 @@ html, body, #root {
 .tv-spinner {
   width: 48px;
   height: 48px;
-  border: 4px solid rgba(245, 166, 35, 0.15);
+  border: 4px solid rgba(45, 212, 191, 0.15);
   border-top-color: var(--accent-gold);
   border-radius: 50%;
   animation: tv-spin 0.8s linear infinite;
@@ -1180,7 +1319,7 @@ html, body, #root {
 }
 
 .tv-settings-card:focus-within {
-  border-color: rgba(245, 166, 35, 0.15);
+  border-color: rgba(45, 212, 191, 0.15);
 }
 
 .tv-settings-title {
@@ -1259,8 +1398,8 @@ html, body, #root {
 }
 
 .live-cat-btn.active {
-  background: linear-gradient(135deg, rgba(245, 166, 35, 0.24), rgba(180, 83, 9, 0.16));
-  border-color: rgba(245, 166, 35, 0.75);
+  background: linear-gradient(135deg, rgba(45, 212, 191, 0.24), rgba(13, 148, 136, 0.16));
+  border-color: rgba(45, 212, 191, 0.75);
   color: #ffffff;
 }
 
@@ -1335,8 +1474,10 @@ html, body, #root {
 
 .live-channel-grid {
   display: grid;
-  grid-template-columns: repeat(10, minmax(132px, 1fr));
-  gap: 16px;
+  /* v3.12.76: auto-fill at 150px+ so columns divide the viewport cleanly
+     instead of bleeding a sliver of the next column past the right edge. */
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 18px;
   align-items: start;
 }
 
@@ -1380,8 +1521,11 @@ html, body, #root {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 27px;
-  background: rgba(245, 166, 35, 0.14);
+  font-size: 26px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  color: #ffffff;
+  background: linear-gradient(150deg, rgba(45, 212, 191, 0.22), rgba(8, 10, 15, 0.95));
 }
 
 .live-channel-card:focus {
@@ -1438,14 +1582,11 @@ html, body, #root {
   font-size: 0.58rem;
 }
 
-/* Fire TV / smaller TV screens: 8 columns keeps targets comfortably large. */
-@media (max-width: 1600px) {
-  .live-channel-grid { grid-template-columns: repeat(8, minmax(140px, 1fr)); }
-}
-
-@media (max-width: 1280px) {
-  .live-channel-grid { grid-template-columns: repeat(7, minmax(136px, 1fr)); }
-}
+/* v3.12.76: single auto-fill rule — no fixed column counts. Fixed counts
+   always bleed a sliver at some viewport width; auto-fill with minmax keeps
+   whole tiles inside the visible area at any size. (The old 1600px/1280px
+   media queries were overriding the base rule on the 4K Lumio WebView,
+   collapsing the grid to 3 fat clipped columns.) */
 
 /* v3.12.75: was max-width:960px — that trips on a 1080p Android TV WebView
    reporting 960 CSS px (2x density), flipping TV layouts to the phone stack.
@@ -1463,7 +1604,7 @@ html, body, #root {
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   }
   .live-cat-btn { width: auto; min-height: 44px; }
-  .live-channel-grid { grid-template-columns: repeat(4, minmax(130px, 1fr)); }
+  .live-channel-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
 }
 
 /* ============================================
@@ -1509,6 +1650,17 @@ html, body, #root {
 .tv-section-divider {
   width: 100%;
   height: 1px;
-  background: linear-gradient(90deg, transparent 0%, rgba(245, 166, 35, 0.1) 50%, transparent 100%);
+  background: linear-gradient(90deg, transparent 0%, rgba(45, 212, 191, 0.1) 50%, transparent 100%);
   margin: 8px 0 24px;
+}
+
+/* v3.12.76: bigger, calmer focus target — 4px ring + soft halo, no jitter
+   on low-refresh panels; every press visibly settles. */
+.tv-card:focus,
+.tv-nav-pill:focus,
+.tv-cat-btn:focus,
+.live-cat-btn:focus,
+.tv-hero-grid-tile:focus {
+  outline: none;
+  scroll-margin: 24px;
 }

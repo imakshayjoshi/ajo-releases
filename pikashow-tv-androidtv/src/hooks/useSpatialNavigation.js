@@ -68,6 +68,51 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
 
     // 2. FAST-PATH: Inter-rail vertical navigation
     if (direction === 'ArrowDown' || direction === 'ArrowUp') {
+      // v3.12.76: the live grid cards live inside .live-view-shell (a flex row),
+      // so the rail-walk never finds the toolbar by sibling traversal — the
+      // closest() "rail" is the INNER .live-channel-grid, whose siblings are
+      // the cat rail and the grid scroller, not the toolbar. Handle the Live
+      // TV stack explicitly before the generic rail walk.
+      const inLiveArea = current.closest('.live-channel-grid, .live-cat-rail, .live-toolbar');
+      if (inLiveArea) {
+        if (direction === 'ArrowUp') {
+          // Grid card or rail item → toolbar first; toolbar → header.
+          if (!current.closest('.live-toolbar')) {
+            const toolbar = document.querySelector('.tv-main-content .live-toolbar');
+            if (toolbar) {
+              const tbEls = getFocusableElements(toolbar);
+              if (tbEls.length > 0) {
+                const currentLeft = current.getBoundingClientRect().left;
+                let closestTb = tbEls[0];
+                let minTbDiff = Infinity;
+                for (const el of tbEls) {
+                  const diff = Math.abs(el.getBoundingClientRect().left - currentLeft);
+                  if (diff < minTbDiff) { minTbDiff = diff; closestTb = el; }
+                }
+                return closestTb;
+              }
+            }
+          }
+          const headerEls = getFocusableElements(document.querySelector('.tv-header'));
+          if (headerEls.length > 0) {
+            const currentLeft = current.getBoundingClientRect().left;
+            let closestH = headerEls[0];
+            let minHDiff = Infinity;
+            for (const el of headerEls) {
+              const diff = Math.abs(el.getBoundingClientRect().left - currentLeft);
+              if (diff < minHDiff) { minHDiff = diff; closestH = el; }
+            }
+            return closestH;
+          }
+        }
+        if (direction === 'ArrowDown' && current.closest('.live-toolbar')) {
+          // Toolbar → first grid card (skip the category rail: LEFT/RIGHT
+          // already moves between rail and grid on the horizontal plane).
+          const firstCard = document.querySelector('.live-channel-grid .tv-card-live');
+          if (firstCard) return firstCard;
+        }
+        // Grid vertical movement is handled by the 2D fallback below.
+      }
       const currentRail = current.closest('.tv-rail, .tv-header, .tv-hero, .tv-modal-card, .live-toolbar, .live-cat-rail, .live-channel-grid');
 
       // v3.9: header <-> content in ONE press. Previously the rail-walk only
@@ -139,6 +184,23 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
 
         // Rail walk found nothing above us: snap straight into the header.
         if (exhausted && direction === 'ArrowUp') {
+          // v3.12.76: on the Live TV tab the mode toolbar (All Channels / TV
+          // Guide) sits between the grid and the header — stop there first,
+          // never jump past it straight to the nav pills.
+          const toolbar = document.querySelector('.tv-main-content .live-toolbar');
+          if (toolbar) {
+            const tbEls = getFocusableElements(toolbar);
+            if (tbEls.length > 0) {
+              const currentLeft = current.getBoundingClientRect().left;
+              let closestTb = tbEls[0];
+              let minTbDiff = Infinity;
+              for (const el of tbEls) {
+                const diff = Math.abs(el.getBoundingClientRect().left - currentLeft);
+                if (diff < minTbDiff) { minTbDiff = diff; closestTb = el; }
+              }
+              return closestTb;
+            }
+          }
           const headerEls = getFocusableElements(document.querySelector('.tv-header'));
           if (headerEls.length > 0) {
             const currentLeft = current.getBoundingClientRect().left;
