@@ -84,9 +84,14 @@ export function LiveView({ channels, onSelectItem, loading }) {
         if (rect.bottom > root.getBoundingClientRect().bottom - 700) {
           setVisibleCount((n) => Math.min(n + 120, visible.length));
         }
-        // v3.12.68: scrollIntoView({inline:'nearest'}) was a no-op for the
-        // horizontally-overflowing grid ancestor; scroll the page scroller
-        // directly so the focused row is always visible.
+        // v3.12.82 (live-catalog focus-jump fix): the previous build called
+        // el.scrollIntoView({block:'center'}) on EVERY focus change. On a TV
+        // the browser's native scrollIntoView fights the app's own scroller
+        // and yanks the focused card to mid-screen each press — that's the
+        // "focus jumps around the live channel catalog" Akkshay reported.
+        // Now we nudge the page scroller just enough to keep the card inside
+        // the viewport (nearest-edge), never re-centering. The spatial nav
+        // engine's own focusAndScroll does the same, so this stays in lockstep.
         const scroller = el.closest('.tv-main-content') || document.querySelector('.tv-main-content');
         if (scroller) {
           const er = el.getBoundingClientRect();
@@ -97,7 +102,7 @@ export function LiveView({ channels, onSelectItem, loading }) {
             scroller.scrollTop -= (sr.top + 24 - er.top);
           }
         }
-        el.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'instant' });
+        // NO scrollIntoView here — that was the jump source.
       }
     });
     observer.observe(root, { subtree: true, attributes: true, attributeFilter: ['tabindex', 'class'] });
@@ -192,21 +197,12 @@ export function LiveView({ channels, onSelectItem, loading }) {
                     loading="lazy"
                     decoding="async"
                     onError={(e) => {
-                      // v3.12.73: first failure — retry through the VPS image
-                      // proxy. Second failure — remember the URL as dead (so
-                      // remounts never re-try it) and swap to a fallback tile.
+                      // v3.12.79: the logo proxy is dead (403/502), so don't
+                      // retry through it — it just loops. Mark the URL dead and
+                      // swap straight to the initials fallback tile.
                       const img = e.currentTarget;
                       const orig = img.dataset.logoSrc || img.getAttribute('src') || '';
-                      if (orig && !img.dataset.proxyTried && !orig.startsWith('https://new.ajo.co.in/channels/logo')) {
-                        img.dataset.proxyTried = '1';
-                        img.dataset.logoSrc = orig;
-                        img.src = 'https://new.ajo.co.in/channels/logo?u=' + encodeURIComponent(orig);
-                        return;
-                      }
                       if (orig) deadLogoUrls.add(orig);
-                      const proxied = img.getAttribute('src') || '';
-                      if (proxied) deadLogoUrls.add(proxied);
-                      // DOM nodes are created with fixed literal classes/text only.
                       const box = img.parentElement;
                       if (!box) return;
                       const fallback = document.createElement('div');
