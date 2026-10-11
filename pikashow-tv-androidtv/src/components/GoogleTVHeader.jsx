@@ -16,25 +16,21 @@ export function GoogleTVHeader({ activeTab, onSelectTab, activeSubTab, onSelectS
     return () => clearInterval(interval);
   }, []);
 
+  // v3.12.83 (StreamFlix structure): clean content-type nav. Sports folds into
+  // Live TV; Search stays a top-level tab (magnifier on the right). 6 items,
+  // no clutter — matches the StreamFlix reference the user pointed at.
   const tabs = [
     { id: 'home', label: 'Home', icon: Home },
-    { id: 'sports', label: 'Sports', icon: Trophy },
+    { id: 'live', label: 'Live TV', icon: Radio },
     { id: 'movies', label: 'Movies', icon: Film },
     { id: 'series', label: 'Series', icon: Tv },
-    { id: 'live', label: 'Live TV', icon: Radio },
     { id: 'search', label: 'Search', icon: Search },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
-  const subTabs = [
-    { id: 'trending', label: '🔥 Trending' },
-    { id: 'movies', label: '🎬 Movies' },
-    { id: 'series', label: '📺 Series' },
-    { id: 'anime', label: '⛩️ Anime' },
-    { id: 'kids', label: '🧸 Kids' },
-    { id: 'music', label: '🎵 Music' },
-    { id: 'providers', label: '📡 Providers' },
-  ];
+  // v3.12.83: Home is one curated feed now — no cluttered sub-tab bar. The
+  // Movies/Series content lives on its own top-level tab with genre + sort.
+  const subTabs = [];
 
   // v3.12.79 ColorOS sliding indicator — glides to the active pill without
   // a hard cut. transform/width only (GPU), no layout thrash on the Lumio.
@@ -88,8 +84,9 @@ export function GoogleTVHeader({ activeTab, onSelectTab, activeSubTab, onSelectS
         </div>
       </header>
 
-      {/* Sub-tab bar — only on Home tab */}
-      {activeTab === 'home' && onSelectSubTab && (
+      {/* Sub-tab bar — only rendered when there ARE sub-tabs (v3.12.83: Home
+          is a single curated feed now, so this is empty and renders nothing). */}
+      {activeTab === 'home' && onSelectSubTab && subTabs.length > 0 && (
         <div style={{ padding: '0 40px' }}>
           <div className="tv-subtab-bar">
             {subTabs.map(sub => (

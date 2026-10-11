@@ -33,16 +33,16 @@
     "releaseDate": "2026-10-09"
   },
   "android_tv": {
-    "version": "3.12.82",
-    "versionCode": 232,
+    "version": "3.12.83",
+    "versionCode": 233,
     "packageId": "com.ajo.androidtv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
-    "changelog": "v3.12.82: Live TV channel catalog no longer jumps around — the focused channel now scrolls smoothly into view instead of snapping to center on every press. Carries everything from v3.12.80-81: corner Options icon (LEFT/RIGHT always seek), OTT logos fixed, Movies/Series categories un-mixed, and the Settings D-pad fix so every option including Check for Updates is reachable.",
+    "changelog": "v3.12.83: New StreamFlix-style structure. Clean top nav (Home / Live TV / Movies / Series / Search / Settings), a cinematic hero banner on Home, then content rails in order — Live TV, Trending Movies, Popular Series, New Releases, Bollywood, Hollywood. Movies & Series screens now have genre chips and a sort control (Popular / Newest / A-Z) like Apple TV. Carries all earlier fixes: corner Options seek, OTT logos, un-mixed categories, Settings + Live D-pad nav.",
     "size_mb": 7.0,
-    "sha256": "b0f821ee011aa1ee0af2feb33d9f86975d7623434def002ad8d88a78c2e142f9",
+    "sha256": "e2ef279e86652e1f597bd0cffa92587127a952ad05d3f04472535f98ea67633a",
     "releaseDate": "2026-10-11",
     "size": 7365192
   },

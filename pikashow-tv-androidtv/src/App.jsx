@@ -9,7 +9,7 @@ import { getTmdbTrending, getTmdbCatalog, getTmdbCatalogDeep, getTmdbNowPlaying,
 import { getRankedServers } from './api/mirrorHealth';
 import { getAddonCatalogs, getAddonStreams } from './api/stremio';
 import { GoogleTVHeader } from './components/GoogleTVHeader';
-import { HeroGrid } from './components/HeroGrid';
+import { HeroBanner } from './components/HeroBanner';
 import { MediaRail } from './components/MediaRail';
 import { MediaGridView } from './components/MediaGridView';
 import { MediaDetailsModal } from './components/MediaDetailsModal';
@@ -18,7 +18,6 @@ import { SettingsView } from './components/SettingsView';
 import { EPGGuideView } from './components/EPGGuideView';
 import { TVPlayer } from './components/TVPlayer';
 import { ProviderRow, ProviderCatalog } from './components/ProviderCatalog';
-import { getMajorProviders } from './api/providerApi';
 import { useSpatialNavigation } from './hooks/useSpatialNavigation';
 import { shouldPreferNativePlayer, playInNativePlayer, isNativePlaybackActive, nativePlayerControl, setNativePlaybackActive } from './utils/nativePlayer';
 import { generateUniversalServers } from './utils/streamingEngines';
@@ -670,6 +669,25 @@ export default function App() {
 
   const featuredItem = featuredItems[0] || null;
 
+  // v3.12.83 (StreamFlix structure): the Home feed needs SEPARATE trending
+  // movie + series rails (the reference mixes them). Split the blended
+  // tmdbTrending list by resolved type so each rail shows the right content.
+  const trendingMovies = useMemo(() => {
+    return (tmdbTrending || []).filter(it => {
+      if (it.type === 'series' || it.type === 'serial' || it.type === 'tv') return false;
+      if (it.first_air_date && !it.release_date) return false;
+      return true;
+    });
+  }, [tmdbTrending]);
+
+  const trendingSeries = useMemo(() => {
+    return (tmdbTrending || []).filter(it => {
+      if (it.type === 'series' || it.type === 'serial' || it.type === 'tv') return true;
+      if (it.first_air_date && !it.release_date) return true;
+      return false;
+    });
+  }, [tmdbTrending]);
+
   // v3.9.0 PERF: removed YouTube trailer iframe from hero banner.
   // On Fire TV Stick 4K (1.5GB RAM) the iframe consumed ~150MB (Chromium
   // sub-renderer), competed for GPU with the WebView, and broke D-pad focus.
@@ -786,10 +804,11 @@ export default function App() {
           </div>
         ) : (
           <>
-            {/* 🏠 HOME TAB */}
+            {/* 🏠 HOME TAB — StreamFlix-style curated feed (v3.12.83): one
+                cinematic hero banner, then clean content-type rails in
+                engagement order. No cluttered sub-tab bar. */}
             {activeTab === 'home' && (
               <>
-                {/* Provider Catalog Full Page (when a provider is selected) */}
                 {activeProvider ? (
                   <ProviderCatalog
                     provider={activeProvider}
@@ -798,264 +817,120 @@ export default function App() {
                   />
                 ) : (
                   <>
-                    {/* ===== TRENDING SUB-TAB (default) ===== */}
-                    {activeSubTab === 'trending' && (
-                      <>
-                        {/* Multi-tile spotlight grid (v3.12.76) — 5 things to
-                            watch visible at once instead of one rotating banner */}
-                        {featuredItems.length > 0 && (
-                          <HeroGrid
-                            items={featuredItems}
-                            onPlay={(item) => handleStartPlayback(item)}
-                            onSelectInfo={(item) => { rememberFocus(); setSelectedItem(item); }}
-                          />
-                        )}
-
-                        {/* Continue Watching Rail */}
-                        {continueWatching.length > 0 && (
-                          <MediaRail
-                            title="🕒 Continue Watching"
-                            items={continueWatching}
-                            onSelectItem={handleItemClick}
-                          />
-                        )}
-
-                        {/* Streaming Providers Row */}
-                        <ProviderRow
-                          onSelectProvider={(p) => setActiveProvider(p)}
-                          activeProviderId={null}
-                        />
-
-                        <div className="tv-section-divider" />
-
-                        {/* Because You Watched */}
-                        {becauseYouWatched.length > 0 && (
-                          <MediaRail
-                            title={`🎯 Because you watched ${becauseYouWatched[0]?.becauseOf || 'recent titles'}`}
-                            items={becauseYouWatched}
-                            onSelectItem={handleItemClick}
-                          />
-                        )}
-
-                        {/* Watchlist */}
-                        {watchlist.length > 0 && (
-                          <MediaRail
-                            title="🔖 My Watchlist"
-                            items={watchlist}
-                            onSelectItem={handleItemClick}
-                          />
-                        )}
-
-                        {/* Trending Worldwide */}
-                        {tmdbTrending.length > 0 && (
-                          <MediaRail
-                            title="🔥 Trending Worldwide"
-                            items={tmdbTrending}
-                            onSelectItem={handleItemClick}
-                            onSeeAll={() => setActiveSubTab('trending')}
-                          />
-                        )}
-
-                        {/* v3.12.64: Movibox rail — direct-MP4 playback, no embeds */}
-                        {moviboxItems.length > 0 && (
-                          <MediaRail
-                            title="🎬 Movibox — Full Catalog, Direct HD"
-                            items={moviboxItems.slice(0, 40)}
-                            onSelectItem={handleItemClick}
-                          />
-                        )}
-
-                        {/* New Releases */}
-                        {nowPlaying.length > 0 && (
-                          <MediaRail
-                            title="🆕 New Releases"
-                            items={nowPlaying}
-                            onSelectItem={handleItemClick}
-                          />
-                        )}
-
-                        {/* Addon catalogs */}
-                        {addonCatalogItems.length > 0 && (
-                          <MediaRail
-                            title="🧩 From Your Addons"
-                            items={addonCatalogItems}
-                            onSelectItem={handleItemClick}
-                          />
-                        )}
-
-                        {/* Live Sports Rail */}
-                        {sportsItems.length > 0 && (
-                          <MediaRail
-                            title="🏆 Live Sports"
-                            items={sportsItems}
-                            isLive={true}
-                            onSelectItem={handleItemClick}
-                            onSeeAll={() => setActiveTab('sports')}
-                          />
-                        )}
-
-                        {/* Live TV Rail */}
-                        {liveItems.length > 0 && (
-                          <MediaRail
-                            title={`🔴 Live TV (${liveItems.length} channels)`}
-                            items={liveItems.slice(0, 20)}
-                            isLive={true}
-                            onSelectItem={handleItemClick}
-                            onSeeAll={() => setActiveTab('live')}
-                          />
-                        )}
-
-                        {/* Bollywood */}
-                        {bollywoodItems.length > 0 && (
-                          <MediaRail
-                            title="🎬 Bollywood Blockbusters"
-                            items={bollywoodItems.slice(0, 20)}
-                            onSelectItem={handleItemClick}
-                            onSeeAll={() => setActiveSubTab('movies')}
-                          />
-                        )}
-
-                        {/* Hollywood */}
-                        {hollywoodItems.length > 0 && (
-                          <MediaRail
-                            title="🍿 Hollywood Cinema"
-                            items={hollywoodItems.slice(0, 20)}
-                            onSelectItem={handleItemClick}
-                            onSeeAll={() => setActiveSubTab('movies')}
-                          />
-                        )}
-
-                        {/* Web Series */}
-                        {seriesItems.length > 0 && (
-                          <MediaRail
-                            title="📺 Binge-Worthy Series"
-                            items={seriesItems.slice(0, 20)}
-                            onSelectItem={handleItemClick}
-                            onSeeAll={() => setActiveSubTab('series')}
-                          />
-                        )}
-
-                        {/* Anime */}
-                        {animeItems.length > 0 && (
-                          <MediaRail
-                            title="⛩️ Anime & Animation"
-                            items={animeItems.slice(0, 20)}
-                            onSelectItem={handleItemClick}
-                            onSeeAll={() => setActiveSubTab('anime')}
-                          />
-                        )}
-
-                        {/* Kids & Family */}
-                        {kidsItems.length > 0 && (
-                          <MediaRail
-                            title="🧸 Kids & Family"
-                            items={kidsItems.slice(0, 20)}
-                            onSelectItem={handleItemClick}
-                            onSeeAll={() => setActiveSubTab('kids')}
-                          />
-                        )}
-                      </>
+                    {/* Cinematic hero banner (StreamFlix-style): one featured
+                        title with metadata + Watch Now / More Info CTAs. */}
+                    {featuredItems.length > 0 && (
+                      <HeroBanner
+                        items={featuredItems}
+                        onPlay={(item) => handleStartPlayback(item)}
+                        onSelectInfo={(item) => { rememberFocus(); setSelectedItem(item); }}
+                      />
                     )}
 
-                    {/* ===== MOVIES SUB-TAB ===== */}
-                    {activeSubTab === 'movies' && (
-                      <MediaGridView
-                        title="🎬 All Movies"
-                        items={allMovies}
+                    {/* Continue Watching */}
+                    {continueWatching.length > 0 && (
+                      <MediaRail
+                        title="Continue Watching"
+                        items={continueWatching}
                         onSelectItem={handleItemClick}
                       />
                     )}
 
-                    {/* ===== SERIES SUB-TAB ===== */}
-                    {activeSubTab === 'series' && (
-                      <MediaGridView
-                        title="📺 All Series"
-                        items={allSeries}
+                    {/* Live TV */}
+                    {liveItems.length > 0 && (
+                      <MediaRail
+                        title={`Live TV (${liveItems.length} channels)`}
+                        items={liveItems.slice(0, 20)}
+                        isLive={true}
+                        onSelectItem={handleItemClick}
+                        onSeeAll={() => setActiveTab('live')}
+                      />
+                    )}
+
+                    {/* Trending Movies */}
+                    {trendingMovies.length > 0 && (
+                      <MediaRail
+                        title="Trending Movies"
+                        items={trendingMovies.slice(0, 20)}
+                        onSelectItem={handleItemClick}
+                        onSeeAll={() => setActiveTab('movies')}
+                      />
+                    )}
+
+                    {/* Popular Series */}
+                    {trendingSeries.length > 0 && (
+                      <MediaRail
+                        title="Popular Series"
+                        items={trendingSeries.slice(0, 20)}
+                        onSelectItem={handleItemClick}
+                        onSeeAll={() => setActiveTab('series')}
+                      />
+                    )}
+
+                    {/* Because You Watched */}
+                    {becauseYouWatched.length > 0 && (
+                      <MediaRail
+                        title={`Because you watched ${becauseYouWatched[0]?.becauseOf || 'recent titles'}`}
+                        items={becauseYouWatched}
                         onSelectItem={handleItemClick}
                       />
                     )}
 
-                    {/* ===== ANIME SUB-TAB ===== */}
-                    {activeSubTab === 'anime' && (
-                      <MediaGridView
-                        title="⛩️ Anime & Animation"
-                        items={animeItems}
+                    {/* My Watchlist */}
+                    {watchlist.length > 0 && (
+                      <MediaRail
+                        title="My Watchlist"
+                        items={watchlist}
                         onSelectItem={handleItemClick}
                       />
                     )}
 
-                    {/* ===== KIDS SUB-TAB ===== */}
-                    {activeSubTab === 'kids' && (
-                      <MediaGridView
-                        title="🧸 Kids & Family"
-                        items={kidsItems}
+                    {/* New Releases */}
+                    {nowPlaying.length > 0 && (
+                      <MediaRail
+                        title="New Releases"
+                        items={nowPlaying}
                         onSelectItem={handleItemClick}
                       />
                     )}
 
-                    {/* ===== MUSIC SUB-TAB ===== */}
-                    {activeSubTab === 'music' && (
-                      <div className="tv-center-state">
-                        <p style={{ fontWeight: 700, color: '#8a8a9a' }}>🎵 Music section coming soon</p>
-                      </div>
+                    {/* Bollywood */}
+                    {bollywoodItems.length > 0 && (
+                      <MediaRail
+                        title="Bollywood Blockbusters"
+                        items={bollywoodItems.slice(0, 20)}
+                        onSelectItem={handleItemClick}
+                        onSeeAll={() => setActiveTab('movies')}
+                      />
                     )}
 
-                    {/* ===== PROVIDERS SUB-TAB ===== */}
-                    {activeSubTab === 'providers' && (
-                      <>
-                        <h2 style={{ fontSize: '1.4rem', fontWeight: 900, marginBottom: 20, marginTop: 8 }}>
-                          📡 Browse by Streaming Service
-                        </h2>
-                        <div className="tv-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 14 }}>
-                          {(() => {
-                            return getMajorProviders().map(p => (
-                              <button
-                                key={p.id}
-                                tabIndex={0}
-                                className="tv-provider-chip"
-                                onClick={() => setActiveProvider(p)}
-                                style={{
-                                  padding: '18px 24px',
-                                  background: 'var(--bg-card)',
-                                  width: '100%',
-                                  justifyContent: 'flex-start'
-                                }}
-                              >
-                                <span
-                                  style={{
-                                    position: 'relative', width: 36, height: 36, borderRadius: 8,
-                                    background: p.color || '#222', display: 'inline-flex',
-                                    alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0
-                                  }}
-                                >
-                                  <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, color: '#fff', fontSize: '1rem', zIndex: 0 }}>
-                                    {(p.name || '?').trim().charAt(0).toUpperCase()}
-                                  </span>
-                                  <img
-                                    src={p.logo}
-                                    alt=""
-                                    aria-hidden="true"
-                                    style={{ position: 'relative', zIndex: 1, width: 36, height: 36, borderRadius: 8, objectFit: 'contain' }}
-                                    onError={(e) => { e.target.style.display = 'none'; }}
-                                  />
-                                </span>
-                                <span style={{ fontWeight: 800, fontSize: '0.95rem' }}>{p.name}</span>
-                              </button>
-                            ));
-                          })()}
-                        </div>
-                      </>
+                    {/* Hollywood */}
+                    {hollywoodItems.length > 0 && (
+                      <MediaRail
+                        title="Hollywood Cinema"
+                        items={hollywoodItems.slice(0, 20)}
+                        onSelectItem={handleItemClick}
+                        onSeeAll={() => setActiveTab('movies')}
+                      />
                     )}
+
+                    {/* Browse by Streaming Service */}
+                    <ProviderRow
+                      onSelectProvider={(p) => setActiveProvider(p)}
+                      activeProviderId={null}
+                    />
                   </>
                 )}
               </>
             )}
 
 
-            {/* 🏆 LIVE SPORTS TAB */}
+            {/* 🏆 LIVE SPORTS — folded into Live TV tab (v3.12.83). Kept as a
+                route alias in case a cast/old link sends 'sports': it renders
+                the live wall. The standalone nav pill is gone from the header. */}
             {activeTab === 'sports' && (
               <MediaGridView
-                title="🏆 Live Sports Tournaments & Channels"
+                title="Live Sports"
                 items={sportsItems}
                 isLive={true}
                 onSelectItem={handleItemClick}
