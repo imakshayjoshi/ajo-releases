@@ -40,13 +40,44 @@ export function LiveView({ channels, onSelectItem, loading }) {
     activeCat === ALL ? channels : (groups.get(activeCat) || [])
   ), [activeCat, channels, groups]);
 
-  // Keep the focused live tile onscreen as D-pad moves through the grid.
+  // v3.12.74 (Lumio 55" crash hardening): never mount a 1,000+ card DOM at
+  // once on low-RAM Android TV WebViews. React still sees the full catalog;
+  // only the rendered window is capped, and D-pad scrolling loads the next
+  // chunk before the focused tile reaches the bottom.
+  const [visibleCount, setVisibleCount] = useState(120);
+  useEffect(() => setVisibleCount(120), [activeCat, channels]);
+  useEffect(() => {
+    const root = gridRef.current;
+    if (!root) return;
+    const onScroll = () => {
+      const nearBottom = root.scrollHeight - root.scrollTop - root.clientHeight < 600;
+      if (nearBottom) setVisibleCount((n) => Math.min(n + 120, visible.length));
+    };
+    root.addEventListener('scroll', onScroll, { passive: true });
+    return () => root.removeEventListener('scroll', onScroll);
+  }, [visible.length]);
+  const rendered = useMemo(() => visible.slice(0, visibleCount), [visible, visibleCount]);
+
+  // Render in steady 120-card chunks: memory stays capped while the wall
+  // continues filling automatically instead of hanging on one giant commit.
+  useEffect(() => {
+    if (visibleCount >= visible.length) return;
+    const t = setTimeout(() => setVisibleCount((n) => Math.min(n + 120, visible.length)), 180);
+    return () => clearTimeout(t);
+  }, [visible.length, visibleCount]);
+
+  // Keep the focused live tile onscreen as D-pad moves through the grid,
+  // and extend the rendered window BEFORE the focus runs past its bottom.
   useEffect(() => {
     const root = gridRef.current;
     if (!root || typeof MutationObserver === 'undefined') return;
     const observer = new MutationObserver(() => {
       const el = document.activeElement;
       if (root.contains(el)) {
+        const rect = el.getBoundingClientRect();
+        if (rect.bottom > root.getBoundingClientRect().bottom - 700) {
+          setVisibleCount((n) => Math.min(n + 120, visible.length));
+        }
         // v3.12.68: scrollIntoView({inline:'nearest'}) was a no-op for the
         // horizontally-overflowing grid ancestor; scroll the page scroller
         // directly so the focused row is always visible.
@@ -65,7 +96,7 @@ export function LiveView({ channels, onSelectItem, loading }) {
     });
     observer.observe(root, { subtree: true, attributes: true, attributeFilter: ['tabindex', 'class'] });
     return () => observer.disconnect();
-  }, []);
+  }, [visible.length]);
 
   // A category switch replaces the grid: land focus on its first channel
   // unless the user is still navigating the category rail itself.
@@ -134,7 +165,7 @@ export function LiveView({ channels, onSelectItem, loading }) {
         </header>
 
         <div className="live-channel-grid" role="list">
-          {visible.map((ch, idx) => (
+          {rendered.map((ch, idx) => (
             <button
               key={ch.id || `${ch.title}-${idx}`}
               type="button"
@@ -188,6 +219,9 @@ export function LiveView({ channels, onSelectItem, loading }) {
               <div className="tv-card-info live-card-info">
                 <span className="tv-card-title">{ch.title || ch.name}</span>
                 <span className="live-card-meta">{ch.lang || ch.category || 'Live channel'}</span>
+                {visible.length > visibleCount && idx === rendered.length - 1 && (
+                  <span className="live-more-count">{visible.length - visibleCount} more below</span>
+                )}
               </div>
             </button>
           ))}

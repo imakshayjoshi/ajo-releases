@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { getBollywoodCatalog, getHollywoodCatalog, getSerialsCatalog, getLiveBroadcasts } from './api/pikashow';
-import { getLiveChannels } from './api/live';
+import { getLiveChannels, isPopularLiveChannel, classifyLiveChannel, hasWorkingPlayer, applyLiveSourceOverride, probeLiveChannels } from './api/live';
 import { LiveView } from './components/LiveView';
 import { getLiveSportsEvents } from './api/sports';
 import { getWatchHistory, saveProgress, getWatchProgress } from './api/history';
@@ -171,11 +171,30 @@ export default function App() {
   // v3.11.0 PERF: IPTV (16 playlists) no longer blocks startup. Kick it off
   // 1.2s after first paint so the Home tab renders instantly on low-RAM Fire
   // TV sticks; the Live TV tab forces an immediate load when opened.
-  const loadLiveTV = useCallback(async () => {
+  const loadLiveTV = useCallback(async (retryCount = 0) => {
+    const [merged, legacy] = await Promise.allSettled([getLiveChannels(), getLiveBroadcasts()]);
+    // v3.12.74 (Lumio crash hardening): a failed network boot used to render
+    // an empty wall even though a retry one second later would succeed. Keep
+    // the first paint alive and retry instead of dying on one failed fetch.
+    if (retryCount < 2) {
+      const aggEmpty = merged.status !== 'fulfilled' || !merged.value.length;
+      const oldEmpty = legacy.status !== 'fulfilled' || !legacy.value.length;
+      if (aggEmpty && oldEmpty) {
+        setTimeout(() => loadLiveTV(retryCount + 1), 1000 * (retryCount + 1));
+        return;
+      }
+    }
     try {
-      const [merged, legacy] = await Promise.allSettled([getLiveChannels(), getLiveBroadcasts()]);
+      // v3.12.75: ported from the Fire TV fork (v3.12.69) — strict
+      // popular-only curation on BOTH sources. This tree previously merged
+      // the legacy iptv-org list raw (~900 junk/foreign FAST channels on top
+      // of the aggregator), which is why the wall showed ~1,000 channels.
       const agg = merged.status === 'fulfilled' ? merged.value : [];
-      const old = legacy.status === 'fulfilled' ? legacy.value : [];
+      const oldRaw = legacy.status === 'fulfilled' ? legacy.value : [];
+      const old = oldRaw.filter((ch) => isPopularLiveChannel({
+        name: ch.title_en || ch.title || ch.name,
+        lang: ch.lang || '',
+      })).map((ch) => ({ ...ch, category: classifyLiveChannel(ch.title_en || ch.title || ch.name) }));
       const seen = new Map();
       const seenIds = new Set();
       const push = (ch, fallbackSource) => {
@@ -190,10 +209,46 @@ export default function App() {
         seen.set(nameKey, ch.id ? ch : { ...ch, id, source: ch.source || fallbackSource });
       };
       for (const ch of agg) push(ch, 'ajo-live');
-      for (const ch of old) push(ch, 'legacy-live');
-      setLiveItems(Array.from(seen.values()));
+      // v3.12.70: drop channels whose every player sits on a dead host, and
+      // swap in the probed-live HD mirror for Star channels where one exists.
+      for (const ch of old) {
+        if (!hasWorkingPlayer(ch)) continue;
+        push(applyLiveSourceOverride(ch), 'legacy-live');
+      }
+      // v3.12.69: sort popular-first so the wall opens on Sony/Star/Zee/Colors
+      // instead of whatever order the feeds merged in.
+      const popularityRank = (ch) => {
+        const n = String(ch.title_en || ch.title || ch.name || '').toLowerCase();
+        if (n.includes('sony sports') || n.includes('star sports') || n.includes('ten 1') || n.includes('ten 2') || n.includes('ten 3')) return 0;
+        if (n.includes('sony') || n.includes('star plus') || n.includes('star bharat') || n.includes('star pravah')) return 1;
+        if (n.includes('colors')) return 2;
+        if (n.includes('zee')) return 3;
+        if (n.includes('aaj tak') || n.includes('ndtv') || n.includes('republic') || n.includes('abp')) return 4;
+        if (n.includes('discovery') || n.includes('national geographic') || n.includes('history') || n.includes('animal planet') || n.includes('epic')) return 5;
+        return 9;
+      };
+      const sorted = Array.from(seen.values()).sort((a, b) => {
+        const pa = popularityRank(a);
+        const pb = popularityRank(b);
+        if (pa !== pb) return pa - pb;
+        return String(a.title_en || a.title || '').localeCompare(String(b.title_en || b.title || ''));
+      });
+      // v3.12.72: runtime liveness probe — static dead-lists can't keep up
+      // with relays that 404 mid-week. Probe unique manifest URLs (30 min
+      // cache) and drop channels with zero live players. Render the pre-probe
+      // wall first, then re-render the pruned set so the tab never blocks.
+      setLiveItems(sorted);
+      probeLiveChannels(sorted)
+        .then((alive) => {
+          if (alive.length && alive.length < sorted.length) {
+            console.info('[live] runtime probe dropped ' + (sorted.length - alive.length) + ' dead channels');
+          }
+          setLiveItems(alive.length ? alive : sorted);
+        })
+        .catch(() => {});
     } catch (e) {
       console.error('Error loading live TV:', e);
+      setLiveItems(legacy.status === 'fulfilled' ? legacy.value : []);
     } finally {
       setLiveLoaded(true);
     }
@@ -988,7 +1043,7 @@ export default function App() {
             {/* 🔴 LIVE TV TAB */}
             {activeTab === 'live' && (
               <>
-                <div style={{
+                <div className="live-toolbar" style={{
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
