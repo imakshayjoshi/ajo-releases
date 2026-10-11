@@ -33,16 +33,16 @@
     "releaseDate": "2026-10-09"
   },
   "android_tv": {
-    "version": "3.12.76",
-    "versionCode": 226,
+    "version": "3.12.78",
+    "versionCode": 228,
     "packageId": "com.ajo.androidtv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
-    "changelog": "UI/UX overhaul: soft-teal palette (was amber), multi-tile hero grid on Home (5 picks at once, no rotating banner), live grid no longer clips tiles off the right edge, UP from the grid stops at All Channels/TV Guide instead of jumping to the top nav, channel tiles show initials when a logo fails instead of a bare icon, ShortTV removed, bigger poster cards for readability.",
+    "changelog": "Player overhaul: LEFT/RIGHT D-pad now SEEKS (tap = \u00b110s, HOLD = continuous scan), web embed controls hidden so only our OSD shows, seek bar + timestamp always visible above buttons, dead-title 404 failover (auto-tries next server instead of the Content-not-found wall), provider strip (Netflix/Prime) now scrolls with D-pad, Kids row fixed (Doraemon plays), OSD no longer overlaps or clips off-screen, unmute-on-start.",
     "size_mb": 7.02,
-    "sha256": "2b1f64e894ca6f4dab804ac0d932712988ec03f02961fd97e439db555550c09c",
+    "sha256": "d5fc281e220ba5e544de7c68acb6fa2c3bdeb702e9e0fd887aaf811c2ee4c905",
     "releaseDate": "2026-10-09",
     "size": 7345801
   },

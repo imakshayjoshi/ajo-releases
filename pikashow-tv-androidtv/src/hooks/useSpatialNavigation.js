@@ -300,7 +300,7 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
     // v3.12.75: .live-cat-rail is the Live TV category strip. On the Lumio it
     // renders HORIZONTAL (overflow-x) because the media query at max-width:
     // 960px flips the shell — the strip now scrolls with the focused chip.
-    const horizontalContainer = el.closest('.tv-rail-track, .tv-filter-bar, .tv-header-nav, .live-cat-rail, [data-horizontal-scroll="true"]');
+    const horizontalContainer = el.closest('.tv-rail-track, .tv-filter-bar, .tv-header-nav, .live-cat-rail, .tv-provider-row, [data-horizontal-scroll="true"]');
     if (horizontalContainer) {
       try {
         const er = el.getBoundingClientRect();

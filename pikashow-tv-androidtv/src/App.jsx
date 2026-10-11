@@ -97,7 +97,7 @@ export default function App() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [bolly, holly, serials, sports, trending, popMovies, popTv, newReleases, anime, kids] = await Promise.allSettled([
+      const [bolly, holly, serials, sports, trending, popMovies, popTv, newReleases, anime, kids, kidsTv] = await Promise.allSettled([
         getBollywoodCatalog(),
         getHollywoodCatalog(),
         getSerialsCatalog(),
@@ -109,7 +109,10 @@ export default function App() {
         getTmdbCatalogDeep('movie', 30, (items) => setTmdbMovies(items)),
         getTmdbCatalogDeep('tv', 30, (items) => setTmdbSeries(items)),
         getTmdbCatalog('tv', 'popular', 1, { with_genres: '16' }),
-        getTmdbCatalog('movie', 'popular', 1, { with_genres: '10751,16' })
+        // v3.12.77: kids' row must include BOTH animation genres — movie-only
+        // '10751,16' excluded kids' TV (Doraemon etc.), so kids' titles 404'd.
+        getTmdbCatalog('movie', 'popular', 1, { with_genres: '16,10751' }),
+        getTmdbCatalog('tv', 'popular', 1, { with_genres: '16,10762,10751' })
       ]);
 
       if (bolly.status === 'fulfilled') setBollywoodItems(bolly.value || []);
@@ -121,7 +124,21 @@ export default function App() {
       if (popMovies.status === 'fulfilled') setTmdbMovies(popMovies.value || []);
       if (popTv.status === 'fulfilled') setTmdbSeries(popTv.value || []);
       if (anime.status === 'fulfilled') setAnimeItems(anime.value || []);
-      if (kids.status === 'fulfilled') setKidsItems(kids.value || []);
+      if (kids.status === 'fulfilled' || kidsTv.status === 'fulfilled') {
+        // v3.12.77: merge kids' movies + kids' TV (Doraemon etc.) into one row,
+        // title-deduped, so kids' content actually plays from the Kids tab.
+        const km = kids.status === 'fulfilled' ? (kids.value || []) : [];
+        const kt = kidsTv.status === 'fulfilled' ? (kidsTv.value || []) : [];
+        const seenKids = new Set();
+        const mergedKids = [];
+        for (const item of [...km, ...kt]) {
+          const key = String(item.title_en || item.title || '').toLowerCase().trim();
+          if (!key || seenKids.has(key)) continue;
+          seenKids.add(key);
+          mergedKids.push(item);
+        }
+        setKidsItems(mergedKids);
+      }
       
       
       // Addon catalogs (only loads when addons are installed — no-op otherwise)
@@ -446,7 +463,12 @@ export default function App() {
     setActivePlayback({ item: resolvedItem, server: selectedSrv, allServers, episodes, episodeIndex });
   }, [rememberFocus]);
 
-  // Close player and save progress
+  // v3.12.77: the details modal was staying MOUNTED under the native player
+  // (the ghost-text bleed-through behind the OSD). Dismiss it the moment a
+  // stream starts — on a TV, two stacked surfaces are a focus + render bug.
+  useEffect(() => {
+    if (activePlayback && selectedItem) setSelectedItem(null);
+  }, [activePlayback]); // eslint-disable-line react-hooks/exhaustive-deps
   const handleClosePlayer = useCallback((lastTime, duration) => {
     if (activePlayback && typeof lastTime === 'number' && lastTime > 5 && duration > 0) {
       saveProgress(activePlayback.item, lastTime, duration);

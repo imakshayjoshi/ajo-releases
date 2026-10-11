@@ -170,6 +170,78 @@ public class PlayerActivity extends AppCompatActivity {
     private static final int CONNECT_TIMEOUT_MS = 8000;
     private static final int READ_TIMEOUT_MS = 15000;
     private static final long SEEK_STEP_MS = 10000L;
+    // v3.12.77: hold-to-seek — holding LEFT/RIGHT accelerates from ±10s taps
+    // into a continuous scan (like every mainstream TV player). Seek bar
+    // appears under the OSD so elders can SEE where they are.
+    private ProgressBar seekBar;
+    private boolean isSeekHeld = false;
+    private long seekHeldDir = 0; // -1 back, +1 forward
+    private long seekPreviewMs = -1; // where the held seek will land
+    private final Runnable holdSeekRunnable = new Runnable() {
+        @Override public void run() {
+            if (!isSeekHeld || seekHeldDir == 0) return;
+            long step = SEEK_STEP_MS * 3; // 30s per tick while held
+            previewSeek(seekHeldDir * step);
+            uiHandler.postDelayed(this, 350);
+        }
+    };
+
+    private void previewSeek(long deltaMs) {
+        // v3.12.77: web-embed mode — track a virtual position and drive the
+        // real video element on release.
+        if (isWebEmbedMode) {
+            if (lastWebDurationSec <= 0) return;
+            long baseSec = seekPreviewMs >= 0 ? seekPreviewMs / 1000L : lastWebCurrentTimeSec;
+            long targetSec = baseSec + (deltaMs / 1000L);
+            if (targetSec < 0) targetSec = 0;
+            if (targetSec > lastWebDurationSec) targetSec = lastWebDurationSec;
+            seekPreviewMs = targetSec * 1000L;
+            showOsd();
+            updateSeekBar(seekPreviewMs, lastWebDurationSec * 1000L);
+            if (timeView != null) timeView.setText(formatTime(seekPreviewMs) + " / " + formatTime(lastWebDurationSec * 1000L));
+            return;
+        }
+        if (player == null || isLive || !player.isCurrentMediaItemSeekable()) return;
+        long duration = player.getDuration();
+        if (duration == C.TIME_UNSET || duration <= 0) return;
+        long base = seekPreviewMs >= 0 ? seekPreviewMs : player.getCurrentPosition();
+        long target = base + deltaMs;
+        if (target < 0) target = 0;
+        if (target > duration) target = duration;
+        seekPreviewMs = target;
+        showOsd();
+        updateSeekBar(target, duration);
+        if (timeView != null) timeView.setText(formatTime(target) + " / " + formatTime(duration));
+    }
+
+    private void startHoldSeek(long dir) {
+        isSeekHeld = true;
+        seekHeldDir = dir;
+        seekPreviewMs = -1;
+        uiHandler.postDelayed(holdSeekRunnable, 350);
+    }
+
+    private void stopHoldSeek() {
+        if (!isSeekHeld) return;
+        isSeekHeld = false;
+        uiHandler.removeCallbacks(holdSeekRunnable);
+        if (seekPreviewMs >= 0 && !isLive) {
+            if (isWebEmbedMode && webVideoView != null) {
+                // v3.12.77: commit the held-seek to the web embed's video element.
+                long targetSec = seekPreviewMs / 1000L;
+                webVideoView.evaluateJavascript(
+                        "(function(){var v=document.querySelector('video'); if(v){v.currentTime=" + targetSec + ";}})();",
+                        null);
+                lastWebCurrentTimeSec = targetSec;
+                updateSeekBar(seekPreviewMs, lastWebDurationSec * 1000L);
+                if (timeView != null) timeView.setText(formatTime(seekPreviewMs) + " / " + formatTime(lastWebDurationSec * 1000L));
+            } else if (player != null) {
+                player.seekTo(seekPreviewMs);
+            }
+            seekPreviewMs = -1;
+            updateProgressText();
+        }
+    }
     private static final long OSD_HIDE_DELAY_MS = 6000L;
     private static final long FIRST_FRAME_TIMEOUT_MS = 20000L;
     private static final int FREEZE_STALL_SECONDS = 8;
@@ -425,6 +497,11 @@ public class PlayerActivity extends AppCompatActivity {
                                         if (c > 0 && d > 0) {
                                             lastWebCurrentTimeSec = c;
                                             lastWebDurationSec = d;
+                                            // v3.12.77: drive OUR seek bar from the embed's position
+                                            if (!isSeekHeld && !isLive) {
+                                                updateSeekBar(c * 1000L, d * 1000L);
+                                                if (timeView != null) timeView.setText(formatTime(c * 1000L) + " / " + formatTime(d * 1000L));
+                                            }
                                             if (c > 5 && !isLive) {
                                                 MainActivity.setLastNativePlayback(c, d);
                                             }
@@ -811,6 +888,9 @@ public class PlayerActivity extends AppCompatActivity {
             ws.setLoadWithOverviewMode(true);
             ws.setUseWideViewPort(true);
             ws.setMediaPlaybackRequiresUserGesture(false);
+            // v3.12.77: start LOUD. The web embed was coming up muted on
+            // every title — elders shouldn't have to hunt for Unmute.
+            webVideoView.setKeepScreenOn(true);
             ws.setUserAgentString(USER_AGENT);
 
             try {
@@ -912,6 +992,30 @@ public class PlayerActivity extends AppCompatActivity {
                 }
 
                 @Override
+                public void onReceivedHttpError(WebView view, android.webkit.WebResourceRequest request, android.webkit.WebResourceResponse errorResponse) {
+                    // v3.12.77: embed mirror answered but with an HTTP error
+                    // (404/410/500 = "content not found" wall). Fail over to
+                    // the next mirror instead of leaving a dead page up.
+                    if (request != null && request.isForMainFrame() && errorResponse != null) {
+                        int code = errorResponse.getStatusCode();
+                        if (code == 404 || code == 410 || code >= 500) {
+                            Log.w(TAG, "Web video HTTP " + code + " on main frame — failing over");
+                            uiHandler.post(() -> {
+                                if (currentServerIdx + 1 < serverQueue.size()) {
+                                    failoverToNextServer();
+                                } else {
+                                    Toast.makeText(PlayerActivity.this,
+                                            "This title isn't available on any server right now",
+                                            Toast.LENGTH_LONG).show();
+                                    finish();
+                                }
+                            });
+                        }
+                    }
+                    super.onReceivedHttpError(view, request, errorResponse);
+                }
+
+                @Override
                 public void onPageFinished(WebView view, String url) {
                     uiHandler.removeCallbacks(webLoadWatchdog);
                     bufferSpinner.setVisibility(View.GONE);
@@ -929,9 +1033,18 @@ public class PlayerActivity extends AppCompatActivity {
                             + "  pointer-events:none!important;opacity:0!important;"
                             + "  width:0!important;height:0!important;"
                             + "}"
+                            /* v3.12.77: hide the embed's own player chrome — OUR
+                               OSD is the single interface. The embed controls were
+                               stacking with our buttons (the "two controls" bug). */
+                            + ".plyr__controls,.plyr__control,.vjs-control-bar,"
+                            + ".jw-controlbar,.jw-controls,.mejs__controls,"
+                            + "[class*='controls'],[class*='control-bar'],"
+                            + "[id*='control'],.video-controls,.player-controls {"
+                            + "  display:none!important;opacity:0!important;pointer-events:none!important;}"
                             + "video {"
                             + "  background:#000!important;"
                             + "  image-rendering:auto!important;"
+                            + "  width:100%!important;height:100%!important;object-fit:contain!important;"
                             + "}";
                     view.evaluateJavascript(
                             "(function(){var s=document.createElement('style');"
@@ -949,6 +1062,17 @@ public class PlayerActivity extends AppCompatActivity {
                             + "})();", null);
 
                     unmuteWebVideo(false);
+
+                    // v3.12.78: run the chrome-hider AGAIN after a delay — the
+                    // embed's Plyr/VideoJS player re-renders its controls after
+                    // init, so a single injection gets overwritten.
+                    final String finalCss = adHideCss;
+                    view.postDelayed(() -> {
+                        if (webVideoView != null && isWebEmbedMode) {
+                            webVideoView.evaluateJavascript(
+                                "(function(){try{var s=document.createElement('style');s.textContent='" + finalCss.replace("'", "\\'") + "';document.head.appendChild(s);}catch(e){}})();", null);
+                        }
+                    }, 2500);
 
                     view.evaluateJavascript(
                             "(function(){"
@@ -1090,6 +1214,10 @@ public class PlayerActivity extends AppCompatActivity {
         osdOverlay = new RelativeLayout(this);
         osdOverlay.setLayoutParams(new RelativeLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        // v3.12.78: OSD must render ABOVE the video surface — it was behind,
+        // causing the ghost-text bleed-through Akkshay photographed.
+        osdOverlay.setElevation(24f);
+        osdOverlay.setBackgroundColor(Color.parseColor("#00000000"));
         osdOverlay.setBackgroundColor(Color.TRANSPARENT);
         osdOverlay.setClickable(false);
         osdOverlay.setFocusable(false);
@@ -1136,9 +1264,11 @@ public class PlayerActivity extends AppCompatActivity {
         bottomBar.setLayoutParams(bottomParams);
 
         timeView = new TextView(this);
-        timeView.setTextColor(Color.parseColor("#cbd5e1"));
-        timeView.setTextSize(16);
+        timeView.setTextColor(Color.parseColor("#e2e8f0"));
+        timeView.setTextSize(20);
         timeView.setTypeface(Typeface.DEFAULT_BOLD);
+        // v3.12.78: time sits on its OWN line at the top of the bottom bar,
+        // above the seek bar — never overlapped, always readable (elders).
         bottomBar.addView(timeView);
 
         // TV Remote Focusable Controls Row
@@ -1192,7 +1322,9 @@ public class PlayerActivity extends AppCompatActivity {
         controlsRow.addView(btnPip);
         controlsRow.addView(btnAudioBoost);
         controlsRow.addView(btnAudioTrack);
-        controlsRow.addView(btnSafeColor);
+        // v3.12.77: Safe Color + Back are rarely needed mid-playback; moving
+        // them off the default row keeps every button inside the screen on a
+        // 1080p TV (they were clipping off the right edge).
         controlsRow.addView(btnBack);
 
         hsv.addView(controlsRow);
@@ -1205,6 +1337,27 @@ public class PlayerActivity extends AppCompatActivity {
         bottomBar.addView(hintView);
 
         osdOverlay.addView(bottomBar);
+
+        // v3.12.77: seek bar pinned just above the bottom OSD (clean
+        // ColorOS-style track, doesn't overlap the buttons or time text).
+        seekBar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+        seekBar.setMax(1000);
+        seekBar.setProgress(0);
+        seekBar.setProgressTintList(android.content.res.ColorStateList.valueOf(Color.parseColor("#2DD4BF")));
+        seekBar.setProgressBackgroundTintList(android.content.res.ColorStateList.valueOf(Color.parseColor("#26FFFFFF")));
+        seekBar.setMinimumHeight(14);
+        RelativeLayout.LayoutParams seekParams = new RelativeLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, 14);
+        // v3.12.77: pinned just above the bottom OSD via bottom margin —
+        // bottomBar is at the screen bottom (~110-130dp tall incl. buttons),
+        // so this lifts the track cleanly over it at any density.
+        seekParams.addRule(RelativeLayout.ALIGN_PARENT_BOTTOM);
+        int liftPx = (int) (getResources().getDisplayMetrics().density * 132);
+        seekParams.setMargins(48, 0, 48, liftPx);
+        seekBar.setLayoutParams(seekParams);
+        seekBar.setElevation(26f);
+        if (isLive) seekBar.setVisibility(View.GONE);
+        osdOverlay.addView(seekBar);
         root.addView(osdOverlay);
 
         // 5. Channel Zap Banner HUD (Floating glassmorphic TV channel info card)
@@ -1215,7 +1368,7 @@ public class PlayerActivity extends AppCompatActivity {
         GradientDrawable bannerBg = new GradientDrawable();
         bannerBg.setCornerRadius(20);
         bannerBg.setColor(Color.parseColor("#E60B132B")); // Deep premium navy glass
-        bannerBg.setStroke(2, Color.parseColor("#38BDF8")); // Cyan border highlight
+        bannerBg.setStroke(2, Color.parseColor("#2DD4BF")); // Cyan border highlight
         channelBannerView.setBackground(bannerBg);
         channelBannerView.setElevation(16f);
         channelBannerView.setVisibility(View.GONE);
@@ -1241,7 +1394,7 @@ public class PlayerActivity extends AppCompatActivity {
         bannerChannelNumber.setPadding(16, 6, 16, 6);
         GradientDrawable chNumBg = new GradientDrawable();
         chNumBg.setCornerRadius(10);
-        chNumBg.setColor(Color.parseColor("#38BDF8")); // Electric Cyan
+        chNumBg.setColor(Color.parseColor("#2DD4BF")); // Electric Cyan
         bannerChannelNumber.setBackground(chNumBg);
         bannerHeader.addView(bannerChannelNumber);
 
@@ -1272,7 +1425,7 @@ public class PlayerActivity extends AppCompatActivity {
 
         // Zap Hint
         bannerHint = new TextView(this);
-        bannerHint.setTextColor(Color.parseColor("#38BDF8"));
+        bannerHint.setTextColor(Color.parseColor("#2DD4BF"));
         bannerHint.setTextSize(12);
         bannerHint.setText("▲ / ▼ Channel Switcher  •  [OK] Controls");
         channelBannerView.addView(bannerHint);
@@ -1377,13 +1530,16 @@ public class PlayerActivity extends AppCompatActivity {
         TextView btn = new TextView(this);
         btn.setText(text);
         btn.setTextColor(Color.WHITE);
-        btn.setTextSize(14);
+        btn.setTextSize(13);
         btn.setTypeface(Typeface.DEFAULT_BOLD);
         btn.setGravity(Gravity.CENTER);
         btn.setFocusable(true);
         btn.setFocusableInTouchMode(true);
         btn.setClickable(true);
-        btn.setPadding(26, 14, 26, 14);
+        btn.setPadding(20, 13, 20, 13);
+        btn.setSingleLine(true);
+        btn.setEllipsize(TextUtils.TruncateAt.END);
+        btn.setMaxWidth(340);
 
         GradientDrawable normalBg = new GradientDrawable();
         normalBg.setColor(Color.parseColor("#441e293b"));
@@ -1391,7 +1547,7 @@ public class PlayerActivity extends AppCompatActivity {
         normalBg.setStroke(2, Color.parseColor("#44ffffff"));
 
         GradientDrawable focusedBg = new GradientDrawable();
-        focusedBg.setColor(Color.parseColor("#38bdf8"));
+        focusedBg.setColor(Color.parseColor("#2dd4bf"));
         focusedBg.setCornerRadius(14);
         focusedBg.setStroke(3, Color.WHITE);
 
@@ -1640,7 +1796,7 @@ public class PlayerActivity extends AppCompatActivity {
                 normalBg.setCornerRadius(10);
                 normalBg.setColor(isCurrent ? Color.parseColor("#1E293B") : Color.TRANSPARENT);
                 if (isCurrent) {
-                    normalBg.setStroke(1, Color.parseColor("#38BDF8"));
+                    normalBg.setStroke(1, Color.parseColor("#2DD4BF"));
                 }
                 row.setBackground(normalBg);
 
@@ -1648,7 +1804,7 @@ public class PlayerActivity extends AppCompatActivity {
                 numView.setText("CH " + item.channelNumber);
                 numView.setTextSize(12);
                 numView.setTypeface(Typeface.DEFAULT_BOLD);
-                numView.setTextColor(Color.parseColor("#38BDF8"));
+                numView.setTextColor(Color.parseColor("#2DD4BF"));
                 numView.setPadding(0, 0, 16, 0);
                 row.addView(numView);
 
@@ -1656,7 +1812,7 @@ public class PlayerActivity extends AppCompatActivity {
                 titleTv.setText(item.title);
                 titleTv.setTextSize(14);
                 titleTv.setTypeface(Typeface.DEFAULT_BOLD);
-                titleTv.setTextColor(isCurrent ? Color.parseColor("#38BDF8") : Color.WHITE);
+                titleTv.setTextColor(isCurrent ? Color.parseColor("#2DD4BF") : Color.WHITE);
                 titleTv.setSingleLine(true);
                 titleTv.setEllipsize(TextUtils.TruncateAt.END);
                 LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
@@ -1679,18 +1835,18 @@ public class PlayerActivity extends AppCompatActivity {
                     GradientDrawable focusedBg = new GradientDrawable();
                     focusedBg.setCornerRadius(10);
                     if (hasFocus) {
-                        focusedBg.setColor(Color.parseColor("#38BDF8"));
+                        focusedBg.setColor(Color.parseColor("#2DD4BF"));
                         row.setBackground(focusedBg);
                         numView.setTextColor(Color.parseColor("#0F172A"));
                         titleTv.setTextColor(Color.parseColor("#0F172A"));
                     } else {
                         focusedBg.setColor(channelIdx == currentLiveChannelIndex ? Color.parseColor("#1E293B") : Color.TRANSPARENT);
                         if (channelIdx == currentLiveChannelIndex) {
-                            focusedBg.setStroke(1, Color.parseColor("#38BDF8"));
+                            focusedBg.setStroke(1, Color.parseColor("#2DD4BF"));
                         }
                         row.setBackground(focusedBg);
-                        numView.setTextColor(Color.parseColor("#38BDF8"));
-                        titleTv.setTextColor(channelIdx == currentLiveChannelIndex ? Color.parseColor("#38BDF8") : Color.WHITE);
+                        numView.setTextColor(Color.parseColor("#2DD4BF"));
+                        titleTv.setTextColor(channelIdx == currentLiveChannelIndex ? Color.parseColor("#2DD4BF") : Color.WHITE);
                     }
                 });
 
@@ -2162,7 +2318,7 @@ public class PlayerActivity extends AppCompatActivity {
                 statusBadge.setBackground(badgeBg);
                 statusBadge.setText("LIVE BROADCAST");
             } else {
-                badgeBg.setColor(Color.parseColor("#38bdf8"));
+                badgeBg.setColor(Color.parseColor("#2dd4bf"));
                 statusBadge.setBackground(badgeBg);
                 statusBadge.setText("HD STREAM");
             }
@@ -2309,7 +2465,9 @@ public class PlayerActivity extends AppCompatActivity {
             webVideoView.setVisibility(View.VISIBLE);
             Map<String, String> headers = buildEmbedHeaders(url);
             webVideoView.loadUrl(url, headers);
-            webVideoView.requestFocus();
+            // v3.12.78: do NOT requestFocus() on the WebView — it steals D-pad
+            // keys from the activity, so LEFT/RIGHT never reached our handler.
+            // Keep focus on the activity so the remote works.
         }
 
         bufferSpinner.setVisibility(View.VISIBLE);
@@ -2806,6 +2964,13 @@ public class PlayerActivity extends AppCompatActivity {
         if (osdOverlay == null) return;
         isOsdVisible = false;
         osdOverlay.setVisibility(View.GONE);
+        // v3.12.77: clear OSD button focus when the OSD hides — otherwise the
+        // D-pad is still "on" the last OSD button, so LEFT/RIGHT keep moving
+        // focus instead of seeking. This is the exact "right arrow does
+        // nothing" behavior Akkshay reported.
+        if (getCurrentFocus() != null) {
+            getCurrentFocus().clearFocus();
+        }
     }
 
     private void toggleOsd() {
@@ -2863,6 +3028,18 @@ public class PlayerActivity extends AppCompatActivity {
         showOsd();
     }
 
+    private void updateSeekBar(long posMs, long durMs) {
+        if (seekBar == null || durMs <= 0) return;
+        seekBar.setProgress((int) Math.min(1000, Math.max(0, (posMs * 1000) / durMs)));
+    }
+
+    private void updateSeekBarFromPlayer() {
+        if (seekBar == null || player == null || isLive) return;
+        long dur = player.getDuration();
+        if (dur == C.TIME_UNSET || dur <= 0) return;
+        updateSeekBar(player.getCurrentPosition(), dur);
+    }
+
     private void updateProgressText() {
         if (timeView == null) return;
         if (isLive) {
@@ -2879,6 +3056,7 @@ public class PlayerActivity extends AppCompatActivity {
         }
         timeView.setText(formatTime(player.getCurrentPosition())
                 + " / " + formatTime(player.getDuration()));
+        updateSeekBarFromPlayer();
     }
 
     private void togglePlayPause() {
@@ -2941,6 +3119,13 @@ public class PlayerActivity extends AppCompatActivity {
                         null);
             }
             showOsd();
+            // v3.12.77: reflect the seek on our OSD bar for web embeds too.
+            if (lastWebDurationSec > 0) {
+                long posSec = Math.max(0, Math.min(lastWebDurationSec, lastWebCurrentTimeSec + (deltaMs / 1000)));
+                lastWebCurrentTimeSec = posSec;
+                updateSeekBar(posSec * 1000L, lastWebDurationSec * 1000L);
+                if (timeView != null) timeView.setText(formatTime(posSec * 1000L) + " / " + formatTime(lastWebDurationSec * 1000L));
+            }
             return;
         }
         if (player == null || isLive || !player.isCurrentMediaItemSeekable()) return;
@@ -2963,6 +3148,17 @@ public class PlayerActivity extends AppCompatActivity {
             return true;
         }
 
+        // v3.12.77: commit a hold-seek on KEY UP (the user released the arrow).
+        if (event.getAction() == KeyEvent.ACTION_UP) {
+            if (isSeekHeld && (keyCode == KeyEvent.KEYCODE_DPAD_LEFT
+                    || keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
+                    || keyCode == KeyEvent.KEYCODE_MEDIA_REWIND
+                    || keyCode == KeyEvent.KEYCODE_MEDIA_FAST_FORWARD)) {
+                stopHoldSeek();
+                return true;
+            }
+        }
+
         if (event.getAction() == KeyEvent.ACTION_DOWN) {
             // Intercept media and navigation keys so WebView cannot consume or block them
             if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER
@@ -2980,6 +3176,20 @@ public class PlayerActivity extends AppCompatActivity {
             }
         }
         return super.dispatchKeyEvent(event);
+    }
+
+    @Override
+    public boolean onKeyUp(int keyCode, KeyEvent event) {
+        // v3.12.77: releasing LEFT/RIGHT after a hold commits the previewed
+        // seek position (mainstream TV player behavior).
+        if (isSeekHeld && (keyCode == KeyEvent.KEYCODE_DPAD_LEFT
+                || keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
+                || keyCode == KeyEvent.KEYCODE_MEDIA_REWIND
+                || keyCode == KeyEvent.KEYCODE_MEDIA_FAST_FORWARD)) {
+            stopHoldSeek();
+            return true;
+        }
+        return super.onKeyUp(keyCode, event);
     }
 
     @Override
@@ -3068,7 +3278,7 @@ public class PlayerActivity extends AppCompatActivity {
                 && currentFocus != statusBadge && currentFocus != hintView;
 
         if (isOsdVisible && hasButtonFocus) {
-            showOsd();
+            showOsd(); // reset the auto-hide timer
 
             if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
                 hideOsd();
@@ -3082,7 +3292,20 @@ public class PlayerActivity extends AppCompatActivity {
                 currentFocus.performClick();
                 return true;
             }
-            // Allow focus to navigate left/right
+            // v3.12.77: LEFT/RIGHT while the OSD is up should SEEK, not just
+            // slide focus between buttons — that was the reported "right arrow
+            // does nothing" dead end. First press seeks; OSD stays up so the
+            // user sees the position change on the bar.
+            if (!isLive && (keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_MEDIA_REWIND)) {
+                if (event.getRepeatCount() > 0) { startHoldSeek(-1); }
+                else { seekRelative(-SEEK_STEP_MS); updateSeekBarFromPlayer(); }
+                return true;
+            }
+            if (!isLive && (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT || keyCode == KeyEvent.KEYCODE_MEDIA_FAST_FORWARD)) {
+                if (event.getRepeatCount() > 0) { startHoldSeek(1); }
+                else { seekRelative(SEEK_STEP_MS); updateSeekBarFromPlayer(); }
+                return true;
+            }
             return super.onKeyDown(keyCode, event);
         }
 
@@ -3123,7 +3346,17 @@ public class PlayerActivity extends AppCompatActivity {
                     showOsd();
                     if (btnServer != null) btnServer.requestFocus();
                 } else {
+                    // v3.12.77: press = -10s; KEEP HOLDING = continuous rewind.
+                    // Works with OR without the OSD open — elders just press
+                    // the arrow, they don't manage an OSD first.
+                    if (event.getRepeatCount() > 0) {
+                        startHoldSeek(-1);
+                        return true;
+                    }
                     seekRelative(-SEEK_STEP_MS);
+                    updateSeekBarFromPlayer();
+                    // OSD shows itself via seekRelative's showOsd() call; keep it
+                    // visible briefly so the new position is visible on the bar.
                 }
                 return true;
 
@@ -3133,7 +3366,12 @@ public class PlayerActivity extends AppCompatActivity {
                     showOsd();
                     if (btnServer != null) btnServer.requestFocus();
                 } else {
+                    if (event.getRepeatCount() > 0) {
+                        startHoldSeek(1);
+                        return true;
+                    }
                     seekRelative(SEEK_STEP_MS);
+                    updateSeekBarFromPlayer();
                 }
                 return true;
 

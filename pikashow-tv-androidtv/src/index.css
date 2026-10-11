@@ -41,11 +41,11 @@
   --focus-scale: scale(1.05);
 
   /* Radii */
-  --radius-xs: 6px;
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 20px;
+  --radius-xs: 8px;
+  --radius-sm: 12px;
+  --radius-md: 18px;
+  --radius-lg: 24px;
+  --radius-xl: 28px;
   --radius-full: 9999px;
 
   /* Typography */
@@ -592,15 +592,20 @@ html, body, #root {
   border: 2px solid transparent;
   cursor: pointer;
   position: relative;
-  transition: transform 0.18s cubic-bezier(0.2, 0, 0, 1),
-              border-color 0.18s ease,
-              box-shadow 0.18s ease;
+  /* v3.12.77 ColorOS: soft resting shadow so cards read as touchable
+     surfaces, not flat rectangles */
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  transition: transform 0.2s cubic-bezier(0.2, 0, 0, 1),
+              border-color 0.2s ease,
+              box-shadow 0.2s ease;
 }
 
 .tv-card:focus {
   transform: var(--focus-scale);
   border-color: var(--accent-gold);
-  box-shadow: var(--focus-ring);
+  box-shadow: 0 0 0 3px rgba(45, 212, 191, 0.75),
+              0 12px 40px rgba(45, 212, 191, 0.28),
+              0 4px 16px rgba(0, 0, 0, 0.4);
   z-index: 10;
   background: var(--bg-card-hover);
 }
@@ -633,7 +638,8 @@ html, body, #root {
 }
 
 .tv-card-title {
-  font-size: 0.82rem;
+  /* v3.12.77: bumped for 10-foot readability (elders) */
+  font-size: 0.92rem;
   font-weight: 700;
   color: var(--text-primary);
   white-space: nowrap;
@@ -646,7 +652,7 @@ html, body, #root {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 0.72rem;
+  font-size: 0.8rem;
   color: var(--text-secondary);
 }
 

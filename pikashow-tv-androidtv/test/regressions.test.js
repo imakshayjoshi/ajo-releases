@@ -132,8 +132,8 @@ test('Bug C2: getPairingRoom / setPairingRoom persist correctly', () => {
 // --- v3.12.52 STABILITY REGRESSION TESTS -----------------------------------
 test('v3.12.52: OTA version and code are bumped', async () => {
   const ota = await import('../src/api/otaUpdate.js');
-  assert.equal(ota.CURRENT_APP_VERSION, '3.12.76');
-  assert.equal(ota.CURRENT_VERSION_CODE, 226);
+  assert.equal(ota.CURRENT_APP_VERSION, '3.12.78');
+  assert.equal(ota.CURRENT_VERSION_CODE, 228);
   assert.equal(ota.compareVersions('3.12.65', '3.12.49'), 1);
   assert.equal(ota.compareVersions('3.12.49', '3.12.65'), -1);
   assert.equal(ota.compareVersions('3.12.49', '3.12.49'), 0);
