@@ -402,7 +402,7 @@ public class PlayerActivity extends AppCompatActivity {
 
     private LinearLayout controlsRow;
     private boolean isSafeColorMode = false;
-    private int audioBoostLevel = 2; // Default to 200% loud audio for dialogue clarity
+    private int audioBoostLevel = 3; // v3.12.78: default to 300% — users complained streams were too quiet
     private int currentAudioTrackIndex = 0;
 
     private boolean isLive = false;
@@ -2096,6 +2096,17 @@ public class PlayerActivity extends AppCompatActivity {
     }
 
     private void unmuteWebVideo(boolean showFeedback) {
+        // v3.12.78: crank the SYSTEM music stream too — the web embed's JS
+        // volume is capped at 1.0, so we boost the Android audio channel as
+        // well. Users reported streams too quiet even at max embed volume.
+        try {
+            android.media.AudioManager am = (android.media.AudioManager) getSystemService(AUDIO_SERVICE);
+            if (am != null) {
+                int max = am.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC);
+                int target = (int) (max * 0.9f);
+                am.setStreamVolume(android.media.AudioManager.STREAM_MUSIC, target, 0);
+            }
+        } catch (Exception ignored) {}
         if (isWebEmbedMode && webVideoView != null) {
             simulateTouchToUnmute();
             webVideoView.evaluateJavascript(
