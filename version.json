@@ -33,18 +33,18 @@
     "releaseDate": "2026-10-09"
   },
   "android_tv": {
-    "version": "3.12.87",
-    "versionCode": 237,
+    "version": "3.12.89",
+    "versionCode": 239,
     "packageId": "com.ajo.androidtv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
-    "changelog": "v3.12.87: UP in the live channel grid now moves exactly one row up — it no longer jumps straight to the top toolbar unless you're already on the top row. Carries v3.12.83-86: sidebar category navigation, real channel logos, StreamFlix structure, dock nav fixes.",
+    "changelog": "v3.12.89: Search results now scroll vertically through every result (the results grid was a nested scroller the remote couldn't scroll — only one row was ever visible). Settings page opens at the top with the full Connect Your Phone card + working QR code (the old QR image host is dead, replaced). Settings pill sits fully inside the nav capsule. Movies/Series genre chips now render (TMDB genre ids were dropped). Addon URL input is remote-reachable.",
     "size_mb": 7.0,
-    "sha256": "8e60efb1202224a281238a8350c384031a116b5a29066fcfca3b1797005b531a",
+    "sha256": "d4560374fcded7cfb610ed49f572d7368746c018f367156e8418657afb34a6a1",
     "releaseDate": "2026-10-12",
-    "size": 7373367
+    "size": 7373825
   },
   "changelog": "v3.12.73: Movies & series fixed \u2014 movibox CDN hotlink gate (429) handled: native player now sends Referer/UA headers; web/phone playback streams through the VPS proxy. Live channel thumbnails fixed \u2014 dead Sony logos repaired, logos served via image proxy with retry. Live channel playback untouched.",
   "sha256": "6e2dc11f6d2c34bdfbe719e181511383f093fe2376c92261791740af00c27c26"

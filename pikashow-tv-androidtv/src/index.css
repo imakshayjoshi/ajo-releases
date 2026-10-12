@@ -119,6 +119,9 @@ html, body, #root {
   gap: 6px;
   padding: 7px 10px;
   border-radius: var(--radius-full);
+  /* v3.12.88: hug the full content width — shrink-to-fit was squeezing the
+     capsule narrower than the pill row (Settings pill overflowed the edge). */
+  width: max-content;
   /* frosted glass at ~0.85 alpha */
   background: var(--fluid-glass);
   backdrop-filter: blur(18px) saturate(1.5);
@@ -174,6 +177,10 @@ html, body, #root {
   gap: 4px;
   min-width: 0;
   flex-wrap: nowrap;
+  /* v3.12.88: the nav shrank under its content (scrollWidth 576 > box 552),
+     so the last pill (Settings) stuck out past the frosted capsule. Never
+     let it shrink — the pills can't compress (flex-shrink: 0 on them). */
+  flex-shrink: 0;
 }
 
 /* Sliding indicator — glides between pills on D-pad, no hard cuts.

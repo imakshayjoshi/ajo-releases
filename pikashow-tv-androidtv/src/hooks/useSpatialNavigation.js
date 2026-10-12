@@ -125,42 +125,12 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
       return current;
     }
 
-    // v3.12.81/84: Settings tab fast-paths. Cards walk cleanly card-to-card;
-    // the top edge goes to the OTA banner (visually above), never to the
-    // bottom dock; the bottom edge drops into the dock deliberately.
-    const settingsCard = current.closest('.tv-settings-card');
-    if (settingsCard && (direction === 'ArrowUp' || direction === 'ArrowDown')) {
-      if (direction === 'ArrowDown') {
-        let nxt = settingsCard.nextElementSibling;
-        while (nxt) {
-          if (nxt.classList && nxt.classList.contains('tv-settings-card')) {
-            const els = getFocusableElements(nxt);
-            if (els.length > 0) return els[0];
-          }
-          nxt = nxt.nextElementSibling;
-        }
-        // bottom of settings → the dock
-        const dock = dockPillNear(current);
-        if (dock) return dock;
-        return current;
-      }
-      // ArrowUp: previous card, else the OTA banner (it renders ABOVE the
-      // content pane), else stay at the top card — the dock is DOWN, not UP.
-      let prv = settingsCard.previousElementSibling;
-      while (prv) {
-        if (prv.classList && prv.classList.contains('tv-settings-card')) {
-          const els = getFocusableElements(prv);
-          if (els.length > 0) return els[0];
-        }
-        prv = prv.previousElementSibling;
-      }
-      const banner = document.querySelector('.tv-ota-rail');
-      if (banner) {
-        const be = getFocusableElements(banner).filter((el) => elements.includes(el));
-        if (be.length > 0) return be[0];
-      }
-      return current;
-    }
+    // v3.12.88: the settings fast-path was REMOVED. It hijacked every UP/DOWN
+    // inside a card and jumped card-to-card, so same-card elements (URL input,
+    // Install, Disconnect) were skipped, and focus could never move UP past a
+    // card's first button — the Room Code/QR stayed hidden above the viewport
+    // with no way to scroll to them. The dock model + 2D scan handle the
+    // settings page correctly on their own now.
 
     // v3.12.79: Live TV grid horizontal edges. LEFT at the leftmost grid
     // column → category rail (and back). Without this, LEFT/RIGHT fell to the
@@ -284,7 +254,12 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
       // v3.12.84: the old inHeader ArrowDown branch (header → first content
       // rail) is dead code — the dock fast-path at the top handles every key
       // for header elements and returns before we get here.
-      const currentRail = current.closest('.tv-rail, .tv-header, .tv-hero, .tv-modal-card, .live-toolbar, .live-cat-rail, .live-channel-grid, .tv-settings-card');
+      // v3.12.88: .tv-settings-card was REMOVED from the rail list — with it,
+      // DOWN from any settings element jumped to the NEXT card's first button,
+      // making same-card rows (the addon URL input, Install) unreachable
+      // focus islands. Settings pages are stacked forms — the geometric 2D
+      // scan handles them correctly on its own.
+      const currentRail = current.closest('.tv-rail, .tv-header, .tv-hero, .tv-modal-card, .live-toolbar, .live-cat-rail, .live-channel-grid');
 
       if (currentRail) {
         let targetRail = direction === 'ArrowDown'
@@ -500,9 +475,12 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
     // keypress on the dock dragged the content pane ("the screen pane moves for
     // no reason"). Only scroll a container the element actually lives in.
     const isLiveCard = el.closest && el.closest('.live-channel-grid, .live-cat-rail');
+    // v3.12.89: .tv-search-results is a nested scroller inside the page —
+    // closest() picks it (nearest ancestor) so result cards scroll into view
+    // within the results box, not the page.
     const scroller = isLiveCard
       ? el.closest('.tv-main-content')
-      : el.closest('.tv-main-content, .tv-modal-body, .tv-player-drawer, .tv-modal-scroll, .live-grid-scroll, .live-cat-rail');
+      : el.closest('.tv-search-results, .tv-main-content, .tv-modal-body, .tv-player-drawer, .tv-modal-scroll, .live-grid-scroll, .live-cat-rail');
     if (scroller) {
       try {
         const er = el.getBoundingClientRect();
@@ -511,6 +489,17 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
           scroller.scrollTop -= (sr.top + 24 - er.top);
         } else if (er.bottom > sr.bottom - 24) {
           scroller.scrollTop += (er.bottom - sr.bottom + 24);
+        }
+        // v3.12.88: inside a settings card, also reveal the CARD's top — the
+        // title/Room Code/QR sit ABOVE the first focusable button, so focusing
+        // the button alone left them hidden above the viewport with no D-pad
+        // path to scroll up to them (Akkshay: "casting option hidden above").
+        const card = el.closest('.tv-settings-card');
+        if (card) {
+          const cr = card.getBoundingClientRect();
+          if (cr.top < sr.top + 12) {
+            scroller.scrollTop -= (sr.top + 12 - cr.top);
+          }
         }
       } catch (_) {}
     }
