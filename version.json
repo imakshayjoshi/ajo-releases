@@ -33,18 +33,18 @@
     "releaseDate": "2026-10-09"
   },
   "android_tv": {
-    "version": "3.12.84",
-    "versionCode": 234,
+    "version": "3.12.85",
+    "versionCode": 235,
     "packageId": "com.ajo.androidtv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
-    "changelog": "v3.12.84: Navigation rebuilt around the bottom dock — the content pane no longer moves when you navigate the nav bar, focus no longer jumps to random elements (nearest-neighbor recovery), DOWN at the bottom of any page enters the dock and UP from it returns to where you were. Live channel logos now retry through the image proxy before falling back, so far fewer blank tiles. Carries v3.12.83's StreamFlix structure and all earlier fixes.",
+    "changelog": "v3.12.85: Live channel logos FIXED — name-based resolution against the verified tv-logos repo (Sony/Star/Colors/Zee/Aaj Tak/NDTV all show real brand logos now; rescue chain direct → tv-logos → proxy → initials so tiles never sit blank). Dock navigation corrected: the content pane no longer shifts when you use the nav bar, focus no longer jumps randomly, DOWN at the bottom of a page opens the nav and UP returns to where you were. Last live row clears the bottom dock.",
     "size_mb": 7.0,
-    "sha256": "71b54dd8234e7d7a984a99c256364f9d74c5fd7bccc03c3447c3ad6f94f0feb9",
+    "sha256": "98559b93f1e11d3d4562212f351b99810d2fcd866a88f749baf4a16ab11d14b8",
     "releaseDate": "2026-10-12",
-    "size": 7366934
+    "size": 7367102
   },
   "changelog": "v3.12.73: Movies & series fixed \u2014 movibox CDN hotlink gate (429) handled: native player now sends Referer/UA headers; web/phone playback streams through the VPS proxy. Live channel thumbnails fixed \u2014 dead Sony logos repaired, logos served via image proxy with retry. Live channel playback untouched.",
   "sha256": "6e2dc11f6d2c34bdfbe719e181511383f093fe2376c92261791740af00c27c26"

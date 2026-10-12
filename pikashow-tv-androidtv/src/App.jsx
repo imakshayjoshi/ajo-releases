@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { getBollywoodCatalog, getHollywoodCatalog, getSerialsCatalog, getLiveBroadcasts } from './api/pikashow';
-import { getLiveChannels, isPopularLiveChannel, classifyLiveChannel, hasWorkingPlayer, applyLiveSourceOverride, probeLiveChannels } from './api/live';
+import { getLiveChannels, isPopularLiveChannel, classifyLiveChannel, hasWorkingPlayer, applyLiveSourceOverride, probeLiveChannels, guessLiveLogo } from './api/live';
 import { LiveView } from './components/LiveView';
 import { getLiveSportsEvents } from './api/sports';
 import { getWatchHistory, saveProgress, getWatchProgress } from './api/history';
@@ -249,6 +249,15 @@ export default function App() {
         if (pa !== pb) return pa - pb;
         return String(a.title_en || a.title || '').localeCompare(String(b.title_en || b.title || ''));
       });
+      // v3.12.84: fill missing logos from the channel NAME (tv-logos repo,
+      // verified file list). The legacy/iptv sources carry no logo field, so
+      // the wall opened on initials tiles for every Sony/Star/Colors/Zee.
+      for (const ch of sorted) {
+        if (!ch.logo) {
+          const g = guessLiveLogo(ch.title_en || ch.title || ch.name || '');
+          if (g) { ch.logo = g; ch.poster = ch.poster || g; }
+        }
+      }
       // v3.12.72: runtime liveness probe — static dead-lists can't keep up
       // with relays that 404 mid-week. Probe unique manifest URLs (30 min
       // cache) and drop channels with zero live players. Render the pre-probe

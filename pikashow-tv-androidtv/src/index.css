@@ -1755,7 +1755,9 @@ html, body, #root {
 .live-grid-scroll {
   flex: 1;
   min-width: 0;
-  padding: 12px 30px 30px 26px;
+  /* v3.12.85: 130px bottom so the last channel row scrolls clear of the
+     floating bottom dock (rows were getting cut off behind it). */
+  padding: 12px 30px 130px 26px;
   overflow-y: auto;
   scrollbar-width: none;
 }

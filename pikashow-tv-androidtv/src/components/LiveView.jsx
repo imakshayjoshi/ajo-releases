@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { groupByCategory, liveLogoProxyUrl } from '../api/live';
+import { groupByCategory, liveLogoProxyUrl, guessLiveLogo } from '../api/live';
 
 /**
  * LiveView — MovieBoxTV-style live channel browser.
@@ -197,17 +197,21 @@ export function LiveView({ channels, onSelectItem, loading }) {
                     loading="lazy"
                     decoding="async"
                     onError={(e) => {
-                      // v3.12.84: rescue before fallback. The TV routes some
-                      // logo CDNs badly, so a direct-URL failure retries ONCE
-                      // through the VPS image proxy (cloudfront/jio/amagi only
-                      // — it can't serve raw.githubusercontent/hotstar). Only
-                      // when the proxy also fails do we swap to initials.
+                      // v3.12.84: rescue chain before fallback. (1) name-based
+                      // tv-logos guess (verified file list — never 404s),
+                      // (2) VPS image proxy for hosts it can serve, (3) initials.
                       const img = e.currentTarget;
                       const cur = img.getAttribute('src') || '';
-                      const proxyUrl = liveLogoProxyUrl(cur);
-                      if (proxyUrl && cur !== proxyUrl) {
-                        img.src = proxyUrl;
-                        return;
+                      const step = Number(img.dataset.logoStep || '0');
+                      if (step === 0) {
+                        img.dataset.logoStep = '1';
+                        const guess = guessLiveLogo(ch.title || ch.name || '');
+                        if (guess && guess !== cur) { img.src = guess; return; }
+                      }
+                      if (step <= 1) {
+                        img.dataset.logoStep = '2';
+                        const proxyUrl = liveLogoProxyUrl(cur);
+                        if (proxyUrl && cur !== proxyUrl) { img.src = proxyUrl; return; }
                       }
                       deadLogoUrls.add(cur);
                       const box = img.parentElement;

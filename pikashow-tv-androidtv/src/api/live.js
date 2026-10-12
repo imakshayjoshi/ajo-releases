@@ -155,12 +155,127 @@ export function liveLogoProxyUrl(logo) {
   return null;
 }
 function safeLiveLogo(name, logo) {
-  // v3.12.79: the logo proxy (new.ajo.co.in/channels/logo) is DEAD — it 403s
-  // on tv-logos and 502s on jio, so every tile fell back to initials. Load the
-  // direct (repaired) URL; the client-side onError already retries through the
-  // proxy only for the genuinely-CORS-broken hosts. Never route through it here.
-  return repairLiveLogo(name, logo);
+  // v3.12.84: repair dead hosts, then fill missing logos from the channel NAME
+  // (the legacy/iptv sources the wall opens on — Sony/Star/Colors/Zee — carry
+  // no logo field at all, which is why the user saw initials everywhere).
+  const repaired = repairLiveLogo(name, logo);
+  if (!repaired) {
+    const guessed = guessLiveLogo(name);
+    if (guessed) return guessed;
+  }
+  return repaired || '';
 }
+
+// ---------------------------------------------------------------------------
+// v3.12.84: name-based logo resolution against the tv-logos India repo.
+// Every candidate is verified against the embedded real file list, so a guess
+// never 404s — it either maps to a file that exists or returns null (initials).
+// ---------------------------------------------------------------------------
+const TVLOGOS_BASE = 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/';
+
+// Brand rules for channels whose slug doesn't match the repo naming
+// (checked before the generic guesser; first match wins).
+const LOGO_BRAND_RULES = [
+  [/\bsony\s+(?:sports\s+)?ten\s*1\b/i, 'sony-ten-1-in.png'],
+  [/\bsony\s+(?:sports\s+)?ten\s*2\b/i, 'sony-ten-2-in.png'],
+  [/\bsony\s+(?:sports\s+)?ten\s*3\b/i, 'sony-ten-3-in.png'],
+  [/\bsony\s+(?:sports\s+)?ten\s*4\b/i, 'sony-ten-4-in.png'],
+  [/\bsony\s+(?:sports\s+)?ten\s*5\b|\bsony\s+six\b/i, 'sony-ten-5-in.png'],
+  [/\bsony\s+sports\s*1\b/i, 'sony-ten-1-in.png'],
+  [/\bsony\s+sports\s*2\b/i, 'sony-ten-2-in.png'],
+  [/\bsony\s+sports\s*3\b/i, 'sony-ten-3-in.png'],
+  [/\bsony\s+sports\s*4\b/i, 'sony-ten-4-in.png'],
+  [/\bsony\s+sports\s*5\b/i, 'sony-ten-5-in.png'],
+  [/\bstar\s+sports\s+select\s*1\b/i, 'star-sports-select-1-in.png'],
+  [/\bstar\s+sports\s+select\s*2\b/i, 'star-sports-select-2-in.png'],
+  [/\bstar\s+sports\s*1\s+hindi\b/i, 'star-sports-1-hindi-in.png'],
+  [/\bstar\s+sports\s*1\b/i, 'star-sports-1-in.png'],
+  [/\bstar\s+sports\s*2\b/i, 'star-sports-2-in.png'],
+  [/\bstar\s+sports\s*3\b/i, 'star-sports-3-in.png'],
+  [/\bstar\s+plus\b/i, 'star-plus-hd-in.png'],
+  [/\bstar\s+bharat\b/i, 'star-bharat-in.png'],
+  [/\bstar\s+pravah\b/i, 'star-pravah-in.png'],
+  [/\bstar\s+gold\b/i, 'star-gold-hd-in.png'],
+  [/\bcolors\s+rishtey\b/i, 'colors-rishtey-in.png'],
+  [/\bcolors\s+(?:mena|super)\b/i, 'colors-in.png'],
+  [/\brepublic\s+bharat\b/i, 'republic-bharat-tv-in.png'],
+  [/\brepublic\b/i, 'republic-tv-in.png'],
+  [/\bsony\s+entertainment\s+television\b|\bset\s+hd\b/i, 'sony-entertainment-television-hd-in.png'],
+  [/\bsony\s+sab\b/i, 'sony-sab-hd-in.png'],
+  [/\bsony\s+max\s*2\b/i, 'sony-max-2-hd-in.png'],
+  [/\bsony\s+max\b/i, 'sony-max-hd-in.png'],
+  [/\bsony\s+marathi\b/i, 'sony-marathi-in.png'],
+  [/\bsony\s+pix\b/i, 'sony-pix-hd-in.png'],
+  [/\bsony\s+pal\b/i, 'sony-pal-in.png'],
+  [/\bsony\s+wah\b/i, 'sony-wah-in.png'],
+  [/\bsony\s+yay\b/i, 'sony-yay-in.png'],
+  [/\bsony\s+aath\b/i, 'sony-aath-in.png'],
+  [/\bsony\s+bbc\s+earth\b/i, 'sony-bbc-earth-hd-in.png'],
+  [/\baaj\s+tak\b/i, 'aaj-tak-in.png'],
+  [/\bndtv\s*24\s*[x×]\s*7\b/i, 'ndtv-24x7-in.png'],
+  [/\bndtv\s+india\b/i, 'ndtv-india-in.png'],
+  [/\bzee\s+news\b/i, 'zee-news-in.png'],
+  [/\bzee\s+tv\b/i, 'zee-tv-hd-in.png'],
+  [/\bzee\s+cinema\b/i, 'zee-cinema-in.png'],
+  [/\bzee\s+talkies\b/i, 'zee-talkies-in.png'],
+  [/\bzee\s+action\b/i, 'zee-action-in.png'],
+  [/\bzee\s+classic\b/i, 'zee-classic-in.png'],
+  [/\bzee\s+bharat\b/i, 'zee-bharat-in.png'],
+  [/\bzee\s+business\b/i, 'zee-business-in.png'],
+  [/\bzee\s+24\s+taas\b/i, 'zee-24-taas-in.png'],
+  [/\bcolors\s+marathi\b/i, 'colors-marathi-in.png'],
+  [/\bcolors\s+infinity\b/i, 'colors-infinity-in.png'],
+  [/\bcolors\s+cineplex\b/i, 'colors-cineplex-in.png'],
+  [/\bcolors\b/i, 'colors-in.png'],
+];
+
+const LIVE_LOGO_QUALITY_TOKENS = new Set(['hd', 'sd', 'fhd', 'uhd', '4k', 'tv', 'channel', 'live']);
+
+function liveLogoSlugTokens(name) {
+  return String(name || '')
+    .replace(/\([^)]*\)/g, ' ')       // drop "(24/7 TMKOC)" style suffixes
+    .replace(/&/g, ' and ')
+    .replace(/[''.]/g, ' ')
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean);
+}
+
+/**
+ * Resolve a channel NAME to a tv-logos India URL that is guaranteed to exist
+ * (verified against the embedded file list). Returns null when nothing maps —
+ * the caller then shows the initials tile.
+ */
+export function guessLiveLogo(name) {
+  if (!name) return null;
+  for (const [re, file] of LOGO_BRAND_RULES) {
+    if (re.test(name)) {
+      if (TVLOGOS_INDIA.has(file)) return TVLOGOS_BASE + file;
+      break;
+    }
+  }
+  const toks = liveLogoSlugTokens(name);
+  if (!toks.length) return null;
+  const noQuality = toks.filter((t) => !LIVE_LOGO_QUALITY_TOKENS.has(t));
+  const candidates = [];
+  const full = toks.join('-');
+  const base = noQuality.join('-');
+  if (full) candidates.push(full + '-in.png');
+  if (base && base !== full) candidates.push(base + '-in.png');
+  if (base) candidates.push(base + '-hd-in.png');
+  if (base) candidates.push(base + '-in.png');
+  for (const c of candidates) {
+    if (TVLOGOS_INDIA.has(c)) return TVLOGOS_BASE + c;
+  }
+  return null;
+}
+
+// v3.12.84: real file list of tv-logo/tv-logos countries/india, embedded so
+// name-based logo guesses never 404. Regenerate from the repo tree if the app
+// adds channels whose logos are missing.
+const TVLOGOS_INDIA_FILES = ['1sports-in.png', '9x-jalwa-in.png', '9x-jhakaas-in.png', '9x-tashan-in.png', '9xm-in.png', 'a1tv-in.png', 'aaj-tak-hd-in.png', 'aaj-tak-in.png', 'aakash-aath-in.png', 'aastha-bhajan-in.png', 'aastha-in.png', 'abp-ananda-in.png', 'abp-asmita-in.png', 'abp-ganga-in.png', 'abp-majha-in.png', 'abp-news-in.png', 'abzy-cool-in.png', 'abzy-movies-in.png', 'alankar-tv-in.png', 'anaadi-tv-in.png', 'and-flix-hd-in.png', 'and-flix-in.png', 'and-pictures-hd-in.png', 'and-pictures-in.png', 'and-prive-hd-in.png', 'and-prive-in.png', 'and-tv-hd-in.png', 'and-tv-in.png', 'apn-news-in.png', 'argus-in.png', 'arihant-in.png', 'asianet-hd-in.png', 'asianet-in.png', 'asianet-movies-in.png', 'asianet-news-in.png', 'asianet-plus-in.png', 'assam-talks-in.png', 'awakening-in.png', 'b4u-bhojpuri-in.png', 'b4u-kadak-in.png', 'b4u-movies-in.png', 'b4u-music-in.png', 'balle-balle-in.png', 'bansal-news-in.png', 'bflix-movies-in.png', 'bharat-samachar-in.png', 'bhojpuri-cinema-in.png', 'big-magic-in.png', 'bindass-in.png', 'box-cinema-in.png', 'calcutta-news-in.png', 'cartoon-network-hd-plus-in.png', 'cartoon-network-in.png', 'channel-win-in.png', 'chardikla-time-tv-in.png', 'cinema-tv-india-in.png', 'cna-channel-news-asia-in.png', 'cnbc-awaaz-in.png', 'cnbc-tv18-in.png', 'cnbc-tv18-prime-hd-in.png', 'cnn-news-18-in.png', 'colors-cineplex-bollywood-in.png', 'colors-cineplex-hd-in.png', 'colors-cineplex-in.png', 'colors-cineplex-superhits-in.png', 'colors-hd-in.png', 'colors-in.png', 'colors-infinity-hd-in.png', 'colors-infinity-in.png', 'colors-marathi-hd-in.png', 'colors-marathi-in.png', 'colors-rishtey-in.png', 'dangal-in.png', 'dd-bharati-in.png', 'dd-bihar-in.png', 'dd-india-hd-in.png', 'dd-india-in.png', 'dd-kisan-in.png', 'dd-madhya-pradesh-in.png', 'dd-national-in.png', 'dd-news-hd-in.png', 'dd-news-in.png', 'dd-rajasthan-in.png', 'dd-retro-in.png', 'dd-sports-in.png', 'dd-uttar-pradesh-in.png', 'dhinchaak-in.png', 'discovery-kids-in.png', 'disha-tv-in.png', 'dishum-in.png', 'divya-in.png', 'e24-in.png', 'enterr10-movies-in.png', 'enterr10-rangeela-in.png', 'epic-in.png', 'et-now-in.png', 'et-now-swadesh-in.png', 'etv-bal-bharat-in.png', 'eurosport-in.png', 'fakt-marathi-in.png', 'filamchi-bhojpuri-in.png', 'first-india-news-rajasthan-in.png', 'food-food-in.png', 'gnt-in.png', 'goodtimes-in.png', 'gubbare-in.png', 'gulistan-news-in.png', 'haryana-beats-in.png', 'hindi-khabar-in.png', 'history-tv18-hd-in.png', 'history-tv18-in.png', 'hungama-in.png', 'ibc-24-in.png', 'india-ahead-in.png', 'india-news-in.png', 'india-news-madhya-pradesh-chhattisgarh-in.png', 'india-news-rajasthan-in.png', 'india-news-uttar-pradesh-in.png', 'india-today-in.png', 'india-tv-in.png', 'india-voice-in.png', 'inh-24x7-in.png', 'insync-in.png', 'ishwar-tv-in.png', 'jai-maharashtra-in.png', 'jalsha-movies-hd-in.png', 'jalsha-movies-in.png', 'jan-tv-in.png', 'jantantra-tv-in.png', 'jinvani-channel-in.png', 'kashish-news-in.png', 'lok-sabha-tv-in.png', 'manoranjan-in.png', 'mastiii-in.png', 'mh-one-in.png', 'mh-one-prime-in.png', 'mh-one-shraddha-in.png', 'mirror-now-in.png', 'mn-plus-hd-in.png', 'mnx-hd-in.png', 'mnx-in.png', 'movies-now-hd-in.png', 'movies-now-in.png', 'mtv-beats-hd-in.png', 'mtv-beats-in.png', 'mtv-hd-plus-in.png', 'mtv-in.png', 'naaptol-in.png', 'ndtv-24x7-in.png', 'ndtv-india-in.png', 'ndtv-prime-in.png', 'ndtv-profit-in.png', 'network-10-in.png', 'news-1-india-in.png', 'news-11-bharat-in.png', 'news-18-bihar-jharkhand-in.png', 'news-18-india-in.png', 'news-18-lokmat-in.png', 'news-18-madhya-pradesh-chhattisgarh-in.png', 'news-18-punjab-haryana-in.png', 'news-18-rajasthan-in.png', 'news-18-urdu-in.png', 'news-18-uttar-pradesh-uttarakhand-in.png', 'news-24-in.png', 'news-24-madhya-pradesh-chhattisgarh-in.png', 'news-india-24x7-in.png', 'news-nation-in.png', 'news-state-in.png', 'news-state-madhya-pradesh-chhattisgarh-in.png', 'news-x-in.png', 'nick-hd-plus-in.png', 'nick-in.png', 'nick-jr-in.png', 'nickelodeon-sonic-in.png', 'oscar-movies-in.png', 'paras-tv-in.png', 'patrika-rajasthan-in.png', 'peace-of-mind-in.png', 'pogo-in.png', 'pravah-picture-in.png', 'prime-news-in.png', 'rajya-sabha-tv-in.png', 'republic-bharat-tv-in.png', 'republic-tv-in.png', 'romedy-now-in.png', 'saam-tv-in.png', 'sadhna-bangla-in.png', 'sadhna-news-madhya-pradesh-chhattisgarh-in.png', 'sadhna-plus-news-in.png', 'salaam-tv-in.png', 'samay-in.png', 'sansad-tv-in.png', 'sanskar-in.png', 'santwani-in.png', 'satsang-tv-in.png', 'sharnam-tv-in.png', 'shemaroo-in.png', 'shemaroo-marathibana-in.png', 'showbox-in.png', 'shubh-tv-in.png', 'sony-aath-in.png', 'sony-bbc-earth-hd-in.png', 'sony-bbc-earth-in.png', 'sony-entertainment-television-hd-in.png', 'sony-entertainment-television-in.png', 'sony-marathi-in.png', 'sony-max-2-hd-in.png', 'sony-max-2-in.png', 'sony-max-hd-in.png', 'sony-max-in.png', 'sony-pal-hd-in.png', 'sony-pal-in.png', 'sony-pix-hd-in.png', 'sony-pix-in.png', 'sony-sab-hd-in.png', 'sony-sab-in.png', 'sony-ten-1-hd-in.png', 'sony-ten-1-in.png', 'sony-ten-2-hd-in.png', 'sony-ten-2-in.png', 'sony-ten-3-hd-in.png', 'sony-ten-3-in.png', 'sony-ten-4-hd-in.png', 'sony-ten-4-in.png', 'sony-ten-5-hd-in.png', 'sony-ten-5-in.png', 'sony-wah-hd-in.png', 'sony-wah-in.png', 'sony-yay-in.png', 'sports-18-in.png', 'star-bharat-hd-in.png', 'star-bharat-in.png', 'star-gold-2-in.png', 'star-gold-hd-in.png', 'star-gold-in.png', 'star-gold-select-hd-in.png', 'star-gold-select-in.png', 'star-jalsha-hd-in.png', 'star-jalsha-in.png', 'star-kiran-in.png', 'star-life-in.png', 'star-maa-gold-in.png', 'star-maa-hd-in.png', 'star-maa-in.png', 'star-maa-movies-hd-in.png', 'star-maa-music-in.png', 'star-movies-hd-in.png', 'star-movies-in.png', 'star-movies-select-hd-in.png', 'star-plus-hd-in.png', 'star-plus-in.png', 'star-pravah-hd-in.png', 'star-pravah-in.png', 'star-sports-1-bangla-in.png', 'star-sports-1-hindi-in.png', 'star-sports-1-in.png', 'star-sports-1-kannada-in.png', 'star-sports-1-marathi-in.png', 'star-sports-1-tamil-in.png', 'star-sports-1-telugu-in.png', 'star-sports-2-in.png', 'star-sports-3-in.png', 'star-sports-first-in.png', 'star-sports-select-1-in.png', 'star-sports-select-2-in.png', 'star-suvarna-hd-in.png', 'star-suvarna-in.png', 'star-suvarna-plus-in.png', 'star-utsav-in.png', 'star-utsav-movies-in.png', 'star-world-hd-in.png', 'star-world-in.png', 'star-world-premiere-hd-in.png', 'subharti.tv-in.png', 'sudarshan-news-in.png', 'super-hungama-in.png', 'swaraj-express-smbc-in.png', 'tata-sky-aradhana-in.png', 'tata-sky-astro-duniya-in.png', 'tata-sky-beauty-in.png', 'tata-sky-cooking-in.png', 'tata-sky-curiosity-channel-in.png', 'tata-sky-english-in-hindi-in.png', 'tata-sky-family-health-in.png', 'tata-sky-fitness-in.png', 'tata-sky-fun-learn-in.png', 'tata-sky-hits-in.png', 'tata-sky-hollywood-local-in.png', 'tata-sky-javed-akhtar-in.png', 'tata-sky-jee-prep-in.png', 'tata-sky-neet-prep-in.png', 'tata-sky-seniors-in.png', 'tata-sky-shortstv-in.png', 'tata-sky-smart-manager-in.png', 'tata-sky-theatre-in.png', 'tata-sky-vedic-maths-in.png', 'tehzeeb-tv-in.png', 'the-q-in.png', 'times-now-in.png', 'times-now-navbharat-in.png', 'times-now-world-in.png', 'total-tv-in.png', 'travelxp-4k-hdr-in.png', 'travelxp-4k-in.png', 'travelxp-hd-in.png', 'travelxp-in.png', 'tv9-bharatvarsh-in.png', 'vedic-in.png', 'vijay-super-in.png', 'vijay-tv-hd-in.png', 'vijay-tv-in.png', 'wion-in.png', 'zee-24-ghanta-in.png', 'zee-24-kalak-in.png', 'zee-24-taas-in.png', 'zee-action-in.png', 'zee-anmol-cinema-in.png', 'zee-bangla-cinema-in.png', 'zee-bangla-hd-in.png', 'zee-bangla-in.png', 'zee-bharat-in.png', 'zee-bihar-jharkhand-in.png', 'zee-biskope-in.png', 'zee-bollywood-in.png', 'zee-business-in.png', 'zee-cafe-hd-in.png', 'zee-cafe-in.png', 'zee-chitramandir-in.png', 'zee-cinema-hd-in.png', 'zee-cinema-in.png', 'zee-cinemalu-hd-in.png', 'zee-cinemalu-in.png', 'zee-classic-in.png', 'zee-delhi-ncr-haryana-in.png', 'zee-ganga-in.png', 'zee-hindustan-in.png', 'zee-jk-ladakh-in.png', 'zee-kannada-hd-in.png', 'zee-kannada-in.png', 'zee-kannada-news-in.png', 'zee-keralam-hd-in.png', 'zee-keralam-in.png', 'zee-madhya-pradesh-chattisgarh-in.png', 'zee-malayalam-news-in.png', 'zee-marathi-hd-in.png', 'zee-marathi-in.png', 'zee-news-hd-in.png', 'zee-news-in.png', 'zee-odisha-news-in.png', 'zee-picchar-hd-in.png', 'zee-picchar-in.png', 'zee-punjab-haryana-himachal-in.png', 'zee-punjabi-in.png', 'zee-rajasthan-in.png', 'zee-sarthak-in.png', 'zee-talkies-hd-in.png', 'zee-talkies-in.png', 'zee-tamil-hd-in.png', 'zee-tamil-in.png', 'zee-tamil-news-in.png', 'zee-telugu-hd-in.png', 'zee-telugu-in.png', 'zee-telugu-news-in.png', 'zee-thirai-hd-in.png', 'zee-thirai-in.png', 'zee-tv-hd-in.png', 'zee-tv-in.png', 'zee-uttar-pradesh-uttarakhand-in.png', 'zee-yuva-in.png', 'zee-zest-hd-in.png', 'zee-zest-in.png', 'zee-zindagi-in.png', 'zing-in.png', 'zoom-in.png'];
+
+const TVLOGOS_INDIA = new Set(TVLOGOS_INDIA_FILES);
 
 /**
  * v3.12.70: streams probed live right now. The old 51.75.127.199 relay farm is
