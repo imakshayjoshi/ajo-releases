@@ -136,8 +136,30 @@ function proxyLiveLogo(logo) {
   } catch { /* invalid url — keep as-is */ }
   return logo;
 }
+
+// v3.12.84: on-device logo rescue. The stick routes some logo CDNs badly
+// (same reason TMDB needed a proxy), so when a direct logo 404s/errors on the
+// TV, LiveView retries ONCE through the VPS proxy — but only for hosts the
+// proxy actually serves (cloudfront/jio/amagi verified 200; it 403s
+// raw.githubusercontent and hotstar is geo-blocked from the VPS, so those
+// stay direct-or-initials). Returns null when the host is not rescuable.
+export function liveLogoProxyUrl(logo) {
+  if (!logo || typeof logo !== 'string') return null;
+  if (logo.startsWith(LOGO_PROXY)) return null;
+  try {
+    const h = new URL(logo).hostname;
+    if (LOGO_PROXY_HOSTS.some((host) => h === host || h.endsWith('.' + host))) {
+      return LOGO_PROXY + encodeURIComponent(logo);
+    }
+  } catch { /* invalid */ }
+  return null;
+}
 function safeLiveLogo(name, logo) {
-  return proxyLiveLogo(repairLiveLogo(name, logo));
+  // v3.12.79: the logo proxy (new.ajo.co.in/channels/logo) is DEAD — it 403s
+  // on tv-logos and 502s on jio, so every tile fell back to initials. Load the
+  // direct (repaired) URL; the client-side onError already retries through the
+  // proxy only for the genuinely-CORS-broken hosts. Never route through it here.
+  return repairLiveLogo(name, logo);
 }
 
 /**

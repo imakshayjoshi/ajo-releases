@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { groupByCategory } from '../api/live';
+import { groupByCategory, liveLogoProxyUrl } from '../api/live';
 
 /**
  * LiveView — MovieBoxTV-style live channel browser.
@@ -197,12 +197,19 @@ export function LiveView({ channels, onSelectItem, loading }) {
                     loading="lazy"
                     decoding="async"
                     onError={(e) => {
-                      // v3.12.79: the logo proxy is dead (403/502), so don't
-                      // retry through it — it just loops. Mark the URL dead and
-                      // swap straight to the initials fallback tile.
+                      // v3.12.84: rescue before fallback. The TV routes some
+                      // logo CDNs badly, so a direct-URL failure retries ONCE
+                      // through the VPS image proxy (cloudfront/jio/amagi only
+                      // — it can't serve raw.githubusercontent/hotstar). Only
+                      // when the proxy also fails do we swap to initials.
                       const img = e.currentTarget;
-                      const orig = img.dataset.logoSrc || img.getAttribute('src') || '';
-                      if (orig) deadLogoUrls.add(orig);
+                      const cur = img.getAttribute('src') || '';
+                      const proxyUrl = liveLogoProxyUrl(cur);
+                      if (proxyUrl && cur !== proxyUrl) {
+                        img.src = proxyUrl;
+                        return;
+                      }
+                      deadLogoUrls.add(cur);
                       const box = img.parentElement;
                       if (!box) return;
                       const fallback = document.createElement('div');

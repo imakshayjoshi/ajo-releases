@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
-import { Home, Film, Tv, Radio, Trophy, Search, Settings, Zap, Music } from 'lucide-react';
+import { Home, Film, Tv, Radio, Search, Settings } from 'lucide-react';
 
 export function GoogleTVHeader({ activeTab, onSelectTab, activeSubTab, onSelectSubTab }) {
   const [timeStr, setTimeStr] = useState('');

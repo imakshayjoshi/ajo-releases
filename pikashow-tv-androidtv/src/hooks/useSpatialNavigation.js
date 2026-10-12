@@ -7,6 +7,12 @@ import { useEffect, useRef, useCallback } from 'react';
  */
 export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelector = null }) {
   const lastFocusedRef = useRef(null);
+  // v3.12.84: dock model state. The nav is a position:fixed BOTTOM capsule, so
+  // the engine must know (a) which CONTENT element to return to when the user
+  // presses UP from the dock, and (b) the last focused rect for nearest-
+  // neighbor recovery when a grid re-render unmounts the focused card.
+  const lastContentRef = useRef(null);
+  const lastRectRef = useRef(null);
 
   // Fast check if an element is focusable and visible without triggering reflow.
   // offsetParent is null for position:fixed and position:sticky elements, so
@@ -36,6 +42,7 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
   };
 
   const getFocusableElements = useCallback((container = document) => {
+    if (!container) return []; // v3.12.84: guard — dock helpers query .tv-header which may be absent mid-render
     const raw = container.querySelectorAll(
       'button:not([disabled]), [tabindex="0"]:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), .tv-card, .tv-nav-pill, .tv-hero, .tv-cat-btn, .tv-btn-primary, .tv-btn-secondary, .tv-player-btn, .tv-drawer-item, [data-focusable="true"]'
     );
@@ -51,21 +58,56 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
   const findNextElement = useCallback((current, direction, elements) => {
     if (!current || elements.length === 0) return elements[0] || null;
 
-    // v3.12.81: header fast-paths. The header holds TWO focus zones — the
-    // logo badge (far left) and the nav pills — but the nav engine treats it
-    // as one rail, so a mis-aimed ArrowUp from content landed on the logo and
-    // the next ArrowRight had to cross the entire pill row (the "focus jumps
-    // to bottom nav / random tab" Akkshay hit). Move cleanly within the header.
+    // v3.12.84: dock helpers. The nav is a BOTTOM-anchored capsule, so:
+    //  - content bottom edge + DOWN = the only way INTO the dock
+    //  - UP from the dock returns to the content element you came from
+    //  - the dock never wins a geometric scan mid-page (that was the jumping)
+    const dockPillNear = (fromEl) => {
+      const headerEls = getFocusableElements(document.querySelector('.tv-header'));
+      const pool = headerEls.filter((el) => elements.includes(el));
+      if (!pool.length) return null;
+      const active = pool.find((el) => el.classList && el.classList.contains('tv-nav-pill') && el.classList.contains('active'));
+      if (active) return active;
+      const fr = fromEl ? fromEl.getBoundingClientRect() : null;
+      const fx = fr ? fr.left + fr.width / 2 : window.innerWidth / 2;
+      let best = pool[0], bd = Infinity;
+      for (const p of pool) {
+        const r = p.getBoundingClientRect();
+        const d = Math.abs(r.left + r.width / 2 - fx);
+        if (d < bd) { bd = d; best = p; }
+      }
+      return best;
+    };
+    const contentReturnTarget = () => {
+      if (lastContentRef.current && elements.includes(lastContentRef.current)) return lastContentRef.current;
+      // nearest content element to the last known focus rect, else first in main
+      const main = document.querySelector('.tv-main-content');
+      if (!main) return null;
+      const mainEls = getFocusableElements(main).filter((el) => elements.includes(el));
+      if (!mainEls.length) return null;
+      if (lastRectRef.current) {
+        const lr = lastRectRef.current;
+        let best = mainEls[0], bd = Infinity;
+        for (const el of mainEls) {
+          const r = el.getBoundingClientRect();
+          const d = Math.abs(r.left + r.width / 2 - lr.x) + Math.abs(r.top + r.height / 2 - lr.y);
+          if (d < bd) { bd = d; best = el; }
+        }
+        return best;
+      }
+      return mainEls[0];
+    };
+
+    // v3.12.84: dock fast-path. The header capsule sits at the BOTTOM of the
+    // screen. LEFT/RIGHT move inside it; UP returns to content; DOWN stays.
     const inHeaderZone = current.closest('.tv-header');
     if (inHeaderZone) {
       if (current.closest('.tv-logo-section')) {
-        // Logo: RIGHT → first nav pill; DOWN falls through to content below.
         if (direction === 'ArrowRight') {
           const pill = document.querySelector('.tv-header .tv-nav-pill.active') || document.querySelector('.tv-header .tv-nav-pill');
           if (pill) return pill;
         }
       } else if (current.closest('.tv-nav-pills')) {
-        // Pills: LEFT past the first pill → logo; RIGHT past last → stay.
         const pills = Array.from(document.querySelectorAll('.tv-header .tv-nav-pill'));
         const idx = pills.indexOf(current);
         if (direction === 'ArrowLeft' && idx <= 0) {
@@ -75,16 +117,20 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
         if (direction === 'ArrowLeft' && idx > 0) return pills[idx - 1];
         if (direction === 'ArrowRight' && idx >= 0 && idx < pills.length - 1) return pills[idx + 1];
       }
+      if (direction === 'ArrowUp') {
+        const back = contentReturnTarget();
+        if (back) return back;
+      }
+      // DOWN from the dock: nothing below — stay. Any other unhandled key: stay.
+      return current;
     }
 
-    // v3.12.81: Settings tab fast-paths. The settings cards aren't registered
-    // rails, so ArrowUp used to fall into the 2D scan and land on the logo
-    // (leftmost header element) instead of the Settings pill directly above —
-    // the "can't reach Check for Updates, jumps to bottom nav" report.
+    // v3.12.81/84: Settings tab fast-paths. Cards walk cleanly card-to-card;
+    // the top edge goes to the OTA banner (visually above), never to the
+    // bottom dock; the bottom edge drops into the dock deliberately.
     const settingsCard = current.closest('.tv-settings-card');
     if (settingsCard && (direction === 'ArrowUp' || direction === 'ArrowDown')) {
       if (direction === 'ArrowDown') {
-        // Next card's first focusable (sibling walk), else stay.
         let nxt = settingsCard.nextElementSibling;
         while (nxt) {
           if (nxt.classList && nxt.classList.contains('tv-settings-card')) {
@@ -93,9 +139,13 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
           }
           nxt = nxt.nextElementSibling;
         }
-        return current; // bottom of settings — don't fly to nowhere
+        // bottom of settings → the dock
+        const dock = dockPillNear(current);
+        if (dock) return dock;
+        return current;
       }
-      // ArrowUp: previous card, else the active header pill.
+      // ArrowUp: previous card, else the OTA banner (it renders ABOVE the
+      // content pane), else stay at the top card — the dock is DOWN, not UP.
       let prv = settingsCard.previousElementSibling;
       while (prv) {
         if (prv.classList && prv.classList.contains('tv-settings-card')) {
@@ -104,8 +154,12 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
         }
         prv = prv.previousElementSibling;
       }
-      const pill = document.querySelector('.tv-header .tv-nav-pill.active') || document.querySelector('.tv-header .tv-nav-pill');
-      if (pill) return pill;
+      const banner = document.querySelector('.tv-ota-rail');
+      if (banner) {
+        const be = getFocusableElements(banner).filter((el) => elements.includes(el));
+        if (be.length > 0) return be[0];
+      }
+      return current;
     }
 
     // v3.12.79: Live TV grid horizontal edges. LEFT at the leftmost grid
@@ -145,7 +199,9 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
       const inLiveArea = current.closest('.live-channel-grid, .live-cat-rail, .live-toolbar');
       if (inLiveArea) {
         if (direction === 'ArrowUp') {
-          // Grid card or rail item → toolbar first; toolbar → header.
+          // Grid card or rail item → toolbar first. v3.12.84: from the toolbar,
+          // UP stays on the toolbar — the nav is a BOTTOM dock, so jumping to
+          // it from the TOP of the live screen was pure confusion.
           if (!current.closest('.live-toolbar')) {
             const toolbar = document.querySelector('.tv-main-content .live-toolbar');
             if (toolbar) {
@@ -162,17 +218,7 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
               }
             }
           }
-          const headerEls = getFocusableElements(document.querySelector('.tv-header'));
-          if (headerEls.length > 0) {
-            const currentLeft = current.getBoundingClientRect().left;
-            let closestH = headerEls[0];
-            let minHDiff = Infinity;
-            for (const el of headerEls) {
-              const diff = Math.abs(el.getBoundingClientRect().left - currentLeft);
-              if (diff < minHDiff) { minHDiff = diff; closestH = el; }
-            }
-            return closestH;
-          }
+          return current; // top of the live area — stay
         }
         if (direction === 'ArrowDown' && current.closest('.live-toolbar')) {
           // Toolbar → first grid card (skip the category rail: LEFT/RIGHT
@@ -189,53 +235,21 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
         }
         // Grid vertical movement is handled by the 2D fallback below.
       }
+      // v3.12.84: the old inHeader ArrowDown branch (header → first content
+      // rail) is dead code — the dock fast-path at the top handles every key
+      // for header elements and returns before we get here.
       const currentRail = current.closest('.tv-rail, .tv-header, .tv-hero, .tv-modal-card, .live-toolbar, .live-cat-rail, .live-channel-grid, .tv-settings-card');
-
-      // v3.9: header <-> content in ONE press. Previously the rail-walk only
-      // visited rail SIBLINGS — the header isn't one — so every ArrowUp from
-      // content fell through to the slow full-document scan (thousands of
-      // elements pre-curation), which felt like dead keypresses.
-      const inHeader = !!current.closest('.tv-header');
-      if (inHeader && direction === 'ArrowDown') {
-        // v3.10.0: the OTA update banner (between header and main) used to be
-        // unreachable — its Update/Dismiss buttons could never take focus.
-        // Check it first, then fall through to the content rails.
-        const banner = document.querySelector('.tv-ota-rail');
-        if (banner) {
-          const bannerEls = getFocusableElements(banner);
-          if (bannerEls.length > 0) {
-            const currentLeft = current.getBoundingClientRect().left;
-            let closestBanner = bannerEls[0];
-            let minBannerDiff = Infinity;
-            for (const el of bannerEls) {
-              const diff = Math.abs(el.getBoundingClientRect().left - currentLeft);
-              if (diff < minBannerDiff) { minBannerDiff = diff; closestBanner = el; }
-            }
-            return closestBanner;
-          }
-        }
-        const firstRail = document.querySelector('.tv-main-content .live-toolbar, .tv-main-content .tv-rail, .tv-main-content .tv-hero');
-        if (firstRail) {
-          const railEls = getFocusableElements(firstRail);
-          if (railEls.length > 0) {
-            const currentLeft = current.getBoundingClientRect().left;
-            let closest = railEls[0];
-            let minDiff = Infinity;
-            for (const el of railEls) {
-              const diff = Math.abs(el.getBoundingClientRect().left - currentLeft);
-              if (diff < minDiff) { minDiff = diff; closest = el; }
-            }
-            return closest;
-          }
-        }
-      }
 
       if (currentRail) {
         let targetRail = direction === 'ArrowDown'
           ? currentRail.nextElementSibling
           : currentRail.previousElementSibling;
 
-        let exhausted = false;
+        // v3.12.84: exhausted must mean "the walk found nothing in this
+        // direction" — including when there are NO siblings at all (the old
+        // loop left it false, so top/bottom edge handling never fired for a
+        // lone first/last rail).
+        let exhausted = true;
         while (targetRail) {
           const railElements = getFocusableElements(targetRail);
           if (railElements.length > 0) {
@@ -258,11 +272,11 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
           exhausted = true;
         }
 
-        // Rail walk found nothing above us: snap straight into the header.
+        // Rail walk exhausted. v3.12.84: the nav is a BOTTOM dock — UP at the
+        // top of content must NOT dive into it (the "focus jumps to the bottom
+        // nav" complaint). UP → live toolbar → OTA banner → stay. DOWN at the
+        // bottom edge → the dock (deliberate, nearest pill by x).
         if (exhausted && direction === 'ArrowUp') {
-          // v3.12.76: on the Live TV tab the mode toolbar (All Channels / TV
-          // Guide) sits between the grid and the header — stop there first,
-          // never jump past it straight to the nav pills.
           const toolbar = document.querySelector('.tv-main-content .live-toolbar');
           if (toolbar) {
             const tbEls = getFocusableElements(toolbar);
@@ -277,17 +291,26 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
               return closestTb;
             }
           }
-          const headerEls = getFocusableElements(document.querySelector('.tv-header'));
-          if (headerEls.length > 0) {
-            const currentLeft = current.getBoundingClientRect().left;
-            let closest = headerEls[0];
-            let minDiff = Infinity;
-            for (const el of headerEls) {
-              const diff = Math.abs(el.getBoundingClientRect().left - currentLeft);
-              if (diff < minDiff) { minDiff = diff; closest = el; }
+          const banner = document.querySelector('.tv-ota-rail');
+          if (banner) {
+            const bannerEls = getFocusableElements(banner).filter((el) => elements.includes(el));
+            if (bannerEls.length > 0) {
+              const currentLeft = current.getBoundingClientRect().left;
+              let closestBanner = bannerEls[0];
+              let minBannerDiff = Infinity;
+              for (const el of bannerEls) {
+                const diff = Math.abs(el.getBoundingClientRect().left - currentLeft);
+                if (diff < minBannerDiff) { minBannerDiff = diff; closestBanner = el; }
+              }
+              return closestBanner;
             }
-            return closest;
           }
+          return current; // top edge — stay put, the dock is DOWN
+        }
+        if (exhausted && direction === 'ArrowDown') {
+          // Deliberately fall through to the 2D scan — it may find a lower
+          // element (hero CTAs have no rail siblings). The dock is entered via
+          // the post-scan fallback only when nothing exists below.
         }
       }
     }
@@ -311,7 +334,14 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
           .filter((el) => el !== current && !el.disabled && el.offsetParent !== null);
       }
     }
-    const scanEls = liveGridEls || elements;
+    // v3.12.84: the dock is position:fixed at the BOTTOM of the viewport, so
+    // geometrically it is "below" EVERYTHING — the 2D scan kept snapping to it
+    // from the middle of the page (the "focus jumps for no reason" complaint).
+    // Dock entry is only via the explicit bottom-edge fallback after the scan.
+    let scanEls = liveGridEls || elements;
+    if (!inHeaderZone) {
+      scanEls = scanEls.filter((el) => !el.closest('.tv-header'));
+    }
 
     let bestCandidate = null;
     let minDistance = Infinity;
@@ -374,8 +404,17 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
       }
     }
 
+    // v3.12.84: bottom edge of content = the ONLY way into the dock. The scan
+    // above excluded dock elements, so "nothing found below" means the user is
+    // genuinely at the bottom of the page — land on the nearest nav pill.
+    if (!bestCandidate && direction === 'ArrowDown' && !inHeaderZone) {
+      const dock = dockPillNear(current);
+      if (dock && dock !== current) return dock;
+    }
+
     // v3.12.79: in the live area, pressing DOWN with no channel below stays
-    // put — never escapes to the toolbar/header (the focus-jump bug).
+    // put — never escapes to the toolbar (the dock fallback above handles the
+    // deliberate bottom-edge case).
     if (!bestCandidate && inLiveGridOrRail && direction === 'ArrowDown') return current;
 
     return bestCandidate;
@@ -409,18 +448,15 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
     }
 
     // 2. Vertical alignment within the main scroll area
-    // v3.10.0 FIX: the modal's real scroller is .tv-modal-body (the
-    // .tv-modal-scroll class never existed), and the player drawer scrolls
-    // independently — include both so focused items scroll into view.
-    // v3.12.75 FIX (ported from Fire TV v3.12.68): the previous selector
-    // matched .live-grid-scroll FIRST for every live card, but that container
-    // has no height constraint on TV (scrollHeight == clientHeight), so the
-    // scroller never moved and focused rows below the fold stayed offscreen.
-    // Live cards must scroll the real page scroller (.tv-main-content).
+    // v3.12.84 (pane-jump fix): the nav dock is position:fixed at the BOTTOM,
+    // outside .tv-main-content. The old `|| document.querySelector('.tv-main-content')`
+    // fallback scrolled the page for elements that were never inside it — every
+    // keypress on the dock dragged the content pane ("the screen pane moves for
+    // no reason"). Only scroll a container the element actually lives in.
     const isLiveCard = el.closest && el.closest('.live-channel-grid, .live-cat-rail');
     const scroller = isLiveCard
-      ? (el.closest('.tv-main-content') || document.querySelector('.tv-main-content'))
-      : (el.closest('.tv-main-content, .tv-modal-body, .tv-player-drawer, .tv-modal-scroll, .live-grid-scroll, .live-cat-rail') || document.querySelector('.tv-main-content'));
+      ? el.closest('.tv-main-content')
+      : el.closest('.tv-main-content, .tv-modal-body, .tv-player-drawer, .tv-modal-scroll, .live-grid-scroll, .live-cat-rail');
     if (scroller) {
       try {
         const er = el.getBoundingClientRect();
@@ -497,16 +533,27 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
             let target = lastFocusedRef.current && elements.includes(lastFocusedRef.current)
               ? lastFocusedRef.current
               : null;
+            if (!target && lastRectRef.current) {
+              // v3.12.84: nearest-neighbor recovery. When a grid re-render
+              // unmounts the focused card, snapping to the dock pill (or
+              // elements[0]) is the "focus jumps to a random place" bug.
+              // Focus whatever is closest to where focus WAS instead.
+              const lr = lastRectRef.current;
+              let bd = Infinity;
+              for (const el of elements) {
+                if (el.closest('.tv-header')) continue; // never recover INTO the dock
+                const r = el.getBoundingClientRect();
+                const d = Math.abs(r.left + r.width / 2 - lr.x) + Math.abs(r.top + r.height / 2 - lr.y);
+                if (d < bd) { bd = d; target = el; }
+              }
+            }
             if (!target) {
-              // v3.12.81: prefer the ACTIVE nav pill over elements[0]. The
-              // header logo badge is now focusable, so elements[0] is the
-              // far-left logo — snapping there on focus loss (e.g. the
-              // "Check for Updates" button disabling itself after a check)
-              // is exactly the "focus jumps to a random place" feel.
-              target = document.querySelector('.tv-header .tv-nav-pill.active');
-              if (!target || !elements.includes(target)) target = null;
+              // Last resort: the first CONTENT element (never the dock).
+              target = elements.find((el) => !el.closest('.tv-header')) || null;
             }
             focusAndScroll(target || elements[0]);
+            if (target && !target.closest('.tv-header')) lastContentRef.current = target;
+            lastFocusedRef.current = target || elements[0];
           }
           return;
         }
@@ -516,6 +563,13 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
           e.preventDefault();
           focusAndScroll(next);
           lastFocusedRef.current = next;
+          // v3.12.84: track where focus is + the last CONTENT element, so the
+          // dock's UP can return to it and recovery can stay in-neighborhood.
+          try {
+            const r = next.getBoundingClientRect();
+            lastRectRef.current = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+          } catch (_) {}
+          if (!next.closest('.tv-header')) lastContentRef.current = next;
         } else if (dir === 'ArrowLeft' || dir === 'ArrowRight') {
           // v3.12.79 ColorOS elastic edge: at the end of a rail, stretch the
           // track 16px along the swipe vector, then snap back on release.
