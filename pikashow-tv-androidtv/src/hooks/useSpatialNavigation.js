@@ -173,6 +173,12 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
       const firstCard = document.querySelector('.live-channel-grid .tv-card-live');
       if (firstCard) return firstCard;
     }
+    if (direction === 'ArrowLeft' && current.closest('.live-cat-rail')) {
+      // v3.12.86: the rail is the leftmost element on the screen — the generic
+      // sibling fast-path would otherwise walk UP the category list on a LEFT
+      // press (a sideways key moving focus vertically is pure confusion).
+      return current;
+    }
 
     // 1. FAST-PATH: Intra-rail horizontal navigation (O(1) sibling traversal)
     if (direction === 'ArrowRight') {
@@ -198,6 +204,26 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
       // TV stack explicitly before the generic rail walk.
       const inLiveArea = current.closest('.live-channel-grid, .live-cat-rail, .live-toolbar');
       if (inLiveArea) {
+        // v3.12.86: the category rail is a VERTICAL stack of buttons, but the
+        // rail-walk below treats .live-cat-rail as a container and jumps to its
+        // SIBLING (the grid) — so DOWN from "All Channels" bounced to a channel
+        // card and Sports/News/Entertainment were unreachable (Akkshay report).
+        // Walk WITHIN the rail first.
+        const catBtn = current.closest('.live-cat-btn');
+        if (catBtn && current.closest('.live-cat-rail')) {
+          if (direction === 'ArrowDown') {
+            let s = catBtn.nextElementSibling;
+            while (s && !elements.includes(s)) s = s.nextElementSibling;
+            if (s) return s;
+            // last category: fall through (lands in the grid via the scan)
+          }
+          if (direction === 'ArrowUp') {
+            let s = catBtn.previousElementSibling;
+            while (s && !elements.includes(s)) s = s.previousElementSibling;
+            if (s) return s;
+            // first category ("All Channels"): fall through to the toolbar below
+          }
+        }
         if (direction === 'ArrowUp') {
           // Grid card or rail item → toolbar first. v3.12.84: from the toolbar,
           // UP stays on the toolbar — the nav is a BOTTOM dock, so jumping to
