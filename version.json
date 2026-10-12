@@ -44,7 +44,7 @@
     "size_mb": 7.0,
     "sha256": "98559b93f1e11d3d4562212f351b99810d2fcd866a88f749baf4a16ab11d14b8",
     "releaseDate": "2026-10-12",
-    "size": 7367102
+    "size": 7372970
   },
   "changelog": "v3.12.73: Movies & series fixed \u2014 movibox CDN hotlink gate (429) handled: native player now sends Referer/UA headers; web/phone playback streams through the VPS proxy. Live channel thumbnails fixed \u2014 dead Sony logos repaired, logos served via image proxy with retry. Live channel playback untouched.",
   "sha256": "6e2dc11f6d2c34bdfbe719e181511383f093fe2376c92261791740af00c27c26"
