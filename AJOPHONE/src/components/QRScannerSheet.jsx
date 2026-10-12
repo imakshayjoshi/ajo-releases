@@ -14,9 +14,19 @@ import jsQR from 'jsqr';
  */
 export function extractRoomCode(text) {
   if (!text) return null;
-  const m = String(text).match(/AJO[-\s]?([A-Z0-9]{3,8})/i);
-  if (!m) return null;
-  return 'AJO-' + m[1].toUpperCase();
+  // Canonical payload first: ajoapp://pair?code=AJO-XXXX (or legacy https
+  // pair URLs). NB: the scheme 'ajoapp' itself matches /AJO[-\s]?[A-Z0-9]+/
+  // ('AJO-APP'), so the bare-pattern fallback must run only after code=
+  // fails — proven by the decode test that returned AJO-APP for a real QR.
+  const param = String(text).match(/[?&]code=([A-Za-z0-9][A-Za-z0-9-]*)/);
+  if (param) {
+    const bare = param[1].match(/^AJO[-\s]?([A-Z0-9]{3,8})$/i);
+    if (bare) return 'AJO-' + bare[1].toUpperCase();
+    if (/^[A-Z0-9]{3,8}$/i.test(param[1])) return 'AJO-' + param[1].toUpperCase();
+  }
+  const m = String(text).match(/\bAJO[-\s]([A-Z0-9]{3,8})\b/i);
+  if (m) return 'AJO-' + m[1].toUpperCase();
+  return null;
 }
 
 export function QRScannerSheet({ onCode, onClose }) {

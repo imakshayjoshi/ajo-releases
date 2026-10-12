@@ -15,9 +15,9 @@
     "minimumVersionCode": 1,
     "changelog": "v3.4.0: Scan-to-pair \u2014 Remote tab now has a QR scanner: point your phone at the TV Settings QR and it connects instantly, no typing. Scanning the QR with the phone camera also opens the app straight into pairing. New unified design: Space Grotesk/Inter fonts and the teal AJO accent across the app, matching the TV.",
     "size_mb": 3.4,
-    "sha256": "c051e30c68a285c07df5ad6be96843c38e535782b9d14fc0cba5e6ed566136ca",
+    "sha256": "4ddeb6cd6b1361526ae35ddbac2fa21ca2c1a21628068439b6ffe88cbcc8512c",
     "releaseDate": "2026-10-13",
-    "size": 3565293
+    "size": 3565365
   },
   "tv": {
     "version": "3.12.73",
