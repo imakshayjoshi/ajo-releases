@@ -228,6 +228,26 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
           // Grid card or rail item → toolbar first. v3.12.84: from the toolbar,
           // UP stays on the toolbar — the nav is a BOTTOM dock, so jumping to
           // it from the TOP of the live screen was pure confusion.
+          // v3.12.87: UP from a grid card must move ONE ROW UP, not fly to the
+          // toolbar. Only the top row (no card above) goes to the toolbar.
+          if (current.closest('.live-channel-grid')) {
+            const grid = current.closest('.live-channel-grid');
+            const cr = current.getBoundingClientRect();
+            const cx = cr.left + cr.width / 2;
+            let best = null, bd = Infinity;
+            const cards = grid.querySelectorAll('.tv-card-live');
+            for (const c of cards) {
+              if (c === current) continue;
+              const r = c.getBoundingClientRect();
+              if (r.bottom > cr.top + 2) continue; // must be ABOVE the current row
+              const dy = cr.top - r.top;
+              const dx = Math.abs(r.left + r.width / 2 - cx);
+              const d = dy + dx * 2;
+              if (d < bd) { bd = d; best = c; }
+            }
+            if (best) return best;
+            // no card above → top row → toolbar
+          }
           if (!current.closest('.live-toolbar')) {
             const toolbar = document.querySelector('.tv-main-content .live-toolbar');
             if (toolbar) {
