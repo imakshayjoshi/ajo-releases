@@ -13,11 +13,11 @@
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
-    "changelog": "v3.4.0: Scan-to-pair \u2014 Remote tab now has a QR scanner: point your phone at the TV Settings QR and it connects instantly, no typing. Scanning the QR with the phone camera also opens the app straight into pairing. New unified design: Space Grotesk/Inter fonts and the teal AJO accent across the app, matching the TV.",
+    "changelog": "v3.4.0: Scan-to-pair \u2014 Remote tab QR scanner connects to your TV instantly. New unified design (Space Grotesk/Inter, teal AJO accent). Update checker fixed: removed a mirror that served stale manifests, so update banners arrive reliably.",
     "size_mb": 3.4,
-    "sha256": "4ddeb6cd6b1361526ae35ddbac2fa21ca2c1a21628068439b6ffe88cbcc8512c",
+    "sha256": "124e41c90acb1dc9f75d954ea8ecb658f02f04048f2bc7f2b8fcd63af21e66a7",
     "releaseDate": "2026-10-13",
-    "size": 3565365
+    "size": 3565361
   },
   "tv": {
     "version": "3.12.73",
@@ -34,18 +34,18 @@
     "releaseDate": "2026-10-09"
   },
   "android_tv": {
-    "version": "3.12.91",
-    "versionCode": 241,
+    "version": "3.12.92",
+    "versionCode": 242,
     "packageId": "com.ajo.androidtv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
-    "changelog": "v3.12.91: Pairing QR encodes the room code as an ajoapp:// deep link (matches the phone app intent filter) \u2014 scan with AJO Phone 3.4.0 and the phone connects and casts. No web page, no 404.",
+    "changelog": "v3.12.92: Update checker fixed \u2014 removed a stale-caching mirror that could hide update banners. Carries v3.12.91: pairing QR deep link for AJO Phone scan-to-cast.",
     "size_mb": 7.0,
-    "sha256": "82017c38a054c9d8bf4f0431931bdbee465e4e83d0a9acbcc63a1902cec99619",
+    "sha256": "9bee32abd088ff8862f13b404df374208175e458b587c16e51dfccd78eaa4e43",
     "releaseDate": "2026-10-13",
-    "size": 7373796
+    "size": 7373783
   },
   "changelog": "v3.12.73: Movies & series fixed \u2014 movibox CDN hotlink gate (429) handled: native player now sends Referer/UA headers; web/phone playback streams through the VPS proxy. Live channel thumbnails fixed \u2014 dead Sony logos repaired, logos served via image proxy with retry. Live channel playback untouched.",
   "sha256": "6e2dc11f6d2c34bdfbe719e181511383f093fe2376c92261791740af00c27c26"

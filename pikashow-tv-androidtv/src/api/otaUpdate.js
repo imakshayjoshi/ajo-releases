@@ -1,10 +1,12 @@
-export const CURRENT_APP_VERSION = '3.12.91';
-export const CURRENT_VERSION_CODE = 241;
+export const CURRENT_APP_VERSION = '3.12.92';
+export const CURRENT_VERSION_CODE = 242;
 const MANIFEST_SOURCES = [
   'https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/version.json',
   'https://cdn.jsdelivr.net/gh/imakshayjoshi/ajo-releases@main/version.json',
-  'https://api.github.com/repos/imakshayjoshi/ajo-releases/releases/latest',
-  'https://raw.githack.com/imakshayjoshi/ajo-releases/main/version.json'
+  'https://api.github.com/repos/imakshayjoshi/ajo-releases/releases/latest'
+  // REMOVED raw.githack.com (v3.12.92): it caches forever with no purge path
+  // and serves stale manifests, short-circuiting the source loop — devices on
+  // networks where raw.github fails never saw update banners.
 ];
 const RELEASE_PREFIX = 'https://github.com/imakshayjoshi/ajo-releases/releases/download/';
 
