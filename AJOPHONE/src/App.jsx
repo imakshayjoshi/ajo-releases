@@ -24,11 +24,36 @@ import { DownloadsView } from './components/DownloadsView';
 import { getDocumentariesCatalog, getAnimeCatalog, getNetworkOriginalsCatalog } from './api/hubCatalog';
 import { checkForAppUpdates, startAppUpdate } from './api/otaUpdate';
 import { Film, Video, Tv, Radio, Bookmark, Cast, Rocket, X, ArrowUpCircle, Flame } from 'lucide-react';
+import { App as CapApp } from '@capacitor/app';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('home');
   const [liveViewMode, setLiveViewMode] = useState('epg');
   const [ambientPoster, setAmbientPoster] = useState('');
+
+  // Deep link: scanning the TV's pairing QR with the phone camera opens
+  // ajo://pair?code=AJO-XXXX — jump to the Remote tab and hand the code to
+  // TVRemoteControlView, which auto-pairs.
+  useEffect(() => {
+    let handle;
+    let cancelled = false;
+    try {
+      Promise.resolve(CapApp.addListener('appUrlOpen', (data) => {
+        const url = data?.url || '';
+        if (!url.startsWith('ajoapp://') && !url.includes('/pair')) return;
+        const m = url.match(/code=([A-Za-z0-9-]+)/);
+        const code = m ? m[1].toUpperCase() : null;
+        setActiveTab('remote');
+        if (code) {
+          // Give the Remote tab a tick to mount, then hand over the code.
+          setTimeout(() => {
+            window.dispatchEvent(new CustomEvent('ajo:pair-code', { detail: code }));
+          }, 350);
+        }
+      })).then(h => { if (cancelled) { h.remove(); } else { handle = h; } });
+    } catch {}
+    return () => { cancelled = true; try { handle?.remove(); } catch {} };
+  }, []);
   
   // OTA Update Startup Notice State
   const [otaNotice, setOtaNotice] = useState(null);
@@ -397,7 +422,7 @@ export default function App() {
                   borderRadius: '12px',
                   fontSize: '12px',
                   fontWeight: 800,
-                  background: liveViewMode === 'epg' ? '#38bdf8' : 'rgba(255,255,255,0.08)',
+                  background: liveViewMode === 'epg' ? '#2DD4BF' : 'rgba(255,255,255,0.08)',
                   color: liveViewMode === 'epg' ? '#06090e' : '#ffffff',
                   border: 'none',
                   cursor: 'pointer'
@@ -412,7 +437,7 @@ export default function App() {
                   borderRadius: '12px',
                   fontSize: '12px',
                   fontWeight: 800,
-                  background: liveViewMode === 'grid' ? '#38bdf8' : 'rgba(255,255,255,0.08)',
+                  background: liveViewMode === 'grid' ? '#2DD4BF' : 'rgba(255,255,255,0.08)',
                   color: liveViewMode === 'grid' ? '#06090e' : '#ffffff',
                   border: 'none',
                   cursor: 'pointer'
@@ -707,7 +732,7 @@ export default function App() {
               width: '36px',
               height: '36px',
               borderRadius: '10px',
-              background: 'linear-gradient(135deg, #0284c7 0%, #38bdf8 100%)',
+              background: 'linear-gradient(135deg, #0d9488 0%, #2DD4BF 100%)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -748,7 +773,7 @@ export default function App() {
                 );
               }}
               style={{
-                background: 'linear-gradient(135deg, #38bdf8 0%, #0284c7 100%)',
+                background: 'linear-gradient(135deg, #2DD4BF 0%, #0d9488 100%)',
                 color: '#06090e',
                 border: 'none',
                 borderRadius: '12px',

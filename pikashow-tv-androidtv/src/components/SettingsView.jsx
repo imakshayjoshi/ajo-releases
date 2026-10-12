@@ -204,13 +204,17 @@ export function SettingsView() {
               </div>
               {castState.roomCode && !castState.isPaired && (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                  {/* v3.12.90: QR carries the room code as an ajoapp:// deep
+                      link — AJO Phone scans it (in-app scanner or phone camera
+                      via the ajoapp:// intent filter) and pairs instantly.
+                      The old https://new.ajo.co.in/pair URL 404'd. */}
                   <img
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent('https://new.ajo.co.in/pair?code=' + castState.roomCode)}`}
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent('ajoapp://pair?code=' + castState.roomCode)}`}
                     alt={`QR: ${castState.roomCode}`}
                     style={{ width: 110, height: 110, borderRadius: 8, background: '#fff', padding: 4 }}
                     onError={(e) => { e.target.style.display = 'none'; }}
                   />
-                  <span style={{ fontSize: 11, color: '#94a3b8', textAlign: 'center', maxWidth: 110 }}>Scan with phone camera</span>
+                  <span style={{ fontSize: 11, color: '#94a3b8', textAlign: 'center', maxWidth: 110 }}>Scan with AJO Phone app</span>
                 </div>
               )}
             </div>

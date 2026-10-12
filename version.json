@@ -6,17 +6,18 @@
   "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
   "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
   "phone": {
-    "version": "3.3.48",
-    "versionCode": 216,
+    "version": "3.4.0",
+    "versionCode": 217,
     "packageId": "com.ajo.phone",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
-    "changelog": "v3.3.48: Movies fixed \u2014 movibox streams routed through VPS proxy (CDN rejects headerless video requests).",
-    "size_mb": 3.3,
-    "sha256": "f4c432437a4ef0b4e4840c6f58191573e00d454be14d81f1ef4f68fcc386c9db",
-    "releaseDate": "2026-10-08"
+    "changelog": "v3.4.0: Scan-to-pair \u2014 Remote tab now has a QR scanner: point your phone at the TV Settings QR and it connects instantly, no typing. Scanning the QR with the phone camera also opens the app straight into pairing. New unified design: Space Grotesk/Inter fonts and the teal AJO accent across the app, matching the TV.",
+    "size_mb": 3.4,
+    "sha256": "c051e30c68a285c07df5ad6be96843c38e535782b9d14fc0cba5e6ed566136ca",
+    "releaseDate": "2026-10-13",
+    "size": 3565293
   },
   "tv": {
     "version": "3.12.73",
@@ -33,18 +34,18 @@
     "releaseDate": "2026-10-09"
   },
   "android_tv": {
-    "version": "3.12.89",
-    "versionCode": 239,
+    "version": "3.12.90",
+    "versionCode": 240,
     "packageId": "com.ajo.androidtv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
-    "changelog": "v3.12.89: Search results now scroll vertically through every result (the results grid was a nested scroller the remote couldn't scroll — only one row was ever visible). Settings page opens at the top with the full Connect Your Phone card + working QR code (the old QR image host is dead, replaced). Settings pill sits fully inside the nav capsule. Movies/Series genre chips now render (TMDB genre ids were dropped). Addon URL input is remote-reachable.",
+    "changelog": "v3.12.90: The Settings pairing QR now encodes the room code directly (ajoapp:// deep link) \u2014 scan it with AJO Phone 3.4.0 and the phone connects and casts, no web page, no 404.",
     "size_mb": 7.0,
-    "sha256": "d4560374fcded7cfb610ed49f572d7368746c018f367156e8418657afb34a6a1",
-    "releaseDate": "2026-10-12",
-    "size": 7373825
+    "sha256": "ae45bf8b87236acdaf941bca0bcd3d0fc086bb11fe215358df97bb81ff0e8285",
+    "releaseDate": "2026-10-13",
+    "size": 7373793
   },
   "changelog": "v3.12.73: Movies & series fixed \u2014 movibox CDN hotlink gate (429) handled: native player now sends Referer/UA headers; web/phone playback streams through the VPS proxy. Live channel thumbnails fixed \u2014 dead Sony logos repaired, logos served via image proxy with retry. Live channel playback untouched.",
   "sha256": "6e2dc11f6d2c34bdfbe719e181511383f093fe2376c92261791740af00c27c26"
