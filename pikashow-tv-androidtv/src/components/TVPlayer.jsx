@@ -27,7 +27,7 @@ import {
   playInNativePlayer,
   preflightEmbedUrl
 } from '../utils/nativePlayer';
-import { saveProgress, getWatchHistory, getWatchProgress } from '../api/history';
+import { saveProgress, getWatchHistory, getWatchProgress, markItemDead } from '../api/history';
 import {
   trackPlaybackStart, trackPlaybackEngine, trackFailover,
   trackPlaybackError, trackWatchTick, trackPlaybackEnd
@@ -114,15 +114,25 @@ export function TVPlayer({
     return generateUniversalServers(item);
   }, [externalAllServers, isLive, item, server]);
 
-  // On a TV box, an iframe embed source can never render: the native player only
-  // accepts real stream URLs, and the legacy WebView cannot composite MSE video.
-  // So put directly playable sources first and leave the embeds at the bottom.
+  // v3.12.93: direct streams (m3u8/mp4) ALWAYS outrank iframe embeds, on every
+  // platform — a dead embed renders its 404 error page inside the player, and
+  // iframes fire onLoad for error pages so no watchdog can catch them. Within
+  // direct sources, higher quality labels rank first (1080 > 720 > SD).
   const orderedServers = useMemo(() => {
     let list = allServers;
-    if (shouldPreferNativePlayer() && list.length >= 2) {
+    if (list.length >= 2) {
+      const qualityRank = (s) => {
+        const q = String(s?.quality || '').toLowerCase();
+        if (/2160|4k|uhd/.test(q)) return 4;
+        if (/1080|fhd/.test(q)) return 3;
+        if (/720|\bhd\b/.test(q)) return 2;
+        if (/480|360|\bsd\b/.test(q)) return 1;
+        return 0;
+      };
       const playable = list.filter((srv) => isNativePlayableUrl(srv?.url));
       if (playable.length > 0) {
         const rest = list.filter((srv) => !isNativePlayableUrl(srv?.url));
+        playable.sort((a, b) => qualityRank(b) - qualityRank(a));
         list = [...playable, ...rest];
       }
     }
@@ -369,6 +379,12 @@ export function TVPlayer({
         if (failedUrl) markChannelDead(failedUrl);
       }
       trackPlaybackError(reason); // v3.12.59: analytics funnel
+      // v3.12.93: every source failed — blocklist the title so it leaves the
+      // catalog/search until sources recover (14-day TTL in history.js).
+      // Live channels exempt: they have their own dead-channel handling.
+      if (item && !(item.is_live || item.type === 'live' || item.year === 'LIVE') && item.id) {
+        markItemDead(item.id);
+      }
       // v3.12.61 FIX (black screen after "all servers dead"): the terminal
       // message contained no 'Failed'/'Error' keyword, so the 3.5s auto-clear
       // effect wiped it, leaving a silent dead black player. Now the terminal

@@ -3,7 +3,8 @@ import { getBollywoodCatalog, getHollywoodCatalog, getSerialsCatalog, getLiveBro
 import { getLiveChannels, isPopularLiveChannel, classifyLiveChannel, hasWorkingPlayer, applyLiveSourceOverride, probeLiveChannels, guessLiveLogo } from './api/live';
 import { LiveView } from './components/LiveView';
 import { getLiveSportsEvents } from './api/sports';
-import { getWatchHistory, saveProgress, getWatchProgress } from './api/history';
+import { getWatchHistory, saveProgress, getWatchProgress, filterAliveItems } from './api/history';
+import { runStreamHealthSweep } from './utils/streamHealth';
 import { checkForAppUpdates } from './api/otaUpdate';
 import { getTmdbTrending, getTmdbCatalog, getTmdbCatalogDeep, getTmdbNowPlaying, getBecauseYouWatched } from './api/tmdb';
 import { getRankedServers } from './api/mirrorHealth';
@@ -105,8 +106,8 @@ export default function App() {
         getTmdbCatalog('movie', 'popular'),
         getTmdbCatalog('tv', 'popular'),
         getTmdbNowPlaying(20),
-        getTmdbCatalogDeep('movie', 30, (items) => setTmdbMovies(items)),
-        getTmdbCatalogDeep('tv', 30, (items) => setTmdbSeries(items)),
+        getTmdbCatalogDeep('movie', 30, (items) => setTmdbMovies(filterAliveItems(items))),
+        getTmdbCatalogDeep('tv', 30, (items) => setTmdbSeries(filterAliveItems(items))),
         getTmdbCatalog('tv', 'popular', 1, { with_genres: '16' }),
         // v3.12.77: kids' row must include BOTH animation genres — movie-only
         // '10751,16' excluded kids' TV (Doraemon etc.), so kids' titles 404'd.
@@ -114,15 +115,15 @@ export default function App() {
         getTmdbCatalog('tv', 'popular', 1, { with_genres: '16,10762,10751' })
       ]);
 
-      if (bolly.status === 'fulfilled') setBollywoodItems(bolly.value || []);
-      if (holly.status === 'fulfilled') setHollywoodItems(holly.value || []);
-      if (serials.status === 'fulfilled') setSeriesItems(serials.value || []);
+      if (bolly.status === 'fulfilled') setBollywoodItems(filterAliveItems(bolly.value || []));
+      if (holly.status === 'fulfilled') setHollywoodItems(filterAliveItems(holly.value || []));
+      if (serials.status === 'fulfilled') setSeriesItems(filterAliveItems(serials.value || []));
       if (sports.status === 'fulfilled') setSportsItems(sports.value || []);
-      if (newReleases.status === 'fulfilled') setNowPlaying(newReleases.value || []);
+      if (newReleases.status === 'fulfilled') setNowPlaying(filterAliveItems(newReleases.value || []));
       if (trending.status === 'fulfilled') setTmdbTrending(trending.value || []);
-      if (popMovies.status === 'fulfilled') setTmdbMovies(popMovies.value || []);
-      if (popTv.status === 'fulfilled') setTmdbSeries(popTv.value || []);
-      if (anime.status === 'fulfilled') setAnimeItems(anime.value || []);
+      if (popMovies.status === 'fulfilled') setTmdbMovies(filterAliveItems(popMovies.value || []));
+      if (popTv.status === 'fulfilled') setTmdbSeries(filterAliveItems(popTv.value || []));
+      if (anime.status === 'fulfilled') setAnimeItems(filterAliveItems(anime.value || []));
       if (kids.status === 'fulfilled' || kidsTv.status === 'fulfilled') {
         // v3.12.77: merge kids' movies + kids' TV (Doraemon etc.) into one row,
         // title-deduped, so kids' content actually plays from the Kids tab.
@@ -150,9 +151,21 @@ export default function App() {
         setBecauseYouWatched(recs || []);
       }).catch(() => {});
       import('./api/movibox').then((m) => m.getMoviboxCatalog()).then((items) => {
-        setMoviboxItems((items || []).map(m.normalizeMovibox).filter(Boolean).slice(0, 30));
+        setMoviboxItems(filterAliveItems((items || []).map(m.normalizeMovibox).filter(Boolean).slice(0, 30)));
       }).catch(() => {});
       setContinueWatching(getWatchHistory() || []);
+
+      // v3.12.93: background stream-health sweep — probe the first direct
+      // source of on-screen titles; a hard 404/410 pulls the title from the
+      // catalog. Ambiguous errors never hide content. Once per load.
+      try {
+        const sweepPool = [
+          ...(bolly.status === 'fulfilled' ? (bolly.value || []) : []),
+          ...(holly.status === 'fulfilled' ? (holly.value || []) : []),
+          ...(serials.status === 'fulfilled' ? (serials.value || []) : [])
+        ];
+        runStreamHealthSweep(sweepPool);
+      } catch {}
     } catch (err) {
       console.error('Error loading catalogs:', err);
     } finally {
@@ -746,7 +759,17 @@ export default function App() {
       {/* Top MovieBox-Style Navigation Bar with Sub-tabs */}
       <GoogleTVHeader
         activeTab={activeTab}
-        onSelectTab={(tab) => { setActiveTab(tab); setActiveProvider(null); }}
+        onSelectTab={(tab) => {
+          setActiveTab(tab);
+          setActiveProvider(null);
+          // v3.12.88: every tab opens at its TOP. Without this the new page
+          // kept the old scroll position (or auto-recover scrolled mid-page),
+          // and content above the fold looked "hidden" (Settings' cast card).
+          try {
+            const sc = document.querySelector('.tv-main-content');
+            if (sc) sc.scrollTop = 0;
+          } catch (_) {}
+        }}
         activeSubTab={activeSubTab}
         onSelectSubTab={(sub) => { setActiveSubTab(sub); setActiveProvider(null); }}
       />

@@ -242,6 +242,7 @@ export function clearAppCache() {
       /^ajo_live_channels_v\d+$/,   // v3.12.80: live channel walls
       /^ajo_live_probe_v\d+$/,      // v3.12.80: stream health probes
       /^ajo_mirror_failures_v\d+$/, // v3.12.80: dead-mirror learning
+      /^ajo_dead_items_v\d+$/,      // v3.12.93: dead-title blocklist
     ];
     const keys = [];
     for (let i = 0; i < localStorage.length; i++) keys.push(localStorage.key(i));
@@ -251,4 +252,57 @@ export function clearAppCache() {
       }
     }
   } catch {}
+}
+// v3.12.93 / phone v3.4.1: dead-item blocklist — when every stream source for
+// a title fails, the title stops appearing in catalogs and search until its
+// TTL expires (sources recover all the time). Delivers "only show thumbnails
+// that actually stream" reactively, without probing thousands of items.
+const DEAD_ITEMS_KEY = 'ajo_dead_items_v1';
+const DEAD_ITEM_TTL = 14 * 24 * 60 * 60 * 1000;
+
+function readDeadItemMap() {
+  try {
+    const raw = localStorage.getItem(DEAD_ITEMS_KEY);
+    const map = raw ? JSON.parse(raw) : {};
+    const now = Date.now();
+    const pruned = {};
+    for (const [id, ts] of Object.entries(map)) {
+      if (now - Number(ts) < DEAD_ITEM_TTL) pruned[id] = ts;
+    }
+    return pruned;
+  } catch { return {}; }
+}
+
+export function markItemDead(itemId) {
+  if (!itemId) return;
+  try {
+    const map = readDeadItemMap();
+    map[String(itemId)] = Date.now();
+    // bound the map so years of failures can't grow localStorage forever
+    const entries = Object.entries(map);
+    if (entries.length > 500) {
+      entries.sort((a, b) => b[1] - a[1]);
+      const trimmed = Object.fromEntries(entries.slice(0, 500));
+      localStorage.setItem(DEAD_ITEMS_KEY, JSON.stringify(trimmed));
+      return;
+    }
+    localStorage.setItem(DEAD_ITEMS_KEY, JSON.stringify(map));
+  } catch {}
+}
+
+export function getDeadItemIds() {
+  return new Set(Object.keys(readDeadItemMap()));
+}
+
+export function isItemDead(itemId) {
+  if (!itemId) return false;
+  return Boolean(readDeadItemMap()[String(itemId)]);
+}
+
+/** Filter helper for catalog/search arrays. */
+export function filterAliveItems(items) {
+  if (!Array.isArray(items) || !items.length) return items || [];
+  const dead = getDeadItemIds();
+  if (!dead.size) return items;
+  return items.filter((i) => i && !dead.has(String(i.id)));
 }

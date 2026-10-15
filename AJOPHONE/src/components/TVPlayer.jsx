@@ -13,9 +13,11 @@ import {
   AlertCircle,
   RefreshCw,
   Maximize,
-  Radio
+  Radio,
+  WifiOff
 } from 'lucide-react';
-import { generateUniversalServers, isEmbedUrl } from '../utils/streamingEngines';
+import { generateUniversalServers, isEmbedUrl, detectStreamType } from '../utils/streamingEngines';
+import { markMirrorFailed, deprioritizeFailedMirrors } from '../api/mirrorFailures';
 import { getCurrentAndNextProgram } from '../api/epg';
 import {
   hasNativePlayer,
@@ -25,7 +27,11 @@ import {
   playInNativePlayer,
   preflightEmbedUrl
 } from '../utils/nativePlayer';
-import { saveProgress, getWatchHistory, getWatchProgress } from '../api/history';
+import { saveProgress, getWatchHistory, getWatchProgress, markItemDead } from '../api/history';
+import {
+  trackPlaybackStart, trackPlaybackEngine, trackFailover,
+  trackPlaybackError, trackWatchTick, trackPlaybackEnd
+} from '../api/analytics';
 import { markChannelDead } from '../api/iptv';
 import { BINGE_COUNTDOWN_SECONDS } from '../utils/binge';
 import './TVPlayer.css';
@@ -59,8 +65,11 @@ export function TVPlayer({
   const lastPositionRef = useRef(0);
   const progressSaverRef = useRef(null);
   const bingeFiredRef = useRef(false);
+  // v3.12.59: analytics — one playback_start per (item, stream) mount.
+  const playingTrackedRef = useRef(false);
   const bingeCountdownRef = useRef(null);
   const blackScreenWatchdogRef = useRef(null);
+  const userPausedRef = useRef(false); // v3.12.43: true only when the USER paused, never during autoplay-stall
   const nativeHandoffDoneRef = useRef(false);
   // Read synchronously by the pipeline effect. State alone lands one commit too
   // late, which is long enough for Hls.js to grab the decoder we just gave away.
@@ -105,18 +114,39 @@ export function TVPlayer({
     return generateUniversalServers(item);
   }, [externalAllServers, isLive, item, server]);
 
-  // On a TV box, an iframe embed source can never render: the native player only
-  // accepts real stream URLs, and the legacy WebView cannot composite MSE video.
-  // So put directly playable sources first and leave the embeds at the bottom.
+  // v3.4.1: direct streams (m3u8/mp4) ALWAYS outrank iframe embeds, on every
+  // platform — a dead embed renders its 404 error page inside the player, and
+  // iframes fire onLoad for error pages so no watchdog can catch them. Within
+  // direct sources, higher quality labels rank first (1080 > 720 > SD).
   const orderedServers = useMemo(() => {
-    if (!shouldPreferNativePlayer() || allServers.length < 2) return allServers;
-    const playable = allServers.filter((srv) => isNativePlayableUrl(srv?.url));
-    if (playable.length === 0) return allServers;
-    const rest = allServers.filter((srv) => !isNativePlayableUrl(srv?.url));
-    return [...playable, ...rest];
+    let list = allServers;
+    if (list.length >= 2) {
+      const qualityRank = (s) => {
+        const q = String(s?.quality || '').toLowerCase();
+        if (/2160|4k|uhd/.test(q)) return 4;
+        if (/1080|fhd/.test(q)) return 3;
+        if (/720|\bhd\b/.test(q)) return 2;
+        if (/480|360|\bsd\b/.test(q)) return 1;
+        return 0;
+      };
+      const playable = list.filter((srv) => isNativePlayableUrl(srv?.url));
+      if (playable.length > 0) {
+        const rest = list.filter((srv) => !isNativePlayableUrl(srv?.url));
+        playable.sort((a, b) => qualityRank(b) - qualityRank(a));
+        list = [...playable, ...rest];
+      }
+    }
+    // v3.12.61: mirrors with recent failures sort to the back, so a title
+    // whose Server 1 died last night doesn't open on the same dead mirror
+    // again. Applied after the native-playable ordering. Downstream
+    // (activeServer, failover chain, server drawer) all read this one list.
+    return deprioritizeFailedMirrors(list);
   }, [allServers]);
 
   const [currentServerIndex, setCurrentServerIndex] = useState(0);
+  // v3.12.61: terminal failure state — persistent, with Retry. Replaces the
+  // 3.5s auto-clearing "Stream offline" toast that left a dead black player.
+  const [allServersDead, setAllServersDead] = useState(null); // { reason, at }
 
   // Match requested server prop to currentServerIndex
   useEffect(() => {
@@ -146,6 +176,9 @@ export function TVPlayer({
   const [currentAudio, setCurrentAudio] = useState(0);
   const [errorMessage, setErrorMessage] = useState(null);
   const [nativeActive, setNativeActive] = useState(false);
+  // v3.12.61: retry bookkeeping for the terminal dead state.
+  const retryCountRef = useRef(0);
+  const [streamEpoch, setStreamEpoch] = useState(0);
   // v3.10.1: embed mirrors are preflighted by the native bridge before the
   // iframe mounts, so a provider's server-error page (Vercel 500 etc.) is
   // skipped before the user ever sees it.
@@ -240,10 +273,14 @@ export function TVPlayer({
   // v3.10.0: let App.handleBack know the drawer is open so the global Back
   // handler closes the drawer (via TVPlayer's own handler) instead of
   // tearing down the whole player and losing the resume position.
+  // v3.12.62: the flag must be EXPLICITLY false when no drawer is open
+  // (not just truthy when open) — useSpatialNavigation keys off
+  // `__ajoPlayerDrawerOpen === false` to know "player mounted, D-pad belongs
+  // to the player, do NOT steal the key for focus movement".
   useEffect(() => {
     window.__ajoPlayerDrawerOpen = Boolean(showDrawer);
     return () => {
-      if (window.__ajoPlayerDrawerOpen) window.__ajoPlayerDrawerOpen = false;
+      window.__ajoPlayerDrawerOpen = undefined;
     };
   }, [showDrawer]);
 
@@ -256,10 +293,21 @@ export function TVPlayer({
         resumePositionRef.current = progress.currentTime;
       }
     } catch {}
+    // v3.12.56 FIX: binge auto-advance fired exactly once per app-session and
+    // then silently died: bingeFiredRef was set true when the countdown fired
+    // and NEVER reset on episode change (the guard then blocked every later
+    // countdown). Reset both the ref and any in-flight countdown when the
+    // episode changes.
+    bingeFiredRef.current = false;
+    if (bingeCountdownRef.current) {
+      clearInterval(bingeCountdownRef.current);
+      bingeCountdownRef.current = null;
+    }
+    setBingeCountdown(null);
     return () => {
       if (osdTimerRef.current) clearTimeout(osdTimerRef.current);
     };
-  }, [item, pingOsd]);
+  }, [item, currentEpisodeIndex, pingOsd]);
 
   // BINGE: countdown ticker — fires next episode at 0
   useEffect(() => {
@@ -273,8 +321,8 @@ export function TVPlayer({
     bingeCountdownRef.current = setInterval(() => {
       setBingeCountdown(prev => {
         if (prev === null) return null;
-        // v3.3.43: countdown state is an OBJECT {countdown, nextItem} —
-        // decrement the countdown field, keep nextItem.
+        // v3.12.44: countdown state is an OBJECT {countdown, nextItem} (see
+        // handleTimeUpdate) — decrement the countdown field, keep nextItem.
         if (typeof prev === 'number') {
           if (prev <= 1) {
             const nextIdx = currentEpisodeIndex + 1;
@@ -303,6 +351,11 @@ export function TVPlayer({
 
   // Auto failover to next server if current server fails
   const handleFailover = useCallback((reason = 'Stream connection error') => {
+    trackFailover(reason); // v3.12.59: analytics funnel
+    // v3.12.61: remember this server failed this session — retries and the
+    // native handoff must never land on a mirror we already burned.
+    const failedUrl = orderedServers[currentServerIndex]?.url;
+    if (failedUrl) markMirrorFailed(failedUrl);
     if (orderedServers.length > 1 && currentServerIndex < orderedServers.length - 1) {
       const nextIdx = currentServerIndex + 1;
       const nextName = orderedServers[nextIdx]?.name || `Server ${nextIdx + 1}`;
@@ -310,18 +363,58 @@ export function TVPlayer({
       setCurrentServerIndex(nextIdx);
       setTimeout(() => setErrorMessage(null), 3000);
     } else {
+      // v3.12.43: terminal branch — clear the stall/black-screen watchdogs so the
+      // failure path stops re-entering every 8s (re-marking dead + re-flashing
+      // the toast forever).
+      if (stallWatchdogRef.current) {
+        clearInterval(stallWatchdogRef.current);
+        stallWatchdogRef.current = null;
+      }
+      if (blackScreenWatchdogRef.current) {
+        clearInterval(blackScreenWatchdogRef.current);
+        blackScreenWatchdogRef.current = null;
+      }
       if (item && (item.is_live || item.type === 'live' || item.year === 'LIVE')) {
         const failedUrl = orderedServers[currentServerIndex]?.url || item.url;
         if (failedUrl) markChannelDead(failedUrl);
       }
-      setErrorMessage('Stream offline. Please select another server or channel.');
+      trackPlaybackError(reason); // v3.12.59: analytics funnel
+      // v3.4.1: every source failed — blocklist the title so it leaves the
+      // catalog/search until sources recover (14-day TTL in history.js).
+      if (item && !(item.is_live || item.type === 'live' || item.year === 'LIVE') && item.id) {
+        markItemDead(item.id);
+      }
+      // v3.12.61 FIX (black screen after "all servers dead"): the terminal
+      // message contained no 'Failed'/'Error' keyword, so the 3.5s auto-clear
+      // effect wiped it, leaving a silent dead black player. Now the terminal
+      // state is explicit, persistent, and offers a retry that skips dead
+      // mirrors (failure memory below).
+      setAllServersDead({ reason, at: Date.now() });
       setIsBuffering(false);
     }
   }, [orderedServers, currentServerIndex]);
 
+  // v3.12.61: Retry from the terminal dead state. Reorders so failed mirrors
+  // (marked during this session) sort last, then restarts from the best
+  // surviving server. A retry of the SAME dead list would loop instantly.
+  const retryFromDead = useCallback(() => {
+    setAllServersDead(null);
+    const retryCount = (retryCountRef.current || 0) + 1;
+    retryCountRef.current = retryCount;
+    // Reset native-handoff + embed flags so the pipeline effect rebuilds.
+    nativeHandoffDoneRef.current = false;
+    nativeActiveRef.current = false;
+    setNativeActive(false);
+    setErrorMessage(`Retrying (attempt ${retryCount})...`);
+    setTimeout(() => setErrorMessage(null), 2500);
+    // Force the pipeline effect to re-run: the stream change (via the
+    // re-ordered list) re-arms watchdogs and re-attaches the player.
+    setCurrentServerIndex(0);
+    setStreamEpoch((e) => e + 1);
+  }, []);
+
   // Toggle Video Engine (HLS.js vs Native Android HTML5 Video)
-  const toggleEngine = useCallback(() => {
-    const nextEngine = videoEngine === 'hls' ? 'native' : 'hls';
+  const toggleEngine = useCallback(() => {    const nextEngine = videoEngine === 'hls' ? 'native' : 'hls';
     setVideoEngine(nextEngine);
     setErrorMessage(`Switched Video Engine to: ${nextEngine === 'hls' ? 'HLS.js' : 'Native TV Player'}`);
     setTimeout(() => setErrorMessage(null), 2500);
@@ -335,6 +428,8 @@ export function TVPlayer({
    * audio on top of a black picture, so nothing may launch before this runs.
    */
   const teardownWebPlayback = useCallback(() => {
+    // v3.12.59: analytics — ship the aggregated watch time on exit.
+    trackPlaybackEnd();
     if (stallWatchdogRef.current) {
       clearInterval(stallWatchdogRef.current);
       stallWatchdogRef.current = null;
@@ -372,7 +467,6 @@ export function TVPlayer({
 
   /** Single entry point for every handoff to the native hardware player. */
   const handOffToNative = useCallback((message) => {
-    if (!hasNativePlayer()) return false;
     if (!streamUrl) return false;
     if (!isNativePlayableUrl(streamUrl)) return false;
 
@@ -449,7 +543,10 @@ export function TVPlayer({
     if (nativeActiveRef.current) return;
     setEmbedReady(true);
     setErrorMessage(null);
-  }, [streamUrl]);
+    // v3.12.61: any stream change leaves the terminal dead state — we are
+    // either retrying or moved to a different server/channel.
+    if (allServersDead) setAllServersDead(null);
+  }, [streamUrl, streamEpoch]);
 
   // Video & Hls.js Pipeline Setup
   useEffect(() => {
@@ -504,7 +601,12 @@ export function TVPlayer({
       };
     }
 
-    if (videoEngine === 'hls' && (streamUrl.includes('.m3u8') || streamUrl.includes('/getm3u8/') || isLive || streamUrl.endsWith('.m3u8'))) {
+    // v3.12.59 FIX: this gate used to string-match .m3u8/getm3u8/isLive only,
+    // but streamingEngines classifies /getstream/, /live/ and /playlist URLs
+    // as HLS too. Those mirrors fell through to the <video> tag — which can't
+    // play HLS — and surfaced as "this server is broken" black screens on
+    // perfectly live mirrors. Use the SAME classifier the server list uses.
+    if (videoEngine === 'hls' && detectStreamType(streamUrl) === 'hls') {
       (async () => {
         // v3.11.0: hls.js (~350KB) is a lazy chunk now — fetched only when a
         // stream actually needs it. Boot time and RAM on Fire TV drop sharply.
@@ -533,7 +635,10 @@ export function TVPlayer({
           highBufferWatchdogPeriod: 2,
           nudgeOffset: 0.2,
           nudgeMaxRetry: 5,
-          fragLoadingTimeOut: 15000,
+          // v3.12.52: 15s -> 20s. A 1080p/4K fragment on a throttled pipe can
+          // legitimately take >15s; aborting mid-read forced a fetch-retry
+          // cycle that surfaced as the spinner returning every few minutes.
+          fragLoadingTimeOut: 20000,
           manifestLoadingTimeOut: 15000,
           levelLoadingTimeOut: 15000,
           fragLoadingMaxRetry: 4,
@@ -547,7 +652,7 @@ export function TVPlayer({
   
         hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
           if (data.audioTracks && data.audioTracks.length > 0) {
-            setAvailableAudioTracks(data.audioTracks.map((t, idx) => ({
+            setAudioTracks(data.audioTracks.map((t, idx) => ({
               id: idx,
               label: t.name || t.lang || `Track ${idx + 1}`
             })));
@@ -562,7 +667,23 @@ export function TVPlayer({
               resumePositionRef.current = null;
             }
           }).catch(err => {
-            console.warn('Autoplay notification:', err);
+            // v3.12.56 FIX: autoplay-blocked start was a SILENT dead end —
+            // the catch only logged, isBuffering stayed true forever, and
+            // neither watchdog escalates while readyState>=3-paused. Muted
+            // autoplay is always allowed: retry muted; if even that fails,
+            // this app runs inside Android where the native player has no
+            // autoplay policy — hand off instead of spinning forever.
+            if (err && (err.name === 'NotAllowedError' || err.name === 'AbortError')) {
+              try { video.muted = true; } catch {}
+              video.play().then(() => {
+                setIsPlaying(true);
+                setIsBuffering(false);
+              }).catch(() => {
+                if (!handOffToNative('Starting in hardware player...')) {
+                  handleFailover('Could not start playback');
+                }
+              });
+            }
           });
         });
   
@@ -611,18 +732,15 @@ export function TVPlayer({
         let lastProgressTime = 0;
         stallWatchdogRef.current = setInterval(() => {
           if (video) {
-            if (video.paused && isBuffering) {
+            // v3.12.43: escalate only when playback never started (autoplay stuck
+            // while buffering). A deliberate user pause is NOT a failure — the old
+            // `video.paused && isBuffering` check used a stale closure and hijacked
+            // every 8s user pause into a native handoff / server failover.
+            if (video.paused && !userPausedRef.current && video.readyState < 3) {
               bufferingDuration += 2;
               if (bufferingDuration >= 8) {
                 bufferingDuration = 0;
-                if (isLive && hls) {
-                  // Re-sync live broadcast cleanly to the live edge without failing over
-                  hls.startLoad();
-                  if (video.buffered.length > 0) {
-                    video.currentTime = Math.max(0, video.buffered.end(video.buffered.length - 1) - 0.5);
-                  }
-                  video.play().catch(() => {});
-                } else if (!handOffToNative('Buffering timeout, switching to hardware player...')) {
+                if (!handOffToNative('Buffering timeout, switching to hardware player...')) {
                   handleFailover('Stream buffering timed out');
                 }
               }
@@ -630,15 +748,10 @@ export function TVPlayer({
               bufferingDuration = 0;
               if (video.currentTime === lastProgressTime && isLive) {
                 stallDuration += 2;
-                if (stallDuration >= 6) {
+                if (stallDuration >= 8) {
                   stallDuration = 0;
-                  if (hls) {
-                    hls.startLoad();
-                    if (video.buffered.length > 0) {
-                      video.currentTime = Math.max(0, video.buffered.end(video.buffered.length - 1) - 0.5);
-                    }
-                    video.play().catch(() => {});
-                  }
+                  hls?.recoverMediaError();
+                  video.play().catch(() => {});
                 }
               } else {
                 stallDuration = 0;
@@ -667,66 +780,101 @@ export function TVPlayer({
           try { video.currentTime = resumePositionRef.current; } catch {}
           resumePositionRef.current = null;
         }
-      }).catch(err => console.warn(err));
+      }).catch(err => {
+        // v3.12.56: same autoplay dead-end guard as the hls branch.
+        if (err && (err.name === 'NotAllowedError' || err.name === 'AbortError')) {
+          try { video.muted = true; } catch {}
+          video.play().then(() => {
+            setIsPlaying(true);
+            setIsBuffering(false);
+          }).catch(() => {
+            if (!handOffToNative('Starting in hardware player...')) {
+              handleFailover('Could not start playback');
+            }
+          });
+        } else {
+          console.warn('Direct play error:', err);
+        }
+      });
     }
 
     // Periodic progress save (every 5s) so Continue Watching is accurate
     // even if the app crashes or power dies mid-watch.
     progressSaverRef.current = setInterval(() => {
       try {
-        if (video.currentTime > 5 && video.duration > 0 && !isLive) {
-          saveProgress(item, video.currentTime, video.duration);
+        // v3.12.56 FIX: (a) never save while PAUSED (used to rewrite history
+        // + trigger a full App re-render every 5s even when nothing played);
+        // (b) never save a REGRESSED position (a fresh failover pipeline used
+        // to overwrite a 40-min resume with ~0 before the seek completed).
+        if (video.paused) return;
+        const pos = video.currentTime;
+        const floorPos = (resumePositionRef.current ?? 0) - 1;
+        if (pos > 5 && video.duration > 0 && !isLive && pos >= floorPos) {
+          saveProgress(item, pos, video.duration);
         }
       } catch {}
-    }, 5000);
+    }, 30000); // v3.12.58: was 5s. Every tick stringified the FULL history
+    // (~120KB: whole item objects with players/descriptions/posters), fired
+    // the update event, reparsed history, and re-rendered Home — every 5s
+    // while playing, on the Fire TV main thread. 30s keeps crash-safety
+    // without the churn (close/pause also save through other paths).
 
     // Black Screen Detection & Auto-Recovery Watchdog:
     // If audio is progressing (currentTime advancing) but the video plane never
     // reports dimensions / decoded frames, the WebView compositor is painting
     // opaque black over the hardware video surface. Hand off to the native
-    // ExoPlayer activity. Only active when a native player is available.
-    if (hasNativePlayer()) {
-      let blackScreenChecks = 0;
-      blackScreenWatchdogRef.current = setInterval(() => {
-        if (!video || nativeActiveRef.current || nativeHandoffDoneRef.current === streamUrl) return;
-        blackScreenChecks += 1;
+    // ExoPlayer activity. Polls instead of firing once, because on a cold Fire TV
+    // the first segment can take longer than 3s to decode.
+    let blackScreenChecks = 0;
+    blackScreenWatchdogRef.current = setInterval(() => {
+      if (!video || nativeActiveRef.current || nativeHandoffDoneRef.current === streamUrl) return;
+      blackScreenChecks += 1;
 
-        const advancing = !video.paused && video.currentTime > 1;
-        const noVideoPlane = video.videoWidth === 0 || video.videoHeight === 0;
-        // decoded-frame counters where the browser exposes them
-        const decodedFrames =
-          (typeof video.getVideoPlaybackQuality === 'function'
-            ? video.getVideoPlaybackQuality().totalVideoFrames
-            : video.webkitDecodedFrameCount) ?? null;
-        const noFrames = decodedFrames !== null && decodedFrames === 0;
+      const advancing = !video.paused && video.currentTime > 1;
+      const noVideoPlane = video.videoWidth === 0 || video.videoHeight === 0;
+      // decoded-frame counters where the browser exposes them
+      const decodedFrames =
+        (typeof video.getVideoPlaybackQuality === 'function'
+          ? video.getVideoPlaybackQuality().totalVideoFrames
+          : video.webkitDecodedFrameCount) ?? null;
+      const noFrames = decodedFrames !== null && decodedFrames === 0;
 
-        if (advancing && (noVideoPlane || noFrames)) {
-          console.warn('Black screen detected in WebView, handing off to native hardware player');
-          const watchdog = blackScreenWatchdogRef.current;
-          if (!handOffToNative('Black screen detected, switching to hardware player...')) {
-            // Cannot hand off (not a real stream URL, or not an Android build).
-            // Try the next source rather than staring at a black screen.
-            nativeHandoffDoneRef.current = streamUrl;
-            handleFailover('Video not rendering');
-          }
-          if (watchdog) clearInterval(watchdog);
-          return;
+      if (advancing && (noVideoPlane || noFrames)) {
+        console.warn('Black screen detected in WebView, handing off to native hardware player');
+        const watchdog = blackScreenWatchdogRef.current;
+        if (!handOffToNative('Black screen detected, switching to hardware player...')) {
+          // Cannot hand off (not a real stream URL, or not an Android build).
+          // Try the next source rather than staring at a black screen.
+          nativeHandoffDoneRef.current = streamUrl;
+          handleFailover('Video not rendering');
         }
+        if (watchdog) clearInterval(watchdog);
+        return;
+      }
 
-        // Stop polling once we have a healthy picture, or after ~15s.
-        if ((advancing && !noVideoPlane) || blackScreenChecks > 10) {
-          clearInterval(blackScreenWatchdogRef.current);
-        }
-      }, 1500);
-    }
+      // Stop polling once we have a healthy picture, or after ~15s.
+      if ((advancing && !noVideoPlane) || blackScreenChecks > 10) {
+        clearInterval(blackScreenWatchdogRef.current);
+      }
+    }, 1500);
 
     return () => {
       disposed = true;
       if (stallWatchdogRef.current) { clearInterval(stallWatchdogRef.current); stallWatchdogRef.current = null; }
       if (blackScreenWatchdogRef.current) { clearInterval(blackScreenWatchdogRef.current); blackScreenWatchdogRef.current = null; }
       if (embedWatchdogRef.current) { clearTimeout(embedWatchdogRef.current); embedWatchdogRef.current = null; }
-      // v3.3.41: CRITICAL — progressSaverRef and bingeCountdownRef were never
-      // cleared here, causing interval accumulation that exhausted device RAM.
+      // v3.12.56 FIX (resume-point preservation, was real DATA LOSS): this
+      // teardown runs on every streamUrl change — a mid-watch server failover
+      // or manual server switch destroyed the resume point: new pipeline
+      // started at 0, and 5s later progressSaver OVERWROTE a 40-minute
+      // Continue-Watching entry with ~0. Stash the current position before
+      // tearing down so the new pipeline resumes exactly here.
+      const v = videoRef.current;
+      if (v && v.currentTime > 5 && v.duration > 0 && !isLive) {
+        resumePositionRef.current = v.currentTime;
+      }
+      // v3.12.37: CRITICAL — progressSaverRef and bingeCountdownRef were never
+      // cleared here, causing interval accumulation that exhausted Fire TV RAM.
       if (progressSaverRef.current) { clearInterval(progressSaverRef.current); progressSaverRef.current = null; }
       if (bingeCountdownRef.current) { clearInterval(bingeCountdownRef.current); bingeCountdownRef.current = null; }
       if (hls) {
@@ -739,7 +887,7 @@ export function TVPlayer({
         video.load();
       }
     };
-  }, [streamUrl, isLive, videoEngine, nativeActive, handOffToNative, handleFailover]);
+  }, [streamUrl, isLive, videoEngine, nativeActive, handOffToNative, handleFailover, streamEpoch]);
 
   // Auto-clear transient error messages after 3.5s
   useEffect(() => {
@@ -755,6 +903,9 @@ export function TVPlayer({
     if (!video || isLive) return;
     setCurrentTime(video.currentTime);
     setDuration(video.duration || 0);
+    // v3.12.59: analytics — piggyback watch-second aggregation on the
+    // existing 30s saver cadence (no new timers).
+    trackWatchTick();
 
     // BINGE AUTO-ADVANCE: near the end of a multi-episode title, show a
     // countdown; at 0, jump to the next episode automatically.
@@ -762,10 +913,12 @@ export function TVPlayer({
       const left = video.duration - video.currentTime;
       if (left <= BINGE_COUNTDOWN_SECONDS && !bingeFiredRef.current) {
         bingeFiredRef.current = true;
-        // v3.3.43 FIX: the countdown card reads bingeCountdown.countdown /
-        // bingeCountdown.nextItem, but the state was a bare NUMBER here —
-        // `bingeCountdown.nextItem?.title` throws on a number and takes the
-        // whole app down to the error boundary (black screen).
+        // v3.12.44 FIX: the countdown card template reads
+        // bingeCountdown.countdown / bingeCountdown.nextItem, but the state was
+        // set to a bare NUMBER here. Rendering {number.countdown} is undefined,
+        // then `bingeCountdown.nextItem?.title` throws on a number -> React
+        // error boundary -> fullscreen black screen on TV with an unfocusable
+        // reload button. Store the object the render expects.
         const nextIdx = currentEpisodeIndex + 1;
         setBingeCountdown({
           countdown: BINGE_COUNTDOWN_SECONDS,
@@ -779,7 +932,10 @@ export function TVPlayer({
         bingeCountdownRef.current = null;
       }
     }
-  }, [isLive, episodes, onSelectEpisode]);
+  }, [isLive, episodes, onSelectEpisode, currentEpisodeIndex]);
+  // v3.12.54 FIX: currentEpisodeIndex was missing from the deps, so after the
+  // first auto-advance the closure kept the stale index — binge mode fired
+  // once, then either never advanced again or replayed the same episode.
 
   // Play / Pause Toggle
   const togglePlayPause = useCallback(() => {
@@ -787,9 +943,11 @@ export function TVPlayer({
     if (!video) return;
     if (video.paused) {
       video.play().then(() => setIsPlaying(true)).catch(() => {});
+      userPausedRef.current = false;
     } else {
       video.pause();
       setIsPlaying(false);
+      userPausedRef.current = true;
     }
     pingOsd();
   }, [pingOsd]);
@@ -860,10 +1018,15 @@ export function TVPlayer({
       const navHandled = e.defaultPrevented;
 
       // Left / Right keys for seeking
-      if (!showDrawer && !isLive && !navHandled) {
+      // v3.12.62: player owns the D-pad while fullscreen (spatial nav is
+      // inert — see useSpatialNavigation). preventDefault + stopPropagation
+      // so nothing else (focus, scroll) reacts to the seek key.
+      if (!showDrawer && !navHandled) {
         if (key === 'ArrowLeft' || keyCode === 21 || keyCode === 37) {
+          if (!isLive) { e.preventDefault(); e.stopPropagation(); }
           handleSeek(-10);
         } else if (key === 'ArrowRight' || keyCode === 22 || keyCode === 39) {
+          if (!isLive) { e.preventDefault(); e.stopPropagation(); }
           handleSeek(10);
         }
       }
@@ -911,15 +1074,28 @@ export function TVPlayer({
         className="tv-player-video"
         playsInline
         autoPlay
-        crossOrigin="anonymous"
         style={videoStyle}
         onWaiting={() => setIsBuffering(true)}
         onPlaying={() => {
           setIsBuffering(false);
           setIsPlaying(true);
+          // v3.12.59: analytics — first frame rolling. Engine + server for
+          // the QBR (quality/bitrate/robustness) picture.
+          if (!playingTrackedRef.current) {
+            playingTrackedRef.current = true;
+            trackPlaybackStart(item, nativeActive ? 'native' : videoEngine, orderedServers[currentServerIndex]?.name);
+          }
         }}
         onCanPlay={() => setIsBuffering(false)}
         onTimeUpdate={handleTimeUpdate}
+        // v3.12.56 FIX: (a) crossOrigin="anonymous" was FORCING a CORS check
+        // on direct <video> sources — mirrors that don't send
+        // Access-Control-Allow-Origin (most free-streaming CDNs) failed to
+        // load where they'd play fine without the attribute; hls.js never
+        // needed it (it fetches via XHR). (b) There was NO onError at all on
+        // the video element: a failed direct stream sat in a spinner until
+        // the 8s stall watchdog detour. Fail over immediately now.
+        onError={() => handleFailover('Direct stream failed')}
       />
 
       {/* Buffering Spinner */}
@@ -937,7 +1113,7 @@ export function TVPlayer({
           }}
         >
           <div className="tv-spinner" />
-          <p style={{ fontWeight: 700, color: '#38bdf8', marginTop: 12 }}>Buffering Stream...</p>
+          <p style={{ fontWeight: 700, color: '#2DD4BF', marginTop: 12 }}>Buffering Stream...</p>
         </div>
       )}
 
@@ -998,6 +1174,73 @@ export function TVPlayer({
         />
       )}
 
+      {/* v3.12.61: terminal "all servers dead" state — persistent, actionable.
+          Replaces the 3.5s auto-clearing toast that left a dead black player
+          with no path out except force-closing the app. */}
+      {allServersDead && (
+        <div style={{
+          position: 'absolute',
+          top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(4, 8, 16, 0.92)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 18,
+          zIndex: 300
+        }}>
+          <WifiOff size={56} color="#f87171" />
+          <div style={{ fontSize: 26, fontWeight: 800, color: '#fff' }}>
+            All servers failed
+          </div>
+          <div style={{ fontSize: 16, color: '#94a3b8', maxWidth: 520, textAlign: 'center' }}>
+            {allServersDead.reason || 'Every mirror timed out or refused the connection.'}
+            <br />Mirrors recover constantly — a retry usually works.
+          </div>
+          <div style={{ display: 'flex', gap: 16, marginTop: 8 }}>
+            <button
+              className="tv-player-btn"
+              tabIndex={0}
+              onClick={retryFromDead}
+              style={{
+                background: '#ef4444',
+                border: 'none',
+                borderRadius: 10,
+                padding: '14px 32px',
+                color: '#fff',
+                fontSize: 18,
+                fontWeight: 800,
+                cursor: 'pointer'
+              }}
+            >
+              ⟳ Retry All Servers
+            </button>
+            {orderedServers.length > 1 && (
+              <button
+                className="tv-player-btn"
+                tabIndex={0}
+                onClick={() => { setShowDrawer('servers'); setAllServersDead(null); }}
+                style={{
+                  background: 'rgba(255,255,255,0.08)',
+                  border: '1px solid rgba(255,255,255,0.25)',
+                  borderRadius: 10,
+                  padding: '14px 32px',
+                  color: '#e2e8f0',
+                  fontSize: 18,
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+              >
+                Pick a Server ({orderedServers.length})
+              </button>
+            )}
+          </div>
+          <div style={{ fontSize: 13, color: '#64748b', marginTop: 6 }}>
+            Press Back to exit the player
+          </div>
+        </div>
+      )}
+
       {/* Binge-Watching Next Episode Countdown Floating Card */}
       {bingeCountdown && (
         <div style={{
@@ -1006,7 +1249,7 @@ export function TVPlayer({
           right: 48,
           background: 'rgba(15, 23, 42, 0.95)',
           backdropFilter: 'blur(16px)',
-          border: '1px solid rgba(56, 189, 248, 0.5)',
+          border: '1px solid rgba(45, 212, 191, 0.5)',
           borderRadius: '16px',
           padding: '20px 24px',
           display: 'flex',
@@ -1016,7 +1259,7 @@ export function TVPlayer({
           boxShadow: '0 20px 40px rgba(0,0,0,0.8)'
         }}>
           <div>
-            <div style={{ color: '#38bdf8', fontSize: '13px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>
+            <div style={{ color: '#2DD4BF', fontSize: '13px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>
               Next Episode in {bingeCountdown.countdown}s
             </div>
             <div style={{ color: '#fff', fontSize: '16px', fontWeight: 700 }}>
@@ -1025,12 +1268,13 @@ export function TVPlayer({
           </div>
           <button
             onClick={() => {
-              if (onNextEpisode && bingeCountdown.nextItem) {
-                onNextEpisode(bingeCountdown.nextItem);
+              const nextIdx = currentEpisodeIndex + 1;
+              if (nextIdx < episodes.length && onSelectEpisode) {
+                onSelectEpisode(episodes[nextIdx], nextIdx);
               }
             }}
             style={{
-              background: 'linear-gradient(135deg, #38bdf8 0%, #0ea5e9 100%)',
+              background: 'linear-gradient(135deg, #2DD4BF 0%, #0ea5e9 100%)',
               border: 'none',
               borderRadius: '8px',
               color: '#030712',
@@ -1188,7 +1432,7 @@ export function TVPlayer({
                     className="tv-player-btn" 
                     tabIndex={0}
                     onClick={launchNativeHardwarePlayer}
-                    style={{ background: 'linear-gradient(135deg, #38bdf8, #0284c7)', color: '#000', fontWeight: 800 }}
+                    style={{ background: 'linear-gradient(135deg, #2DD4BF, #0d9488)', color: '#000', fontWeight: 800 }}
                   >
                     <Tv size={18} />
                     <span>Hardware Player</span>
@@ -1304,7 +1548,7 @@ export function TVPlayer({
 
                   {currentEpg?.next && (
                     <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px dashed rgba(255,255,255,0.15)' }}>
-                      <div style={{ fontSize: '0.75rem', color: '#38bdf8', fontWeight: 800, textTransform: 'uppercase', marginBottom: 2 }}>
+                      <div style={{ fontSize: '0.75rem', color: '#2DD4BF', fontWeight: 800, textTransform: 'uppercase', marginBottom: 2 }}>
                         NEXT SHOW ({currentEpg.next.startTimeFormatted})
                       </div>
                       <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#e2e8f0' }}>
@@ -1387,7 +1631,7 @@ export function TVPlayer({
                 }}
               >
                 <span>{srv.name || `Server ${idx + 1}`}</span>
-                <span style={{ fontSize: '0.75rem', color: '#38bdf8' }}>
+                <span style={{ fontSize: '0.75rem', color: '#2DD4BF' }}>
                   {badgeText}
                 </span>
               </button>
@@ -1403,7 +1647,7 @@ export function TVPlayer({
               onClick={() => handleSwitchAudio(trk.id)}
             >
               <span>{trk.label}</span>
-              {trk.id === currentAudio && <span style={{ color: '#38bdf8' }}>✓ Active</span>}
+              {trk.id === currentAudio && <span style={{ color: '#2DD4BF' }}>✓ Active</span>}
             </button>
           ))}
         </div>

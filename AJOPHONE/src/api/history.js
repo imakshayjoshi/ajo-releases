@@ -11,37 +11,15 @@ function normalizeTitle(t) {
   return String(t || '').toLowerCase().trim().replace(/[^a-z0-9]/g, '');
 }
 
-// v3.12.59: one shared live-content check (was three drifted copies).
-function isLiveContent(item) {
-  return Boolean(
-    item?.is_live
-    || item?.type === 'live'
-    || item?.year === 'LIVE'
-    || item?.category === 'Live TV'
-    || item?.category === 'Sports'
-    || item?.category === 'News'
-  );
-}
-
 export function matchMediaItem(a, b) {
   if (!a || !b) return false;
   const idA = a.id || a.tmdb_id || a.imdb_id || a.kinopoisk_id || a.movie_id;
   const idB = b.id || b.tmdb_id || b.imdb_id || b.kinopoisk_id || b.movie_id;
   if (idA && idB && String(idA) === String(idB)) return true;
 
-  // v3.12.59 FIX: bare-title matching merged different shows that share a
-  // name (remakes, same-title remasters) into one Continue Watching entry —
-  // one overwrote the other's progress. Title alone now only matches when
-  // the content TYPE also agrees, and when both entries have an id we never
-  // fall through (two ids that differ = two different things, period).
-  if (idA && idB) return false;
-  const typeA = a.type || (a.category === 'Web Series' || a.category === 'Series' ? 'series' : a.category === 'Live TV' || a.category === 'Sports' || a.category === 'News' ? 'live' : '');
-  const typeB = b.type || (b.category === 'Web Series' || b.category === 'Series' ? 'series' : b.category === 'Live TV' || b.category === 'Sports' || b.category === 'News' ? 'live' : '');
   const titleA = normalizeTitle(a.title_en || a.title || a.name);
   const titleB = normalizeTitle(b.title_en || b.title || b.name);
-  if (titleA && titleB && titleA === titleB) {
-    return typeA === typeB;
-  }
+  if (titleA && titleB && titleA === titleB) return true;
   return false;
 }
 
@@ -50,9 +28,7 @@ export function matchMediaItem(a, b) {
 // ==========================================
 export function saveProgress(item, currentTime, duration) {
   if (!item || !duration || duration <= 0) return;
-  // v3.12.59: single shared isLive check (was duplicated with drifted
-  // conditions in saveProgress and getWatchProgress).
-  const isLive = isLiveContent(item);
+  const isLive = Boolean(item.is_live || item.type === 'live' || item.year === 'LIVE' || item.category === 'Live TV' || item.category === 'Sports' || item.category === 'News');
   if (isLive) return;
 
   const percentage = Math.min(100, Math.max(0, Math.round((currentTime / duration) * 100)));
@@ -71,25 +47,7 @@ export function saveProgress(item, currentTime, duration) {
     const existingIndex = history.findIndex(h => matchMediaItem(h, item));
 
     const historyEntry = {
-      // v3.12.58: slim entry. The old code spread the ENTIRE item object —
-      // players arrays, mirror lists, descriptions, backdrop URLs — into
-      // every history row: 30 entries ≈ 120KB serialized on every save and
-      // re-parsed by every history read. Continue Watching only needs these
-      // fields to render + relaunch; generateUniversalServers rebuilds the
-      // mirror list from ids at play time anyway.
-      id: item.id,
-      tmdb_id: item.tmdb_id,
-      imdb_id: item.imdb_id,
-      type: item.type,
-      category: item.category,
-      title: item.title,
-      title_en: item.title_en,
-      name: item.name,
-      series_title: item.series_title,
-      poster_url: item.poster_url,
-      poster: item.poster,
-      season_number: item.season_number,
-      episode_number: item.episode_number,
+      ...item,
       currentTime: Math.floor(currentTime),
       duration: Math.floor(duration),
       percentage,
@@ -121,7 +79,7 @@ export function getWatchHistory() {
 
 export function getWatchProgress(item) {
   if (!item) return null;
-  const isLive = isLiveContent(item);
+  const isLive = Boolean(item.is_live || item.type === 'live' || item.year === 'LIVE');
   if (isLive) return null;
   try {
     const history = getWatchHistory();
@@ -270,19 +228,18 @@ export function setSleepTimer(minutes, onTrigger) {
   }, minutes * 60 * 1000);
 }
 
-// v3.12.59 FIX: "clear cache" used localStorage.clear() — one Settings tap
-// silently destroyed watch history, favorites, watchlist, cast pairing and
-// the dead-channel list. Cache means re-fetchable data, so only sweep keys
-// that repopulate from the network. User data keys are never touched here.
-const CACHE_KEY_PATTERNS = [
-  /^ajo_iptv_cache_v\d+$/,
-  /^ajo_channels_manifest_v\d+$/,
-  /^ajo_sports_cache_v\d+$/,
-  /^ajo_catalog_v\d+$/,
-];
-
 export function clearAppCache() {
   try {
+    // v3.12.59 FIX (ported): was localStorage.clear() — one Settings tap
+    // destroyed watch history, favorites, watchlist and cast pairing. Only
+    // cache keys (re-fetchable data) are removed now.
+    const CACHE_KEY_PATTERNS = [
+      /^ajo_iptv_cache_v\d+$/,
+      /^ajo_channels_manifest_v\d+$/,
+      /^ajo_sports_cache_v\d+$/,
+      /^ajo_catalog_v\d+$/,
+      /^ajo_dead_items_v\d+$/,      // v3.4.1: dead-title blocklist
+    ];
     const keys = [];
     for (let i = 0; i < localStorage.length; i++) keys.push(localStorage.key(i));
     for (const key of keys) {
@@ -290,32 +247,58 @@ export function clearAppCache() {
         localStorage.removeItem(key);
       }
     }
-  } catch (err) {}
+  } catch {}
+}
+// v3.4.1 / phone v3.4.1: dead-item blocklist — when every stream source for
+// a title fails, the title stops appearing in catalogs and search until its
+// TTL expires (sources recover all the time). Delivers "only show thumbnails
+// that actually stream" reactively, without probing thousands of items.
+const DEAD_ITEMS_KEY = 'ajo_dead_items_v1';
+const DEAD_ITEM_TTL = 14 * 24 * 60 * 60 * 1000;
+
+function readDeadItemMap() {
+  try {
+    const raw = localStorage.getItem(DEAD_ITEMS_KEY);
+    const map = raw ? JSON.parse(raw) : {};
+    const now = Date.now();
+    const pruned = {};
+    for (const [id, ts] of Object.entries(map)) {
+      if (now - Number(ts) < DEAD_ITEM_TTL) pruned[id] = ts;
+    }
+    return pruned;
+  } catch { return {}; }
 }
 
-// v3.12.59: sweep ancient versioned keys left behind by upgrades (v1..v27 of
-// the iptv cache etc.) — dead weight inside the 5MB localStorage quota.
-// Runs once per install; only deletes keys NO current module references.
-const CACHE_SWEEP_FLAG = 'ajo_cache_sweep_v1_done';
-const LIVE_CACHE_KEYS = [
-  'ajo_iptv_cache_v28', 'ajo_channels_manifest_v8', 'ajo_sports_cache_v2', 'ajo_catalog_v6'
-];
-
-export function sweepStaleCacheKeys() {
+export function markItemDead(itemId) {
+  if (!itemId) return;
   try {
-    if (localStorage.getItem(CACHE_SWEEP_FLAG)) return;
-    const liveSet = new Set(LIVE_CACHE_KEYS);
-    const keys = [];
-    for (let i = 0; i < localStorage.length; i++) keys.push(localStorage.key(i));
-    let removed = 0;
-    for (const key of keys) {
-      if (liveSet.has(key)) continue;
-      if (CACHE_KEY_PATTERNS.some((p) => p.test(key))) {
-        localStorage.removeItem(key);
-        removed++;
-      }
+    const map = readDeadItemMap();
+    map[String(itemId)] = Date.now();
+    // bound the map so years of failures can't grow localStorage forever
+    const entries = Object.entries(map);
+    if (entries.length > 500) {
+      entries.sort((a, b) => b[1] - a[1]);
+      const trimmed = Object.fromEntries(entries.slice(0, 500));
+      localStorage.setItem(DEAD_ITEMS_KEY, JSON.stringify(trimmed));
+      return;
     }
-    localStorage.setItem(CACHE_SWEEP_FLAG, String(Date.now()));
-    if (removed > 0) console.warn(`[ajo] swept ${removed} stale cache key(s)`);
+    localStorage.setItem(DEAD_ITEMS_KEY, JSON.stringify(map));
   } catch {}
+}
+
+export function getDeadItemIds() {
+  return new Set(Object.keys(readDeadItemMap()));
+}
+
+export function isItemDead(itemId) {
+  if (!itemId) return false;
+  return Boolean(readDeadItemMap()[String(itemId)]);
+}
+
+/** Filter helper for catalog/search arrays. */
+export function filterAliveItems(items) {
+  if (!Array.isArray(items) || !items.length) return items || [];
+  const dead = getDeadItemIds();
+  if (!dead.size) return items;
+  return items.filter((i) => i && !dead.has(String(i.id)));
 }

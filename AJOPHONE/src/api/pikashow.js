@@ -1,5 +1,6 @@
 import { getIPTVChannels, LOGO_OVERRIDES, normalizeChannelKey } from './iptv.js';
 import { isSafeHttpUrl, generateUniversalServers } from '../utils/streamingEngines.js';
+import { filterAliveItems } from './history.js';
 
 const BASE_URL = 'https://mapi.elochkaigolochla.com/api/v1';
 const CACHE_KEY = 'ajo_catalog_v6';
@@ -346,7 +347,8 @@ export async function searchAllMedia(query) {
     results.push(item);
   }
 
-  return results;
+  // v3.4.1: dead titles (every source failed before) never surface in search.
+  return filterAliveItems(results);
 }
 
 export async function getSeriesEpisodes(movieId) {

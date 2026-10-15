@@ -6,8 +6,8 @@ android {
         applicationId "com.ajo.androidtv"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 242
-        versionName "3.12.92"
+        versionCode 243
+        versionName "3.12.93"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions { ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~' }
     }

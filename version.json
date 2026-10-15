@@ -6,18 +6,18 @@
   "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
   "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
   "phone": {
-    "version": "3.4.0",
-    "versionCode": 217,
+    "version": "3.4.1",
+    "versionCode": 218,
     "packageId": "com.ajo.phone",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
-    "changelog": "v3.4.0: Scan-to-pair \u2014 Remote tab QR scanner connects to your TV instantly. New unified design (Space Grotesk/Inter, teal AJO accent). Update checker fixed: removed a mirror that served stale manifests, so update banners arrive reliably.",
+    "changelog": "v3.4.1: Dead-title filter \u2014 a title whose every stream fails leaves the catalog and search until sources recover. Direct streams (m3u8/mp4) now always play before embed mirrors, best quality first, so 404 error pages can no longer appear inside the player. Background health sweep quietly removes dead titles from the home screen.",
     "size_mb": 3.4,
-    "sha256": "124e41c90acb1dc9f75d954ea8ecb658f02f04048f2bc7f2b8fcd63af21e66a7",
+    "sha256": "ccba9999fbbcd00fce5156e87fe79cb2d6961a76be199a9c1056b39244f6a1f3",
     "releaseDate": "2026-10-13",
-    "size": 3565361
+    "size": 3566025
   },
   "tv": {
     "version": "3.12.73",
@@ -34,18 +34,18 @@
     "releaseDate": "2026-10-09"
   },
   "android_tv": {
-    "version": "3.12.92",
-    "versionCode": 242,
+    "version": "3.12.93",
+    "versionCode": 243,
     "packageId": "com.ajo.androidtv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
-    "changelog": "v3.12.92: Update checker fixed \u2014 removed a stale-caching mirror that could hide update banners. Carries v3.12.91: pairing QR deep link for AJO Phone scan-to-cast.",
+    "changelog": "v3.12.93: Streaming reliability \u2014 direct streams always play before embed mirrors (best quality first), dead titles leave the catalog and search until sources recover, background health sweep removes dead titles from home. No more 404 pages inside the player.",
     "size_mb": 7.0,
-    "sha256": "9bee32abd088ff8862f13b404df374208175e458b587c16e51dfccd78eaa4e43",
+    "sha256": "f0cf1d15d562cbee716bd7751a1dbbd01de7e1a26d414ecf36d7a1cb7a04cb88",
     "releaseDate": "2026-10-13",
-    "size": 7373783
+    "size": 7375493
   },
   "changelog": "v3.12.73: Movies & series fixed \u2014 movibox CDN hotlink gate (429) handled: native player now sends Referer/UA headers; web/phone playback streams through the VPS proxy. Live channel thumbnails fixed \u2014 dead Sony logos repaired, logos served via image proxy with retry. Live channel playback untouched.",
   "sha256": "6e2dc11f6d2c34bdfbe719e181511383f093fe2376c92261791740af00c27c26"

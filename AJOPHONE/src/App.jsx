@@ -6,7 +6,8 @@ import {
   getLiveBroadcasts,
   normalizeMediaItem
 } from './api/pikashow';
-import { getWatchHistory, getFavorites, saveProgress } from './api/history';
+import { getWatchHistory, getFavorites, saveProgress, filterAliveItems } from './api/history';
+import { runStreamHealthSweep } from './utils/streamHealth';
 import { MobileHeader } from './components/MobileHeader';
 import { MobileBottomNav } from './components/MobileBottomNav';
 import { HeroBanner } from './components/HeroBanner';
@@ -171,11 +172,11 @@ export default function App() {
       const sList = serials.status === 'fulfilled' && Array.isArray(serials.value) ? serials.value : [];
 
       setLiveItems(lList);
-      if (deepMovies.status === 'fulfilled') setHollywoodItems((prev) => [...prev, ...(deepMovies.value || [])]);
-      if (deepSeries.status === 'fulfilled') setSerialsItems((prev) => [...prev, ...(deepSeries.value || [])]);
+      if (deepMovies.status === 'fulfilled') setHollywoodItems((prev) => filterAliveItems([...prev, ...(deepMovies.value || [])]));
+      if (deepSeries.status === 'fulfilled') setSerialsItems((prev) => filterAliveItems([...prev, ...(deepSeries.value || [])]));
       if (movibox.status === 'fulfilled') {
         import('./api/movibox').then((m) => {
-          setMoviboxItems((movibox.value || []).map(m.normalizeMovibox).filter(Boolean));
+          setMoviboxItems(filterAliveItems((movibox.value || []).map(m.normalizeMovibox).filter(Boolean)));
         }).catch(() => {});
       }
       
@@ -209,11 +210,16 @@ export default function App() {
       setEntertainmentItems(entertainment.length > 0 ? entertainment : lList.slice(0, 15));
       setNewsItems(news.length > 0 ? news : lList.slice(0, 15));
 
-      setBollywoodItems(bList);
-      setHollywoodItems(hList);
-      setSerialsItems(sList);
+      setBollywoodItems(filterAliveItems(bList));
+      setHollywoodItems(filterAliveItems(hList));
+      setSerialsItems(filterAliveItems(sList));
       setDocuItems(getDocumentariesCatalog());
       setNetworkItems(getNetworkOriginalsCatalog());
+
+      // v3.4.1: background stream-health sweep — probe the first direct
+      // source of on-screen titles; hard 404/410 pulls the title from the
+      // catalog. Ambiguous errors never hide content. Once per load.
+      try { runStreamHealthSweep([...bList, ...hList, ...sList]); } catch {}
       
       const animeData = await getAnimeCatalog();
       setAnimeItems(animeData);
