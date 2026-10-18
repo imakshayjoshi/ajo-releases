@@ -113,8 +113,8 @@ export function LazyImage({
             transform: 'translate(-50%, -50%)',
             width: '24px',
             height: '24px',
-            border: '2px solid rgba(45, 212, 191, 0.3)',
-            borderTopColor: '#2DD4BF',
+            border: '2px solid rgba(0, 187, 127, 0.3)',
+            borderTopColor: '#00BB7F',
             borderRadius: '50%',
             animation: 'spin 0.8s linear infinite'
           }}

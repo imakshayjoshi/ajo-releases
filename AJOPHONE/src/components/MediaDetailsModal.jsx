@@ -196,7 +196,7 @@ export function MediaDetailsModal({ item, onClose, onStartPlayback }) {
             <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
               <Clock size={14} /> {duration}
             </span>
-            <span style={{ background: 'rgba(45, 212, 191, 0.15)', color: '#2DD4BF', padding: '2px 8px', borderRadius: 4, fontWeight: 700 }}>
+            <span style={{ background: 'rgba(0, 187, 127, 0.15)', color: '#00BB7F', padding: '2px 8px', borderRadius: 4, fontWeight: 700 }}>
               {isSeries ? 'TV SERIES' : isLive ? 'LIVE TV' : 'MOVIE'}
             </span>
           </div>
@@ -244,7 +244,7 @@ export function MediaDetailsModal({ item, onClose, onStartPlayback }) {
                   handlePlay();
                 }
               }}
-              style={{ borderColor: 'rgba(45, 212, 191, 0.4)', color: '#2DD4BF' }}
+              style={{ borderColor: 'rgba(0, 187, 127, 0.4)', color: '#00BB7F' }}
             >
               <Tv size={18} />
               <span>{hasNativePlayer() ? 'Hardware Player' : 'Web Player'}</span>
@@ -253,13 +253,13 @@ export function MediaDetailsModal({ item, onClose, onStartPlayback }) {
 
           {/* Resume Progress Bar */}
           {watchProgress && (
-            <div style={{ marginBottom: 12, background: 'rgba(45, 212, 191, 0.08)', border: '1px solid rgba(45, 212, 191, 0.25)', borderRadius: 8, padding: '10px 14px' }}>
+            <div style={{ marginBottom: 12, background: 'rgba(0, 187, 127, 0.08)', border: '1px solid rgba(0, 187, 127, 0.25)', borderRadius: 8, padding: '10px 14px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#94a3b8', marginBottom: 6 }}>
-                <span style={{ color: '#2DD4BF', fontWeight: 700 }}>Watching in Progress</span>
+                <span style={{ color: '#00BB7F', fontWeight: 700 }}>Watching in Progress</span>
                 <span>{formatTime(watchProgress.currentTime)} / {formatTime(watchProgress.duration)} ({watchProgress.percentage}%)</span>
               </div>
               <div style={{ height: 4, background: 'rgba(255, 255, 255, 0.1)', borderRadius: 2, overflow: 'hidden' }}>
-                <div style={{ width: `${watchProgress.percentage}%`, height: '100%', background: '#2DD4BF', borderRadius: 2 }} />
+                <div style={{ width: `${watchProgress.percentage}%`, height: '100%', background: '#00BB7F', borderRadius: 2 }} />
               </div>
             </div>
           )}
@@ -306,7 +306,7 @@ export function MediaDetailsModal({ item, onClose, onStartPlayback }) {
                   justifyContent: 'space-between'
                 }}
               >
-                <span>⚡ Server: <strong style={{ color: '#2DD4BF' }}>{filteredServers[selectedServer]?.name || `Server ${selectedServer + 1}`}</strong></span>
+                <span>⚡ Server: <strong style={{ color: '#00BB7F' }}>{filteredServers[selectedServer]?.name || `Server ${selectedServer + 1}`}</strong></span>
                 <span>{showServerMenu ? '▲ Hide Mirrors' : '▼ Change Mirror'}</span>
               </button>
 
@@ -352,10 +352,10 @@ export function MediaDetailsModal({ item, onClose, onStartPlayback }) {
                       fontSize: '0.82rem',
                       whiteSpace: 'nowrap',
                       borderRadius: '8px',
-                      background: selectedSeason === sNum ? 'linear-gradient(135deg, #2DD4BF, #0d9488)' : 'rgba(255, 255, 255, 0.08)',
+                      background: selectedSeason === sNum ? 'linear-gradient(135deg, #00BB7F, #00875f)' : 'rgba(255, 255, 255, 0.08)',
                       color: selectedSeason === sNum ? '#06090e' : '#ffffff',
                       fontWeight: 800,
-                      border: selectedSeason === sNum ? '2px solid #2DD4BF' : '1px solid rgba(255, 255, 255, 0.15)'
+                      border: selectedSeason === sNum ? '2px solid #00BB7F' : '1px solid rgba(255, 255, 255, 0.15)'
                     }}
                   >
                     Season {sNum}

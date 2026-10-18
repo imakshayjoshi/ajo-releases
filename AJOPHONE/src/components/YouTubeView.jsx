@@ -241,8 +241,8 @@ export function YouTubeView({ onPlayMedia, onFocusItem }) {
               </h3>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#94a3b8' }}>
-                <span style={{ fontWeight: 700, color: '#2DD4BF' }}>{item.channel || 'YouTube'}</span>
-                <CheckCircle2 size={11} color="#2DD4BF" />
+                <span style={{ fontWeight: 700, color: '#00BB7F' }}>{item.channel || 'YouTube'}</span>
+                <CheckCircle2 size={11} color="#00BB7F" />
               </div>
             </div>
           </div>

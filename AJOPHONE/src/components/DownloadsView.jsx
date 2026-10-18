@@ -74,7 +74,7 @@ export function DownloadsView({ onBack, onPlayMedia }) {
           )}
           <div>
             <h1 style={{ fontSize: '1.4rem', fontWeight: 800, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Download size={22} color="#2DD4BF" />
+              <Download size={22} color="#00BB7F" />
               <span>Offline Downloads</span>
             </h1>
             <p style={{ margin: '2px 0 0', fontSize: '0.8rem', color: '#94a3b8' }}>
@@ -87,7 +87,7 @@ export function DownloadsView({ onBack, onPlayMedia }) {
       {/* Device Storage Card */}
       <div style={{
         background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.8) 100%)',
-        border: '1px solid rgba(45, 212, 191, 0.2)',
+        border: '1px solid rgba(0, 187, 127, 0.2)',
         borderRadius: '14px',
         padding: '16px',
         marginBottom: '20px',
@@ -95,10 +95,10 @@ export function DownloadsView({ onBack, onPlayMedia }) {
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <HardDrive size={18} color="#2DD4BF" />
+            <HardDrive size={18} color="#00BB7F" />
             <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#f8fafc' }}>Device Storage</span>
           </div>
-          <span style={{ fontSize: '0.8rem', color: '#2DD4BF', fontWeight: 700 }}>
+          <span style={{ fontSize: '0.8rem', color: '#00BB7F', fontWeight: 700 }}>
             {formatBytes(totalDownloadedBytes)} used by AJO
           </span>
         </div>
@@ -107,7 +107,7 @@ export function DownloadsView({ onBack, onPlayMedia }) {
         <div style={{ height: '8px', background: 'rgba(255, 255, 255, 0.1)', borderRadius: '4px', overflow: 'hidden', display: 'flex' }}>
           <div style={{
             width: `${Math.min(100, Math.max(5, (totalDownloadedBytes / (storageInfo.totalBytes || 1)) * 100))}%`,
-            background: 'linear-gradient(90deg, #2DD4BF, #0ea5e9)',
+            background: 'linear-gradient(90deg, #00BB7F, #0ea5e9)',
             borderRadius: '4px'
           }} />
         </div>
@@ -131,9 +131,9 @@ export function DownloadsView({ onBack, onPlayMedia }) {
             style={{
               padding: '6px 14px',
               borderRadius: '20px',
-              border: activeFilter === tab.id ? '1px solid #2DD4BF' : '1px solid rgba(255,255,255,0.1)',
-              background: activeFilter === tab.id ? 'rgba(45, 212, 191, 0.2)' : 'rgba(255,255,255,0.04)',
-              color: activeFilter === tab.id ? '#2DD4BF' : '#94a3b8',
+              border: activeFilter === tab.id ? '1px solid #00BB7F' : '1px solid rgba(255,255,255,0.1)',
+              background: activeFilter === tab.id ? 'rgba(0, 187, 127, 0.2)' : 'rgba(255,255,255,0.04)',
+              color: activeFilter === tab.id ? '#00BB7F' : '#94a3b8',
               fontSize: '0.8rem',
               fontWeight: 700,
               cursor: 'pointer'
@@ -239,7 +239,7 @@ export function DownloadsView({ onBack, onPlayMedia }) {
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.75rem', color: '#94a3b8', marginBottom: '8px' }}>
                     {item.episode && (
-                      <span style={{ background: 'rgba(45, 212, 191, 0.15)', color: '#2DD4BF', padding: '1px 6px', borderRadius: '4px', fontWeight: 700 }}>
+                      <span style={{ background: 'rgba(0, 187, 127, 0.15)', color: '#00BB7F', padding: '1px 6px', borderRadius: '4px', fontWeight: 700 }}>
                         Episode
                       </span>
                     )}
@@ -251,7 +251,7 @@ export function DownloadsView({ onBack, onPlayMedia }) {
                   {/* Active Download Progress Bar */}
                   {isDownloading && (
                     <div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#2DD4BF', marginBottom: '4px', fontWeight: 600 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#00BB7F', marginBottom: '4px', fontWeight: 600 }}>
                         <span>Downloading...</span>
                         <span>{item.progress >= 0 ? `${item.progress}%` : formatBytes(item.bytesDownloaded)}</span>
                       </div>
@@ -259,7 +259,7 @@ export function DownloadsView({ onBack, onPlayMedia }) {
                         <div style={{
                           width: `${Math.max(5, item.progress || 0)}%`,
                           height: '100%',
-                          background: 'linear-gradient(90deg, #2DD4BF, #0f766e)',
+                          background: 'linear-gradient(90deg, #00BB7F, #0f766e)',
                           transition: 'width 0.3s ease'
                         }} />
                       </div>
@@ -281,7 +281,7 @@ export function DownloadsView({ onBack, onPlayMedia }) {
                     <button
                       onClick={() => handlePlay(item)}
                       style={{
-                        background: 'linear-gradient(135deg, #2DD4BF 0%, #0f766e 100%)',
+                        background: 'linear-gradient(135deg, #00BB7F 0%, #0f766e 100%)',
                         border: 'none',
                         borderRadius: '50%',
                         width: '38px',
@@ -291,7 +291,7 @@ export function DownloadsView({ onBack, onPlayMedia }) {
                         justifyContent: 'center',
                         color: '#06090e',
                         cursor: 'pointer',
-                        boxShadow: '0 4px 12px rgba(45, 212, 191, 0.3)'
+                        boxShadow: '0 4px 12px rgba(0, 187, 127, 0.3)'
                       }}
                       title="Play Offline"
                     >

@@ -113,7 +113,7 @@ export function SearchView({ onSelectItem }) {
         {/* Left Column: Search Bar & QWERTY Keyboard */}
         <div style={{ width: '470px', flexShrink: 0 }}>
           <div className="tv-search-input-box" style={{ marginBottom: '14px' }}>
-            <SearchIcon size={22} color="#2DD4BF" />
+            <SearchIcon size={22} color="#00BB7F" />
             <input
               ref={inputRef}
               type="text"
@@ -194,7 +194,7 @@ export function SearchView({ onSelectItem }) {
 
           <div style={{ marginTop: '12px', color: '#64748b', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <span>💡 Tip: Press</span>
-            <span style={{ background: 'rgba(255,255,255,0.1)', padding: '2px 6px', borderRadius: '4px', color: '#2DD4BF', fontWeight: 700 }}>Right ▶</span>
+            <span style={{ background: 'rgba(255,255,255,0.1)', padding: '2px 6px', borderRadius: '4px', color: '#00BB7F', fontWeight: 700 }}>Right ▶</span>
             <span>on remote to jump straight to results</span>
           </div>
         </div>
@@ -211,7 +211,7 @@ export function SearchView({ onSelectItem }) {
             gap: '8px'
           }}>
             {isSearching ? '⚡ Searching...' : query ? `Results for "${query}" (${results.length})` : (
-              <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Flame size={18} color="#2DD4BF" /> Type to search — or browse trending below</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Flame size={18} color="#00BB7F" /> Type to search — or browse trending below</span>
             )}
           </h3>
 

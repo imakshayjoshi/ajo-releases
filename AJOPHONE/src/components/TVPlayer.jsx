@@ -1113,7 +1113,7 @@ export function TVPlayer({
           }}
         >
           <div className="tv-spinner" />
-          <p style={{ fontWeight: 700, color: '#2DD4BF', marginTop: 12 }}>Buffering Stream...</p>
+          <p style={{ fontWeight: 700, color: '#00BB7F', marginTop: 12 }}>Buffering Stream...</p>
         </div>
       )}
 
@@ -1249,7 +1249,7 @@ export function TVPlayer({
           right: 48,
           background: 'rgba(15, 23, 42, 0.95)',
           backdropFilter: 'blur(16px)',
-          border: '1px solid rgba(45, 212, 191, 0.5)',
+          border: '1px solid rgba(0, 187, 127, 0.5)',
           borderRadius: '16px',
           padding: '20px 24px',
           display: 'flex',
@@ -1259,7 +1259,7 @@ export function TVPlayer({
           boxShadow: '0 20px 40px rgba(0,0,0,0.8)'
         }}>
           <div>
-            <div style={{ color: '#2DD4BF', fontSize: '13px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>
+            <div style={{ color: '#00BB7F', fontSize: '13px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>
               Next Episode in {bingeCountdown.countdown}s
             </div>
             <div style={{ color: '#fff', fontSize: '16px', fontWeight: 700 }}>
@@ -1274,7 +1274,7 @@ export function TVPlayer({
               }
             }}
             style={{
-              background: 'linear-gradient(135deg, #2DD4BF 0%, #0ea5e9 100%)',
+              background: 'linear-gradient(135deg, #00BB7F 0%, #0ea5e9 100%)',
               border: 'none',
               borderRadius: '8px',
               color: '#030712',
@@ -1432,7 +1432,7 @@ export function TVPlayer({
                     className="tv-player-btn" 
                     tabIndex={0}
                     onClick={launchNativeHardwarePlayer}
-                    style={{ background: 'linear-gradient(135deg, #2DD4BF, #0d9488)', color: '#000', fontWeight: 800 }}
+                    style={{ background: 'linear-gradient(135deg, #00BB7F, #00875f)', color: '#000', fontWeight: 800 }}
                   >
                     <Tv size={18} />
                     <span>Hardware Player</span>
@@ -1548,7 +1548,7 @@ export function TVPlayer({
 
                   {currentEpg?.next && (
                     <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px dashed rgba(255,255,255,0.15)' }}>
-                      <div style={{ fontSize: '0.75rem', color: '#2DD4BF', fontWeight: 800, textTransform: 'uppercase', marginBottom: 2 }}>
+                      <div style={{ fontSize: '0.75rem', color: '#00BB7F', fontWeight: 800, textTransform: 'uppercase', marginBottom: 2 }}>
                         NEXT SHOW ({currentEpg.next.startTimeFormatted})
                       </div>
                       <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#e2e8f0' }}>
@@ -1631,7 +1631,7 @@ export function TVPlayer({
                 }}
               >
                 <span>{srv.name || `Server ${idx + 1}`}</span>
-                <span style={{ fontSize: '0.75rem', color: '#2DD4BF' }}>
+                <span style={{ fontSize: '0.75rem', color: '#00BB7F' }}>
                   {badgeText}
                 </span>
               </button>
@@ -1647,7 +1647,7 @@ export function TVPlayer({
               onClick={() => handleSwitchAudio(trk.id)}
             >
               <span>{trk.label}</span>
-              {trk.id === currentAudio && <span style={{ color: '#2DD4BF' }}>✓ Active</span>}
+              {trk.id === currentAudio && <span style={{ color: '#00BB7F' }}>✓ Active</span>}
             </button>
           ))}
         </div>

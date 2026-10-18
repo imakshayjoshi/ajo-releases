@@ -24,12 +24,12 @@ export function MediaRail({ title, items, landscape = false, onSelectItem, onFoc
             width: '24px',
             height: '24px',
             borderRadius: '6px',
-            background: 'rgba(45, 212, 191, 0.15)',
+            background: 'rgba(0, 187, 127, 0.15)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center'
           }}>
-            <SectionIcon size={14} color="#2DD4BF" />
+            <SectionIcon size={14} color="#00BB7F" />
           </div>
           <h2 className="mobile-rail-title" style={{
             fontSize: '18px',
@@ -51,11 +51,11 @@ export function MediaRail({ title, items, landscape = false, onSelectItem, onFoc
               display: 'flex',
               alignItems: 'center',
               gap: '3px',
-              background: 'rgba(45, 212, 191, 0.12)',
-              border: '1px solid rgba(45, 212, 191, 0.3)',
+              background: 'rgba(0, 187, 127, 0.12)',
+              border: '1px solid rgba(0, 187, 127, 0.3)',
               borderRadius: '12px',
               padding: '4px 10px',
-              color: '#2DD4BF',
+              color: '#00BB7F',
               fontSize: '12px',
               fontWeight: 800,
               cursor: 'pointer'

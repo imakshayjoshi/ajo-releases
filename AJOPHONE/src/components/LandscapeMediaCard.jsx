@@ -54,7 +54,7 @@ export const LandscapeMediaCard = React.memo(function LandscapeMediaCard({ item,
           />
         ) : (
           <div className="mobile-landscape-fallback" style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '8px', background: '#0f172a' }}>
-            <Radio size={28} color="#2DD4BF" />
+            <Radio size={28} color="#00BB7F" />
             <span style={{ fontSize: '12px', fontWeight: 800, marginTop: '4px', color: '#ffffff', textAlign: 'center' }}>
               {title}
             </span>
@@ -103,7 +103,7 @@ export const LandscapeMediaCard = React.memo(function LandscapeMediaCard({ item,
             transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
           }}
         >
-          <Tv size={14} color={castSuccess ? '#ffffff' : '#2DD4BF'} />
+          <Tv size={14} color={castSuccess ? '#ffffff' : '#00BB7F'} />
         </button>
 
         {/* Play Icon on Bottom */}
@@ -114,7 +114,7 @@ export const LandscapeMediaCard = React.memo(function LandscapeMediaCard({ item,
           width: '24px',
           height: '24px',
           borderRadius: '50%',
-          background: 'rgba(45, 212, 191, 0.9)',
+          background: 'rgba(0, 187, 127, 0.9)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center'
@@ -132,7 +132,7 @@ export const LandscapeMediaCard = React.memo(function LandscapeMediaCard({ item,
             width: '22px',
             height: '22px',
             borderRadius: '6px',
-            background: provider.color || '#2DD4BF',
+            background: provider.color || '#00BB7F',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',

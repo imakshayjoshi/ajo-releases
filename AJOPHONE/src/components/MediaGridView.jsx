@@ -196,11 +196,11 @@ export function MediaGridView({
             width: '34px',
             height: '34px',
             borderRadius: '10px',
-            background: 'linear-gradient(135deg, #2DD4BF 0%, #06b6d4 100%)',
+            background: 'linear-gradient(135deg, #00BB7F 0%, #06b6d4 100%)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 4px 14px rgba(45, 212, 191, 0.5)'
+            boxShadow: '0 4px 14px rgba(0, 187, 127, 0.5)'
           }}>
             <Icon size={18} color="#ffffff" />
           </div>
@@ -212,7 +212,7 @@ export function MediaGridView({
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span style={{ fontSize: '11px', fontWeight: 800, color: '#2DD4BF', background: 'rgba(45, 212, 191, 0.15)', padding: '3px 8px', borderRadius: '12px' }}>
+          <span style={{ fontSize: '11px', fontWeight: 800, color: '#00BB7F', background: 'rgba(0, 187, 127, 0.15)', padding: '3px 8px', borderRadius: '12px' }}>
             {filteredItems.length} Titles
           </span>
         </div>
@@ -264,9 +264,9 @@ export function MediaGridView({
             style={{
               padding: '8px 16px',
               borderRadius: '10px',
-              background: hasPrev ? 'rgba(45, 212, 191, 0.2)' : 'rgba(255, 255, 255, 0.05)',
-              border: hasPrev ? '1px solid #2DD4BF' : '1px solid rgba(255, 255, 255, 0.1)',
-              color: hasPrev ? '#2DD4BF' : '#64748b',
+              background: hasPrev ? 'rgba(0, 187, 127, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+              border: hasPrev ? '1px solid #00BB7F' : '1px solid rgba(255, 255, 255, 0.1)',
+              color: hasPrev ? '#00BB7F' : '#64748b',
               fontWeight: 800,
               fontSize: '13px',
               cursor: hasPrev ? 'pointer' : 'not-allowed',
@@ -287,9 +287,9 @@ export function MediaGridView({
             style={{
               padding: '8px 16px',
               borderRadius: '10px',
-              background: hasNext ? 'rgba(45, 212, 191, 0.2)' : 'rgba(255, 255, 255, 0.05)',
-              border: hasNext ? '1px solid #2DD4BF' : '1px solid rgba(255, 255, 255, 0.1)',
-              color: hasNext ? '#2DD4BF' : '#64748b',
+              background: hasNext ? 'rgba(0, 187, 127, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+              border: hasNext ? '1px solid #00BB7F' : '1px solid rgba(255, 255, 255, 0.1)',
+              color: hasNext ? '#00BB7F' : '#64748b',
               fontWeight: 800,
               fontSize: '13px',
               cursor: hasNext ? 'pointer' : 'not-allowed',
@@ -308,7 +308,7 @@ export function MediaGridView({
       {hasMore && (
         <div ref={bottomObserverRef} style={{ position: 'relative', zIndex: 20, padding: '24px 0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           {isLoadingMore ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#2DD4BF', fontWeight: 800, fontSize: '13px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#00BB7F', fontWeight: 800, fontSize: '13px' }}>
               <Loader2 size={20} className="spin-animation" />
               <span>Loading more titles...</span>
             </div>

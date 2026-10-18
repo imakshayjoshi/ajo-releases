@@ -119,7 +119,7 @@ export function EPGGuideView({ channels = [], onSelectChannel }) {
           left: '50%',
           transform: 'translateX(-50%)',
           background: 'rgba(15, 23, 42, 0.95)',
-          border: '1px solid #2DD4BF',
+          border: '1px solid #00BB7F',
           color: '#ffffff',
           padding: '10px 20px',
           borderRadius: '24px',
@@ -128,10 +128,10 @@ export function EPGGuideView({ channels = [], onSelectChannel }) {
           display: 'flex',
           alignItems: 'center',
           gap: '8px',
-          boxShadow: '0 8px 24px rgba(45, 212, 191, 0.4)',
+          boxShadow: '0 8px 24px rgba(0, 187, 127, 0.4)',
           zIndex: 99999
         }}>
-          <Cast size={16} color="#2DD4BF" />
+          <Cast size={16} color="#00BB7F" />
           <span>{castAlert}</span>
         </div>
       )}
@@ -198,7 +198,7 @@ export function EPGGuideView({ channels = [], onSelectChannel }) {
           padding: '10px 14px',
           boxShadow: '0 2px 10px rgba(0, 0, 0, 0.4)'
         }}>
-          <Search size={18} color="#2DD4BF" />
+          <Search size={18} color="#00BB7F" />
           <input
             type="text"
             placeholder="Search Live Channels..."
@@ -253,8 +253,8 @@ export function EPGGuideView({ channels = [], onSelectChannel }) {
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '7px',
-                border: isSelected ? '2px solid #2DD4BF' : '1px solid rgba(255, 255, 255, 0.18)',
-                background: isSelected ? 'linear-gradient(135deg, #2DD4BF 0%, #2DD4BF 100%)' : 'rgba(15, 23, 42, 0.85)',
+                border: isSelected ? '2px solid #00BB7F' : '1px solid rgba(255, 255, 255, 0.18)',
+                background: isSelected ? 'linear-gradient(135deg, #00BB7F 0%, #00BB7F 100%)' : 'rgba(15, 23, 42, 0.85)',
                 color: isSelected ? '#06090e' : '#ffffff',
                 cursor: 'pointer',
                 flexShrink: 0
@@ -335,7 +335,7 @@ export function EPGGuideView({ channels = [], onSelectChannel }) {
                       referrerPolicy="no-referrer"
                     />
                   ) : (
-                    <Radio size={24} color="#2DD4BF" />
+                    <Radio size={24} color="#00BB7F" />
                   )}
                   <span style={{
                     position: 'absolute',
@@ -344,7 +344,7 @@ export function EPGGuideView({ channels = [], onSelectChannel }) {
                     fontSize: '9px',
                     fontWeight: 900,
                     background: 'rgba(0,0,0,0.85)',
-                    color: '#2DD4BF',
+                    color: '#00BB7F',
                     padding: '1px 4px',
                     borderRadius: '3px'
                   }}>
@@ -368,7 +368,7 @@ export function EPGGuideView({ channels = [], onSelectChannel }) {
                     </span>
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#2DD4BF', fontWeight: 700 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#00BB7F', fontWeight: 700 }}>
                     <span>{ch.category || 'Live TV'}</span>
                     <span>•</span>
                     <span style={{ color: '#4ade80' }}>24/7 LIVE HD</span>
@@ -423,15 +423,15 @@ export function EPGGuideView({ channels = [], onSelectChannel }) {
                   <button
                     onClick={(e) => handleCastToTV(e, ch)}
                     style={{
-                      background: 'rgba(45, 212, 191, 0.15)',
-                      border: '1px solid rgba(45, 212, 191, 0.4)',
+                      background: 'rgba(0, 187, 127, 0.15)',
+                      border: '1px solid rgba(0, 187, 127, 0.4)',
                       borderRadius: '50%',
                       width: '34px',
                       height: '34px',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      color: '#2DD4BF',
+                      color: '#00BB7F',
                       cursor: 'pointer'
                     }}
                     title="Play on TV"
@@ -468,9 +468,9 @@ export function EPGGuideView({ channels = [], onSelectChannel }) {
               fontSize: '13px',
               fontWeight: 800,
               borderRadius: '20px',
-              background: 'rgba(45, 212, 191, 0.15)',
-              border: '1px solid #2DD4BF',
-              color: '#2DD4BF',
+              background: 'rgba(0, 187, 127, 0.15)',
+              border: '1px solid #00BB7F',
+              color: '#00BB7F',
               cursor: 'pointer'
             }}
           >

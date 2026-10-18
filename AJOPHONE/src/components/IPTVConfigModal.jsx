@@ -45,7 +45,7 @@ export function IPTVConfigModal({ onClose, onConfigSaved }) {
 
           {/* JioTV Server IP */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '12px' }}>
-            <label style={{ fontSize: '13px', fontWeight: 700, color: '#2DD4BF', textTransform: 'uppercase' }}>
+            <label style={{ fontSize: '13px', fontWeight: 700, color: '#00BB7F', textTransform: 'uppercase' }}>
               JioTV Go Server Address
             </label>
             <div style={{ position: 'relative' }}>

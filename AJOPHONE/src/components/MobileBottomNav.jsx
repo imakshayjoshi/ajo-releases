@@ -47,7 +47,7 @@ export function MobileBottomNav({ activeTab, onTabChange }) {
                 )}
               </div>
               <span className="mobile-nav-label" style={{
-                color: isActive ? '#2DD4BF' : '#94a3b8',
+                color: isActive ? '#00BB7F' : '#94a3b8',
                 fontWeight: isActive ? 800 : 600,
                 fontSize: '10px'
               }}>

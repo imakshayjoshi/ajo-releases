@@ -137,11 +137,11 @@ export function QRScannerSheet({ onCode, onClose }) {
             {/* scan frame guide */}
             <div style={{
               position: 'relative', width: 220, height: 220, borderRadius: 18,
-              border: '2.5px solid rgba(45,212,191,0.9)',
+              border: '2.5px solid rgba(0,187,127,0.9)',
               boxShadow: '0 0 0 2000px rgba(0,0,0,0.45)',
               pointerEvents: 'none'
             }}>
-              <ScanLine size={26} color="#2DD4BF" style={{ position: 'absolute', top: -14, left: '50%', transform: 'translateX(-50%)' }} />
+              <ScanLine size={26} color="#00BB7F" style={{ position: 'absolute', top: -14, left: '50%', transform: 'translateX(-50%)' }} />
             </div>
           </>
         )}

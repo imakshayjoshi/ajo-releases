@@ -432,7 +432,7 @@ export default function App() {
                   borderRadius: '12px',
                   fontSize: '12px',
                   fontWeight: 800,
-                  background: liveViewMode === 'epg' ? '#2DD4BF' : 'rgba(255,255,255,0.08)',
+                  background: liveViewMode === 'epg' ? '#00BB7F' : 'rgba(255,255,255,0.08)',
                   color: liveViewMode === 'epg' ? '#06090e' : '#ffffff',
                   border: 'none',
                   cursor: 'pointer'
@@ -447,7 +447,7 @@ export default function App() {
                   borderRadius: '12px',
                   fontSize: '12px',
                   fontWeight: 800,
-                  background: liveViewMode === 'grid' ? '#2DD4BF' : 'rgba(255,255,255,0.08)',
+                  background: liveViewMode === 'grid' ? '#00BB7F' : 'rgba(255,255,255,0.08)',
                   color: liveViewMode === 'grid' ? '#06090e' : '#ffffff',
                   border: 'none',
                   cursor: 'pointer'
@@ -742,7 +742,7 @@ export default function App() {
               width: '36px',
               height: '36px',
               borderRadius: '10px',
-              background: 'linear-gradient(135deg, #0d9488 0%, #2DD4BF 100%)',
+              background: 'linear-gradient(135deg, #00875f 0%, #00BB7F 100%)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -783,7 +783,7 @@ export default function App() {
                 );
               }}
               style={{
-                background: 'linear-gradient(135deg, #2DD4BF 0%, #0d9488 100%)',
+                background: 'linear-gradient(135deg, #00BB7F 0%, #00875f 100%)',
                 color: '#06090e',
                 border: 'none',
                 borderRadius: '12px',

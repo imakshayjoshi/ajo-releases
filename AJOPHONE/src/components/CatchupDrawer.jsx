@@ -56,12 +56,12 @@ export function CatchupDrawer({ channel, onClose, onPlay }) {
       marginTop: '14px',
       padding: '14px',
       background: 'rgba(15, 23, 42, 0.98)',
-      border: '1px solid rgba(45, 212, 191, 0.4)',
+      border: '1px solid rgba(0, 187, 127, 0.4)',
       borderRadius: '16px',
       maxHeight: '300px',
       overflowY: 'auto'
     }}>
-      <div style={{ fontSize: '12px', fontWeight: 900, color: '#2DD4BF', marginBottom: '10px', textTransform: 'uppercase', display: 'flex', justifyContent: 'space-between' }}>
+      <div style={{ fontSize: '12px', fontWeight: 900, color: '#00BB7F', marginBottom: '10px', textTransform: 'uppercase', display: 'flex', justifyContent: 'space-between' }}>
         <span>Catch-Up TV — {channel.catchupDays || 7} days available</span>
         <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontWeight: 900 }}>✕</button>
       </div>
@@ -80,15 +80,15 @@ export function CatchupDrawer({ channel, onClose, onPlay }) {
         </div>
       ) : (
         <>
-          <button onClick={() => setSelectedDay(null)} style={{ background: 'none', border: 'none', color: '#2DD4BF', fontWeight: 800, fontSize: '12px', marginBottom: '8px', cursor: 'pointer' }}>
+          <button onClick={() => setSelectedDay(null)} style={{ background: 'none', border: 'none', color: '#00BB7F', fontWeight: 800, fontSize: '12px', marginBottom: '8px', cursor: 'pointer' }}>
             ← {selectedDay}
           </button>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
             {slots.map(s => (
               <button key={s.label} onClick={() => play(s.start)} style={{
                 padding: '8px 4px', borderRadius: '8px',
-                background: 'rgba(45, 212, 191, 0.12)', color: '#e2e8f0',
-                border: '1px solid rgba(45, 212, 191, 0.3)', fontWeight: 800, fontSize: '12px', cursor: 'pointer'
+                background: 'rgba(0, 187, 127, 0.12)', color: '#e2e8f0',
+                border: '1px solid rgba(0, 187, 127, 0.3)', fontWeight: 800, fontSize: '12px', cursor: 'pointer'
               }}>
                 {s.label}
               </button>

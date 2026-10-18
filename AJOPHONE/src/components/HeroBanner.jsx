@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Play, Info, Star, Plus, Check, Sparkles } from 'lucide-react';
+import { Play, Info, Star, Plus, Check } from 'lucide-react';
 import { getSourceProvider } from '../utils/sourceProvider';
 import { isFavorite, toggleFavorite } from '../api/history';
 
+// v3.5.1: bingr.one-style hero — left-aligned bottom stack, condensed Bebas
+// display title, yellow-star rating meta, green primary Play. Replaces the
+// centered Netflix layout (red ribbon, white play button).
 export function HeroBanner({ featuredItem, onPlay, onSelectInfo, onFavoritesChanged }) {
   const [inWatchlist, setInWatchlist] = useState(false);
 
@@ -16,7 +19,7 @@ export function HeroBanner({ featuredItem, onPlay, onSelectInfo, onFavoritesChan
 
   const isLive = featuredItem.is_live || featuredItem.type === 'live' || featuredItem.year === 'LIVE';
   const title = featuredItem.title_en || featuredItem.title || featuredItem.title_ru || featuredItem.name || "Featured Spotlight";
-  const poster = featuredItem.backdrop_url || featuredItem.poster_url || featuredItem.poster || featuredItem.logo || '';
+  const poster = featuredItem.backdrop_url || featuredItem.backdrop || featuredItem.poster_url || featuredItem.poster || featuredItem.logo || '';
   const provider = getSourceProvider(featuredItem);
 
   const handleToggleWatchlist = (e) => {
@@ -26,90 +29,80 @@ export function HeroBanner({ featuredItem, onPlay, onSelectInfo, onFavoritesChan
     if (onFavoritesChanged) onFavoritesChanged();
   };
 
-  const genres = featuredItem.genres?.map(g => g.name).filter(Boolean) || [];
-  const genreTags = genres.length > 0 
-    ? genres.slice(0, 3).join(' • ')
-    : (isLive ? '24/7 Live Broadcast • Ultra HD' : 'Action • Thriller • Blockbuster');
+  const genres = featuredItem.genres?.map(g => (typeof g === 'string' ? g : g.name)).filter(Boolean) || [];
+  const rating = featuredItem.rating ? Number(featuredItem.rating).toFixed(1) : null;
+  const year = featuredItem.year || '';
+  // bingr meta format: "6.1 · 2026 · Thriller · Drama"
+  const metaParts = [year, ...genres.slice(0, 2)].filter(Boolean).join(' · ');
 
   return (
-    <section 
-      className="mobile-netflix-hero" 
+    <section
+      className="mobile-netflix-hero"
       onClick={() => onSelectInfo(featuredItem)}
       style={{
         position: 'relative',
         width: '100%',
-        height: '490px',
+        height: '520px',
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'flex-end',
-        padding: '0 16px 20px 16px',
+        padding: '0 18px 22px 18px',
         cursor: 'pointer',
         overflow: 'hidden'
       }}
     >
-      {/* Cinematic Backdrop Image */}
+      {/* Backdrop */}
       {poster && (
-        <div 
+        <div
           style={{
             position: 'absolute',
             inset: 0,
             backgroundImage: `url(${poster})`,
             backgroundSize: 'cover',
-            backgroundPosition: 'top center',
-            transform: 'scale(1.04)',
-            filter: 'brightness(0.92)'
+            backgroundPosition: 'center 20%',
+            transform: 'scale(1.03)',
+            filter: 'brightness(0.95)'
           }}
         />
       )}
 
-      {/* Netflix Vignette Gradient Overlays */}
-      <div 
+      {/* bingr gradient: clear image on top, solid #0f1014 at the bottom */}
+      <div
         style={{
           position: 'absolute',
           inset: 0,
-          background: 'linear-gradient(180deg, rgba(6, 9, 14, 0.2) 0%, rgba(6, 9, 14, 0.1) 40%, rgba(6, 9, 14, 0.8) 75%, #06090e 100%)',
+          background: 'linear-gradient(180deg, rgba(15,16,20,0.05) 0%, rgba(15,16,20,0.15) 35%, rgba(15,16,20,0.72) 72%, #0f1014 100%)',
           pointerEvents: 'none'
-        }} 
+        }}
       />
 
-      <div style={{ position: 'relative', zIndex: 3, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-        {/* Netflix Red AJO Ribbon */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+      <div style={{ position: 'relative', zIndex: 3, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left' }}>
+        {/* small provider eyebrow, bingr-green */}
+        {provider && (
           <div style={{
-            background: 'rgba(229, 9, 20, 0.95)',
-            color: '#ffffff',
-            fontSize: '9px',
+            color: '#00BB7F',
+            fontSize: '10px',
             fontWeight: 900,
-            letterSpacing: '1.2px',
-            padding: '3px 8px',
-            borderRadius: '4px',
-            boxShadow: '0 2px 8px rgba(229, 9, 20, 0.4)'
+            letterSpacing: '1.6px',
+            textTransform: 'uppercase',
+            marginBottom: '6px',
+            textShadow: '0 1px 6px rgba(0,0,0,0.8)'
           }}>
-            🔴 AJO ORIGINALS
+            {isLive ? 'LIVE TV' : String(provider).replace(/-/g, ' ')}
           </div>
+        )}
 
-          <div style={{
-            background: 'rgba(0, 0, 0, 0.75)',
-            border: '1px solid rgba(255, 255, 255, 0.15)',
-            color: '#2DD4BF',
-            fontSize: '9px',
-            fontWeight: 800,
-            padding: '3px 7px',
-            borderRadius: '4px'
-          }}>
-            ⚡ 4K DOLBY ATMOS
-          </div>
-        </div>
-
-        {/* Big Hero Title */}
+        {/* Bebas display title */}
         <h1 style={{
-          fontSize: '28px',
-          fontWeight: 900,
+          fontFamily: "'Bebas Neue', 'Anton', Impact, sans-serif",
+          fontSize: '46px',
+          fontWeight: 400,
           color: '#ffffff',
-          letterSpacing: '-0.5px',
-          lineHeight: '1.15',
-          margin: '0 0 6px 0',
-          textShadow: '0 2px 16px rgba(0,0,0,0.9)',
+          letterSpacing: '1.5px',
+          lineHeight: '0.95',
+          margin: '0 0 8px 0',
+          textTransform: 'uppercase',
+          textShadow: '0 2px 18px rgba(0,0,0,0.85)',
           display: '-webkit-box',
           WebkitLineClamp: 2,
           WebkitBoxOrient: 'vertical',
@@ -118,96 +111,93 @@ export function HeroBanner({ featuredItem, onPlay, onSelectInfo, onFavoritesChan
           {title}
         </h1>
 
-        {/* Netflix Dot-Separated Genre Tags */}
+        {/* meta row: yellow star rating · year · genres */}
         <div style={{
-          fontSize: '12px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          fontSize: '12.5px',
           fontWeight: 700,
-          color: '#cbd5e1',
-          marginBottom: '16px',
+          color: '#c7ccd4',
+          marginBottom: '18px',
           textShadow: '0 1px 4px rgba(0,0,0,0.8)'
         }}>
-          {genreTags}
+          {rating && (
+            <>
+              <Star size={13} fill="#FFD236" color="#FFD236" />
+              <span style={{ color: '#FFD236' }}>{rating}</span>
+              {(metaParts) && <span style={{ color: '#5f6773' }}>·</span>}
+            </>
+          )}
+          {isLive ? '24/7 Live · Ultra HD' : metaParts}
         </div>
 
-        {/* Netflix Iconic Triad Action Row */}
-        <div 
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '16px',
-            width: '100%',
-            maxWidth: '340px'
-          }}
+        {/* bingr action row: solid green Play + ghost My List + ghost Info */}
+        <div
+          style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%' }}
           onClick={e => e.stopPropagation()}
         >
-          {/* 1. My List Button */}
-          <button 
-            onClick={handleToggleWatchlist}
-            style={{
-              flex: 1,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '4px',
-              background: 'transparent',
-              border: 'none',
-              color: inWatchlist ? '#2DD4BF' : '#ffffff',
-              cursor: 'pointer',
-              fontSize: '11px',
-              fontWeight: 700
-            }}
-          >
-            {inWatchlist ? <Check size={22} color="#2DD4BF" /> : <Plus size={22} color="#ffffff" />}
-            <span>{inWatchlist ? 'My List' : 'My List'}</span>
-          </button>
-
-          {/* 2. Solid White Netflix Play Button */}
-          <button 
+          <button
             onClick={() => onPlay(featuredItem)}
             style={{
-              flex: 2,
+              flex: 1,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               gap: '8px',
-              padding: '11px 24px',
+              padding: '13px 24px',
               borderRadius: '8px',
-              background: '#ffffff',
-              color: '#06090e',
+              background: '#00BB7F',
+              color: '#04120d',
               border: 'none',
               fontSize: '15px',
               fontWeight: 900,
               cursor: 'pointer',
-              boxShadow: '0 4px 16px rgba(255, 255, 255, 0.35)',
-              transition: 'transform 0.1s ease'
+              boxShadow: '0 6px 20px rgba(0, 187, 127, 0.35)'
             }}
           >
-            <Play size={18} fill="#06090e" color="#06090e" />
+            <Play size={18} fill="#04120d" color="#04120d" />
             <span>Play</span>
           </button>
 
-          {/* 3. Info Button */}
-          <button 
-            onClick={() => onSelectInfo(featuredItem)}
+          <button
+            onClick={handleToggleWatchlist}
+            aria-label="My List"
             style={{
-              flex: 1,
+              width: '47px',
+              height: '47px',
               display: 'flex',
-              flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '4px',
-              background: 'transparent',
-              border: 'none',
-              color: '#ffffff',
+              borderRadius: '8px',
+              background: 'rgba(255,255,255,0.08)',
+              border: '1px solid rgba(255,255,255,0.18)',
+              color: inWatchlist ? '#00BB7F' : '#ffffff',
               cursor: 'pointer',
-              fontSize: '11px',
-              fontWeight: 700
+              backdropFilter: 'blur(8px)'
             }}
           >
-            <Info size={22} color="#ffffff" />
-            <span>Info</span>
+            {inWatchlist ? <Check size={20} color="#00BB7F" /> : <Plus size={20} color="#ffffff" />}
+          </button>
+
+          <button
+            onClick={() => onSelectInfo(featuredItem)}
+            aria-label="More info"
+            style={{
+              width: '47px',
+              height: '47px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: '8px',
+              background: 'rgba(255,255,255,0.08)',
+              border: '1px solid rgba(255,255,255,0.18)',
+              color: '#ffffff',
+              cursor: 'pointer',
+              backdropFilter: 'blur(8px)'
+            }}
+          >
+            <Info size={20} color="#ffffff" />
           </button>
         </div>
       </div>

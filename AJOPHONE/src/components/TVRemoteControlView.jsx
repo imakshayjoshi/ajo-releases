@@ -261,7 +261,7 @@ export function TVRemoteControlView({ onTuneChannelLocally }) {
           left: '50%',
           transform: 'translateX(-50%)',
           background: 'rgba(15, 23, 42, 0.96)',
-          border: '1px solid #2DD4BF',
+          border: '1px solid #00BB7F',
           color: '#ffffff',
           padding: '10px 18px',
           borderRadius: '24px',
@@ -270,11 +270,11 @@ export function TVRemoteControlView({ onTuneChannelLocally }) {
           display: 'flex',
           alignItems: 'center',
           gap: '8px',
-          boxShadow: '0 8px 24px rgba(45, 212, 191, 0.4)',
+          boxShadow: '0 8px 24px rgba(0, 187, 127, 0.4)',
           zIndex: 99999,
           maxWidth: '90%'
         }}>
-          <Cast size={16} color="#2DD4BF" />
+          <Cast size={16} color="#00BB7F" />
           <span>{toast}</span>
         </div>
       )}
@@ -320,7 +320,7 @@ export function TVRemoteControlView({ onTuneChannelLocally }) {
                 }} />
                 <span style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 700 }}>
                   {isConnected ? (
-                    <>Connected to your TV • Room <b style={{ color: '#2DD4BF' }}>{castState.roomCode}</b></>
+                    <>Connected to your TV • Room <b style={{ color: '#00BB7F' }}>{castState.roomCode}</b></>
                   ) : isConnecting ? (
                     <>Connecting…</>
                   ) : (
@@ -369,7 +369,7 @@ export function TVRemoteControlView({ onTuneChannelLocally }) {
               style={{
                 flex: 1,
                 background: 'rgba(0, 0, 0, 0.5)',
-                border: '1.5px solid #2DD4BF',
+                border: '1.5px solid #00BB7F',
                 borderRadius: '10px',
                 padding: '10px 14px',
                 color: '#fff',
@@ -386,9 +386,9 @@ export function TVRemoteControlView({ onTuneChannelLocally }) {
               onClick={() => setShowScanner(true)}
               aria-label="Scan QR code"
               style={{
-                background: 'rgba(45, 212, 191, 0.15)',
-                color: '#2DD4BF',
-                border: '1.5px solid rgba(45, 212, 191, 0.5)',
+                background: 'rgba(0, 187, 127, 0.15)',
+                color: '#00BB7F',
+                border: '1.5px solid rgba(0, 187, 127, 0.5)',
                 borderRadius: '10px',
                 padding: '0 13px',
                 cursor: 'pointer',
@@ -404,7 +404,7 @@ export function TVRemoteControlView({ onTuneChannelLocally }) {
             <button
               type="submit"
               style={{
-                background: '#2DD4BF',
+                background: '#00BB7F',
                 color: '#06090e',
                 border: 'none',
                 borderRadius: '10px',
@@ -426,8 +426,8 @@ export function TVRemoteControlView({ onTuneChannelLocally }) {
           </form>
         )}
         {!isConnected && (
-          <div style={{ marginTop: '10px', fontSize: '13px', color: '#94a3b8', lineHeight: 1.6, background: 'rgba(45,212,191,0.07)', border: '1px solid rgba(45,212,191,0.15)', borderRadius: '10px', padding: '10px 12px' }}>
-            <b style={{ color: '#e2e8f0' }}>How to connect:</b> On your TV, open <b style={{ color: '#2DD4BF' }}>Settings</b> — the first card shows a QR code and a code like <b style={{ color: '#2DD4BF' }}>AJO-7492</b>. Tap <b style={{ color: '#2DD4BF' }}>scan</b> and point at the TV, or type the code and press <b style={{ color: '#2DD4BF' }}>Connect</b>.
+          <div style={{ marginTop: '10px', fontSize: '13px', color: '#94a3b8', lineHeight: 1.6, background: 'rgba(0,187,127,0.07)', border: '1px solid rgba(0,187,127,0.15)', borderRadius: '10px', padding: '10px 12px' }}>
+            <b style={{ color: '#e2e8f0' }}>How to connect:</b> On your TV, open <b style={{ color: '#00BB7F' }}>Settings</b> — the first card shows a QR code and a code like <b style={{ color: '#00BB7F' }}>AJO-7492</b>. Tap <b style={{ color: '#00BB7F' }}>scan</b> and point at the TV, or type the code and press <b style={{ color: '#00BB7F' }}>Connect</b>.
           </div>
         )}
         {showScanner && (
@@ -442,7 +442,7 @@ export function TVRemoteControlView({ onTuneChannelLocally }) {
       <div style={{ marginBottom: '24px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Zap size={16} color="#2DD4BF" />
+            <Zap size={16} color="#00BB7F" />
             <span style={{ fontSize: '13px', fontWeight: 900, color: '#e2e8f0', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
               1-Tap Instant TV Channel Cast
             </span>
@@ -508,7 +508,7 @@ export function TVRemoteControlView({ onTuneChannelLocally }) {
               key={cat}
               onClick={() => setSelectedCategory(cat)}
               style={{
-                background: selectedCategory === cat ? '#2DD4BF' : 'rgba(30, 41, 59, 0.7)',
+                background: selectedCategory === cat ? '#00BB7F' : 'rgba(30, 41, 59, 0.7)',
                 color: selectedCategory === cat ? '#06090e' : '#cbd5e1',
                 border: 'none',
                 borderRadius: '8px',
@@ -527,7 +527,7 @@ export function TVRemoteControlView({ onTuneChannelLocally }) {
         {/* Channels Grid / State */}
         {loadingChannels && channels.length === 0 ? (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '30px 0', gap: '8px', color: '#94a3b8' }}>
-            <Loader2 className="spin-animation" size={20} color="#2DD4BF" />
+            <Loader2 className="spin-animation" size={20} color="#00BB7F" />
             <span style={{ fontSize: '13px', fontWeight: 700 }}>Loading TV channels...</span>
           </div>
         ) : channelError && channels.length === 0 ? (
@@ -536,7 +536,7 @@ export function TVRemoteControlView({ onTuneChannelLocally }) {
             <div style={{ fontSize: '13px', fontWeight: 800, color: '#f87171' }}>{channelError}</div>
             <button
               onClick={loadChannels}
-              style={{ marginTop: '10px', background: '#2DD4BF', color: '#06090e', border: 'none', borderRadius: '8px', padding: '6px 14px', fontSize: '12px', fontWeight: 800, cursor: 'pointer' }}
+              style={{ marginTop: '10px', background: '#00BB7F', color: '#06090e', border: 'none', borderRadius: '8px', padding: '6px 14px', fontSize: '12px', fontWeight: 800, cursor: 'pointer' }}
             >
               Retry
             </button>
@@ -564,8 +564,8 @@ export function TVRemoteControlView({ onTuneChannelLocally }) {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    background: isCasting ? 'rgba(45, 212, 191, 0.25)' : 'rgba(30, 41, 59, 0.7)',
-                    border: isCasting ? '1px solid #2DD4BF' : '1px solid rgba(255, 255, 255, 0.1)',
+                    background: isCasting ? 'rgba(0, 187, 127, 0.25)' : 'rgba(30, 41, 59, 0.7)',
+                    border: isCasting ? '1px solid #00BB7F' : '1px solid rgba(255, 255, 255, 0.1)',
                     padding: '8px 10px',
                     borderRadius: '12px',
                     cursor: 'pointer',
@@ -582,13 +582,13 @@ export function TVRemoteControlView({ onTuneChannelLocally }) {
                         referrerPolicy="no-referrer"
                       />
                     ) : (
-                      <Radio size={18} color="#2DD4BF" />
+                      <Radio size={18} color="#00BB7F" />
                     )}
                     <div style={{ overflow: 'hidden' }}>
                       <span style={{ fontSize: '12px', fontWeight: 800, color: '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }}>
                         {ch.title.replace(/\([^)]*\)/g, '').trim()}
                       </span>
-                      <span style={{ fontSize: '10px', fontWeight: 700, color: '#2DD4BF' }}>
+                      <span style={{ fontSize: '10px', fontWeight: 700, color: '#00BB7F' }}>
                         {ch.category || 'Live TV'}
                       </span>
                     </div>
@@ -600,12 +600,12 @@ export function TVRemoteControlView({ onTuneChannelLocally }) {
                       minWidth: '32px',
                       minHeight: '32px',
                       borderRadius: '8px',
-                      background: isCasting ? '#2DD4BF' : 'rgba(45, 212, 191, 0.15)',
+                      background: isCasting ? '#00BB7F' : 'rgba(0, 187, 127, 0.15)',
                       border: 'none',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      color: isCasting ? '#06090e' : '#2DD4BF',
+                      color: isCasting ? '#06090e' : '#00BB7F',
                       cursor: 'pointer'
                     }}
                     title="Cast to TV"
@@ -679,7 +679,7 @@ export function TVRemoteControlView({ onTuneChannelLocally }) {
           height: '210px',
           borderRadius: '50%',
           background: 'linear-gradient(145deg, #0f172a, #1e293b)',
-          border: '2px solid rgba(45, 212, 191, 0.3)',
+          border: '2px solid rgba(0, 187, 127, 0.3)',
           boxShadow: 'inset 0 4px 12px rgba(0,0,0,0.8), 0 8px 24px rgba(0,0,0,0.6)',
           display: 'flex',
           alignItems: 'center',
@@ -698,7 +698,7 @@ export function TVRemoteControlView({ onTuneChannelLocally }) {
               height: '52px',
               background: 'transparent',
               border: 'none',
-              color: '#2DD4BF',
+              color: '#00BB7F',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -720,7 +720,7 @@ export function TVRemoteControlView({ onTuneChannelLocally }) {
               height: '52px',
               background: 'transparent',
               border: 'none',
-              color: '#2DD4BF',
+              color: '#00BB7F',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -742,7 +742,7 @@ export function TVRemoteControlView({ onTuneChannelLocally }) {
               height: '56px',
               background: 'transparent',
               border: 'none',
-              color: '#2DD4BF',
+              color: '#00BB7F',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -764,7 +764,7 @@ export function TVRemoteControlView({ onTuneChannelLocally }) {
               height: '56px',
               background: 'transparent',
               border: 'none',
-              color: '#2DD4BF',
+              color: '#00BB7F',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -781,7 +781,7 @@ export function TVRemoteControlView({ onTuneChannelLocally }) {
               width: '74px',
               height: '74px',
               borderRadius: '50%',
-              background: 'linear-gradient(135deg, #0d9488 0%, #115e59 100%)',
+              background: 'linear-gradient(135deg, #00875f 0%, #115e59 100%)',
               border: '2px solid rgba(255,255,255,0.3)',
               color: '#ffffff',
               fontSize: '15px',
@@ -831,14 +831,14 @@ export function TVRemoteControlView({ onTuneChannelLocally }) {
               width: '54px',
               height: '54px',
               borderRadius: '50%',
-              background: '#2DD4BF',
+              background: '#00BB7F',
               border: 'none',
               color: '#06090e',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               cursor: 'pointer',
-              boxShadow: '0 4px 14px rgba(45, 212, 191, 0.4)'
+              boxShadow: '0 4px 14px rgba(0, 187, 127, 0.4)'
             }}
             title="Play / Pause"
           >

@@ -83,8 +83,8 @@ export function LiveView({ channels, onSelectItem, loading }) {
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           width: '100%', padding: '11px 16px', fontSize: '1rem', fontWeight: 700,
           borderRadius: 10, textAlign: 'left',
-          border: active ? '2px solid #2DD4BF' : '1px solid transparent',
-          background: active ? 'linear-gradient(135deg, rgba(45,212,191,0.25), rgba(2,132,199,0.18))' : 'transparent',
+          border: active ? '2px solid #00BB7F' : '1px solid transparent',
+          background: active ? 'linear-gradient(135deg, rgba(0,187,127,0.25), rgba(2,132,199,0.18))' : 'transparent',
           color: active ? '#ffffff' : '#b6c0cf', cursor: 'pointer'
         }}
       >
@@ -92,7 +92,7 @@ export function LiveView({ channels, onSelectItem, loading }) {
           <span style={{ fontSize: '1.1rem' }}>{CATEGORY_ICONS[cat] || '📺'}</span>
           {cat === ALL ? '📺 All' : cat}
         </span>
-        <span style={{ fontSize: '0.75rem', color: active ? '#2DD4BF' : '#71809a', fontWeight: 800 }}>{count}</span>
+        <span style={{ fontSize: '0.75rem', color: active ? '#00BB7F' : '#71809a', fontWeight: 800 }}>{count}</span>
       </button>
     );
   };
@@ -137,7 +137,7 @@ export function LiveView({ channels, onSelectItem, loading }) {
                 <img src={ch.logo} alt="" style={{ width: 64, height: 64, objectFit: 'contain', borderRadius: 8,
                   background: 'rgba(255,255,255,0.06)', padding: 4 }} loading="lazy" />
               ) : (
-                <div style={{ width: 64, height: 64, borderRadius: 8, background: 'rgba(45,212,191,0.15)',
+                <div style={{ width: 64, height: 64, borderRadius: 8, background: 'rgba(0,187,127,0.15)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26 }}>📺</div>
               )}
               <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#e8edf5', textAlign: 'center',

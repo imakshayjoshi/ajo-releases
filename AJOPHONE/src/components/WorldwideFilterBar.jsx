@@ -134,7 +134,7 @@ export function WorldwideFilterBar({ filters, onFilterChange, totalResults = nul
             padding: '7px 14px',
             borderRadius: '20px',
             background: activeFilterCount > 0 
-              ? 'linear-gradient(135deg, #2DD4BF 0%, #6366f1 100%)' 
+              ? 'linear-gradient(135deg, #00BB7F 0%, #6366f1 100%)' 
               : 'rgba(255, 255, 255, 0.08)',
             border: activeFilterCount > 0 ? '1px solid #60a5fa' : '1px solid rgba(255, 255, 255, 0.15)',
             color: '#ffffff',
@@ -143,11 +143,11 @@ export function WorldwideFilterBar({ filters, onFilterChange, totalResults = nul
             cursor: 'pointer',
             whiteSpace: 'nowrap',
             flexShrink: 0,
-            boxShadow: activeFilterCount > 0 ? '0 4px 12px rgba(45, 212, 191, 0.4)' : 'none',
+            boxShadow: activeFilterCount > 0 ? '0 4px 12px rgba(0, 187, 127, 0.4)' : 'none',
             transition: 'all 0.2s ease'
           }}
         >
-          <SlidersHorizontal size={14} color={activeFilterCount > 0 ? '#ffffff' : '#2DD4BF'} />
+          <SlidersHorizontal size={14} color={activeFilterCount > 0 ? '#ffffff' : '#00BB7F'} />
           <span>Worldwide Filters</span>
           {activeFilterCount > 0 && (
             <span style={{
@@ -178,9 +178,9 @@ export function WorldwideFilterBar({ filters, onFilterChange, totalResults = nul
               style={{
                 padding: '6px 12px',
                 borderRadius: '20px',
-                background: isSelected ? 'rgba(45, 212, 191, 0.2)' : 'rgba(255, 255, 255, 0.04)',
-                border: isSelected ? '1px solid #2DD4BF' : '1px solid rgba(255, 255, 255, 0.08)',
-                color: isSelected ? '#2DD4BF' : '#94a3b8',
+                background: isSelected ? 'rgba(0, 187, 127, 0.2)' : 'rgba(255, 255, 255, 0.04)',
+                border: isSelected ? '1px solid #00BB7F' : '1px solid rgba(255, 255, 255, 0.08)',
+                color: isSelected ? '#00BB7F' : '#94a3b8',
                 fontSize: '12px',
                 fontWeight: isSelected ? 800 : 600,
                 cursor: 'pointer',
@@ -266,7 +266,7 @@ export function WorldwideFilterBar({ filters, onFilterChange, totalResults = nul
               justifyContent: 'space-between'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <SlidersHorizontal size={20} color="#2DD4BF" />
+                <SlidersHorizontal size={20} color="#00BB7F" />
                 <h2 style={{ fontSize: '17px', fontWeight: 900, color: '#fff', margin: 0 }}>
                   Worldwide Content Filter
                 </h2>
@@ -301,7 +301,7 @@ export function WorldwideFilterBar({ filters, onFilterChange, totalResults = nul
               {/* 1. Region / Country */}
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
-                  <Globe2 size={15} color="#2DD4BF" />
+                  <Globe2 size={15} color="#00BB7F" />
                   <span style={{ fontSize: '13px', fontWeight: 800, color: '#e2e8f0' }}>Region & Country</span>
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
@@ -314,9 +314,9 @@ export function WorldwideFilterBar({ filters, onFilterChange, totalResults = nul
                         style={{
                           padding: '6px 12px',
                           borderRadius: '16px',
-                          background: sel ? 'rgba(45, 212, 191, 0.2)' : 'rgba(255, 255, 255, 0.05)',
-                          border: sel ? '1px solid #2DD4BF' : '1px solid rgba(255, 255, 255, 0.08)',
-                          color: sel ? '#2DD4BF' : '#94a3b8',
+                          background: sel ? 'rgba(0, 187, 127, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                          border: sel ? '1px solid #00BB7F' : '1px solid rgba(255, 255, 255, 0.08)',
+                          color: sel ? '#00BB7F' : '#94a3b8',
                           fontSize: '12px',
                           fontWeight: sel ? 800 : 600,
                           cursor: 'pointer'
@@ -486,7 +486,7 @@ export function WorldwideFilterBar({ filters, onFilterChange, totalResults = nul
                 style={{
                   padding: '10px 24px',
                   borderRadius: '14px',
-                  background: 'linear-gradient(135deg, #2DD4BF 0%, #0f766e 100%)',
+                  background: 'linear-gradient(135deg, #00BB7F 0%, #0f766e 100%)',
                   border: 'none',
                   color: '#ffffff',
                   fontSize: '14px',

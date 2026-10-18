@@ -204,7 +204,7 @@ const [addons, setAddons] = useState(__addonsInit);
           transform: 'translateX(-50%)',
           zIndex: 1000,
           background: 'rgba(15, 23, 42, 0.95)',
-          border: '1.5px solid #2DD4BF',
+          border: '1.5px solid #00BB7F',
           color: '#ffffff',
           padding: '10px 20px',
           borderRadius: '24px',
@@ -215,7 +215,7 @@ const [addons, setAddons] = useState(__addonsInit);
           fontWeight: 700,
           boxShadow: '0 8px 24px rgba(0, 0, 0, 0.6)'
         }}>
-          <Check size={16} color="#2DD4BF" />
+          <Check size={16} color="#00BB7F" />
           <span>{actionNotice}</span>
         </div>
       )}
@@ -223,7 +223,7 @@ const [addons, setAddons] = useState(__addonsInit);
       {/* 🚀 ON-DEVICE OTA SOFTWARE UPDATE CARD */}
       <div className="mobile-settings-card" style={{
         background: 'linear-gradient(145deg, rgba(14, 20, 31, 0.95), rgba(22, 32, 50, 0.95))',
-        border: '1px solid rgba(45, 212, 191, 0.3)',
+        border: '1px solid rgba(0, 187, 127, 0.3)',
         borderRadius: '16px',
         padding: '18px',
         marginBottom: '16px',
@@ -235,7 +235,7 @@ const [addons, setAddons] = useState(__addonsInit);
               width: '36px',
               height: '36px',
               borderRadius: '10px',
-              background: 'linear-gradient(135deg, #2DD4BF 0%, #2DD4BF 100%)',
+              background: 'linear-gradient(135deg, #00BB7F 0%, #00BB7F 100%)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -248,7 +248,7 @@ const [addons, setAddons] = useState(__addonsInit);
                 App Software Updates
               </h3>
               <span style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 600 }}>
-                Current Installed: <strong style={{ color: '#2DD4BF' }}>v{installedVersion} (Build {installedCode})</strong>
+                Current Installed: <strong style={{ color: '#00BB7F' }}>v{installedVersion} (Build {installedCode})</strong>
               </span>
             </div>
           </div>
@@ -260,9 +260,9 @@ const [addons, setAddons] = useState(__addonsInit);
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
-              background: 'rgba(45, 212, 191, 0.15)',
-              border: '1px solid rgba(45, 212, 191, 0.4)',
-              color: '#2DD4BF',
+              background: 'rgba(0, 187, 127, 0.15)',
+              border: '1px solid rgba(0, 187, 127, 0.4)',
+              color: '#00BB7F',
               padding: '8px 14px',
               borderRadius: '20px',
               fontSize: '12px',
@@ -311,7 +311,7 @@ const [addons, setAddons] = useState(__addonsInit);
               <span style={{ fontSize: '13px', fontWeight: 700, color: '#ffffff' }}>
                 {updateStatusText}
               </span>
-              <span style={{ fontSize: '13px', fontWeight: 800, color: '#2DD4BF' }}>
+              <span style={{ fontSize: '13px', fontWeight: 800, color: '#00BB7F' }}>
                 {downloadProgress}%
               </span>
             </div>
@@ -327,7 +327,7 @@ const [addons, setAddons] = useState(__addonsInit);
               <div style={{
                 width: `${downloadProgress}%`,
                 height: '100%',
-                background: 'linear-gradient(90deg, #2DD4BF, #2DD4BF)',
+                background: 'linear-gradient(90deg, #00BB7F, #00BB7F)',
                 borderRadius: '4px',
                 transition: 'width 0.2s ease'
               }} />
@@ -339,8 +339,8 @@ const [addons, setAddons] = useState(__addonsInit);
         {updateInfo && updateInfo.hasUpdate && !isUpdating && (
           <div style={{
             marginTop: '14px',
-            background: updateInfo.needsReinstall ? 'rgba(245, 158, 11, 0.08)' : 'rgba(45, 212, 191, 0.08)',
-            border: updateInfo.needsReinstall ? '1px solid rgba(245, 158, 11, 0.35)' : '1px solid rgba(45, 212, 191, 0.25)',
+            background: updateInfo.needsReinstall ? 'rgba(245, 158, 11, 0.08)' : 'rgba(0, 187, 127, 0.08)',
+            border: updateInfo.needsReinstall ? '1px solid rgba(245, 158, 11, 0.35)' : '1px solid rgba(0, 187, 127, 0.25)',
             borderRadius: '12px',
             padding: '14px'
           }}>
@@ -372,7 +372,7 @@ const [addons, setAddons] = useState(__addonsInit);
               <div style={{ margin: '10px 0', fontSize: '12px', color: '#cbd5e1', lineHeight: '1.6' }}>
                 {updateInfo.changelog.map((log, i) => (
                   <div key={i} style={{ display: 'flex', gap: '6px', alignItems: 'flex-start', marginBottom: '4px' }}>
-                    <span style={{ color: '#2DD4BF' }}>•</span>
+                    <span style={{ color: '#00BB7F' }}>•</span>
                     <span>{log}</span>
                   </div>
                 ))}
@@ -384,7 +384,7 @@ const [addons, setAddons] = useState(__addonsInit);
               style={{
                 width: '100%',
                 marginTop: '8px',
-                background: 'linear-gradient(135deg, #0d9488 0%, #0f766e 100%)',
+                background: 'linear-gradient(135deg, #00875f 0%, #0f766e 100%)',
                 border: 'none',
                 color: '#ffffff',
                 padding: '12px',
@@ -435,7 +435,7 @@ const [addons, setAddons] = useState(__addonsInit);
         marginBottom: '16px'
       }}>
         <div className="mobile-settings-card-header" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-          <Moon size={18} color="#2DD4BF" />
+          <Moon size={18} color="#00BB7F" />
           <h3 style={{ fontSize: '15px', fontWeight: 800, color: '#fff', margin: 0 }}>Playback Sleep Timer</h3>
         </div>
         <p style={{ fontSize: '12px', color: '#94a3b8', margin: '0 0 12px 0' }}>
@@ -447,8 +447,8 @@ const [addons, setAddons] = useState(__addonsInit);
             <button
               key={time}
               style={{
-                background: sleepTimer === time ? 'linear-gradient(135deg, #0d9488, #0f766e)' : 'rgba(255, 255, 255, 0.08)',
-                border: sleepTimer === time ? '1px solid #2DD4BF' : '1px solid rgba(255, 255, 255, 0.1)',
+                background: sleepTimer === time ? 'linear-gradient(135deg, #00875f, #0f766e)' : 'rgba(255, 255, 255, 0.08)',
+                border: sleepTimer === time ? '1px solid #00BB7F' : '1px solid rgba(255, 255, 255, 0.1)',
                 color: '#fff',
                 padding: '6px 14px',
                 borderRadius: '16px',
@@ -473,7 +473,7 @@ const [addons, setAddons] = useState(__addonsInit);
         marginBottom: '16px'
       }}>
         <div className="mobile-settings-card-header" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-          <HardDrive size={18} color="#2DD4BF" />
+          <HardDrive size={18} color="#00BB7F" />
           <h3 style={{ fontSize: '15px', fontWeight: 800, color: '#fff', margin: 0 }}>Storage & History</h3>
         </div>
         <p style={{ fontSize: '12px', color: '#94a3b8', margin: '0 0 12px 0' }}>
@@ -507,9 +507,9 @@ const [addons, setAddons] = useState(__addonsInit);
               display: 'flex',
               alignItems: 'center',
               gap: '10px',
-              background: 'rgba(45, 212, 191, 0.12)',
-              border: '1px solid rgba(45, 212, 191, 0.3)',
-              color: '#2DD4BF',
+              background: 'rgba(0, 187, 127, 0.12)',
+              border: '1px solid rgba(0, 187, 127, 0.3)',
+              color: '#00BB7F',
               padding: '12px 16px',
               borderRadius: '12px',
               fontSize: '13px',
@@ -531,7 +531,7 @@ const [addons, setAddons] = useState(__addonsInit);
         padding: '18px'
       }}>
         <h3 style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '0 0 8px', fontSize: '1rem' }}>
-          <Puzzle size={18} color="#2DD4BF" /> Addons (Stremio Compatible)
+          <Puzzle size={18} color="#00BB7F" /> Addons (Stremio Compatible)
         </h3>
         <p style={{ color: '#94a3b8', fontSize: '0.85rem', margin: '0 0 12px' }}>
           Install community addons for unlimited catalogs & streams.
@@ -547,9 +547,9 @@ const [addons, setAddons] = useState(__addonsInit);
                 disabled={installed}
                 style={{
                   padding: '8px 14px', borderRadius: 20, fontSize: '0.8rem', fontWeight: 700,
-                  background: installed ? 'rgba(34,197,94,0.15)' : 'rgba(45,212,191,0.12)',
-                  border: `1px solid ${installed ? 'rgba(34,197,94,0.4)' : 'rgba(45,212,191,0.4)'}`,
-                  color: installed ? '#22c55e' : '#2DD4BF',
+                  background: installed ? 'rgba(34,197,94,0.15)' : 'rgba(0,187,127,0.12)',
+                  border: `1px solid ${installed ? 'rgba(34,197,94,0.4)' : 'rgba(0,187,127,0.4)'}`,
+                  color: installed ? '#22c55e' : '#00BB7F',
                   cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6
                 }}
               >
@@ -569,11 +569,11 @@ const [addons, setAddons] = useState(__addonsInit);
           />
           <button onClick={() => handleInstallAddon()} disabled={!addonUrl} style={{
             padding: '10px 16px', borderRadius: 8, fontWeight: 800, fontSize: '0.85rem',
-            background: addonUrl ? '#2DD4BF' : 'rgba(148,163,184,0.2)', color: addonUrl ? '#06121f' : '#64748b', border: 'none', cursor: 'pointer'
+            background: addonUrl ? '#00BB7F' : 'rgba(148,163,184,0.2)', color: addonUrl ? '#06121f' : '#64748b', border: 'none', cursor: 'pointer'
           }}>Add</button>
         </div>
         {addonStatus && (
-          <p style={{ marginTop: 8, fontSize: '0.8rem', fontWeight: 700, color: addonStatus.type === 'ok' ? '#22c55e' : addonStatus.type === 'err' ? '#ef4444' : '#2DD4BF' }}>
+          <p style={{ marginTop: 8, fontSize: '0.8rem', fontWeight: 700, color: addonStatus.type === 'ok' ? '#22c55e' : addonStatus.type === 'err' ? '#ef4444' : '#00BB7F' }}>
             {addonStatus.msg}
           </p>
         )}
@@ -600,7 +600,7 @@ const [addons, setAddons] = useState(__addonsInit);
         marginBottom: '16px'
       }}>
         <div className="mobile-settings-card-header" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-          <Tv size={18} color="#2DD4BF" />
+          <Tv size={18} color="#00BB7F" />
           <h3 style={{ fontSize: '15px', fontWeight: 800, color: '#fff', margin: 0 }}>Live TV & Playlist Source</h3>
         </div>
         <p style={{ fontSize: '12px', color: '#94a3b8', margin: '0 0 12px 0' }}>
@@ -615,8 +615,8 @@ const [addons, setAddons] = useState(__addonsInit);
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                background: customM3uUrl === preset.url ? 'rgba(45, 212, 191, 0.15)' : 'rgba(255, 255, 255, 0.05)',
-                border: customM3uUrl === preset.url ? '1px solid #2DD4BF' : '1px solid rgba(255, 255, 255, 0.08)',
+                background: customM3uUrl === preset.url ? 'rgba(0, 187, 127, 0.15)' : 'rgba(255, 255, 255, 0.05)',
+                border: customM3uUrl === preset.url ? '1px solid #00BB7F' : '1px solid rgba(255, 255, 255, 0.08)',
                 padding: '10px 14px',
                 borderRadius: '10px',
                 cursor: 'pointer',
@@ -629,7 +629,7 @@ const [addons, setAddons] = useState(__addonsInit);
                 <div style={{ fontSize: '13px', fontWeight: 700 }}>{preset.name}</div>
                 <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '2px' }}>{preset.url}</div>
               </div>
-              {customM3uUrl === preset.url && <Check size={16} color="#2DD4BF" />}
+              {customM3uUrl === preset.url && <Check size={16} color="#00BB7F" />}
             </button>
           ))}
         </div>
@@ -661,7 +661,7 @@ const [addons, setAddons] = useState(__addonsInit);
             style={{
               width: '100%',
               marginTop: '10px',
-              background: 'linear-gradient(135deg, #0d9488, #0f766e)',
+              background: 'linear-gradient(135deg, #00875f, #0f766e)',
               border: 'none',
               color: '#ffffff',
               padding: '10px',
@@ -690,7 +690,7 @@ const [addons, setAddons] = useState(__addonsInit);
         marginBottom: '40px'
       }}>
         <div className="mobile-settings-card-header" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-          <Info size={18} color="#2DD4BF" />
+          <Info size={18} color="#00BB7F" />
           <h3 style={{ fontSize: '15px', fontWeight: 800, color: '#fff', margin: 0 }}>About AJO Phone</h3>
         </div>
         <div style={{ fontSize: '12px', color: '#94a3b8', lineHeight: '1.8' }}>

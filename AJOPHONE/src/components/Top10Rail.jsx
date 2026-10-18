@@ -106,7 +106,7 @@ export function Top10Rail({ title = "🔥 Top 10 in India Today", items = [], on
                   />
                 ) : (
                   <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0f172a' }}>
-                    <Film size={28} color="#2DD4BF" />
+                    <Film size={28} color="#00BB7F" />
                   </div>
                 )}
 
@@ -134,7 +134,7 @@ export function Top10Rail({ title = "🔥 Top 10 in India Today", items = [], on
                   width: '20px',
                   height: '20px',
                   borderRadius: '5px',
-                  background: provider.color || '#2DD4BF',
+                  background: provider.color || '#00BB7F',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',

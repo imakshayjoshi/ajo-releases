@@ -11,7 +11,7 @@ export const MediaCard = React.memo(function MediaCard({ item, onClick, onFocus 
   if (!item) return null;
 
   const title = item.title_en || item.title || item.title_ru || item.name || "Untitled";
-  const rating = item.ratings?.mlab?.rating || item.ratings?.imdb?.rating;
+  const rating = item.ratings?.mlab?.rating || item.ratings?.imdb?.rating || item.rating;
   const isLive = item.is_live || item.type === 'live' || item.year === 'LIVE';
   const year = isLive ? 'LIVE' : (item.year || '2026');
   const poster = item.poster_url || item.poster || item.logo || item.image || '';
@@ -57,7 +57,7 @@ export const MediaCard = React.memo(function MediaCard({ item, onClick, onFocus 
           />
         ) : (
           <div className="mobile-card-fallback" style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '8px', background: '#0f172a' }}>
-            <Film size={24} color="#2DD4BF" />
+            <Film size={24} color="#00BB7F" />
             <span style={{ fontSize: '11px', fontWeight: 800, color: '#ffffff', marginTop: '4px', textAlign: 'center' }}>{title}</span>
           </div>
         )}
@@ -78,7 +78,7 @@ export const MediaCard = React.memo(function MediaCard({ item, onClick, onFocus 
             </div>
           ) : <div />}
 
-          <div className="mobile-quality-pill" style={{ background: 'rgba(45, 212, 191, 0.95)', padding: '2px 6px', borderRadius: '5px' }}>
+          <div className="mobile-quality-pill" style={{ background: 'rgba(0, 187, 127, 0.95)', padding: '2px 6px', borderRadius: '5px' }}>
             <span style={{ fontSize: '9px', fontWeight: 900, color: '#06090e' }}>4K</span>
           </div>
         </div>
@@ -96,15 +96,15 @@ export const MediaCard = React.memo(function MediaCard({ item, onClick, onFocus 
           <button
             onClick={handleCastToTV}
             style={{
-              background: casted ? 'rgba(45, 212, 191, 0.9)' : 'rgba(15, 23, 42, 0.85)',
-              border: '1px solid rgba(45, 212, 191, 0.6)',
+              background: casted ? 'rgba(0, 187, 127, 0.9)' : 'rgba(15, 23, 42, 0.85)',
+              border: '1px solid rgba(0, 187, 127, 0.6)',
               borderRadius: '6px',
               width: '24px',
               height: '24px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: casted ? '#06090e' : '#2DD4BF',
+              color: casted ? '#06090e' : '#00BB7F',
               cursor: 'pointer',
               boxShadow: '0 2px 6px rgba(0,0,0,0.5)'
             }}
@@ -124,7 +124,7 @@ export const MediaCard = React.memo(function MediaCard({ item, onClick, onFocus 
             width: '22px',
             height: '22px',
             borderRadius: '6px',
-            background: provider.color || '#2DD4BF',
+            background: provider.color || '#00BB7F',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -138,7 +138,7 @@ export const MediaCard = React.memo(function MediaCard({ item, onClick, onFocus 
         {/* Watch Progress */}
         {progressPercent !== undefined && (
           <div className="mobile-progress-track" style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '3px', background: 'rgba(255,255,255,0.2)' }}>
-            <div className="mobile-progress-bar" style={{ width: `${progressPercent}%`, height: '100%', background: '#2DD4BF' }} />
+            <div className="mobile-progress-bar" style={{ width: `${progressPercent}%`, height: '100%', background: '#00BB7F' }} />
           </div>
         )}
       </div>

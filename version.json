@@ -6,18 +6,18 @@
   "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
   "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
   "phone": {
-    "version": "3.5.0",
-    "versionCode": 220,
+    "version": "3.5.1",
+    "versionCode": 221,
     "packageId": "com.ajo.phone",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
-    "changelog": "v3.5.0: bingr.one wave on phone — real anime catalog (the old one was an empty stub, Anime Vault never rendered), 5 extra player mirrors on every movie and episode, new dark green theme.",
+    "changelog": "v3.5.1: The real bingr look — Bebas Neue display titles, left-aligned hero with green Play and yellow-star rating meta, every teal accent in every screen converted to bingr green. This looks unmistakably new.",
     "size_mb": 3.4,
-    "sha256": "c252ff75862a56c04b0ca5c032e239f2b84c61b2b3c1bcfe8352b6d0c9683402",
+    "sha256": "c4954235a6d56ae0debc5978d92b4cb48cd10224d9dba65fe88ef8543d54ac4b",
     "releaseDate": "2026-10-18",
-    "size": 3566757
+    "size": 3595588
   },
   "tv": {
     "version": "3.14.0",

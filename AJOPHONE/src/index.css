@@ -1,3 +1,12 @@
+/* v3.5.1: bingr display font — Bebas Neue (OFL), bundled locally */
+@font-face {
+  font-family: 'Bebas Neue';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/BebasNeue-Regular.ttf') format('truetype');
+}
+
 :root {
   --bg-main: #0f1014;
   --bg-surface: #0e141f;
@@ -6,9 +15,9 @@
   --bg-glass-heavy: rgba(10, 14, 23, 0.95);
   
   --accent-primary: #00BB7F;
-  --accent-cyan: #14b8a6;
+  --accent-cyan: #00A572;
   --accent-purple: #8b5cf6;
-  --accent-gradient: linear-gradient(135deg, #00BB7F 0%, #14b8a6 100%);
+  --accent-gradient: linear-gradient(135deg, #00BB7F 0%, #00A572 100%);
   --accent-gradient-purple: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%);
   
   --text-primary: #f8fafc;
@@ -1018,9 +1027,11 @@ html, body, #root {
 }
 
 .rail-title {
-  font-size: 19px;
-  font-weight: 900;
-  letter-spacing: -0.3px;
+  font-family: 'Bebas Neue', 'Anton', Impact, sans-serif;
+  font-size: 26px;
+  font-weight: 400;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
   color: #ffffff;
   display: flex;
   align-items: center;
