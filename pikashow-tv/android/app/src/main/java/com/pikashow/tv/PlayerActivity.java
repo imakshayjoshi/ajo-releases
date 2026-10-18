@@ -1451,7 +1451,7 @@ public class PlayerActivity extends AppCompatActivity {
         seekBar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
         seekBar.setMax(1000);
         seekBar.setProgress(0);
-        seekBar.setProgressTintList(android.content.res.ColorStateList.valueOf(Color.parseColor("#2DD4BF")));
+        seekBar.setProgressTintList(android.content.res.ColorStateList.valueOf(Color.parseColor("#00BB7F")));
         seekBar.setProgressBackgroundTintList(android.content.res.ColorStateList.valueOf(Color.parseColor("#26FFFFFF")));
         seekBar.setMinimumHeight(14);
         RelativeLayout.LayoutParams seekParams = new RelativeLayout.LayoutParams(
@@ -1478,7 +1478,7 @@ public class PlayerActivity extends AppCompatActivity {
         GradientDrawable bannerBg = new GradientDrawable();
         bannerBg.setCornerRadius(20);
         bannerBg.setColor(Color.parseColor("#E60B132B")); // Deep premium navy glass
-        bannerBg.setStroke(2, Color.parseColor("#2DD4BF")); // Cyan border highlight
+        bannerBg.setStroke(2, Color.parseColor("#00BB7F")); // Cyan border highlight
         channelBannerView.setBackground(bannerBg);
         channelBannerView.setElevation(16f);
         channelBannerView.setVisibility(View.GONE);
@@ -1504,7 +1504,7 @@ public class PlayerActivity extends AppCompatActivity {
         bannerChannelNumber.setPadding(16, 6, 16, 6);
         GradientDrawable chNumBg = new GradientDrawable();
         chNumBg.setCornerRadius(10);
-        chNumBg.setColor(Color.parseColor("#2DD4BF")); // Electric Cyan
+        chNumBg.setColor(Color.parseColor("#00BB7F")); // Electric Cyan
         bannerChannelNumber.setBackground(chNumBg);
         bannerHeader.addView(bannerChannelNumber);
 
@@ -1535,7 +1535,7 @@ public class PlayerActivity extends AppCompatActivity {
 
         // Zap Hint
         bannerHint = new TextView(this);
-        bannerHint.setTextColor(Color.parseColor("#2DD4BF"));
+        bannerHint.setTextColor(Color.parseColor("#00BB7F"));
         bannerHint.setTextSize(12);
         bannerHint.setText("▲ / ▼ Channel Switcher  •  [OK] Controls");
         channelBannerView.addView(bannerHint);
@@ -1657,7 +1657,7 @@ public class PlayerActivity extends AppCompatActivity {
         normalBg.setStroke(2, Color.parseColor("#44ffffff"));
 
         GradientDrawable focusedBg = new GradientDrawable();
-        focusedBg.setColor(Color.parseColor("#2dd4bf"));
+        focusedBg.setColor(Color.parseColor("#00bb7f"));
         focusedBg.setCornerRadius(12); // ColorOS 17: 12dp pills
         focusedBg.setStroke(3, Color.WHITE);
 
@@ -1908,7 +1908,7 @@ public class PlayerActivity extends AppCompatActivity {
                 normalBg.setCornerRadius(10);
                 normalBg.setColor(isCurrent ? Color.parseColor("#1E293B") : Color.TRANSPARENT);
                 if (isCurrent) {
-                    normalBg.setStroke(1, Color.parseColor("#2DD4BF"));
+                    normalBg.setStroke(1, Color.parseColor("#00BB7F"));
                 }
                 row.setBackground(normalBg);
 
@@ -1916,7 +1916,7 @@ public class PlayerActivity extends AppCompatActivity {
                 numView.setText("CH " + item.channelNumber);
                 numView.setTextSize(12);
                 numView.setTypeface(Typeface.DEFAULT_BOLD);
-                numView.setTextColor(Color.parseColor("#2DD4BF"));
+                numView.setTextColor(Color.parseColor("#00BB7F"));
                 numView.setPadding(0, 0, 16, 0);
                 row.addView(numView);
 
@@ -1924,7 +1924,7 @@ public class PlayerActivity extends AppCompatActivity {
                 titleTv.setText(item.title);
                 titleTv.setTextSize(14);
                 titleTv.setTypeface(Typeface.DEFAULT_BOLD);
-                titleTv.setTextColor(isCurrent ? Color.parseColor("#2DD4BF") : Color.WHITE);
+                titleTv.setTextColor(isCurrent ? Color.parseColor("#00BB7F") : Color.WHITE);
                 titleTv.setSingleLine(true);
                 titleTv.setEllipsize(TextUtils.TruncateAt.END);
                 LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
@@ -1947,18 +1947,18 @@ public class PlayerActivity extends AppCompatActivity {
                     GradientDrawable focusedBg = new GradientDrawable();
                     focusedBg.setCornerRadius(10);
                     if (hasFocus) {
-                        focusedBg.setColor(Color.parseColor("#2DD4BF"));
+                        focusedBg.setColor(Color.parseColor("#00BB7F"));
                         row.setBackground(focusedBg);
                         numView.setTextColor(Color.parseColor("#0F172A"));
                         titleTv.setTextColor(Color.parseColor("#0F172A"));
                     } else {
                         focusedBg.setColor(channelIdx == currentLiveChannelIndex ? Color.parseColor("#1E293B") : Color.TRANSPARENT);
                         if (channelIdx == currentLiveChannelIndex) {
-                            focusedBg.setStroke(1, Color.parseColor("#2DD4BF"));
+                            focusedBg.setStroke(1, Color.parseColor("#00BB7F"));
                         }
                         row.setBackground(focusedBg);
-                        numView.setTextColor(Color.parseColor("#2DD4BF"));
-                        titleTv.setTextColor(channelIdx == currentLiveChannelIndex ? Color.parseColor("#2DD4BF") : Color.WHITE);
+                        numView.setTextColor(Color.parseColor("#00BB7F"));
+                        titleTv.setTextColor(channelIdx == currentLiveChannelIndex ? Color.parseColor("#00BB7F") : Color.WHITE);
                     }
                 });
 
@@ -2444,7 +2444,7 @@ public class PlayerActivity extends AppCompatActivity {
                 statusBadge.setBackground(badgeBg);
                 statusBadge.setText("LIVE BROADCAST");
             } else {
-                badgeBg.setColor(Color.parseColor("#2dd4bf"));
+                badgeBg.setColor(Color.parseColor("#00bb7f"));
                 statusBadge.setBackground(badgeBg);
                 statusBadge.setText("HD STREAM");
             }

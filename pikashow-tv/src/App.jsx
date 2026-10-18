@@ -8,6 +8,7 @@ import { runStreamHealthSweep } from './utils/streamHealth';
 import { checkForAppUpdates } from './api/otaUpdate';
 import { getTmdbTrending, getTmdbCatalog, getTmdbCatalogDeep, getTmdbNowPlaying, getBecauseYouWatched } from './api/tmdb';
 import { getRankedServers } from './api/mirrorHealth';
+import { getBingrAnimeDeep } from './api/bingr';
 import { getAddonCatalogs, getAddonStreams } from './api/stremio';
 import { GoogleTVHeader } from './components/GoogleTVHeader';
 import { HeroBanner } from './components/HeroBanner';
@@ -108,7 +109,10 @@ export default function App() {
         getTmdbNowPlaying(20),
         getTmdbCatalogDeep('movie', 30, (items) => setTmdbMovies(filterAliveItems(items))),
         getTmdbCatalogDeep('tv', 30, (items) => setTmdbSeries(filterAliveItems(items))),
-        getTmdbCatalog('tv', 'popular', 1, { with_genres: '16' }),
+        // v3.14.0: anime now comes from bingr.one's open API (AniList-sourced,
+        // real anime catalog with its own player mirrors) instead of TMDB's
+        // generic animation genre, which mixed Pixar into "anime".
+        getBingrAnimeDeep(3),
         // v3.12.77: kids' row must include BOTH animation genres — movie-only
         // '10751,16' excluded kids' TV (Doraemon etc.), so kids' titles 404'd.
         getTmdbCatalog('movie', 'popular', 1, { with_genres: '16,10751' }),
@@ -899,6 +903,16 @@ export default function App() {
                       />
                     )}
 
+                    {/* Trending Anime (v3.14.0: bingr.one catalog) */}
+                    {animeItems.length > 0 && (
+                      <MediaRail
+                        title="Trending Anime"
+                        items={animeItems.slice(0, 20)}
+                        onSelectItem={handleItemClick}
+                        onSeeAll={() => setActiveTab('anime')}
+                      />
+                    )}
+
                     {/* Because You Watched */}
                     {becauseYouWatched.length > 0 && (
                       <MediaRail
@@ -983,6 +997,15 @@ export default function App() {
               <MediaGridView
                 title="📺 Complete Web Series Vault"
                 items={allSeries}
+                onSelectItem={handleItemClick}
+              />
+            )}
+
+            {/* ✨ ANIME TAB (v3.14.0: bingr.one catalog + mirrors) */}
+            {activeTab === 'anime' && (
+              <MediaGridView
+                title="✨ Anime"
+                items={animeItems}
                 onSelectItem={handleItemClick}
               />
             )}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
-import { Home, Film, Tv, Radio, Search, Settings } from 'lucide-react';
+import { Home, Film, Tv, Radio, Search, Settings, Sparkles } from 'lucide-react';
 
 export function GoogleTVHeader({ activeTab, onSelectTab, activeSubTab, onSelectSubTab }) {
   const [timeStr, setTimeStr] = useState('');
@@ -24,6 +24,9 @@ export function GoogleTVHeader({ activeTab, onSelectTab, activeSubTab, onSelectS
     { id: 'live', label: 'Live TV', icon: Radio },
     { id: 'movies', label: 'Movies', icon: Film },
     { id: 'series', label: 'Series', icon: Tv },
+    // v3.14.0: dedicated Anime tab (bingr.one catalog) — matches the bingr
+    // UX the user asked to replicate.
+    { id: 'anime', label: 'Anime', icon: Sparkles },
     { id: 'search', label: 'Search', icon: Search },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];

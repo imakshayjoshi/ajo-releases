@@ -8,18 +8,18 @@
 
 :root {
   /* MovieBox Dark Cinema Palette */
-  --bg-main: #08080f;
-  --bg-surface: #101018;
-  --bg-card: #16161f;
-  --bg-card-hover: #1e1e2a;
-  --bg-elevated: #1a1a26;
+  --bg-main: #0f1014;
+  --bg-surface: #16181f;
+  --bg-card: #1a1c20;
+  --bg-card-hover: #22262f;
+  --bg-elevated: #1e222a;
 
   /* MovieBox Accent Colors */
   /* v3.12.76: accent switched from yellow-amber to a soft teal — high
      contrast on dark backgrounds, far easier on aging eyes than yellow,
      and matches the "trust/calm" palette of mainstream TV apps. */
-  --accent-gold: #2DD4BF;
-  --accent-gold-dim: rgba(45, 212, 191, 0.15);
+  --accent-gold: #00BB7F;
+  --accent-gold-dim: rgba(0, 187, 127, 0.15);
   --accent-red: #E50914;
   --accent-red-dim: rgba(229, 9, 20, 0.12);
   --accent-cyan: #38bdf8;
@@ -31,10 +31,10 @@
   --text-primary: #f0f0f5;
   --text-secondary: #8a8a9a;
   --text-muted: #55556a;
-  --text-gold: #2DD4BF;
+  --text-gold: #00BB7F;
 
   /* Focus & Interaction */
-  --focus-ring: 0 0 0 3px rgba(45, 212, 191, 0.6), 0 8px 28px rgba(45, 212, 191, 0.3);
+  --focus-ring: 0 0 0 3px rgba(0, 187, 127, 0.6), 0 8px 28px rgba(0, 187, 127, 0.3);
   --focus-ring-red: 0 0 0 3px rgba(229, 9, 20, 0.6), 0 8px 28px rgba(229, 9, 20, 0.3);
   /* v3.12.76: elderly-friendly sizing — bigger tap targets, no right-edge
      clipping (tiles snap to a hard edge instead of bleeding off screen). */
@@ -54,7 +54,7 @@
   --fluid-glass: rgba(16, 16, 24, 0.85);
   --fluid-glass-border: rgba(255, 255, 255, 0.09);
   --fluid-ease: cubic-bezier(0.3, 1.45, 0.5, 1); /* elastic overshoot → settle */
-  --glow-a: rgba(45, 212, 191, 0.55);  /* luminous aura start */
+  --glow-a: rgba(0, 187, 127, 0.55);  /* luminous aura start */
   --glow-b: rgba(56, 189, 248, 0.45);  /* luminous aura end (teal→sky) */
 
   /* Typography */
@@ -93,9 +93,9 @@ html, body, #root {
   flex-direction: column;
   /* ColorOS ambient: soft radial glows over the base gradient (static, zero GPU cost) */
   background:
-    radial-gradient(ellipse 70% 55% at 18% 0%, rgba(45, 212, 191, 0.07), transparent 60%),
+    radial-gradient(ellipse 70% 55% at 18% 0%, rgba(0, 187, 127, 0.07), transparent 60%),
     radial-gradient(ellipse 60% 50% at 88% 100%, rgba(56, 189, 248, 0.05), transparent 60%),
-    linear-gradient(180deg, #0d0d16 0%, #08080f 50%, #060610 100%);
+    linear-gradient(180deg, #0d0d16 0%, #0f1014 50%, #060610 100%);
   position: relative;
   overflow: hidden;
 }
@@ -135,7 +135,7 @@ html, body, #root {
 /* soft radial glow pools behind the capsule whenever it holds focus */
 .tv-header:focus-within {
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55),
-              0 0 48px rgba(45, 212, 191, 0.22),
+              0 0 48px rgba(0, 187, 127, 0.22),
               0 0 96px rgba(56, 189, 248, 0.12);
 }
 
@@ -146,15 +146,15 @@ html, body, #root {
 }
 
 .tv-logo-badge {
-  background: linear-gradient(135deg, #2DD4BF 0%, #14B8A6 50%, #0D9488 100%);
-  color: #08080f;
+  background: linear-gradient(135deg, #00BB7F 0%, #00A572 50%, #00875F 100%);
+  color: #0f1014;
   font-weight: 900;
   font-size: 0.78rem;
   padding: 4px 10px;
   border-radius: var(--radius-full);
   letter-spacing: 1.2px;
   text-transform: uppercase;
-  box-shadow: 0 2px 10px rgba(45, 212, 191, 0.35);
+  box-shadow: 0 2px 10px rgba(0, 187, 127, 0.35);
   border: 2px solid transparent;
   cursor: default;
   font-family: inherit;
@@ -165,7 +165,7 @@ html, body, #root {
 .tv-logo-badge:focus {
   outline: none;
   border-color: rgba(255, 255, 255, 0.9);
-  box-shadow: 0 0 0 3px rgba(45, 212, 191, 0.45), 0 2px 10px rgba(45, 212, 191, 0.35);
+  box-shadow: 0 0 0 3px rgba(0, 187, 127, 0.45), 0 2px 10px rgba(0, 187, 127, 0.35);
 }
 
 .tv-logo-title { display: none; }
@@ -192,7 +192,7 @@ html, body, #root {
   height: 100%;
   border-radius: var(--radius-full);
   background: var(--accent-gold-dim);
-  border: 1.5px solid rgba(45, 212, 191, 0.3);
+  border: 1.5px solid rgba(0, 187, 127, 0.3);
   opacity: 0;
   pointer-events: none;
   transition: transform 0.32s cubic-bezier(0.3, 1.3, 0.4, 1),
@@ -282,10 +282,10 @@ html, body, #root {
 
 .tv-subtab.active {
   background: var(--accent-gold);
-  color: #08080f;
+  color: #0f1014;
   border-color: var(--accent-gold);
   font-weight: 800;
-  box-shadow: 0 2px 12px rgba(45, 212, 191, 0.3);
+  box-shadow: 0 2px 12px rgba(0, 187, 127, 0.3);
 }
 
 .tv-subtab:focus {
@@ -362,7 +362,7 @@ html, body, #root {
   font-weight: 800;
   letter-spacing: 3px;
   text-transform: uppercase;
-  color: var(--accent-gold, #2DD4BF);
+  color: var(--accent-gold, #00BB7F);
 }
 .tv-hero-banner-title {
   margin: 0;
@@ -380,7 +380,7 @@ html, body, #root {
   font-weight: 600;
   color: #cbd5e1;
 }
-.tv-hero-banner-rating { display: inline-flex; align-items: center; gap: 5px; color: var(--accent-gold, #2DD4BF); font-weight: 800; }
+.tv-hero-banner-rating { display: inline-flex; align-items: center; gap: 5px; color: var(--accent-gold, #00BB7F); font-weight: 800; }
 .tv-hero-banner-desc {
   margin: 2px 0 0;
   font-size: 0.95rem;
@@ -414,7 +414,7 @@ html, body, #root {
 .tv-hero-cta:focus {
   outline: none;
   transform: scale(1.07);
-  box-shadow: 0 0 0 3px rgba(45, 212, 191, 0.6), 0 6px 22px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 0 0 3px rgba(0, 187, 127, 0.6), 0 6px 22px rgba(0, 0, 0, 0.5);
 }
 
 /* ============================================
@@ -444,9 +444,9 @@ html, body, #root {
   flex: 1;
 }
 .tv-sort-btn.active, .tv-genre-chip.active {
-  background: var(--accent-gold, #2DD4BF) !important;
+  background: var(--accent-gold, #00BB7F) !important;
   color: #0a0a12 !important;
-  border-color: var(--accent-gold, #2DD4BF) !important;
+  border-color: var(--accent-gold, #00BB7F) !important;
 }
 
 /* ============================================
@@ -517,7 +517,7 @@ html, body, #root {
   align-items: center;
   gap: 6px;
   background: var(--accent-gold);
-  color: #08080f;
+  color: #0f1014;
   font-size: 0.7rem;
   font-weight: 900;
   text-transform: uppercase;
@@ -525,7 +525,7 @@ html, body, #root {
   border-radius: var(--radius-xs);
   margin-bottom: 10px;
   letter-spacing: 0.8px;
-  box-shadow: 0 2px 8px rgba(45, 212, 191, 0.4);
+  box-shadow: 0 2px 8px rgba(0, 187, 127, 0.4);
 }
 
 .tv-hero-title {
@@ -584,13 +584,13 @@ html, body, #root {
   gap: 8px;
   padding: 10px 28px;
   background: var(--accent-gold);
-  color: #08080f;
+  color: #0f1014;
   font-weight: 800;
   font-size: 0.92rem;
   border-radius: var(--radius-sm);
   border: none;
   cursor: pointer;
-  box-shadow: 0 4px 16px rgba(45, 212, 191, 0.4);
+  box-shadow: 0 4px 16px rgba(0, 187, 127, 0.4);
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
@@ -647,7 +647,7 @@ html, body, #root {
   width: 24px;
   border-radius: 4px;
   background: var(--accent-gold);
-  box-shadow: 0 0 8px rgba(45, 212, 191, 0.5);
+  box-shadow: 0 0 8px rgba(0, 187, 127, 0.5);
 }
 
 /* ============================================
@@ -684,7 +684,7 @@ html, body, #root {
 .tv-provider-chip:focus,
 .tv-provider-chip.active {
   border-color: var(--accent-gold);
-  background: rgba(45, 212, 191, 0.08);
+  background: rgba(0, 187, 127, 0.08);
   box-shadow: var(--focus-ring);
   transform: scale(1.06);
 }
@@ -958,7 +958,7 @@ html, body, #root {
   position: absolute;
   inset: -2px;
   border-radius: var(--radius-full);
-  border: 1.5px solid rgba(45, 212, 191, 0.4);
+  border: 1.5px solid rgba(0, 187, 127, 0.4);
   opacity: 0;
   pointer-events: none;
 }
@@ -1032,7 +1032,7 @@ html, body, #root {
   color: var(--text-primary);
   text-shadow: -2px 0 0 var(--bg-card), 2px 0 0 var(--bg-card),
                0 -2px 0 var(--bg-card), 0 2px 0 var(--bg-card);
-  -webkit-text-stroke: 2px rgba(45, 212, 191, 0.3);
+  -webkit-text-stroke: 2px rgba(0, 187, 127, 0.3);
   line-height: 1;
   z-index: 5;
 }
@@ -1087,7 +1087,7 @@ html, body, #root {
   align-items: center;
   justify-content: center;
   font-size: 44px;
-  background: linear-gradient(150deg, rgba(45,212,191,0.18), rgba(8,10,15,0.9));
+  background: linear-gradient(150deg, rgba(0,187,127,0.18), rgba(8,10,15,0.9));
 }
 
 .tv-hero-grid-scrim {
@@ -1221,7 +1221,7 @@ html, body, #root {
 .tv-cat-btn:focus,
 .tv-cat-btn.active {
   background: var(--accent-gold);
-  color: #08080f;
+  color: #0f1014;
   border-color: var(--accent-gold);
   font-weight: 700;
 }
@@ -1256,7 +1256,7 @@ html, body, #root {
   max-height: 92vh;
   background: linear-gradient(135deg, var(--bg-surface) 0%, #13131d 100%);
   border-radius: var(--radius-xl);
-  border: 1px solid rgba(45, 212, 191, 0.08);
+  border: 1px solid rgba(0, 187, 127, 0.08);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -1339,8 +1339,8 @@ html, body, #root {
 
 .tv-btn-primary {
   padding: 12px 28px;
-  background: linear-gradient(135deg, var(--accent-gold), #14B8A6);
-  color: #08080f;
+  background: linear-gradient(135deg, var(--accent-gold), #00A572);
+  color: #0f1014;
   font-weight: 800;
   font-size: 0.95rem;
   border-radius: var(--radius-sm);
@@ -1349,7 +1349,7 @@ html, body, #root {
   display: flex;
   align-items: center;
   gap: 8px;
-  box-shadow: 0 4px 16px rgba(45, 212, 191, 0.35);
+  box-shadow: 0 4px 16px rgba(0, 187, 127, 0.35);
   transition: all 0.15s ease;
 }
 
@@ -1462,7 +1462,7 @@ html, body, #root {
   height: 100%;
   background: var(--accent-gold);
   border-radius: var(--radius-full);
-  box-shadow: 0 0 8px rgba(45, 212, 191, 0.5);
+  box-shadow: 0 0 8px rgba(0, 187, 127, 0.5);
 }
 
 .tv-player-time {
@@ -1501,7 +1501,7 @@ html, body, #root {
 
 .tv-player-btn:focus {
   background: var(--accent-gold);
-  color: #08080f;
+  color: #0f1014;
   border-color: #ffffff;
   box-shadow: var(--focus-ring);
   transform: scale(1.08);
@@ -1518,7 +1518,7 @@ html, body, #root {
   bottom: 0;
   width: 380px;
   background: rgba(8, 8, 15, 0.96);
-  border-left: 1px solid rgba(45, 212, 191, 0.08);
+  border-left: 1px solid rgba(0, 187, 127, 0.08);
   padding: 24px;
   display: flex;
   flex-direction: column;
@@ -1576,7 +1576,7 @@ html, body, #root {
 .tv-spinner {
   width: 48px;
   height: 48px;
-  border: 4px solid rgba(45, 212, 191, 0.15);
+  border: 4px solid rgba(0, 187, 127, 0.15);
   border-top-color: var(--accent-gold);
   border-radius: 50%;
   animation: tv-spin 0.8s linear infinite;
@@ -1646,7 +1646,7 @@ html, body, #root {
 }
 
 .tv-settings-card:focus-within {
-  border-color: rgba(45, 212, 191, 0.15);
+  border-color: rgba(0, 187, 127, 0.15);
 }
 
 .tv-settings-title {
@@ -1725,8 +1725,8 @@ html, body, #root {
 }
 
 .live-cat-btn.active {
-  background: linear-gradient(135deg, rgba(45, 212, 191, 0.24), rgba(13, 148, 136, 0.16));
-  border-color: rgba(45, 212, 191, 0.75);
+  background: linear-gradient(135deg, rgba(0, 187, 127, 0.24), rgba(0, 135, 95, 0.16));
+  border-color: rgba(0, 187, 127, 0.75);
   color: #ffffff;
 }
 
@@ -1854,7 +1854,7 @@ html, body, #root {
   font-weight: 900;
   letter-spacing: 0.04em;
   color: #ffffff;
-  background: linear-gradient(150deg, rgba(45, 212, 191, 0.22), rgba(8, 10, 15, 0.95));
+  background: linear-gradient(150deg, rgba(0, 187, 127, 0.22), rgba(8, 10, 15, 0.95));
 }
 
 .live-channel-card:focus {
@@ -1979,7 +1979,7 @@ html, body, #root {
 .tv-section-divider {
   width: 100%;
   height: 1px;
-  background: linear-gradient(90deg, transparent 0%, rgba(45, 212, 191, 0.1) 50%, transparent 100%);
+  background: linear-gradient(90deg, transparent 0%, rgba(0, 187, 127, 0.1) 50%, transparent 100%);
   margin: 8px 0 24px;
 }
 
