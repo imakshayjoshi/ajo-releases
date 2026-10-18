@@ -1,5 +1,5 @@
-export const CURRENT_APP_VERSION = '3.4.1';
-export const CURRENT_VERSION_CODE = 218;
+export const CURRENT_APP_VERSION = '3.4.2';
+export const CURRENT_VERSION_CODE = 219;
 const MANIFEST_SOURCES = [
   'https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/version.json',
   'https://api.github.com/repos/imakshayjoshi/ajo-releases/releases/latest',
@@ -37,13 +37,17 @@ export async function checkForAppUpdates(appType = 'phone') {
 
   for (const sourceUrl of MANIFEST_SOURCES) {
     try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 4000);
+      // v3.4.2: feature-detect AbortController — pre-Chromium-66 WebViews
+      // (older Fire OS / legacy Android) throw on it and would kill every
+      // manifest source the same way.
+      const supportsAbort = typeof AbortController !== 'undefined';
+      const controller = supportsAbort ? new AbortController() : null;
+      const timer = supportsAbort ? setTimeout(() => controller.abort(), 4000) : null;
       const response = await fetch(sourceUrl + (sourceUrl.includes('api.github') ? '' : '?time=' + Date.now()), {
         cache: 'no-store',
-        signal: controller.signal
+        ...(supportsAbort ? { signal: controller.signal } : {})
       });
-      clearTimeout(timer);
+      if (timer) clearTimeout(timer);
       if (response.ok) {
         manifestData = await response.json();
         if (manifestData.assets) fromGithubApi = true;

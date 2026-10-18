@@ -1,0 +1,209 @@
+/*
+ * Player styles for TVPlayer.jsx.
+ *
+ * This file is imported by the component itself so the player is never at the
+ * mercy of what index.css happens to define. Geometry lives inline in the JSX;
+ * this file is cosmetics plus a few hard overrides.
+ *
+ * The !important rules exist for one reason: on Fire TV, anything that paints an
+ * opaque layer over the video plane, or applies a filter to the <video> element,
+ * shows up as a black screen with working audio. Those are locked down here.
+ */
+
+/* ------------------------------------------------------- hard black-screen locks */
+
+.tv-player-fullscreen {
+  background: #000 !important;
+}
+
+.tv-player-video {
+  background: transparent !important;
+  /* A filter, blend mode or partial opacity on the video element forces the
+     WebView to composite it on the GPU instead of hole-punching the hardware
+     video plane. On legacy Fire OS that means a black picture. */
+  filter: none !important;
+  -webkit-filter: none !important;
+  mix-blend-mode: normal !important;
+  opacity: 1 !important;
+  transform: none !important;
+}
+
+/* The OSD covers the whole screen so it can pin bars to the top and bottom.
+   It must stay transparent: a scrim here is a black film over the picture. */
+.tv-player-osd {
+  background: transparent !important;
+  background-color: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* --------------------------------------------------------------------- top bar */
+
+.tv-player-osd-title-box {
+  min-width: 0;
+}
+
+.tv-player-title {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 800;
+  line-height: 1.15;
+  color: #ffffff;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.9);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tv-player-subtitle {
+  margin: 6px 0 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #cbd5e1;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.9);
+}
+
+/* ------------------------------------------------------------- bottom controls */
+
+.tv-player-controls-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.tv-player-progress-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.tv-player-time {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #e2e8f0;
+  font-variant-numeric: tabular-nums;
+  min-width: 58px;
+}
+
+.tv-player-progress-bar {
+  position: relative;
+  flex: 1;
+  height: 8px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.22);
+  overflow: hidden;
+}
+
+.tv-player-progress-fill {
+  height: 100%;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, #38bdf8, #0284c7);
+  transition: width 0.25s linear;
+}
+
+/* ---------------------------------------------------------------- 10-foot buttons */
+
+.tv-player-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  border: 2px solid rgba(255, 255, 255, 0.18);
+  border-radius: 9999px;
+  background: rgba(15, 23, 42, 0.82);
+  color: #ffffff;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: transform 0.12s ease, background 0.12s ease, border-color 0.12s ease;
+}
+
+.tv-player-btn:hover {
+  background: rgba(30, 41, 59, 0.95);
+}
+
+/* Fire TV is driven by a D-pad, so focus has to be impossible to miss. */
+.tv-player-btn:focus,
+.tv-player-btn:focus-visible {
+  outline: none;
+  border-color: #38bdf8;
+  background: rgba(56, 189, 248, 0.22);
+  transform: scale(1.06);
+  box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.35);
+}
+
+/* ---------------------------------------------------------------------- drawer */
+
+.tv-player-drawer {
+  border-left: 1px solid rgba(148, 163, 184, 0.25);
+  box-shadow: -12px 0 40px rgba(0, 0, 0, 0.6);
+}
+
+.tv-drawer-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  margin-bottom: 8px;
+  padding: 14px 16px;
+  border: 2px solid transparent;
+  border-radius: 12px;
+  background: rgba(30, 41, 59, 0.7);
+  color: #e2e8f0;
+  font-size: 1rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tv-drawer-item.active {
+  background: rgba(56, 189, 248, 0.18);
+  border-color: rgba(56, 189, 248, 0.6);
+  color: #ffffff;
+}
+
+.tv-drawer-item:focus,
+.tv-drawer-item:focus-visible {
+  outline: none;
+  border-color: #38bdf8;
+  background: rgba(56, 189, 248, 0.28);
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.35);
+}
+
+/* ------------------------------------------------------------ buffering spinner */
+
+.tv-center-state {
+  color: #e2e8f0;
+}
+
+.tv-spinner {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto;
+  border: 5px solid rgba(56, 189, 248, 0.25);
+  border-top-color: #38bdf8;
+  border-radius: 50%;
+  animation: tv-spin 0.9s linear infinite;
+}
+
+@keyframes tv-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Smaller panels (720p Fire TV Stick output) need tighter type. */
+@media (max-width: 1280px) {
+  .tv-player-title {
+    font-size: 1.6rem;
+  }
+
+  .tv-player-btn {
+    padding: 10px 16px;
+    font-size: 0.88rem;
+  }
+}

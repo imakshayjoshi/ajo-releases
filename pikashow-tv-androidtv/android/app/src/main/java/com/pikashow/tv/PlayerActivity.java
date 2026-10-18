@@ -65,6 +65,10 @@ import androidx.media3.exoplayer.DefaultRenderersFactory;
 import androidx.media3.exoplayer.ExoPlayer;
 import androidx.media3.exoplayer.hls.DefaultHlsExtractorFactory;
 import androidx.media3.exoplayer.hls.HlsMediaSource;
+import androidx.media3.exoplayer.drm.DefaultDrmSessionManager;
+import androidx.media3.exoplayer.drm.DrmSessionManagerProvider;
+import androidx.media3.exoplayer.drm.FrameworkMediaDrm;
+import androidx.media3.exoplayer.drm.LocalMediaDrmCallback;
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory;
 import androidx.media3.exoplayer.source.MediaSource;
 import androidx.media3.exoplayer.source.ProgressiveMediaSource;
@@ -299,6 +303,11 @@ public class PlayerActivity extends AppCompatActivity {
     private TextView btnFavoriteChannel;
     private TextView btnChannelDrawer;
     private TextView btnPip;
+    // v3.12.80: collapsed controls — the bottom strip is hidden by default,
+    // opened via the small corner Options button.
+    private TextView btnOptions;
+    private LinearLayout bottomBar;
+    private boolean isControlsOpen = false;
 
     private RelativeLayout channelDrawerLayout;
     private LinearLayout channelListContainer;
@@ -412,6 +421,11 @@ public class PlayerActivity extends AppCompatActivity {
     private Map<String, String> capturedStreamHeaders = null;
 
     private boolean isLive = false;
+    // v3.13.0 (ported from the Fire TV line v3.12.64): ClearKey DRM
+    // (jio/zee/hotstar live channels). drmKeyPairs: [["<kid hex>","<key hex>"], ...].
+    private java.util.List<String[]> drmKeyPairs = null;
+    // per-stream headers passed from the web layer (Cookie/UA/Referer/Origin)
+    private java.util.Map<String, String> streamHeaders = null;
     private String streamUrl = "";
     private String streamTitle = "";
     private final List<String> serverQueue = new ArrayList<>();
@@ -481,7 +495,9 @@ public class PlayerActivity extends AppCompatActivity {
     private long lastWebCurrentTimeSec = 0;
     private long lastWebDurationSec = 0;
 
-    private final Runnable hideOsdRunnable = this::hideOsd;
+    // v3.12.80: auto-hide also collapses the controls strip (stale button
+    // focus on a hidden OSD was eating LEFT/RIGHT instead of seeking).
+    private final Runnable hideOsdRunnable = () -> { closeControlsPanel(); hideOsd(); };
 
     private final Runnable progressRunnable = new Runnable() {
         @Override
@@ -725,6 +741,40 @@ public class PlayerActivity extends AppCompatActivity {
                 }
             } catch (Exception e) {
                 Log.w(TAG, "Failed parsing fallbacks: " + e.getMessage());
+            }
+        }
+
+        // v3.13.0 (ported from the Fire TV line v3.12.64): ClearKey DRM payload
+        // for live channels — {"keys": [["<kid hex>","<key hex>"],...],
+        // "headers": {...}} (LocalMediaDrmCallback + CLEARKEY_UUID pattern).
+        String drmJson = intent.getStringExtra("drm");
+        if (!TextUtils.isEmpty(drmJson)) {
+            try {
+                JSONObject drm = new JSONObject(drmJson);
+                JSONArray keys = drm.optJSONArray("keys");
+                if (keys != null && keys.length() > 0) {
+                    drmKeyPairs = new ArrayList<>();
+                    for (int i = 0; i < keys.length(); i++) {
+                        JSONArray pair = keys.optJSONArray(i);
+                        if (pair != null && pair.length() >= 2
+                                && isHexKey(pair.optString(0)) && isHexKey(pair.optString(1))) {
+                            drmKeyPairs.add(new String[]{pair.optString(0), pair.optString(1)});
+                        }
+                    }
+                }
+                JSONObject hdrs = drm.optJSONObject("headers");
+                if (hdrs != null) {
+                    streamHeaders = new HashMap<>();
+                    java.util.Iterator<String> it = hdrs.keys();
+                    while (it.hasNext()) {
+                        String k = it.next();
+                        String v = hdrs.optString(k);
+                        if (!TextUtils.isEmpty(k) && !TextUtils.isEmpty(v)) streamHeaders.put(k, v);
+                    }
+                }
+                if (drmKeyPairs == null) Log.w(TAG, "drm extra had no valid key pairs");
+            } catch (Exception e) {
+                Log.w(TAG, "Failed parsing drm extra: " + e.getMessage());
             }
         }
 
@@ -1286,6 +1336,11 @@ public class PlayerActivity extends AppCompatActivity {
 
         osdOverlay.addView(topBar);
 
+        // v3.12.80 (Akkshay request): the big pause/play button strip trapped
+        // LEFT/RIGHT in button-focus navigation, so seeking was impossible
+        // while it was open. Replaced with ONE small corner "⋮ Options" icon
+        // (top-right). LEFT/RIGHT always seek now; the icon opens the full
+        // controls panel on demand.
         LinearLayout bottomBar = new LinearLayout(this);
         bottomBar.setOrientation(LinearLayout.VERTICAL);
         bottomBar.setPadding(48, 48, 48, 36);
@@ -1296,6 +1351,7 @@ public class PlayerActivity extends AppCompatActivity {
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         bottomParams.addRule(RelativeLayout.ALIGN_PARENT_BOTTOM);
         bottomBar.setLayoutParams(bottomParams);
+        bottomBar.setVisibility(View.GONE);
 
         timeView = new TextView(this);
         timeView.setTextColor(Color.parseColor("#e2e8f0"));
@@ -1372,6 +1428,24 @@ public class PlayerActivity extends AppCompatActivity {
 
         osdOverlay.addView(bottomBar);
 
+        // v3.12.80: field refs for the collapsed-controls pattern.
+        this.bottomBar = bottomBar;
+
+        // v3.12.80: ONE small corner Options icon (top-right). Tapping it
+        // (D-pad CENTER) toggles the full controls strip. LEFT/RIGHT are no
+        // longer stolen by button navigation when the strip is closed.
+        btnOptions = createTvButton("⋮ Options", v -> {
+            if (isControlsOpen) { closeControlsPanel(); showOsd(); if (btnOptions != null) btnOptions.requestFocus(); }
+            else openControlsPanel();
+        });
+        RelativeLayout.LayoutParams optParams = new RelativeLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        optParams.addRule(RelativeLayout.ALIGN_PARENT_TOP);
+        optParams.addRule(RelativeLayout.ALIGN_PARENT_RIGHT);
+        optParams.setMargins(0, 36, 48, 0);
+        btnOptions.setLayoutParams(optParams);
+        osdOverlay.addView(btnOptions);
+
         // v3.12.77: seek bar pinned just above the bottom OSD (clean
         // ColorOS-style track, doesn't overlap the buttons or time text).
         seekBar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
@@ -1386,7 +1460,9 @@ public class PlayerActivity extends AppCompatActivity {
         // bottomBar is at the screen bottom (~110-130dp tall incl. buttons),
         // so this lifts the track cleanly over it at any density.
         seekParams.addRule(RelativeLayout.ALIGN_PARENT_BOTTOM);
-        int liftPx = (int) (getResources().getDisplayMetrics().density * 132);
+        // v3.12.80: the heavy button strip is collapsed by default, so the
+        // seek bar now hugs the bottom edge instead of floating 132dp up.
+        int liftPx = (int) (getResources().getDisplayMetrics().density * 42);
         seekParams.setMargins(48, 0, 48, liftPx);
         seekBar.setLayoutParams(seekParams);
         seekBar.setElevation(26f);
@@ -2697,6 +2773,15 @@ public class PlayerActivity extends AppCompatActivity {
                             .setMaxPlaybackSpeed(1.0f)
                             .build());
         }
+        // v3.13.0 (ported from the Fire TV line v3.12.64): ClearKey DRM —
+        // the MediaItem drm config plus a session manager provider on the
+        // DASH factory path below.
+        if (drmKeyPairs != null && !drmKeyPairs.isEmpty()) {
+            itemBuilder.setDrmConfiguration(
+                    new MediaItem.DrmConfiguration.Builder(C.CLEARKEY_UUID)
+                            .setForceSessionsForAudioAndVideoTracks(true)
+                            .build());
+        }
 
         String lower = url.toLowerCase(java.util.Locale.US);
         boolean looksLikeHls = lower.contains(".m3u8") || lower.contains("/getm3u8/")
@@ -2717,8 +2802,12 @@ public class PlayerActivity extends AppCompatActivity {
         boolean looksLikeDash = lower.contains(".mpd") || lower.contains("/dash/");
         if (looksLikeDash) {
             itemBuilder.setMimeType(MimeTypes.APPLICATION_MPD);
-            return new androidx.media3.exoplayer.dash.DashMediaSource.Factory(dataSourceFactory)
-                    .createMediaSource(itemBuilder.build());
+            androidx.media3.exoplayer.dash.DashMediaSource.Factory dashFactory =
+                    new androidx.media3.exoplayer.dash.DashMediaSource.Factory(dataSourceFactory);
+            if (drmKeyPairs != null && !drmKeyPairs.isEmpty()) {
+                dashFactory.setDrmSessionManagerProvider(buildClearKeyProvider());
+            }
+            return dashFactory.createMediaSource(itemBuilder.build());
         }
 
         DefaultExtractorsFactory extractorsFactory = new DefaultExtractorsFactory()
@@ -2733,6 +2822,68 @@ public class PlayerActivity extends AppCompatActivity {
     }
 
     private static volatile OkHttpClient sharedOkHttpClient = null;
+
+    // ------------------------------------------------- v3.13.0 ClearKey DRM
+    // (ported from the Fire TV line v3.12.64)
+
+    private static boolean isHexKey(String s) {
+        if (s == null) return false;
+        String c = s.replace(" ", "").replace("-", "");
+        if (c.length() != 32) return false;
+        for (int i = 0; i < c.length(); i++) {
+            char ch = c.charAt(i);
+            boolean ok = (ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F');
+            if (!ok) return false;
+        }
+        return true;
+    }
+
+    private static byte[] hexToBytes(String hex) {
+        String c = hex.replace(" ", "").replace("-", "");
+        byte[] data = new byte[c.length() / 2];
+        for (int i = 0; i < data.length; i++) {
+            data[i] = (byte) ((Character.digit(c.charAt(i * 2), 16) << 4)
+                    + Character.digit(c.charAt(i * 2 + 1), 16));
+        }
+        return data;
+    }
+
+    /**
+     * ClearKey recipe: a local JWK-set response served by
+     * LocalMediaDrmCallback, on a DefaultDrmSessionManager with
+     * CLEARKEY_UUID. Feed channels carry hex kid:key pairs (KODIPROP
+     * license_key format); each pair becomes one JWK.
+     */
+    private DrmSessionManagerProvider buildClearKeyProvider() {
+        try {
+            JSONArray keysArray = new JSONArray();
+            for (String[] pair : drmKeyPairs) {
+                String kidB64 = android.util.Base64.encodeToString(hexToBytes(pair[0]),
+                        android.util.Base64.URL_SAFE | android.util.Base64.NO_PADDING | android.util.Base64.NO_WRAP);
+                String keyB64 = android.util.Base64.encodeToString(hexToBytes(pair[1]),
+                        android.util.Base64.URL_SAFE | android.util.Base64.NO_PADDING | android.util.Base64.NO_WRAP);
+                JSONObject keyObj = new JSONObject();
+                keyObj.put("kty", "oct");
+                keyObj.put("k", keyB64);
+                keyObj.put("kid", kidB64);
+                keysArray.put(keyObj);
+            }
+            JSONObject root = new JSONObject();
+            root.put("keys", keysArray);
+            root.put("type", "temporary");
+            byte[] response = root.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            LocalMediaDrmCallback callback = new LocalMediaDrmCallback(response);
+            final DefaultDrmSessionManager sessionManager =
+                    new DefaultDrmSessionManager.Builder()
+                            .setUuidAndExoMediaDrmProvider(C.CLEARKEY_UUID, FrameworkMediaDrm.DEFAULT_PROVIDER)
+                            .setMultiSession(true)
+                            .build(callback);
+            return mediaItem -> sessionManager;
+        } catch (Exception e) {
+            Log.e(TAG, "ClearKey provider build failed: " + e.getMessage());
+            return null;
+        }
+    }
 
     private static synchronized OkHttpClient getSharedOkHttpClient() throws Exception {
         if (sharedOkHttpClient == null) {
@@ -2754,6 +2905,13 @@ public class PlayerActivity extends AppCompatActivity {
     private DataSource.Factory buildDataSourceFactory(String url) {
         Map<String, String> defaultHeaders = new HashMap<>();
         defaultHeaders.put("Accept", "*/*");
+        // v3.13.0 (ported): per-channel headers from the live feed (jio Cookie,
+        // hotstar UA/Origin, yupp referer) arrive via the drm intent extra.
+        if (streamHeaders != null && !streamHeaders.isEmpty()) {
+            for (Map.Entry<String, String> e : streamHeaders.entrySet()) {
+                if (e.getKey() != null && e.getValue() != null) defaultHeaders.put(e.getKey(), e.getValue());
+            }
+        }
         if (url != null && !url.isEmpty()) {
             try {
                 for (Map.Entry<String, String> e : buildEmbedHeaders(url).entrySet()) {
@@ -3043,6 +3201,7 @@ public class PlayerActivity extends AppCompatActivity {
     private void hideOsd() {
         if (osdOverlay == null) return;
         isOsdVisible = false;
+        isControlsOpen = false;
         osdOverlay.setVisibility(View.GONE);
         // v3.12.77: clear OSD button focus when the OSD hides — otherwise the
         // D-pad is still "on" the last OSD button, so LEFT/RIGHT keep moving
@@ -3053,11 +3212,27 @@ public class PlayerActivity extends AppCompatActivity {
         }
     }
 
+    // v3.12.80: the bottom button strip is collapsed by default (Akkshay:
+    // "1 small icon at the right corner"). It opens only when the user picks
+    // the corner Options button (or presses UP/MENU/INFO).
+    private void openControlsPanel() {
+        if (bottomBar == null) return;
+        isControlsOpen = true;
+        bottomBar.setVisibility(View.VISIBLE);
+        showOsd();
+        if (btnPlayPause != null) btnPlayPause.requestFocus();
+    }
+
+    private void closeControlsPanel() {
+        if (bottomBar != null) bottomBar.setVisibility(View.GONE);
+        isControlsOpen = false;
+    }
+
     private void toggleOsd() {
         if (isOsdVisible) hideOsd();
         else {
             showOsd();
-            if (btnPlayPause != null) btnPlayPause.requestFocus();
+            if (btnOptions != null) btnOptions.requestFocus();
         }
     }
 
@@ -3240,10 +3415,10 @@ public class PlayerActivity extends AppCompatActivity {
         }
 
         if (event.getAction() == KeyEvent.ACTION_DOWN) {
-            // v3.12.79: SEEK only when the OSD is hidden. When the OSD button
-            // strip is open, LEFT/RIGHT must move between Pause/Unmute/-10s —
-            // eating them here trapped the user (reported by Akkshay).
-            if (isWebEmbedMode && !isLive && !isOsdVisible
+            // v3.12.80: web-embed seek works whenever the heavy controls strip
+            // is closed. The strip only opens via the corner Options icon, so
+            // LEFT/RIGHT always seek — they never get eaten by button focus.
+            if (isWebEmbedMode && !isLive && !isControlsOpen
                     && (keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
                         || keyCode == KeyEvent.KEYCODE_MEDIA_REWIND || keyCode == KeyEvent.KEYCODE_MEDIA_FAST_FORWARD)) {
                 if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_MEDIA_REWIND) {
@@ -3375,10 +3550,14 @@ public class PlayerActivity extends AppCompatActivity {
             showOsd(); // reset the auto-hide timer
 
             if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+                // v3.12.80: DOWN closes the controls strip and drops focus,
+                // so the very next LEFT/RIGHT seeks (no trapped navigation).
+                closeControlsPanel();
                 hideOsd();
                 return true;
             }
             if (keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_MENU || keyCode == KeyEvent.KEYCODE_INFO) {
+                closeControlsPanel();
                 hideOsd();
                 return true;
             }
@@ -3386,18 +3565,19 @@ public class PlayerActivity extends AppCompatActivity {
                 currentFocus.performClick();
                 return true;
             }
-            // v3.12.79: when the OSD button strip is open, LEFT/RIGHT slide
-            // focus between buttons (Pause/Unmute/-10s/...). The earlier
-            // "LEFT/RIGHT always seek" change trapped focus on one button —
-            // the user couldn't reach Pause at all. Seek now only happens
-            // when the OSD is hidden (handled in dispatchKeyEvent).
+            // v3.12.80 (Akkshay): LEFT/RIGHT while the OSD is up were eaten by
+            // button-focus navigation ("it just navigates"). Seek ALWAYS wins
+            // now — the user reaches the Options icon via UP/MENU, and DOWN
+            // closes the strip again. Focus still slides between buttons when
+            // the user keeps pressing after this seek (they can CENTER one).
             if (!isLive && (keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
                     || keyCode == KeyEvent.KEYCODE_MEDIA_REWIND || keyCode == KeyEvent.KEYCODE_MEDIA_FAST_FORWARD)) {
-                View target = (keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_MEDIA_REWIND)
-                        ? currentFocus.focusSearch(View.FOCUS_LEFT)
-                        : currentFocus.focusSearch(View.FOCUS_RIGHT);
-                if (target != null && target instanceof TextView && target != currentFocus) {
-                    target.requestFocus();
+                if (event.getRepeatCount() > 0) {
+                    startHoldSeek(keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_MEDIA_REWIND ? -1 : 1);
+                } else {
+                    seekRelative(keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_MEDIA_REWIND
+                            ? -SEEK_STEP_MS : SEEK_STEP_MS);
+                    updateSeekBarFromPlayer();
                 }
                 return true;
             }
@@ -3474,10 +3654,12 @@ public class PlayerActivity extends AppCompatActivity {
             case KeyEvent.KEYCODE_DPAD_DOWN:
             case KeyEvent.KEYCODE_MENU:
             case KeyEvent.KEYCODE_INFO:
+                // v3.12.80: UP/MENU/INFO opens the collapsed controls strip
+                // (the corner Options icon). DOWN closes everything.
                 if (!isOsdVisible) {
-                    showOsd();
-                    if (btnPlayPause != null) btnPlayPause.requestFocus();
+                    openControlsPanel();
                 } else {
+                    closeControlsPanel();
                     hideOsd();
                 }
                 return true;
