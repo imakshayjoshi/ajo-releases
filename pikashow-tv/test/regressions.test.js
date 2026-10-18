@@ -132,8 +132,8 @@ test('Bug C2: getPairingRoom / setPairingRoom persist correctly', () => {
 // --- v3.12.52 STABILITY REGRESSION TESTS -----------------------------------
 test('v3.12.52: OTA version and code are bumped', async () => {
   const ota = await import('../src/api/otaUpdate.js');
-  assert.equal(ota.CURRENT_APP_VERSION, '3.14.1');
-  assert.equal(ota.CURRENT_VERSION_CODE, 252);
+  assert.equal(ota.CURRENT_APP_VERSION, '3.14.2');
+  assert.equal(ota.CURRENT_VERSION_CODE, 253);
   // v3.12.82: the -androidtv release-tag suffix must never confuse the
   // version compare (the OTA banner silently no-shows if a source wins with a
   // malformed version string).
@@ -220,15 +220,16 @@ test('v3.12.50: cast payload season/episode fields rebuild episode-exact mirrors
   assert.ok(!servers.some(s => /\/tv\/8\/1\/1(?:\/|\?|$)/.test(s.url)), 'episode digit must never masquerade as series id');
 });
 
-test('v3.14.1: embed chain order follows measured host health', () => {
+test('v3.14.2: chain keeps only render-tested-live hosts; dead ones are gone', () => {
   const servers = generateUniversalServers({ id: 'tmdb-1236045', type: 'movie', title: 'Animals' });
-  const embeds = servers.filter(s => s.source === 'embed' || s.type === 'embed').map(s => s.url);
-  const idx = (re) => embeds.findIndex(u => re.test(u));
-  // measured-good hosts (Oct 18 2026 render test) must precede dead-weights
-  assert.ok(idx(/vidsrc\.pm/) >= 0 && idx(/vidlink\.pro/) >= 0 && idx(/vidrift\.in/) >= 0 && idx(/vidy\.st/) >= 0, 'proven hosts present');
-  assert.ok(idx(/vidlink\.pro/) < idx(/videasy/), 'vidlink before videasy (videasy 403 that day)');
-  assert.ok(idx(/vidrift\.in/) < idx(/vidbolt\.xyz/), 'vidrift before vidbolt (vidbolt 404 that day)');
-  assert.ok(idx(/vidy\.st/) < idx(/filmu\.in/), 'vidy.st before filmu (filmu blank that day)');
+  const urls = servers.map(s => s.url);
+  // dead-that-day (Oct 18 2026 render test) and the apiplayer '12th server'
+  for (const dead of [/videasy/, /2embed\.skin/, /vidbolt/, /filmu/, /cinezo/, /apiplayer\.ru/, /vidjoy/]) {
+    assert.ok(!urls.some(u => dead.test(u)), `dead host must be absent: ${dead}`);
+  }
+  for (const good of [/autoembed\.co/, /vidsrc\.pm/, /vidlink\.pro/, /vidrift\.in/, /vidy\.st/]) {
+    assert.ok(urls.some(u => good.test(u)), `proven-live host must be present: ${good}`);
+  }
 });
 
 test('v3.14.1: anime items get bingr-mirror servers with bingr id', () => {

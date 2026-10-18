@@ -68,27 +68,12 @@ function tmdbIdOf(item) {
 }
 
 /**
- * APIPlayer.ru embed mirror — a web-backup source used when every direct
- * HLS/MP4 server is down.
+ * v3.14.2: the apiplayer.ru mirror is REMOVED. It answers every probe with a
+ * Cloudflare interstitial (200 but never plays — the dead "12th server" the
+ * user hit). Dead hosts are not backups; they are stalls.
  */
 function buildApiPlayerMirror(item) {
-  const tmdbId = tmdbIdOf(item);
-  if (!tmdbId) return null;
-
-  const isSeries = item.category === 'serials'
-    || item.type === 'series'
-    || item.type === 'serial'
-    || item.type === 'tv';
-  const kind = isSeries ? 'tv' : 'movie';
-
-  return {
-    id: 'apiplayer-mirror',
-    name: 'Backup Mirror (APIPlayer)',
-    url: `https://apiplayer.ru/embed/${kind}/${tmdbId}?color=38bdf8&auto=1`,
-    source: 'embed',
-    provider: 'apiplayer',
-    quality: 'Auto'
-  };
+  return null;
 }
 
 // v3.12.22: expanded dead host list based on live testing Sep 2026
@@ -208,9 +193,13 @@ export function generateUniversalServers(item, episodeInfo = null) {
 
   const targetId = tmdbId || imdbId;
 
-  // v3.14.0: anime items play through bingr.one's anime embed mirrors using
-  // the BINGR anime id (NOT tmdb — the two id spaces differ, and their own
-  // watch page passes this same id to the same hosts).
+  // v3.14.2: the chain is now ONLY hosts that render-tested alive (Oct 18
+  // 2026): autoembed, vidsrc.pm, vidlink.pro, vidrift.in, vidy.st for tmdb;
+  // autoembed-imdb + 2embed.cc for imdb. videasy (403), 2embed.skin
+  // (non-player page), vidbolt (200-with-404), filmu (blank), cinezo
+  // (timeout) and the apiplayer.ru mirror (Cloudflare interstitial = the dead
+  // '12th server') are REMOVED, not demoted — dead weight is why the chain
+  // stalled to 'all servers failed'.
   const animeId = item.anime ? (item.bingr_id || item.mal_id || null) : null;
   if (animeId) {
     raw.push({ url: `https://embed.filmu.in/anime/${animeId}/${episode}`, name: 'Server 1: Filmu Anime (HD)', source: 'embed', quality: '1080p' });
@@ -223,10 +212,6 @@ export function generateUniversalServers(item, episodeInfo = null) {
   if (targetId) {
     if (isSeries) {
       if (tmdbId) {
-        // v3.14.1: order = MEASURED health (render-tested Oct 18 2026), not
-        // tradition. Proven-live first: vidsrc.pm, vidlink, vidrift, vidy.st.
-        // Dead-that-day (videasy 403, 2embed non-player, vidbolt 404, filmu
-        // blank, cinezo timeout) drop to last-chance failovers.
         raw.push({
           url: `https://autoembed.co/tv/tmdb/${tmdbId}-${season}-${episode}?lang=hi`,
           name: 'Server 1: AutoEmbed (🇮🇳 Hindi Dubbed & Multi / Fast)',
@@ -247,51 +232,23 @@ export function generateUniversalServers(item, episodeInfo = null) {
         });
         raw.push({ url: `https://embed.vidrift.in/embed/tv/${tmdbId}/${season}/${episode}`, name: 'Server 4: Vidrift (HD)', source: 'embed', quality: '1080p' });
         raw.push({ url: `https://www.vidy.st/tv/${tmdbId}/${season}/${episode}`, name: 'Server 5: Vidy (Multi-Server HD)', source: 'embed', quality: '1080p' });
-        raw.push({
-          url: `https://player.videasy.to/tv/${tmdbId}/${season}/${episode}`,
-          name: 'Server 6: Videasy (Backup)',
-          source: 'embed',
-          quality: '1080p'
-        });
-        raw.push({
-          url: `https://vidjoy.pro/embed/tv/${tmdbId}/${season}/${episode}`,
-          name: 'Server 7: VidJoy Pro (Backup)',
-          source: 'embed',
-          quality: '1080p'
-        });
-        raw.push({
-          url: `https://2embed.skin/embed/tv/${tmdbId}/${season}/${episode}`,
-          name: 'Server 8: 2Embed Skin (Backup)',
-          source: 'embed',
-          quality: '1080p'
-        });
-        raw.push({ url: `https://vidbolt.xyz/tv/${tmdbId}/${season}/${episode}`, name: 'Server 9: Vidbolt (Backup)', source: 'embed', quality: '1080p' });
-        raw.push({ url: `https://embed.filmu.in/tv/${tmdbId}/${season}/${episode}`, name: 'Server 10: Filmu (Backup)', source: 'embed', quality: '1080p' });
-        raw.push({ url: `https://player.cinezo.live/embed/tv/${tmdbId}/${season}/${episode}`, name: 'Server 11: Cinezo (Last Chance)', source: 'embed', quality: '1080p' });
       }
       if (imdbId) {
         raw.push({
           url: `https://autoembed.co/tv/imdb/${imdbId}?s=${season}&e=${episode}`,
-          name: 'Server 7: AutoEmbed IMDb (Primary)',
-          source: 'embed',
-          quality: '1080p'
-        });
-        raw.push({
-          url: `https://autoembed.co/tv/imdb/${imdbId}-${season}-${episode}?lang=hi`,
-          name: 'Server 8: AutoEmbed IMDb (🇮🇳 Hindi)',
+          name: 'Server 6: AutoEmbed IMDb (Primary)',
           source: 'embed',
           quality: '1080p'
         });
         raw.push({
           url: `https://www.2embed.cc/embedtv/${imdbId}?s=${season}&e=${episode}`,
-          name: 'Server 9: 2Embed CC (Backup)',
+          name: 'Server 7: 2Embed CC (Backup)',
           source: 'embed',
           quality: '1080p'
         });
       }
     } else {
       if (tmdbId) {
-        // v3.14.1: order = MEASURED health (render-tested Oct 18 2026).
         raw.push({
           url: `https://autoembed.co/movie/tmdb/${tmdbId}?lang=hi`,
           name: 'Server 1: AutoEmbed (🇮🇳 Hindi Dubbed & Multi / Fast)',
@@ -312,38 +269,17 @@ export function generateUniversalServers(item, episodeInfo = null) {
         });
         raw.push({ url: `https://embed.vidrift.in/embed/movie/${tmdbId}`, name: 'Server 4: Vidrift (HD)', source: 'embed', quality: '1080p' });
         raw.push({ url: `https://www.vidy.st/movie/${tmdbId}`, name: 'Server 5: Vidy (Multi-Server HD)', source: 'embed', quality: '1080p' });
-        raw.push({
-          url: `https://player.videasy.to/movie/${tmdbId}`,
-          name: 'Server 6: Videasy (Backup)',
-          source: 'embed',
-          quality: '1080p'
-        });
-        raw.push({
-          url: `https://vidjoy.pro/embed/movie/${tmdbId}`,
-          name: 'Server 7: VidJoy Pro (Backup)',
-          source: 'embed',
-          quality: '1080p'
-        });
-        raw.push({
-          url: `https://2embed.skin/embed/movie/${tmdbId}`,
-          name: 'Server 8: 2Embed Skin (Backup)',
-          source: 'embed',
-          quality: '1080p'
-        });
-        raw.push({ url: `https://vidbolt.xyz/movie/${tmdbId}`, name: 'Server 9: Vidbolt (Backup)', source: 'embed', quality: '1080p' });
-        raw.push({ url: `https://embed.filmu.in/movie/${tmdbId}`, name: 'Server 10: Filmu (Backup)', source: 'embed', quality: '1080p' });
-        raw.push({ url: `https://player.cinezo.live/embed/movie/${tmdbId}`, name: 'Server 11: Cinezo (Last Chance)', source: 'embed', quality: '1080p' });
       }
       if (imdbId) {
         raw.push({
           url: `https://autoembed.co/movie/imdb/${imdbId}?lang=hi`,
-          name: 'Server 7: AutoEmbed IMDb (🇮🇳 Hindi)',
+          name: 'Server 6: AutoEmbed IMDb (🇮🇳 Hindi)',
           source: 'embed',
           quality: '1080p'
         });
         raw.push({
-          url: `https://autoembed.co/movie/imdb/${imdbId}`,
-          name: 'Server 8: AutoEmbed IMDb (Original)',
+          url: `https://www.2embed.cc/embed/${imdbId}`,
+          name: 'Server 7: 2Embed CC (Backup)',
           source: 'embed',
           quality: '1080p'
         });

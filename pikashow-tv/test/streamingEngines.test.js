@@ -10,13 +10,11 @@ test('detects common stream types', () => {
   assert.equal(isEmbedUrl('https://apiplayer.ru/embed/tv/279471/1/2'), true);
 });
 
-test('generates APIPlayer.ru servers for movies and TV shows', () => {
+test('v3.14.2: apiplayer.ru mirror is never generated (dead 12th server)', () => {
   const movie = { id: 980431, tmdb_id: 980431, title: 'Test Movie', type: 'movie', url: 'https://cdn.test/movie.m3u8' };
   const sources = generateUniversalServers(movie);
-  const apiPlayer = sources.find(s => s.provider === 'apiplayer');
-  assert.ok(apiPlayer, 'APIPlayer server should be generated');
-  assert.equal(apiPlayer.url, 'https://apiplayer.ru/embed/movie/980431?color=38bdf8&auto=1');
-  assert.equal(apiPlayer.source, 'embed');
+  assert.ok(!sources.some(s => s.provider === 'apiplayer' || /apiplayer\.ru/.test(s.url)),
+    'apiplayer.ru must never enter the chain — Cloudflare interstitial, never plays');
 });
 
 test('rejects unsafe and duplicate sources', () => {
