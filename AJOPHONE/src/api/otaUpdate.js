@@ -1,5 +1,5 @@
-export const CURRENT_APP_VERSION = '3.5.3';
-export const CURRENT_VERSION_CODE = 223;
+export const CURRENT_APP_VERSION = '3.6.0';
+export const CURRENT_VERSION_CODE = 224;
 const MANIFEST_SOURCES = [
   'https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/version.json',
   'https://api.github.com/repos/imakshayjoshi/ajo-releases/releases/latest',

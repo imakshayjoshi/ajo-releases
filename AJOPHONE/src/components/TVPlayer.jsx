@@ -644,6 +644,15 @@ export function TVPlayer({
           fragLoadingMaxRetry: 4,
           manifestLoadingMaxRetry: 4,
           levelLoadingMaxRetry: 4,
+          // v3.6.0: direct-resolver streams (vidy) 403 without Referer/Origin.
+          xhrSetup: (xhr) => {
+            const h = activeServer?.headers;
+            if (h && typeof h === 'object') {
+              for (const [k, v] of Object.entries(h)) {
+                try { xhr.setRequestHeader(k, v); } catch {}
+              }
+            }
+          },
         });
         hlsRef.current = hls;
   

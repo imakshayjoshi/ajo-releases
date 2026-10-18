@@ -25,6 +25,7 @@ import {
   isNativePlayableUrl,
   isDirectMediaUrl,
   playInNativePlayer,
+  playInNativePlayerWithDrm,
   preflightEmbedUrl
 } from '../utils/nativePlayer';
 import { saveProgress, getWatchHistory, getWatchProgress, markItemDead } from '../api/history';
@@ -477,7 +478,13 @@ export function TVPlayer({
     teardownWebPlayback();
 
     const fallbackUrls = orderedServers.map(s => s?.url).filter(Boolean);
-    if (!playInNativePlayer(streamUrl, title, isLive, fallbackUrls)) return false;
+    // v3.15.0: direct-resolver streams (vidy) 403 without Referer/Origin —
+    // route through the headers-aware bridge when the server carries them.
+    const activeHeaders = orderedServers[currentServerIndex]?.headers;
+    const launched = (activeHeaders && Object.keys(activeHeaders).length > 0)
+      ? playInNativePlayerWithDrm(streamUrl, title, isLive, fallbackUrls, null, activeHeaders)
+      : playInNativePlayer(streamUrl, title, isLive, fallbackUrls);
+    if (!launched) return false;
 
     nativeHandoffDoneRef.current = streamUrl;
     nativeActiveRef.current = true;
@@ -655,6 +662,17 @@ export function TVPlayer({
           fragLoadingMaxRetry: 4,
           manifestLoadingMaxRetry: 4,
           levelLoadingMaxRetry: 4,
+          // v3.15.0: direct-resolver streams (vidy) 403 without Referer/Origin.
+          // xhrSetup covers playlist + segment + key requests. No-op for
+          // servers without headers.
+          xhrSetup: (xhr) => {
+            const h = activeServer?.headers;
+            if (h && typeof h === 'object') {
+              for (const [k, v] of Object.entries(h)) {
+                try { xhr.setRequestHeader(k, v); } catch {}
+              }
+            }
+          },
         });
         hlsRef.current = hls;
   

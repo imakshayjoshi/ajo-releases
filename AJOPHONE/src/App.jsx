@@ -361,6 +361,41 @@ export default function App() {
         }));
       }
     } catch {}
+    // v3.6.0: vidy.st direct-stream resolver — raw HLS in OUR hls.js player,
+    // no ads, no embed pages. Fail-soft; embed chain stays as fallback.
+    try {
+      const resolverTmdbId = playItem.tmdb_id
+        || (typeof playItem.id === 'string' ? Number((playItem.id.match(/tmdb-(?:ep-)?(\d+)/) || [])[1]) : null);
+      if (resolverTmdbId && Number.isFinite(resolverTmdbId) && !playItem.is_live && playItem.type !== 'live') {
+        const { resolveVidyDirect } = await import('./api/directResolver');
+        const isSeriesItem = Boolean(pickedEpisode) || playItem.type === 'series' || playItem.type === 'tv' || playItem.category === 'serials';
+        const direct = await Promise.race([
+          resolveVidyDirect({
+            title: playItem.series_title || playItem.title_en || playItem.title || playItem.name || '',
+            year: parseInt(playItem.year, 10) || '',
+            tmdbId: resolverTmdbId,
+            imdbId: playItem.imdb_id || playItem.imdb || '',
+            mediaType: isSeriesItem ? 'tv' : 'movie',
+            season: playItem.season_number || playItem.season || 1,
+            episode: playItem.episode_number || playItem.episode || 1,
+          }),
+          new Promise((res) => setTimeout(() => res([]), 3500)),
+        ]);
+        if (Array.isArray(direct) && direct.length > 0) {
+          const directServers = direct.map((s, i) => ({
+            id: `vidy-direct-${i}`,
+            name: s.label,
+            url: s.url,
+            source: 'hls',
+            quality: s.quality,
+            headers: s.headers,
+            provider: 'vidy-direct'
+          }));
+          const { generateUniversalServers } = await import('./utils/streamingEngines');
+          allServers = [...directServers, ...allServers, ...generateUniversalServers(playItem, pickedEpisode)];
+        }
+      }
+    } catch {}
     const chosenPlayer = server || playItem.players?.[0] || playItem.player?.[0] || (playItem.url ? { url: playItem.url, source: 'm3u8' } : null);
     setActivePlayback({ item: playItem, server: chosenPlayer, allServers });
   }, []);
