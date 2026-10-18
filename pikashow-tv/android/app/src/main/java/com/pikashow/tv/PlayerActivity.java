@@ -437,7 +437,9 @@ public class PlayerActivity extends AppCompatActivity {
     // v3.10.0: web-engine (iframe/embed) load watchdog. A dead mirror or a
     // hung Cloudflare interstitial never finishes loading, so the spinner
     // used to spin forever. After WEB_LOAD_TIMEOUT_MS we fail over.
-    private static final long WEB_LOAD_TIMEOUT_MS = 15000L;
+    // v3.14.1: 15s -> 9s. The liveness probe (onPageFinished) catches dead
+    // 200-pages at ~4.5s; this watchdog is now only the never-loads backstop.
+    private static final long WEB_LOAD_TIMEOUT_MS = 9000L;
     private final Runnable webLoadWatchdog = new Runnable() {
         @Override
         public void run() {
@@ -1157,6 +1159,39 @@ public class PlayerActivity extends AppCompatActivity {
                                 "(function(){try{var s=document.createElement('style');s.textContent='" + finalCss.replace("'", "\\'") + "';document.head.appendChild(s);}catch(e){}})();", null);
                         }
                     }, 2500);
+
+                    // v3.14.1: EMBED LIVENESS PROBE. Blind spot being closed:
+                    // iframe onLoad and onPageFinished fire for a provider's
+                    // 404/403/BLANK pages too (they return HTTP 200), so the
+                    // watchdog used to disarm on a dead mirror and the user
+                    // stared at a dead page until "all servers failed". 4.5s
+                    // after load, look INSIDE the page: a real <video>, a
+                    // nested player iframe, or dead-page text. Dead = instant
+                    // failover to the next mirror instead of a 15s black stall.
+                    view.postDelayed(() -> {
+                        if (webVideoView == null || !isWebEmbedMode) return;
+                        webVideoView.evaluateJavascript(
+                                "(function(){try{"
+                                + "var deadTxt=/404 not found|page not found|access denied|was denied|don\\'t have authorization|just a moment|no longer available|not available on/i;"
+                                + "var body=document.body?(document.body.innerText||''):'';"
+                                + "var title=document.title||'';"
+                                + "if(deadTxt.test(title+' '+body.slice(0,2000)))return '0';"
+                                + "var vs=document.querySelectorAll('video');"
+                                + "for(var i=0;i<vs.length;i++){var v=vs[i];if(v&&(v.currentSrc||v.src||(v.querySelector('source')&&v.querySelector('source').src)||v.readyState>0))return '1';}"
+                                + "var fs=document.querySelectorAll('iframe');"
+                                + "for(var j=0;j<fs.length;j++){var s=fs[j].src||'';if(/player|embed|video|stream/i.test(s))return '1';}"
+                                + "if(body.length>400)return '1';"
+                                + "return '0';"
+                                + "}catch(e){return '1';}})();",
+                                probeResult -> {
+                                    try {
+                                        if (probeResult != null && probeResult.trim().equals("\"0\"")) {
+                                            Log.w(TAG, "Embed liveness probe FAILED (dead/blank/404 page) — failing over");
+                                            failoverToNextServer();
+                                        }
+                                    } catch (Throwable ignored) {}
+                                });
+                    }, 4500);
 
                     view.evaluateJavascript(
                             "(function(){"

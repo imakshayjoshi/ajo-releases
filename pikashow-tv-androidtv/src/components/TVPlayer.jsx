@@ -39,7 +39,9 @@ import './TVPlayer.css';
 // v3.12.20: how long to wait for an embed iframe to signal a load before
 // auto-failing over. Dead hosts never fire onLoad; Cloudflare hang pages
 // usually do not either. Reduced from 12000 to speed up fallback further.
-const EMBED_LOAD_TIMEOUT_MS = 8000;
+// v3.14.1: 8s -> 6s. Dead mirrors fail faster; the measured-good hosts now
+// sit at the front of the chain so the watchdog rarely fires at all.
+const EMBED_LOAD_TIMEOUT_MS = 6000;
 
 export function TVPlayer({
   item,
