@@ -361,35 +361,45 @@ export default function App() {
         }));
       }
     } catch {}
-    // v3.6.0: vidy.st direct-stream resolver — raw HLS in OUR hls.js player,
-    // no ads, no embed pages. Fail-soft; embed chain stays as fallback.
+    // v3.7.0: dual direct-stream resolvers (vidy HLS + vidsrc MP4) — raw video
+    // in OUR hls.js/native player, no ads. Fail-soft; embed chain stays.
     try {
       const resolverTmdbId = playItem.tmdb_id
         || (typeof playItem.id === 'string' ? Number((playItem.id.match(/tmdb-(?:ep-)?(\d+)/) || [])[1]) : null);
       if (resolverTmdbId && Number.isFinite(resolverTmdbId) && !playItem.is_live && playItem.type !== 'live') {
-        const { resolveVidyDirect } = await import('./api/directResolver');
+        const { resolveVidyDirect, resolveVidsrcDirect } = await import('./api/directResolver');
         const isSeriesItem = Boolean(pickedEpisode) || playItem.type === 'series' || playItem.type === 'tv' || playItem.category === 'serials';
-        const direct = await Promise.race([
-          resolveVidyDirect({
-            title: playItem.series_title || playItem.title_en || playItem.title || playItem.name || '',
-            year: parseInt(playItem.year, 10) || '',
-            tmdbId: resolverTmdbId,
-            imdbId: playItem.imdb_id || playItem.imdb || '',
-            mediaType: isSeriesItem ? 'tv' : 'movie',
-            season: playItem.season_number || playItem.season || 1,
-            episode: playItem.episode_number || playItem.episode || 1,
-          }),
-          new Promise((res) => setTimeout(() => res([]), 3500)),
+        const mediaType = isSeriesItem ? 'tv' : 'movie';
+        const season = playItem.season_number || playItem.season || 1;
+        const episode = playItem.episode_number || playItem.episode || 1;
+        const budget = new Promise((res) => setTimeout(() => res('timeout'), 4000));
+        const [vidy, vidsrc] = await Promise.all([
+          Promise.race([
+            resolveVidyDirect({
+              title: playItem.series_title || playItem.title_en || playItem.title || playItem.name || '',
+              year: parseInt(playItem.year, 10) || '',
+              tmdbId: resolverTmdbId,
+              imdbId: playItem.imdb_id || playItem.imdb || '',
+              mediaType, season, episode,
+            }),
+            budget,
+          ]).then(r => (Array.isArray(r) ? r : [])),
+          Promise.race([
+            resolveVidsrcDirect({ tmdbId: resolverTmdbId, mediaType, season, episode }),
+            budget,
+          ]).then(r => (Array.isArray(r) ? r : [])),
         ]);
-        if (Array.isArray(direct) && direct.length > 0) {
+        const direct = [...vidy, ...vidsrc];
+        if (direct.length > 0) {
           const directServers = direct.map((s, i) => ({
-            id: `vidy-direct-${i}`,
+            id: `direct-${i}`,
             name: s.label,
             url: s.url,
-            source: 'hls',
+            source: s.source || 'hls',
             quality: s.quality,
             headers: s.headers,
-            provider: 'vidy-direct'
+            subtitles: s.subtitles || [],
+            provider: s.source === 'mp4' ? 'vidsrc-direct' : 'vidy-direct'
           }));
           const { generateUniversalServers } = await import('./utils/streamingEngines');
           allServers = [...directServers, ...allServers, ...generateUniversalServers(playItem, pickedEpisode)];

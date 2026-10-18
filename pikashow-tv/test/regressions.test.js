@@ -132,8 +132,8 @@ test('Bug C2: getPairingRoom / setPairingRoom persist correctly', () => {
 // --- v3.12.52 STABILITY REGRESSION TESTS -----------------------------------
 test('v3.12.52: OTA version and code are bumped', async () => {
   const ota = await import('../src/api/otaUpdate.js');
-  assert.equal(ota.CURRENT_APP_VERSION, '3.15.0');
-  assert.equal(ota.CURRENT_VERSION_CODE, 254);
+  assert.equal(ota.CURRENT_APP_VERSION, '3.16.0');
+  assert.equal(ota.CURRENT_VERSION_CODE, 255);
   // v3.12.82: the -androidtv release-tag suffix must never confuse the
   // version compare (the OTA banner silently no-shows if a source wins with a
   // malformed version string).
@@ -283,4 +283,26 @@ test('v3.15.0: vidyDecrypt round-trips and enforces the mvm1 magic', async () =>
   const out = vidyDecrypt(b64, seed, mediaId);
   assert.equal(out, payload);
   assert.throws(() => vidyDecrypt(b64, 'wrong-seed', mediaId), /decrypt failed/);
+});
+
+test('v3.16.0: vidsrc resolver parses oreon sources and carries Referer headers', async () => {
+  const { resolveVidsrcDirect } = await import('../src/api/directResolver.js');
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url, opts) => {
+    if (!String(url).includes('vidsrc.pm')) return realFetch(url, opts);
+    assert.equal(opts.headers['x-player-key'].length, 64, 'static player key present');
+    assert.equal(opts.headers.Referer, 'https://vidsrc.pm/');
+    return { ok: true, json: async () => ({ result: true, sources: [{ file_code: 'x', url: 'https://relay.test/p2/proxy?url=a.mp4', tracks: [{ label: 'English', file: 'https://x.test/en.vtt' }] }] }) };
+  };
+  try {
+    const out = await resolveVidsrcDirect({ tmdbId: 693134, mediaType: 'movie' });
+    assert.equal(out.length, 1);
+    assert.equal(out[0].source, 'mp4');
+    assert.equal(out[0].headers.Referer, 'https://vidsrc.pm/');
+    assert.equal(out[0].subtitles.length, 1);
+    const empty = await resolveVidsrcDirect({ tmdbId: null, mediaType: 'movie' });
+    assert.deepEqual(empty, []);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
 });

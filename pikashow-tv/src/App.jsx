@@ -428,36 +428,45 @@ export default function App() {
       ? episodes[episodeIndex]
       : (resolvedItem.season_number || resolvedItem.episode_number ? resolvedItem : null);
     let allServers = generateUniversalServers(resolvedItem, episodeInfo);
-    // v3.15.0: vidy.st direct-stream resolver — raw HLS (1080p/720p/480p/2160p)
-    // decrypted from their sources API, played in OUR player: no ads, no embed
-    // pages, real seek. Prepended ahead of everything, 3.5s budget, fail-soft.
+    // v3.16.0: dual direct-stream resolvers (vidy HLS + vidsrc MP4) — raw video
+    // in OUR player: no ads, no embed pages, real seek. Prepended, fail-soft.
     try {
       const resolverTmdbId = resolvedItem.tmdb_id
         || (typeof resolvedItem.id === 'string' ? Number((resolvedItem.id.match(/tmdb-(?:ep-)?(\d+)/) || [])[1]) : null);
       if (resolverTmdbId && Number.isFinite(resolverTmdbId)) {
-        const { resolveVidyDirect } = await import('./api/directResolver');
+        const { resolveVidyDirect, resolveVidsrcDirect } = await import('./api/directResolver');
         const isSeriesItem = Boolean(episodeInfo) || resolvedItem.type === 'series' || resolvedItem.type === 'tv' || resolvedItem.category === 'serials';
-        const direct = await Promise.race([
-          resolveVidyDirect({
-            title: resolvedItem.series_title || resolvedItem.title_en || resolvedItem.title || resolvedItem.name || '',
-            year: parseInt(resolvedItem.year, 10) || '',
-            tmdbId: resolverTmdbId,
-            imdbId: resolvedItem.imdb_id || resolvedItem.imdb || '',
-            mediaType: isSeriesItem ? 'tv' : 'movie',
-            season: episodeInfo?.season_number || episodeInfo?.season || resolvedItem.season_number || 1,
-            episode: episodeInfo?.episode_number || episodeInfo?.episode || resolvedItem.episode_number || 1,
-          }),
-          new Promise((res) => setTimeout(() => res([]), 3500)),
+        const mediaType = isSeriesItem ? 'tv' : 'movie';
+        const season = episodeInfo?.season_number || episodeInfo?.season || resolvedItem.season_number || 1;
+        const episode = episodeInfo?.episode_number || episodeInfo?.episode || resolvedItem.episode_number || 1;
+        const budget = new Promise((res) => setTimeout(() => res('timeout'), 4000));
+        const [vidy, vidsrc] = await Promise.all([
+          Promise.race([
+            resolveVidyDirect({
+              title: resolvedItem.series_title || resolvedItem.title_en || resolvedItem.title || resolvedItem.name || '',
+              year: parseInt(resolvedItem.year, 10) || '',
+              tmdbId: resolverTmdbId,
+              imdbId: resolvedItem.imdb_id || resolvedItem.imdb || '',
+              mediaType, season, episode,
+            }),
+            budget,
+          ]).then(r => (Array.isArray(r) ? r : [])),
+          Promise.race([
+            resolveVidsrcDirect({ tmdbId: resolverTmdbId, mediaType, season, episode }),
+            budget,
+          ]).then(r => (Array.isArray(r) ? r : [])),
         ]);
-        if (Array.isArray(direct) && direct.length > 0) {
+        const direct = [...vidy, ...vidsrc];
+        if (direct.length > 0) {
           allServers = [...direct.map((s, i) => ({
-            id: `vidy-direct-${i}`,
+            id: `direct-${i}`,
             name: s.label,
             url: s.url,
-            source: 'hls',
+            source: s.source || 'hls',
             quality: s.quality,
             headers: s.headers,
-            provider: 'vidy-direct'
+            subtitles: s.subtitles || [],
+            provider: s.source === 'mp4' ? 'vidsrc-direct' : 'vidy-direct'
           })), ...allServers];
         }
       }

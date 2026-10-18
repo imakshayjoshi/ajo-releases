@@ -151,3 +151,40 @@ export async function resolveVidyDirect({ title, year, tmdbId, imdbId, mediaType
     return [];
   }
 }
+
+// v3.16.0: vidsrc.pm vidora API (found Oct 18 2026 in their /assets/main-*.js).
+// Static x-player-key from the bundle (rotates with their deploys — re-extract
+// from https://vidsrc.pm/assets/main-*.js if this starts 401ing).
+// Returns proxied MP4s (vidspark-relay workers -> bcdn.hakunaymatata.com, the
+// same CDN family as movibox) + subtitle tracks. Proxy needs Referer vidsrc.pm.
+const VIDSRC_KEY = 'f3b72e73c80c9a996574379798703796a1936efa3516a7105cb0e43048b46b5a';
+const VIDSRC_HEADERS = { 'x-player-key': VIDSRC_KEY, Referer: 'https://vidsrc.pm/' };
+
+export async function resolveVidsrcDirect({ tmdbId, mediaType, season, episode }) {
+  if (!tmdbId) return [];
+  try {
+    const path = mediaType === 'tv'
+      ? `/api/vidora/v1/tv/${tmdbId}/${season || 1}/${episode || 1}?source=oreon`
+      : `/api/vidora/v1/movie/${tmdbId}?source=oreon`;
+    const res = await fetch(`https://vidsrc.pm${path}`, { headers: VIDSRC_HEADERS });
+    if (!res.ok) return [];
+    const data = await res.json().catch(() => null);
+    if (!data?.result || !Array.isArray(data.sources)) return [];
+    const out = [];
+    for (const s of data.sources) {
+      const url = s.url || '';
+      if (!/^https:\/\//.test(url)) continue;
+      out.push({
+        url,
+        quality: '1080p',
+        label: '⚡ Direct MP4 (No Ads)',
+        source: 'mp4',
+        headers: { Referer: 'https://vidsrc.pm/' },
+        subtitles: Array.isArray(s.tracks) ? s.tracks.filter(t => t && (t.file || t.url)) : [],
+      });
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
