@@ -434,13 +434,15 @@ export default function App() {
       const resolverTmdbId = resolvedItem.tmdb_id
         || (typeof resolvedItem.id === 'string' ? Number((resolvedItem.id.match(/tmdb-(?:ep-)?(\d+)/) || [])[1]) : null);
       if (resolverTmdbId && Number.isFinite(resolverTmdbId)) {
-        const { resolveVidyDirect, resolveVidsrcDirect } = await import('./api/directResolver');
+        const { resolveVidyDirect, resolveVidsrcDirect, resolveVidriftDirect } = await import('./api/directResolver');
         const isSeriesItem = Boolean(episodeInfo) || resolvedItem.type === 'series' || resolvedItem.type === 'tv' || resolvedItem.category === 'serials';
         const mediaType = isSeriesItem ? 'tv' : 'movie';
         const season = episodeInfo?.season_number || episodeInfo?.season || resolvedItem.season_number || 1;
         const episode = episodeInfo?.episode_number || episodeInfo?.episode || resolvedItem.episode_number || 1;
         const budget = new Promise((res) => setTimeout(() => res('timeout'), 4000));
-        const [vidy, vidsrc] = await Promise.all([
+        let hevcOk = true;
+        try { hevcOk = !!(window.MediaSource && MediaSource.isTypeSupported('video/mp4; codecs="hvc1.1.6.L120.90"')); } catch {}
+        const [vidy, vidsrc, vidrift] = await Promise.all([
           Promise.race([
             resolveVidyDirect({
               title: resolvedItem.series_title || resolvedItem.title_en || resolvedItem.title || resolvedItem.name || '',
@@ -455,8 +457,12 @@ export default function App() {
             resolveVidsrcDirect({ tmdbId: resolverTmdbId, mediaType, season, episode }),
             budget,
           ]).then(r => (Array.isArray(r) ? r : [])),
+          Promise.race([
+            resolveVidriftDirect({ tmdbId: resolverTmdbId, mediaType, season, episode, hevcOk }),
+            budget,
+          ]).then(r => (Array.isArray(r) ? r : [])),
         ]);
-        const direct = [...vidy, ...vidsrc];
+        const direct = [...vidy, ...vidrift, ...vidsrc];
         if (direct.length > 0) {
           allServers = [...direct.map((s, i) => ({
             id: `direct-${i}`,

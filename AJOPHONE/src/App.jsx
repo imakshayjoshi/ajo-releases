@@ -367,13 +367,15 @@ export default function App() {
       const resolverTmdbId = playItem.tmdb_id
         || (typeof playItem.id === 'string' ? Number((playItem.id.match(/tmdb-(?:ep-)?(\d+)/) || [])[1]) : null);
       if (resolverTmdbId && Number.isFinite(resolverTmdbId) && !playItem.is_live && playItem.type !== 'live') {
-        const { resolveVidyDirect, resolveVidsrcDirect } = await import('./api/directResolver');
+        const { resolveVidyDirect, resolveVidsrcDirect, resolveVidriftDirect } = await import('./api/directResolver');
         const isSeriesItem = Boolean(pickedEpisode) || playItem.type === 'series' || playItem.type === 'tv' || playItem.category === 'serials';
         const mediaType = isSeriesItem ? 'tv' : 'movie';
         const season = playItem.season_number || playItem.season || 1;
         const episode = playItem.episode_number || playItem.episode || 1;
         const budget = new Promise((res) => setTimeout(() => res('timeout'), 4000));
-        const [vidy, vidsrc] = await Promise.all([
+        let hevcOk = true;
+        try { hevcOk = !!(window.MediaSource && MediaSource.isTypeSupported('video/mp4; codecs="hvc1.1.6.L120.90"')); } catch {}
+        const [vidy, vidsrc, vidrift] = await Promise.all([
           Promise.race([
             resolveVidyDirect({
               title: playItem.series_title || playItem.title_en || playItem.title || playItem.name || '',
@@ -388,8 +390,12 @@ export default function App() {
             resolveVidsrcDirect({ tmdbId: resolverTmdbId, mediaType, season, episode }),
             budget,
           ]).then(r => (Array.isArray(r) ? r : [])),
+          Promise.race([
+            resolveVidriftDirect({ tmdbId: resolverTmdbId, mediaType, season, episode, hevcOk }),
+            budget,
+          ]).then(r => (Array.isArray(r) ? r : [])),
         ]);
-        const direct = [...vidy, ...vidsrc];
+        const direct = [...vidy, ...vidrift, ...vidsrc];
         if (direct.length > 0) {
           const directServers = direct.map((s, i) => ({
             id: `direct-${i}`,

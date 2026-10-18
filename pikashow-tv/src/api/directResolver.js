@@ -188,3 +188,52 @@ export async function resolveVidsrcDirect({ tmdbId, mediaType, season, episode }
     return [];
   }
 }
+
+// v3.17.0: vidrift orion API (cracked Oct 18 2026). Flow, all from public data:
+//   1. GET /embed/{movie|tv}/... HTML -> embedMeta.playbackToken (2-part signed
+//      token, handed to every page visitor)
+//   2. GET /api/source/{movie|tv}/...?token=..&provider=orion -> streams[] with
+//      /api/orion/{hash}/master.m3u8 adaptive HLS (HEVC; multiple language
+//      variants incl. Hindi). Playlists+segments play with Referer=embed page.
+const VIDRIFT_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36';
+
+export async function resolveVidriftDirect({ tmdbId, mediaType, season, episode, hevcOk = true }) {
+  if (!tmdbId) return [];
+  try {
+    const isTv = mediaType === 'tv';
+    const embedUrl = isTv
+      ? `https://embed.vidrift.in/embed/tv/${tmdbId}/${season || 1}/${episode || 1}`
+      : `https://embed.vidrift.in/embed/movie/${tmdbId}`;
+    const pageRes = await fetch(embedUrl, { headers: { 'User-Agent': VIDRIFT_UA } });
+    if (!pageRes.ok) return [];
+    const html = await pageRes.text();
+    const tokMatch = html.match(/"playbackToken":"([^"]+)"/);
+    if (!tokMatch) return [];
+    const path = isTv ? `tv/${tmdbId}/${season || 1}/${episode || 1}` : `movie/${tmdbId}`;
+    const apiRes = await fetch(
+      `https://embed.vidrift.in/api/source/${path}?token=${encodeURIComponent(tokMatch[1])}&provider=orion${hevcOk ? '' : '&hevc=0'}`,
+      { headers: { Referer: embedUrl, 'User-Agent': VIDRIFT_UA } }
+    );
+    if (!apiRes.ok) return [];
+    const data = await apiRes.json().catch(() => null);
+    if (!Array.isArray(data?.streams)) return [];
+    const out = [];
+    for (const s of data.streams) {
+      if (s.type !== 'hls' || !s.url) continue;
+      const url = s.url.startsWith('http') ? s.url : `https://embed.vidrift.in${s.url}`;
+      const maxRung = (s.rungs || []).reduce((m2, r) => Math.max(m2, r?.height || 0), 0);
+      const quality = maxRung >= 1000 ? '1080p' : maxRung >= 700 ? '720p' : '480p';
+      const lang = /hindi/i.test(s.name || '') ? ' 🇮🇳 Hindi' : '';
+      out.push({
+        url,
+        quality,
+        label: `⚡ Direct ${quality}${lang} (No Ads)`,
+        source: 'hls',
+        headers: { Referer: embedUrl },
+      });
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
