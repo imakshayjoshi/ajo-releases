@@ -1,6 +1,9 @@
 const HLS_PATTERNS = [/\.m3u8(?:$|\?)/i, /\/getm3u8\//i, /\/getstream\//i, /\/live\//i, /\/playlist/i];
 const DASH_PATTERNS = [/\.mpd(?:$|\?)/i];
-const VIDEO_PATTERNS = [/\.(mp4|m4v|webm|mkv)(?:$|\?)/i, /\/movibox\/stream/i]; // v3.12.73: VPS movibox range proxy
+// v3.12.73: our own VPS movibox range proxy serves progressive MP4s — classify
+// as direct video so the web <video> pipeline picks them (they carry no .mp4
+// extension in the path, only inside the ?url= query param).
+const VIDEO_PATTERNS = [/\.(mp4|m4v|webm|mkv)(?:$|\?)/i, /\/movibox\/stream/i];
 
 // v3.12.20 FIX: purged dead providers, reordered by reliability.
 // Confirmed alive (Aug 2026): VidLink, VidSrc PM, AutoEmbed, VidJoy,
@@ -204,6 +207,19 @@ export function generateUniversalServers(item, episodeInfo = null) {
     || 1;
 
   const targetId = tmdbId || imdbId;
+
+  // v3.14.0: anime items play through bingr.one's anime embed mirrors using
+  // the BINGR anime id (NOT tmdb — the two id spaces differ, and their own
+  // watch page passes this same id to the same hosts).
+  const animeId = item.anime ? (item.bingr_id || item.mal_id || null) : null;
+  if (animeId) {
+    raw.push({ url: `https://embed.filmu.in/anime/${animeId}/${episode}`, name: 'Server 1: Filmu Anime (HD)', source: 'embed', quality: '1080p' });
+    raw.push({ url: `https://vidbolt.xyz/anime/${animeId}/${episode}`, name: 'Server 2: Vidbolt Anime', source: 'embed', quality: '1080p' });
+    raw.push({ url: `https://embed.vidrift.in/embed/anime/${animeId}/${episode}`, name: 'Server 3: Vidrift Anime', source: 'embed', quality: '1080p' });
+    raw.push({ url: `https://www.vidy.st/anime/${animeId}/${episode}`, name: 'Server 4: Vidy Anime', source: 'embed', quality: '1080p' });
+    raw.push({ url: `https://player.cinezo.live/embed/anime/${animeId}/${episode}?dub=true`, name: 'Server 5: Cinezo Anime (Dub)', source: 'embed', quality: '1080p' });
+  }
+
   if (targetId) {
     if (isSeries) {
       if (tmdbId) {
@@ -244,6 +260,13 @@ export function generateUniversalServers(item, episodeInfo = null) {
           source: 'embed',
           quality: '1080p'
         });
+        // v3.14.0: bingr.one's player mirrors (probed alive Oct 18 2026) —
+        // more failovers per episode, same tmdb id space.
+        raw.push({ url: `https://vidbolt.xyz/tv/${tmdbId}/${season}/${episode}`, name: 'Server 7: Vidbolt (bingr Mirror)', source: 'embed', quality: '1080p' });
+        raw.push({ url: `https://embed.filmu.in/tv/${tmdbId}/${season}/${episode}`, name: 'Server 8: Filmu (bingr Mirror)', source: 'embed', quality: '1080p' });
+        raw.push({ url: `https://embed.vidrift.in/embed/tv/${tmdbId}/${season}/${episode}`, name: 'Server 9: Vidrift (bingr Mirror)', source: 'embed', quality: '1080p' });
+        raw.push({ url: `https://www.vidy.st/tv/${tmdbId}/${season}/${episode}`, name: 'Server 10: Vidy (bingr Mirror)', source: 'embed', quality: '1080p' });
+        raw.push({ url: `https://player.cinezo.live/embed/tv/${tmdbId}/${season}/${episode}`, name: 'Server 11: Cinezo (bingr Mirror)', source: 'embed', quality: '1080p' });
       }
       if (imdbId) {
         raw.push({
@@ -304,6 +327,12 @@ export function generateUniversalServers(item, episodeInfo = null) {
           source: 'embed',
           quality: '1080p'
         });
+        // v3.14.0: bingr.one's player mirrors (probed alive Oct 18 2026).
+        raw.push({ url: `https://vidbolt.xyz/movie/${tmdbId}`, name: 'Server 7: Vidbolt (bingr Mirror)', source: 'embed', quality: '1080p' });
+        raw.push({ url: `https://embed.filmu.in/movie/${tmdbId}`, name: 'Server 8: Filmu (bingr Mirror)', source: 'embed', quality: '1080p' });
+        raw.push({ url: `https://embed.vidrift.in/embed/movie/${tmdbId}`, name: 'Server 9: Vidrift (bingr Mirror)', source: 'embed', quality: '1080p' });
+        raw.push({ url: `https://www.vidy.st/movie/${tmdbId}`, name: 'Server 10: Vidy (bingr Mirror)', source: 'embed', quality: '1080p' });
+        raw.push({ url: `https://player.cinezo.live/embed/movie/${tmdbId}`, name: 'Server 11: Cinezo (bingr Mirror)', source: 'embed', quality: '1080p' });
       }
       if (imdbId) {
         raw.push({

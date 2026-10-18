@@ -22,7 +22,8 @@ import { MediaGridView } from './components/MediaGridView';
 import { AppProvidersRow } from './components/AppProvidersRow';
 import { TVRemoteControlView } from './components/TVRemoteControlView';
 import { DownloadsView } from './components/DownloadsView';
-import { getDocumentariesCatalog, getAnimeCatalog, getNetworkOriginalsCatalog } from './api/hubCatalog';
+import { getDocumentariesCatalog, getNetworkOriginalsCatalog } from './api/hubCatalog';
+import { getBingrAnimeDeep } from './api/bingr';
 import { checkForAppUpdates, startAppUpdate } from './api/otaUpdate';
 import { Film, Video, Tv, Radio, Bookmark, Cast, Rocket, X, ArrowUpCircle, Flame } from 'lucide-react';
 import { App as CapApp } from '@capacitor/app';
@@ -221,7 +222,10 @@ export default function App() {
       // catalog. Ambiguous errors never hide content. Once per load.
       try { runStreamHealthSweep([...bList, ...hList, ...sList]); } catch {}
       
-      const animeData = await getAnimeCatalog();
+      // v3.5.0: anime from bingr.one's open API (AniList-sourced) — the old
+      // hubCatalog getAnimeCatalog() was an empty stub, so the Anime Vault
+      // rail never rendered. Bingr ids drive the anime player mirrors.
+      const animeData = await getBingrAnimeDeep(3).catch(() => []);
       setAnimeItems(animeData);
 
       // Featured Spotlight
