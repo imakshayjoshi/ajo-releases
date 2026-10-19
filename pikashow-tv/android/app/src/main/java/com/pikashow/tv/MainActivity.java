@@ -150,6 +150,10 @@ public class MainActivity extends BridgeActivity {
         if (getBridge() != null && getBridge().getWebView() != null) {
             WebView webView = getBridge().getWebView();
             webView.setBackgroundColor(android.graphics.Color.BLACK);
+            // v3.17.4: hardware layer on the TV WebView — compositor-thread
+            // animations (splash, card focus, hero cross-fades) stay at 60fps
+            // even while the JS bundle is executing on the main thread.
+            webView.setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null);
             webView.setOverScrollMode(View.OVER_SCROLL_NEVER);
             webView.setVerticalScrollBarEnabled(false);
             webView.setHorizontalScrollBarEnabled(false);

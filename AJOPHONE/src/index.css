@@ -3167,7 +3167,10 @@ html, body, #root {
   font-weight: 700;
 }
 
-/* v3.17.3: cold-start splash (Netflix-style, polished) */
+/* v3.17.4: cold-start splash — 60fps pass. ONLY transform/opacity animate
+   (GPU-composited, immune to main-thread bundle load). The old sweep used
+   `left` and the rule used `width` — both are layout properties and rendered
+   at ~30fps while the app bundle was executing underneath. */
 .ajo-splash {
   position: fixed;
   inset: 0;
@@ -3188,9 +3191,13 @@ html, body, #root {
   top: 46%;
   width: 340px;
   height: 340px;
-  transform: translate(-50%, -50%);
+  margin-left: -170px;
+  margin-top: -170px;
   background: radial-gradient(circle, rgba(0, 187, 127, 0.22) 0%, rgba(0, 187, 127, 0.07) 42%, transparent 68%);
   border-radius: 50%;
+  opacity: 0;
+  transform: translateZ(0);
+  will-change: opacity;
   animation: ajoSplashGlow 1.4s ease-out both;
   pointer-events: none;
 }
@@ -3199,6 +3206,8 @@ html, body, #root {
   display: flex;
   overflow: hidden;
   padding: 0 6px;
+  transform: translateZ(0);
+  will-change: transform;
   animation: ajoSplashZoom 1.3s cubic-bezier(0.16, 0.84, 0.3, 1) both;
 }
 .ajo-splash-letter {
@@ -3208,7 +3217,8 @@ html, body, #root {
   color: #ffffff;
   text-shadow: 0 0 38px rgba(0, 187, 127, 0.6), 0 2px 18px rgba(0, 0, 0, 0.6);
   opacity: 0;
-  transform: translateY(16px) scale(0.9);
+  transform: translate3d(0, 16px, 0) scale(0.9);
+  will-change: transform, opacity;
   animation: ajoSplashLetter 0.62s cubic-bezier(0.16, 0.9, 0.24, 1.18) both;
 }
 .ajo-splash-sweep {
@@ -3216,16 +3226,20 @@ html, body, #root {
   top: -12%;
   bottom: -12%;
   width: 46px;
-  left: -70px;
+  left: 0;
   background: linear-gradient(100deg, transparent, rgba(0, 187, 127, 0.9), rgba(255, 255, 255, 0.55), transparent);
   filter: blur(7px);
+  transform: translate3d(-116px, 0, 0);
+  will-change: transform;
   animation: ajoSplashSweep 0.95s 0.42s cubic-bezier(0.3, 0.6, 0.3, 1) both;
 }
 .ajo-splash-rule {
-  width: 0;
+  width: 150px;
   height: 2px;
   background: linear-gradient(90deg, transparent, #00BB7F 22%, #00BB7F 78%, transparent);
   border-radius: 2px;
+  transform: scaleX(0);
+  will-change: transform;
   animation: ajoSplashRule 0.65s 0.62s cubic-bezier(0.2, 0.8, 0.3, 1) both;
 }
 .ajo-splash-tag {
@@ -3237,23 +3251,23 @@ html, body, #root {
   animation: ajoSplashFade 0.55s 0.72s ease both;
 }
 @keyframes ajoSplashLetter {
-  to { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
 }
 @keyframes ajoSplashSweep {
-  to { left: calc(100% + 70px); }
+  to { transform: translate3d(340px, 0, 0); }
 }
 @keyframes ajoSplashZoom {
-  0% { transform: scale(0.93); }
-  55% { transform: scale(1.0); }
-  100% { transform: scale(1.05); }
+  0% { transform: translateZ(0) scale(0.93); }
+  55% { transform: translateZ(0) scale(1.0); }
+  100% { transform: translateZ(0) scale(1.05); }
 }
 @keyframes ajoSplashGlow {
-  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.6); }
+  0% { opacity: 0; }
   45% { opacity: 1; }
-  100% { opacity: 0.85; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0.85; }
 }
 @keyframes ajoSplashRule {
-  to { width: 150px; }
+  to { transform: scaleX(1); }
 }
 @keyframes ajoSplashFade {
   to { opacity: 1; }
