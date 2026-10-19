@@ -124,8 +124,6 @@ html, body, #root {
   width: max-content;
   /* frosted glass at ~0.85 alpha */
   background: var(--fluid-glass);
-  backdrop-filter: blur(18px) saturate(1.5);
-  -webkit-backdrop-filter: blur(18px) saturate(1.5);
   border: 1px solid var(--fluid-glass-border);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
   z-index: 100;
@@ -409,7 +407,6 @@ html, body, #root {
   background: rgba(255, 255, 255, 0.14);
   color: #fff;
   border: 1px solid rgba(255, 255, 255, 0.22);
-  backdrop-filter: blur(6px);
 }
 .tv-hero-cta:focus {
   outline: none;
@@ -611,7 +608,6 @@ html, body, #root {
   border-radius: var(--radius-sm);
   border: 1.5px solid rgba(255, 255, 255, 0.15);
   cursor: pointer;
-  backdrop-filter: blur(8px);
   transition: all 0.15s ease;
 }
 
@@ -739,6 +735,10 @@ html, body, #root {
 
 .tv-rail {
   margin-bottom: 28px;
+  /* v3.17.3: skip rendering off-screen rails — big scroll/render win on
+     weak TV GPUs (content-visibility is a no-op where unsupported). */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 340px;
 }
 
 .tv-rail-header {
@@ -940,8 +940,6 @@ html, body, #root {
   padding: 7px 14px;
   border-radius: var(--radius-full);
   background: var(--fluid-glass);
-  -webkit-backdrop-filter: blur(14px) saturate(1.4);
-  backdrop-filter: blur(14px) saturate(1.4);
   border: 1px solid var(--fluid-glass-border);
   color: var(--text-secondary);
   font-size: 0.72rem;
@@ -978,8 +976,6 @@ html, body, #root {
   padding: 12px 14px;
   border-radius: var(--radius-md);
   background: var(--fluid-glass);
-  -webkit-backdrop-filter: blur(18px) saturate(1.5);
-  backdrop-filter: blur(18px) saturate(1.5);
   border: 1px solid var(--fluid-glass-border);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
   display: flex;
@@ -1013,7 +1009,6 @@ html, body, #root {
   display: flex;
   align-items: center;
   justify-content: center;
-  backdrop-filter: blur(4px);
 }
 
 .tv-card-provider img {
@@ -1246,8 +1241,6 @@ html, body, #root {
   padding: 16px;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
 }
 
 .tv-modal-card {
@@ -1525,8 +1518,6 @@ html, body, #root {
   gap: 10px;
   z-index: 100;
   overflow-y: auto;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
 }
 
 .tv-player-drawer::-webkit-scrollbar {
@@ -1993,65 +1984,94 @@ html, body, #root {
   outline: none;
   scroll-margin: 24px;
 }
-/* v3.9.1: cold-start splash (Netflix-style) */
+
+/* v3.17.3: cold-start splash (Netflix-style, polished) */
 .ajo-splash {
   position: fixed;
   inset: 0;
   z-index: 9999;
-  background: #0f1014;
+  background: radial-gradient(120% 90% at 50% 42%, #151820 0%, #0f1014 55%, #0a0b0e 100%);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 18px;
+  gap: 16px;
   opacity: 1;
-  transition: opacity 0.25s ease;
+  transition: opacity 0.28s ease;
 }
 .ajo-splash-leave { opacity: 0; pointer-events: none; }
+.ajo-splash-glow {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  width: 340px;
+  height: 340px;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(circle, rgba(0, 187, 127, 0.22) 0%, rgba(0, 187, 127, 0.07) 42%, transparent 68%);
+  border-radius: 50%;
+  animation: ajoSplashGlow 1.4s ease-out both;
+  pointer-events: none;
+}
 .ajo-splash-mark {
   position: relative;
   display: flex;
   overflow: hidden;
-  animation: ajoSplashZoom 1.15s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  padding: 0 6px;
+  animation: ajoSplashZoom 1.3s cubic-bezier(0.16, 0.84, 0.3, 1) both;
 }
 .ajo-splash-letter {
-  font-size: 76px;
+  font-size: 82px;
   font-weight: 900;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.1em;
   color: #ffffff;
-  text-shadow: 0 0 34px rgba(0, 187, 127, 0.55);
+  text-shadow: 0 0 38px rgba(0, 187, 127, 0.6), 0 2px 18px rgba(0, 0, 0, 0.6);
   opacity: 0;
-  transform: translateY(14px) scale(0.92);
-  animation: ajoSplashLetter 0.55s cubic-bezier(0.2, 0.8, 0.25, 1) both;
+  transform: translateY(16px) scale(0.9);
+  animation: ajoSplashLetter 0.62s cubic-bezier(0.16, 0.9, 0.24, 1.18) both;
 }
 .ajo-splash-sweep {
   position: absolute;
-  top: -10%;
-  bottom: -10%;
-  width: 42px;
-  left: -60px;
-  background: linear-gradient(100deg, transparent, rgba(0, 187, 127, 0.85), transparent);
-  filter: blur(6px);
-  animation: ajoSplashSweep 0.9s 0.35s ease-in-out both;
+  top: -12%;
+  bottom: -12%;
+  width: 46px;
+  left: -70px;
+  background: linear-gradient(100deg, transparent, rgba(0, 187, 127, 0.9), rgba(255, 255, 255, 0.55), transparent);
+  filter: blur(7px);
+  animation: ajoSplashSweep 0.95s 0.42s cubic-bezier(0.3, 0.6, 0.3, 1) both;
+}
+.ajo-splash-rule {
+  width: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #00BB7F 22%, #00BB7F 78%, transparent);
+  border-radius: 2px;
+  animation: ajoSplashRule 0.65s 0.62s cubic-bezier(0.2, 0.8, 0.3, 1) both;
 }
 .ajo-splash-tag {
   font-size: 11px;
   font-weight: 800;
-  letter-spacing: 4px;
-  color: rgba(255, 255, 255, 0.45);
+  letter-spacing: 4.5px;
+  color: rgba(255, 255, 255, 0.42);
   opacity: 0;
-  animation: ajoSplashFade 0.5s 0.55s ease both;
+  animation: ajoSplashFade 0.55s 0.72s ease both;
 }
 @keyframes ajoSplashLetter {
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 @keyframes ajoSplashSweep {
-  to { left: calc(100% + 60px); }
+  to { left: calc(100% + 70px); }
 }
 @keyframes ajoSplashZoom {
-  0% { transform: scale(0.94); }
-  60% { transform: scale(1); }
-  100% { transform: scale(1.04); }
+  0% { transform: scale(0.93); }
+  55% { transform: scale(1.0); }
+  100% { transform: scale(1.05); }
+}
+@keyframes ajoSplashGlow {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.6); }
+  45% { opacity: 1; }
+  100% { opacity: 0.85; transform: translate(-50%, -50%) scale(1); }
+}
+@keyframes ajoSplashRule {
+  to { width: 150px; }
 }
 @keyframes ajoSplashFade {
   to { opacity: 1; }

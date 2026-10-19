@@ -662,7 +662,6 @@ html, body, #root {
   padding: 3px 7px;
   border-radius: 6px;
   background: rgba(6, 9, 14, 0.85);
-  backdrop-filter: blur(6px);
   color: #facc15;
   font-size: 11px;
   font-weight: 800;
@@ -878,7 +877,6 @@ html, body, #root {
   padding: 4px 9px;
   border-radius: 6px;
   background: var(--badge-bg, rgba(6, 9, 14, 0.85));
-  backdrop-filter: blur(8px);
   border: 1px solid rgba(255, 255, 255, 0.15);
   font-size: 11px;
   font-weight: 800;
@@ -1005,7 +1003,6 @@ html, body, #root {
   padding: 10px 18px;
   border-left: 4px solid #00BB7F;
   background: linear-gradient(90deg, rgba(14, 20, 31, 0.95) 0%, rgba(22, 32, 50, 0.85) 50%, rgba(6, 9, 14, 0.5) 100%);
-  backdrop-filter: blur(16px);
   border-radius: 6px 16px 16px 6px;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   border-bottom: 1px solid rgba(255, 255, 255, 0.04);
@@ -1708,7 +1705,6 @@ html, body, #root {
 .tv-btn-secondary {
   background: rgba(255, 255, 255, 0.12);
   color: #ffffff;
-  backdrop-filter: blur(12px);
 }
 
 .tv-btn-secondary:hover {
@@ -1954,7 +1950,6 @@ html, body, #root {
   max-width: 90vw;
   height: 100%;
   background: rgba(10, 14, 23, 0.97);
-  backdrop-filter: blur(30px);
   border-left: 1px solid rgba(255, 255, 255, 0.12);
   z-index: 100;
   display: flex;
@@ -2036,8 +2031,6 @@ html, body, #root {
   left: 36px;
   right: 36px;
   background: rgba(8, 12, 20, 0.98);
-  backdrop-filter: blur(40px);
-  -webkit-backdrop-filter: blur(40px);
   border-radius: 24px;
   border: 1.5px solid rgba(255, 255, 255, 0.16);
   padding: 20px 24px;
@@ -2290,7 +2283,6 @@ html, body, #root {
   inset: 0;
   z-index: 1000;
   background: rgba(6, 9, 14, 0.88);
-  backdrop-filter: blur(30px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2555,8 +2547,6 @@ html, body, #root {
   right: 0;
   z-index: 500;
   background: rgba(6, 9, 14, 0.96);
-  backdrop-filter: blur(30px);
-  -webkit-backdrop-filter: blur(30px);
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   padding-bottom: env(safe-area-inset-bottom, 4px);
 }
@@ -2745,8 +2735,6 @@ html, body, #root {
   inset: 0;
   z-index: 1000;
   background: rgba(0, 0, 0, 0.75);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
@@ -3035,8 +3023,6 @@ html, body, #root {
   position: fixed;
   inset: 0;
   background: rgba(3, 5, 8, 0.94);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -3181,66 +3167,93 @@ html, body, #root {
   font-weight: 700;
 }
 
-
-/* v3.9.1: cold-start splash (Netflix-style) */
+/* v3.17.3: cold-start splash (Netflix-style, polished) */
 .ajo-splash {
   position: fixed;
   inset: 0;
   z-index: 9999;
-  background: #0f1014;
+  background: radial-gradient(120% 90% at 50% 42%, #151820 0%, #0f1014 55%, #0a0b0e 100%);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 18px;
+  gap: 16px;
   opacity: 1;
-  transition: opacity 0.25s ease;
+  transition: opacity 0.28s ease;
 }
 .ajo-splash-leave { opacity: 0; pointer-events: none; }
+.ajo-splash-glow {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  width: 340px;
+  height: 340px;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(circle, rgba(0, 187, 127, 0.22) 0%, rgba(0, 187, 127, 0.07) 42%, transparent 68%);
+  border-radius: 50%;
+  animation: ajoSplashGlow 1.4s ease-out both;
+  pointer-events: none;
+}
 .ajo-splash-mark {
   position: relative;
   display: flex;
   overflow: hidden;
-  animation: ajoSplashZoom 1.15s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  padding: 0 6px;
+  animation: ajoSplashZoom 1.3s cubic-bezier(0.16, 0.84, 0.3, 1) both;
 }
 .ajo-splash-letter {
-  font-size: 76px;
+  font-size: 82px;
   font-weight: 900;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.1em;
   color: #ffffff;
-  text-shadow: 0 0 34px rgba(0, 187, 127, 0.55);
+  text-shadow: 0 0 38px rgba(0, 187, 127, 0.6), 0 2px 18px rgba(0, 0, 0, 0.6);
   opacity: 0;
-  transform: translateY(14px) scale(0.92);
-  animation: ajoSplashLetter 0.55s cubic-bezier(0.2, 0.8, 0.25, 1) both;
+  transform: translateY(16px) scale(0.9);
+  animation: ajoSplashLetter 0.62s cubic-bezier(0.16, 0.9, 0.24, 1.18) both;
 }
 .ajo-splash-sweep {
   position: absolute;
-  top: -10%;
-  bottom: -10%;
-  width: 42px;
-  left: -60px;
-  background: linear-gradient(100deg, transparent, rgba(0, 187, 127, 0.85), transparent);
-  filter: blur(6px);
-  animation: ajoSplashSweep 0.9s 0.35s ease-in-out both;
+  top: -12%;
+  bottom: -12%;
+  width: 46px;
+  left: -70px;
+  background: linear-gradient(100deg, transparent, rgba(0, 187, 127, 0.9), rgba(255, 255, 255, 0.55), transparent);
+  filter: blur(7px);
+  animation: ajoSplashSweep 0.95s 0.42s cubic-bezier(0.3, 0.6, 0.3, 1) both;
+}
+.ajo-splash-rule {
+  width: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #00BB7F 22%, #00BB7F 78%, transparent);
+  border-radius: 2px;
+  animation: ajoSplashRule 0.65s 0.62s cubic-bezier(0.2, 0.8, 0.3, 1) both;
 }
 .ajo-splash-tag {
   font-size: 11px;
   font-weight: 800;
-  letter-spacing: 4px;
-  color: rgba(255, 255, 255, 0.45);
+  letter-spacing: 4.5px;
+  color: rgba(255, 255, 255, 0.42);
   opacity: 0;
-  animation: ajoSplashFade 0.5s 0.55s ease both;
+  animation: ajoSplashFade 0.55s 0.72s ease both;
 }
 @keyframes ajoSplashLetter {
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 @keyframes ajoSplashSweep {
-  to { left: calc(100% + 60px); }
+  to { left: calc(100% + 70px); }
 }
 @keyframes ajoSplashZoom {
-  0% { transform: scale(0.94); }
-  60% { transform: scale(1); }
-  100% { transform: scale(1.04); }
+  0% { transform: scale(0.93); }
+  55% { transform: scale(1.0); }
+  100% { transform: scale(1.05); }
+}
+@keyframes ajoSplashGlow {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.6); }
+  45% { opacity: 1; }
+  100% { opacity: 0.85; transform: translate(-50%, -50%) scale(1); }
+}
+@keyframes ajoSplashRule {
+  to { width: 150px; }
 }
 @keyframes ajoSplashFade {
   to { opacity: 1; }
