@@ -187,6 +187,8 @@ export function TVPlayer({
 
   const activeServer = orderedServers[currentServerIndex] || orderedServers[0] || server;
   const streamUrl = activeServer?.url || item?.url;
+  // v3.9.2: WebView can't send Referer — direct streams play via VPS proxy
+  const webStreamUrl = activeServer?.proxyUrl || streamUrl;
   const isEmbedStream = Boolean(streamUrl && (isEmbedUrl(streamUrl) || !isDirectMediaUrl(streamUrl)));
 
   const cycleFitMode = useCallback(() => {
@@ -656,7 +658,7 @@ export function TVPlayer({
         });
         hlsRef.current = hls;
   
-        hls.loadSource(streamUrl);
+        hls.loadSource(webStreamUrl);
         hls.attachMedia(video);
   
         hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
@@ -774,7 +776,7 @@ export function TVPlayer({
     // v3.12.20: embed watchdog moved to the early-return block above (line ~460)
     } else {
       // Native Android HTML5 video playback
-      video.src = streamUrl;
+      video.src = webStreamUrl;
       const onLoadedMeta = () => {
         if (resumePositionRef.current) {
           try { video.currentTime = resumePositionRef.current; } catch {}

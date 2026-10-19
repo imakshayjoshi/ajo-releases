@@ -471,6 +471,10 @@ export default function App() {
             id: `direct-${i}`,
             name: s.label,
             url: s.url,
+            // web path (hls.js/<video>) can't send Referer — VPS proxy can
+            proxyUrl: s.headers?.Referer
+              ? `https://new.ajo.co.in/movibox/stream?url=${encodeURIComponent(s.url)}&ref=${encodeURIComponent(s.headers.Referer)}`
+              : undefined,
             source: s.source || 'hls',
             quality: s.quality,
             headers: s.headers,

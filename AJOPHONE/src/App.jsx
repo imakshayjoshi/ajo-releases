@@ -436,6 +436,11 @@ export default function App() {
             id: `direct-${i}`,
             name: s.label,
             url: s.url,
+            // phone has no native player — the WebView must go through the
+            // VPS proxy so the Referer header survives
+            proxyUrl: s.headers?.Referer
+              ? `https://new.ajo.co.in/movibox/stream?url=${encodeURIComponent(s.url)}&ref=${encodeURIComponent(s.headers.Referer)}`
+              : undefined,
             source: s.source || 'hls',
             quality: s.quality,
             headers: s.headers,
