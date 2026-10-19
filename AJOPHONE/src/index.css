@@ -1027,11 +1027,13 @@ html, body, #root {
 }
 
 .rail-title {
-  font-family: 'Bebas Neue', 'Anton', Impact, sans-serif;
-  font-size: 26px;
-  font-weight: 400;
-  letter-spacing: 1.2px;
-  text-transform: uppercase;
+  /* v3.9.0: TV parity — same rail title as the Android TV app (.tv-rail-title):
+     800 weight, sentence case, no display font. */
+  font-family: inherit;
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -0.2px;
+  text-transform: none;
   color: #ffffff;
   display: flex;
   align-items: center;
@@ -2520,7 +2522,7 @@ html, body, #root {
   }
 
   .rail-title {
-    font-size: 26px;
+    font-size: 19px;
   }
 
   .media-portrait-card {
@@ -2726,7 +2728,7 @@ html, body, #root {
   }
 
   .gtv-hero-title {
-    font-size: 26px;
+    font-size: 19px;
   }
 
   .gtv-hero-meta-text {

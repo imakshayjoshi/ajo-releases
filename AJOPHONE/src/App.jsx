@@ -89,6 +89,10 @@ export default function App() {
   const [animeItems, setAnimeItems] = useState([]);
   const [networkItems, setNetworkItems] = useState([]);
   const [featuredItem, setFeaturedItem] = useState(null);
+  const [featuredItems, setFeaturedItems] = useState([]);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const retriedOnceRef = useRef(false);
+  const loadAllContentRef = useRef(null);
   
   // Infinite Scroll Pagination State
   const [moviePage, setMoviePage] = useState(3);
@@ -228,11 +232,38 @@ export default function App() {
       const animeData = await getBingrAnimeDeep(3).catch(() => []);
       setAnimeItems(animeData);
 
-      // Featured Spotlight
-      const spotlight = bList[0] || lList[0] || null;
+      // v3.9.0: spotlight is a 7-item carousel (TV parity). Prefer mapi items,
+      // fall back to the TMDB deep catalog (works even when mapi is down) so
+      // the hero never renders empty.
+      const deepM = deepMovies.status === 'fulfilled' && Array.isArray(deepMovies.value) ? deepMovies.value : [];
+      const spotlightPool = [...bList, ...deepM, ...lList].filter(Boolean);
+      const seenSpot = new Set();
+      const spotlightItems = spotlightPool.filter((it) => {
+        const k = String(it?.id || it?.title || '').toLowerCase();
+        if (!k || seenSpot.has(k)) return false;
+        seenSpot.add(k);
+        return true;
+      }).slice(0, 7);
+      setFeaturedItems(spotlightItems);
+      const spotlight = spotlightItems[0] || null;
       setFeaturedItem(spotlight);
       if (spotlight?.poster_url || spotlight?.poster) {
         setAmbientPoster(spotlight.poster_url || spotlight.poster);
+      }
+
+      // v3.9.0: empty-home guard. If EVERY source came back empty (proxy
+      // outage, first-launch offline), auto-retry once, then show a real
+      // empty state with a Retry button — never a silent blank home.
+      const totalItems = lList.length + bList.length + hList.length + sList.length + deepM.length;
+      if (totalItems === 0) {
+        if (!retriedOnceRef.current) {
+          retriedOnceRef.current = true;
+          setTimeout(() => { loadAllContentRef.current?.(); }, 3000);
+        } else {
+          setLoadFailed(true);
+        }
+      } else {
+        setLoadFailed(false);
       }
     } catch (err) {
       console.error('Error loading content:', err);
@@ -240,6 +271,7 @@ export default function App() {
   }, [refreshFavorites]);
 
   useEffect(() => {
+    loadAllContentRef.current = loadAllContent;
     loadAllContent();
   }, [loadAllContent]);
 
@@ -509,7 +541,7 @@ export default function App() {
             </div>
             {liveViewMode === 'grid' ? (
               <MediaGridView
-                title="🔴 Live Television Channels"
+                title="Live Television Channels"
                 icon={Radio}
                 type="channels"
                 items={liveItems}
@@ -561,20 +593,42 @@ export default function App() {
           />
         ) : (
           <>
-            {/* FEATURED SPOTLIGHT HERO */}
-            {featuredItem && (
+            {/* FEATURED SPOTLIGHT HERO (TV-parity carousel) */}
+            {(featuredItems.length > 0 || featuredItem) && (
               <HeroBanner
                 featuredItem={featuredItem}
+                featuredItems={featuredItems}
                 onPlay={(item) => handleStartPlayback(item, item.players?.[0] || item.player?.[0])}
                 onSelectInfo={(item) => setSelectedItem(item)}
                 onFavoritesChanged={refreshFavorites}
               />
             )}
 
+            {/* v3.9.0: every source failed twice — real empty state, not a blank home */}
+            {loadFailed && (
+              <div style={{
+                margin: '40px 18px', padding: '28px 22px', borderRadius: 14,
+                background: '#16181f', border: '1px solid #22262f',
+                display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 12
+              }}>
+                <div style={{ fontSize: 17, fontWeight: 800, color: '#fff' }}>Content didn’t load</div>
+                <div style={{ fontSize: 13.5, lineHeight: 1.5, color: '#9aa0ab' }}>
+                  The catalog servers are unreachable right now. Check your connection and retry — your downloads and watchlist are untouched.
+                </div>
+                <button
+                  onClick={() => { retriedOnceRef.current = false; setLoadFailed(false); loadAllContentRef.current?.(); }}
+                  style={{
+                    padding: '11px 22px', background: '#00BB7F', color: '#0f1014',
+                    fontWeight: 800, fontSize: 14, borderRadius: 8, border: 'none', cursor: 'pointer'
+                  }}
+                >Retry</button>
+              </div>
+            )}
+
             {/* CONTINUE WATCHING (Landscape) */}
             {continueWatching.length > 0 && (
               <MediaRail 
-                title="▶ Continue Watching" 
+                title="Continue Watching" 
                 items={continueWatching}
                 landscape={true}
                 onSelectItem={handleCardClick}
@@ -584,7 +638,7 @@ export default function App() {
             {/* TOP 10 IN INDIA TODAY (Iconic Netflix Giant Rank Outlines) */}
             {topPicksItems.length > 0 && (
               <Top10Rail
-                title="🔥 Top 10 in India Today"
+                title="Top 10 in India Today"
                 items={topPicksItems}
                 onSelectItem={handleCardClick}
               />
@@ -593,7 +647,7 @@ export default function App() {
             {/* ⭐ MY WATCHLIST */}
             {favoritesList.length > 0 && (
               <MediaRail 
-                title="⭐ My Watchlist" 
+                title="My Watchlist" 
                 items={favoritesList}
                 landscape={false}
                 onSelectItem={handleCardClick}
@@ -603,7 +657,7 @@ export default function App() {
             {/* TOP PICKS FOR YOU */}
             {topPicksItems.length > 0 && (
               <MediaRail 
-                title="🔥 Top Picks For You" 
+                title="Top Picks For You" 
                 items={topPicksItems}
                 landscape={false}
                 onSelectItem={handleCardClick}
@@ -627,7 +681,7 @@ export default function App() {
             {/* LIVE SPORTS & CRICKET */}
             {sportsItems.length > 0 && (
               <MediaRail 
-                title="⚡ Live Sports & Cricket" 
+                title="Live Sports & Cricket" 
                 items={sportsItems}
                 landscape={true}
                 onSelectItem={handleCardClick}
@@ -638,7 +692,7 @@ export default function App() {
             {/* 🔴 LIVE ENTERTAINMENT CHANNELS */}
             {entertainmentItems.length > 0 && (
               <MediaRail 
-                title="🔴 Live TV Channels" 
+                title="Live TV Channels" 
                 items={entertainmentItems}
                 landscape={true}
                 onSelectItem={handleCardClick}
@@ -649,7 +703,7 @@ export default function App() {
             {/* 📰 24/7 LIVE NEWS */}
             {newsItems.length > 0 && (
               <MediaRail 
-                title="📰 24/7 Live News" 
+                title="24/7 Live News" 
                 items={newsItems}
                 landscape={true}
                 onSelectItem={handleCardClick}
@@ -661,7 +715,7 @@ export default function App() {
             {/* BOLLYWOOD BLOCKBUSTERS */}
             {remainingBollywoodItems.length > 0 && (
               <MediaRail 
-                title="🎬 Bollywood Movies" 
+                title="Bollywood Movies" 
                 items={remainingBollywoodItems}
                 landscape={false}
                 onSelectItem={handleCardClick}
@@ -672,7 +726,7 @@ export default function App() {
             {/* HOLLYWOOD CINEMA */}
             {hollywoodItems.length > 0 && (
               <MediaRail 
-                title="🍿 Hollywood Cinema" 
+                title="Hollywood Cinema" 
                 items={hollywoodItems}
                 landscape={false}
                 onSelectItem={handleCardClick}
@@ -683,7 +737,7 @@ export default function App() {
             {/* WEB SERIES */}
             {serialsItems.length > 0 && (
               <MediaRail 
-                title="📺 Web Series & Shows" 
+                title="Web Series & Shows" 
                 items={serialsItems}
                 landscape={false}
                 onSelectItem={handleCardClick}
@@ -694,7 +748,7 @@ export default function App() {
             {/* 👑 NETWORK ORIGINALS (HBO, Netflix, Apple TV+, Prime) */}
             {networkItems.length > 0 && (
               <MediaRail 
-                title="👑 Premium Network Originals" 
+                title="Premium Network Originals" 
                 items={networkItems}
                 landscape={false}
                 onSelectItem={handleCardClick}
@@ -704,7 +758,7 @@ export default function App() {
             {/* 🌍 PREMIUM DOCUMENTARIES & TRUE CRIME */}
             {docuItems.length > 0 && (
               <MediaRail 
-                title="🌍 Documentaries & True Crime" 
+                title="Documentaries & True Crime" 
                 items={docuItems}
                 landscape={false}
                 onSelectItem={handleCardClick}
@@ -714,7 +768,7 @@ export default function App() {
             {/* ⚔️ ANIME & ANIMATION VAULT */}
             {moviboxItems.length > 0 && (
               <MediaRail 
-                title="🎬 Movibox — Full Catalog, Direct HD"
+                title="Movibox — Full Catalog, Direct HD"
                 items={moviboxItems}
                 landscape={false}
                 onSelectItem={handleCardClick}
@@ -722,7 +776,7 @@ export default function App() {
             )}
             {animeItems.length > 0 && (
               <MediaRail 
-                title="⚔️ Anime Vault (4K Ultra HD)" 
+                title="Anime Vault" 
                 items={animeItems}
                 landscape={false}
                 onSelectItem={handleCardClick}

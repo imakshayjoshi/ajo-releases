@@ -1,6 +1,6 @@
 {
   "name": "ajo-phone",
-  "version": "3.8.0",
+  "version": "3.9.0",
   "private": true,
   "description": "AJO Phone entertainment client",
   "type": "module",

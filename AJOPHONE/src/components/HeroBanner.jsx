@@ -1,206 +1,208 @@
-import React, { useState, useEffect } from 'react';
-import { Play, Info, Star, Plus, Check } from 'lucide-react';
-import { getSourceProvider } from '../utils/sourceProvider';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Play, Info, Star, Plus, Check, Sparkles } from 'lucide-react';
 import { isFavorite, toggleFavorite } from '../api/history';
 
-// v3.5.1: bingr.one-style hero — left-aligned bottom stack, condensed Bebas
-// display title, yellow-star rating meta, green primary Play. Replaces the
-// centered Netflix layout (red ribbon, white play button).
-export function HeroBanner({ featuredItem, onPlay, onSelectInfo, onFavoritesChanged }) {
+// v3.9.0: TV-parity hero — the same auto-rotating spotlight carousel as the
+// Android TV app (tv-hero design tokens: accent badge, 900-weight title,
+// green-glow Play button, dot indicators), adapted to portrait + touch.
+// Accepts a LIST of items (featuredItems) or a single featuredItem; rotates
+// every 6s, pauses while touching, swipe to change slide.
+export function HeroBanner({ featuredItem, featuredItems, onPlay, onSelectInfo, onFavoritesChanged }) {
+  const items = (Array.isArray(featuredItems) && featuredItems.length > 0
+    ? featuredItems
+    : featuredItem ? [featuredItem] : []
+  ).filter(Boolean).slice(0, 7);
+
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
   const [inWatchlist, setInWatchlist] = useState(false);
+  const timerRef = useRef(null);
+  const touchRef = useRef(null);
+
+  const active = items[activeIndex] || items[0] || null;
 
   useEffect(() => {
-    if (featuredItem) {
-      setInWatchlist(isFavorite(featuredItem));
-    }
-  }, [featuredItem]);
+    if (active) setInWatchlist(isFavorite(active));
+  }, [active]);
 
-  if (!featuredItem) return null;
+  useEffect(() => {
+    if (isPaused || items.length <= 1) return;
+    timerRef.current = setInterval(() => {
+      setActiveIndex((prev) => (prev + 1) % items.length);
+    }, 6000);
+    return () => clearInterval(timerRef.current);
+  }, [isPaused, items.length]);
 
-  const isLive = featuredItem.is_live || featuredItem.type === 'live' || featuredItem.year === 'LIVE';
-  const title = featuredItem.title_en || featuredItem.title || featuredItem.title_ru || featuredItem.name || "Featured Spotlight";
-  const poster = featuredItem.backdrop_url || featuredItem.backdrop || featuredItem.poster_url || featuredItem.poster || featuredItem.logo || '';
-  const provider = getSourceProvider(featuredItem);
+  const goToSlide = useCallback((idx) => {
+    if (items.length === 0) return;
+    setActiveIndex(((idx % items.length) + items.length) % items.length);
+  }, [items.length]);
+
+  const onTouchStart = (e) => { touchRef.current = e.touches[0].clientX; setIsPaused(true); };
+  const onTouchEnd = (e) => {
+    setIsPaused(false);
+    if (touchRef.current == null || items.length <= 1) return;
+    const dx = e.changedTouches[0].clientX - touchRef.current;
+    touchRef.current = null;
+    if (Math.abs(dx) > 42) goToSlide(activeIndex + (dx < 0 ? 1 : -1));
+  };
+
+  if (!active) return null;
+
+  const isLive = active.is_live || active.type === 'live' || active.year === 'LIVE';
+  const title = active.title_en || active.title || active.title_ru || active.name || 'Featured';
+  const genres = (active.genres || []).map(g => (typeof g === 'string' ? g : g.name)).filter(Boolean);
+  const rating = active.rating ? Number(active.rating).toFixed(1) : null;
+  const year = active.year || (active.release_date ? String(active.release_date).split('-')[0] : '');
+  const desc = typeof active.description === 'string' ? active.description : (active.overview || '');
 
   const handleToggleWatchlist = (e) => {
     e.stopPropagation();
-    const newState = toggleFavorite(featuredItem);
+    const newState = toggleFavorite(active);
     setInWatchlist(newState);
     if (onFavoritesChanged) onFavoritesChanged();
   };
 
-  const genres = featuredItem.genres?.map(g => (typeof g === 'string' ? g : g.name)).filter(Boolean) || [];
-  const rating = featuredItem.rating ? Number(featuredItem.rating).toFixed(1) : null;
-  const year = featuredItem.year || '';
-  // bingr meta format: "6.1 · 2026 · Thriller · Drama"
-  const metaParts = [year, ...genres.slice(0, 2)].filter(Boolean).join(' · ');
-
   return (
     <section
-      className="mobile-netflix-hero"
-      onClick={() => onSelectInfo(featuredItem)}
+      className="ajo-hero"
+      onTouchStart={onTouchStart}
+      onTouchEnd={onTouchEnd}
+      onClick={() => onSelectInfo && onSelectInfo(active)}
       style={{
         position: 'relative',
         width: '100%',
-        height: '520px',
+        height: '480px',
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'flex-end',
-        padding: '0 18px 22px 18px',
-        cursor: 'pointer',
-        overflow: 'hidden'
+        overflow: 'hidden',
+        cursor: 'pointer'
       }}
     >
-      {/* Backdrop */}
-      {poster && (
-        <div
-          style={{
-            position: 'absolute',
-            inset: 0,
-            backgroundImage: `url(${poster})`,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center 20%',
-            transform: 'scale(1.03)',
-            filter: 'brightness(0.95)'
-          }}
-        />
-      )}
+      {/* slides cross-fade */}
+      {items.map((item, idx) => {
+        const p = item.backdrop_url || item.backdrop || item.poster_url || item.poster || item.logo || '';
+        return (
+          <div
+            key={item.id || idx}
+            style={{
+              position: 'absolute',
+              inset: 0,
+              backgroundImage: p ? `url(${p})` : undefined,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center 20%',
+              opacity: idx === activeIndex ? 1 : 0,
+              transition: 'opacity 0.7s ease',
+              transform: 'scale(1.02)'
+            }}
+          />
+        );
+      })}
 
-      {/* bingr gradient: clear image on top, solid #0f1014 at the bottom */}
-      <div
-        style={{
-          position: 'absolute',
-          inset: 0,
-          background: 'linear-gradient(180deg, rgba(15,16,20,0.05) 0%, rgba(15,16,20,0.15) 35%, rgba(15,16,20,0.72) 72%, #0f1014 100%)',
-          pointerEvents: 'none'
-        }}
-      />
+      {/* gradient into page bg */}
+      <div style={{
+        position: 'absolute',
+        inset: 0,
+        background: 'linear-gradient(180deg, rgba(15,16,20,0.08) 0%, rgba(15,16,20,0.18) 40%, rgba(15,16,20,0.78) 74%, #0f1014 100%)',
+        pointerEvents: 'none'
+      }} />
 
-      <div style={{ position: 'relative', zIndex: 3, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left' }}>
-        {/* small provider eyebrow, bingr-green */}
-        {provider && (
-          <div style={{
-            color: '#00BB7F',
-            fontSize: '10px',
-            fontWeight: 900,
-            letterSpacing: '1.6px',
-            textTransform: 'uppercase',
-            marginBottom: '6px',
-            textShadow: '0 1px 6px rgba(0,0,0,0.8)'
-          }}>
-            {isLive ? 'LIVE TV' : String(provider).replace(/-/g, ' ')}
-          </div>
-        )}
+      <div style={{ position: 'relative', zIndex: 3, padding: '0 18px 22px', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left' }}>
+        {/* badge (tv-hero-badge) */}
+        <span style={{
+          display: 'inline-flex', alignItems: 'center', gap: 6,
+          background: '#00BB7F', color: '#0f1014',
+          fontSize: 11, fontWeight: 900, textTransform: 'uppercase',
+          padding: '3px 10px', borderRadius: 4, marginBottom: 10, letterSpacing: 0.8
+        }}>
+          <Sparkles size={11} />
+          Featured
+        </span>
 
-        {/* Bebas display title */}
+        {/* title (tv-hero-title) */}
         <h1 style={{
-          fontFamily: "'Bebas Neue', 'Anton', Impact, sans-serif",
-          fontSize: '46px',
-          fontWeight: 400,
-          color: '#ffffff',
-          letterSpacing: '1.5px',
-          lineHeight: '0.95',
-          margin: '0 0 8px 0',
-          textTransform: 'uppercase',
-          textShadow: '0 2px 18px rgba(0,0,0,0.85)',
-          display: '-webkit-box',
-          WebkitLineClamp: 2,
-          WebkitBoxOrient: 'vertical',
-          overflow: 'hidden'
-        }}>
-          {title}
-        </h1>
+          fontSize: 30, fontWeight: 900, lineHeight: 1.15, letterSpacing: -0.5,
+          margin: '0 0 8px', color: '#fff', textShadow: '0 2px 20px rgba(0,0,0,0.9)',
+          display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
+        }}>{title}</h1>
 
-        {/* meta row: yellow star rating · year · genres */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '6px',
-          fontSize: '12.5px',
-          fontWeight: 700,
-          color: '#c7ccd4',
-          marginBottom: '18px',
-          textShadow: '0 1px 4px rgba(0,0,0,0.8)'
-        }}>
+        {/* meta row */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8, fontSize: 13, color: '#d7dae0', fontWeight: 600, flexWrap: 'wrap' }}>
           {rating && (
-            <>
-              <Star size={13} fill="#FFD236" color="#FFD236" />
-              <span style={{ color: '#FFD236' }}>{rating}</span>
-              {(metaParts) && <span style={{ color: '#5f6773' }}>·</span>}
-            </>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: '#FFD236' }}>
+              <Star size={13} fill="#FFD236" /> {rating}
+            </span>
           )}
-          {isLive ? '24/7 Live · Ultra HD' : metaParts}
+          {year && <span>{year}</span>}
+          {genres.slice(0, 2).map(g => <span key={g} style={{ opacity: 0.85 }}>{g}</span>)}
+          {isLive && <span style={{ color: '#ff4d4d', fontWeight: 800 }}>● LIVE</span>}
         </div>
 
-        {/* bingr action row: solid green Play + ghost My List + ghost Info */}
-        <div
-          style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%' }}
-          onClick={e => e.stopPropagation()}
-        >
+        {desc && (
+          <p style={{
+            margin: '0 0 14px', fontSize: 13, lineHeight: 1.45, color: '#b9bdc7',
+            display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+            maxWidth: 520
+          }}>{desc}</p>
+        )}
+
+        {/* actions (tv-hero-btn) */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }} onClick={(e) => e.stopPropagation()}>
           <button
-            onClick={() => onPlay(featuredItem)}
+            onClick={() => onPlay && onPlay(active)}
             style={{
-              flex: 1,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-              padding: '13px 24px',
-              borderRadius: '8px',
-              background: '#00BB7F',
-              color: '#04120d',
-              border: 'none',
-              fontSize: '15px',
-              fontWeight: 900,
-              cursor: 'pointer',
-              boxShadow: '0 6px 20px rgba(0, 187, 127, 0.35)'
+              display: 'inline-flex', alignItems: 'center', gap: 8,
+              padding: '12px 26px', background: '#00BB7F', color: '#0f1014',
+              fontWeight: 800, fontSize: 15, borderRadius: 8, border: 'none',
+              cursor: 'pointer', boxShadow: '0 4px 16px rgba(0,187,127,0.4)'
             }}
           >
-            <Play size={18} fill="#04120d" color="#04120d" />
-            <span>Play</span>
+            <Play size={17} fill="#0f1014" /> Play
           </button>
-
           <button
             onClick={handleToggleWatchlist}
-            aria-label="My List"
             style={{
-              width: '47px',
-              height: '47px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderRadius: '8px',
-              background: 'rgba(255,255,255,0.08)',
-              border: '1px solid rgba(255,255,255,0.18)',
-              color: inWatchlist ? '#00BB7F' : '#ffffff',
-              cursor: 'pointer',
-              backdropFilter: 'blur(8px)'
+              display: 'inline-flex', alignItems: 'center', gap: 7,
+              padding: '12px 18px', background: 'rgba(255,255,255,0.1)', color: '#fff',
+              fontWeight: 700, fontSize: 14, borderRadius: 8,
+              border: '1px solid rgba(255,255,255,0.22)', cursor: 'pointer'
             }}
           >
-            {inWatchlist ? <Check size={20} color="#00BB7F" /> : <Plus size={20} color="#ffffff" />}
+            {inWatchlist ? <Check size={16} color="#00BB7F" /> : <Plus size={16} />} My List
           </button>
-
           <button
-            onClick={() => onSelectInfo(featuredItem)}
+            onClick={() => onSelectInfo && onSelectInfo(active)}
             aria-label="More info"
             style={{
-              width: '47px',
-              height: '47px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderRadius: '8px',
-              background: 'rgba(255,255,255,0.08)',
-              border: '1px solid rgba(255,255,255,0.18)',
-              color: '#ffffff',
-              cursor: 'pointer',
-              backdropFilter: 'blur(8px)'
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              width: 44, height: 44, background: 'rgba(255,255,255,0.1)', color: '#fff',
+              borderRadius: 8, border: '1px solid rgba(255,255,255,0.22)', cursor: 'pointer'
             }}
           >
-            <Info size={20} color="#ffffff" />
+            <Info size={17} />
           </button>
         </div>
       </div>
+
+      {/* dots */}
+      {items.length > 1 && (
+        <div style={{ position: 'absolute', bottom: 8, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 7, zIndex: 10 }}>
+          {items.map((_, idx) => (
+            <button
+              key={idx}
+              aria-label={`Slide ${idx + 1}`}
+              onClick={(e) => { e.stopPropagation(); goToSlide(idx); }}
+              style={{
+                width: idx === activeIndex ? 18 : 7, height: 7,
+                borderRadius: 4, border: 'none', padding: 0, cursor: 'pointer',
+                background: idx === activeIndex ? '#00BB7F' : 'rgba(255,255,255,0.35)',
+                transition: 'all 0.25s ease'
+              }}
+            />
+          ))}
+        </div>
+      )}
     </section>
   );
 }

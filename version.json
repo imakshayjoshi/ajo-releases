@@ -6,18 +6,18 @@
   "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
   "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
   "phone": {
-    "version": "3.8.0",
-    "versionCode": 226,
+    "version": "3.9.0",
+    "versionCode": 227,
     "packageId": "com.ajo.phone",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
-    "changelog": "v3.8.0: third direct source with adaptive quality + Hindi audio variants. Smoother on slow connections.",
+    "changelog": "v3.9.0: phone home redesigned to match the TV app — rotating featured spotlight, consistent rails. Home screen now retries and shows a real message instead of going blank when servers are unreachable.",
     "size_mb": 3.4,
-    "sha256": "d9d44a28713eb0477fdbc9f2add6f8c6a921411992ada6e1ef3dd0b3e324b4a0",
+    "sha256": "1adb226c1136152110fabf49dce8c8f9075b43258fb001a5c9a19ba4de4b8398",
     "releaseDate": "2026-10-18",
-    "size": 3598521
+    "size": 3599221
   },
   "tv": {
     "version": "3.17.0",
