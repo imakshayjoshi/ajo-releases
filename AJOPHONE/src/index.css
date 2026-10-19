@@ -3181,3 +3181,67 @@ html, body, #root {
   font-weight: 700;
 }
 
+
+/* v3.9.1: cold-start splash (Netflix-style) */
+.ajo-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: #0f1014;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  opacity: 1;
+  transition: opacity 0.25s ease;
+}
+.ajo-splash-leave { opacity: 0; pointer-events: none; }
+.ajo-splash-mark {
+  position: relative;
+  display: flex;
+  overflow: hidden;
+  animation: ajoSplashZoom 1.15s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.ajo-splash-letter {
+  font-size: 76px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  color: #ffffff;
+  text-shadow: 0 0 34px rgba(0, 187, 127, 0.55);
+  opacity: 0;
+  transform: translateY(14px) scale(0.92);
+  animation: ajoSplashLetter 0.55s cubic-bezier(0.2, 0.8, 0.25, 1) both;
+}
+.ajo-splash-sweep {
+  position: absolute;
+  top: -10%;
+  bottom: -10%;
+  width: 42px;
+  left: -60px;
+  background: linear-gradient(100deg, transparent, rgba(0, 187, 127, 0.85), transparent);
+  filter: blur(6px);
+  animation: ajoSplashSweep 0.9s 0.35s ease-in-out both;
+}
+.ajo-splash-tag {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 4px;
+  color: rgba(255, 255, 255, 0.45);
+  opacity: 0;
+  animation: ajoSplashFade 0.5s 0.55s ease both;
+}
+@keyframes ajoSplashLetter {
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes ajoSplashSweep {
+  to { left: calc(100% + 60px); }
+}
+@keyframes ajoSplashZoom {
+  0% { transform: scale(0.94); }
+  60% { transform: scale(1); }
+  100% { transform: scale(1.04); }
+}
+@keyframes ajoSplashFade {
+  to { opacity: 1; }
+}

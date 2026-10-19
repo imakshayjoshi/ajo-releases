@@ -12,6 +12,7 @@ import { getBingrAnimeDeep } from './api/bingr';
 import { getAddonCatalogs, getAddonStreams } from './api/stremio';
 import { GoogleTVHeader } from './components/GoogleTVHeader';
 import { HeroBanner } from './components/HeroBanner';
+import { SplashScreen } from './components/SplashScreen';
 import { MediaRail } from './components/MediaRail';
 import { MediaGridView } from './components/MediaGridView';
 import { MediaDetailsModal } from './components/MediaDetailsModal';
@@ -62,6 +63,8 @@ export default function App() {
   const selectedItemRef = useRef(null);
   useEffect(() => { selectedItemRef.current = selectedItem; }, [selectedItem]);
   const [activePlayback, setActivePlayback] = useState(null); // { item, server, episodes, episodeIndex }
+  // v3.17.1: Netflix-style cold-start splash — once per process, any key skips
+  const [showSplash, setShowSplash] = useState(() => !window.__ajoSplashShown);
   const [liveViewMode, setLiveViewMode] = useState('grid'); // 'grid' (high performance default) | 'epg'
   const [otaPrompt, setOtaPrompt] = useState(null);
   const [downloadProgress, setDownloadProgress] = useState(null);
@@ -809,6 +812,9 @@ export default function App() {
 
   return (
     <div className="tv-app">
+      {showSplash && (
+        <SplashScreen onDone={() => { window.__ajoSplashShown = true; setShowSplash(false); }} />
+      )}
       {/* Top MovieBox-Style Navigation Bar with Sub-tabs */}
       <GoogleTVHeader
         activeTab={activeTab}

@@ -11,6 +11,7 @@ import { runStreamHealthSweep } from './utils/streamHealth';
 import { MobileHeader } from './components/MobileHeader';
 import { MobileBottomNav } from './components/MobileBottomNav';
 import { HeroBanner } from './components/HeroBanner';
+import { SplashScreen } from './components/SplashScreen';
 import { MediaRail } from './components/MediaRail';
 import { Top10Rail } from './components/Top10Rail';
 import { MediaDetailsModal } from './components/MediaDetailsModal';
@@ -89,6 +90,8 @@ export default function App() {
   const [animeItems, setAnimeItems] = useState([]);
   const [networkItems, setNetworkItems] = useState([]);
   const [featuredItem, setFeaturedItem] = useState(null);
+  // v3.9.1: Netflix-style cold-start splash — once per process, tap to skip
+  const [showSplash, setShowSplash] = useState(() => !window.__ajoSplashShown);
   const [featuredItems, setFeaturedItems] = useState([]);
   const [loadFailed, setLoadFailed] = useState(false);
   const retriedOnceRef = useRef(false);
@@ -477,6 +480,9 @@ export default function App() {
 
   return (
     <div className="mobile-root-layout">
+      {showSplash && (
+        <SplashScreen onDone={() => { window.__ajoSplashShown = true; setShowSplash(false); }} />
+      )}
       {/* Dynamic Ambient Background */}
       <div className="mobile-background">
         <div 

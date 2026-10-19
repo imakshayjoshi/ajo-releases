@@ -16,8 +16,8 @@ test('allows only AJO GitHub release APKs', () => {
 
 test('v3.3.45: OTA version and code are bumped', async () => {
   const ota = await import('../src/api/otaUpdate.js');
-  assert.equal(ota.CURRENT_APP_VERSION, '3.9.0');
-  assert.equal(ota.CURRENT_VERSION_CODE, 227);
+  assert.equal(ota.CURRENT_APP_VERSION, '3.9.1');
+  assert.equal(ota.CURRENT_VERSION_CODE, 228);
   assert.equal(ota.compareVersions('3.3.48', '3.3.41'), 1);
   assert.equal(ota.compareVersions('3.3.41', '3.3.48'), -1);
   assert.equal(ota.compareVersions('3.3.48', '3.3.48'), 0);
