@@ -9,6 +9,38 @@ import React, { useEffect, useState } from 'react';
 export function SplashScreen({ onDone }) {
   const [leaving, setLeaving] = useState(false);
 
+  // v3.17.5: the "ta-dum" — AJO's own synthesized two-hit chime, bundled
+  // locally (public/startup.wav, 45KB). WebAudio first (no gesture needed on
+  // our WebViews), HTMLAudio fallback, total silence on any failure.
+  useEffect(() => {
+    let stopped = false;
+    (async () => {
+      try {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (AC) {
+          const ctx = new AC();
+          const buf = await ctx.decodeAudioData(await (await fetch('/startup.wav')).arrayBuffer());
+          if (stopped) return;
+          const src = ctx.createBufferSource();
+          const gain = ctx.createGain();
+          gain.gain.value = 0.85;
+          src.buffer = buf;
+          src.connect(gain).connect(ctx.destination);
+          src.start(0);
+          src.onended = () => { try { ctx.close(); } catch {} };
+          return;
+        }
+      } catch {}
+      try {
+        if (stopped) return;
+        const audio = new Audio('/startup.wav');
+        audio.volume = 0.85;
+        audio.play().catch(() => {});
+      } catch {}
+    })();
+    return () => { stopped = true; };
+  }, []);
+
   useEffect(() => {
     const t1 = setTimeout(() => setLeaving(true), 1200);
     const t2 = setTimeout(() => onDone && onDone(), 1480);
