@@ -593,6 +593,71 @@ public class MainActivity extends BridgeActivity {
             });
 
             webView.setWebViewClient(new com.getcapacitor.BridgeWebViewClient(getBridge()) {
+                // v3.9.3: network-layer ad block. The phone plays embeds in
+                // iframes inside THIS WebView, and until now it had no
+                // ad blocking at all — embed pages were loading popad/adsterra
+                // scripts and YouTube ad iframes ("youtube opens while opening
+                // a movie"). Same list as the TV player, plus YouTube domains
+                // (youtube-nocookie stays allowed — the in-app YouTube tab
+                // uses it legitimately).
+                private final String[] AD_DOMAINS = {
+                    "doubleclick.net", "googlesyndication.com", "googleadservices.com",
+                    "popads.net", "popcash.net", "popunder.net", "juicyads.com",
+                    "exoclick.com", "exosrv.com", "adsterra.com", "monetag.com",
+                    "propellerads.com", "adskeeper.co.uk",
+                    "adcash.com", "hilltopads.net", "trafficjunky.com",
+                    "pushno.com", "clksite.com", "betterads.org",
+                    "a-ads.com", "revenuecpmnetwork.com", "adf.ly",
+                    "richpush.co", "ero-advertising.com", "clickadu.com",
+                    "cpm.bz", "bongacash.com", "tsyndicate.com",
+                    "bidvertiser.com", "ad-maven.com", "admaven.com",
+                    "realsrv.com", "onclicka.com", "onclicksuper.com",
+                    "sssmaster.com", "sureads.com", "adserverplus.com"
+                };
+                private final String[] YOUTUBE_AD_HOSTS = {
+                    // NOT googlevideo.com (YouTube tab's video bytes) and NOT
+                    // ytimg.com (its thumbnails) — blocking the embed pages is
+                    // enough to kill the ad players.
+                    "youtube.com", "youtu.be", "youtubei.googleapis.com"
+                };
+
+                private boolean isAdUrl(String url) {
+                    if (url == null) return false;
+                    String lower = url.toLowerCase(java.util.Locale.US);
+                    for (String domain : AD_DOMAINS) {
+                        if (lower.contains(domain)) return true;
+                    }
+                    // YouTube iframes inside movie embeds = the ad layer.
+                    // youtube-nocookie.com is NOT blocked (in-app YouTube tab).
+                    if (!lower.contains("youtube-nocookie.com")) {
+                        for (String host : YOUTUBE_AD_HOSTS) {
+                            if (lower.contains(host)) return true;
+                        }
+                    }
+                    if (lower.contains("/popunder") || lower.contains("/pop_under")
+                            || lower.contains("/clickunder") || lower.contains("/adserve")
+                            || lower.contains("ads.php") || lower.contains("/ad/click")
+                            || lower.contains("track.php?")) {
+                        return true;
+                    }
+                    return false;
+                }
+
+                @Override
+                public android.webkit.WebResourceResponse shouldInterceptRequest(
+                        WebView view, android.webkit.WebResourceRequest request) {
+                    try {
+                        String url = request.getUrl() != null ? request.getUrl().toString() : "";
+                        if (isAdUrl(url)) {
+                            android.util.Log.d("AJO.MainActivity", "AD_BLOCK: " + url);
+                            return new android.webkit.WebResourceResponse(
+                                    "text/plain", "utf-8",
+                                    new java.io.ByteArrayInputStream(new byte[0]));
+                        }
+                    } catch (Throwable ignored) {}
+                    return super.shouldInterceptRequest(view, request);
+                }
+
                 @Override
                 public void onReceivedSslError(WebView view, SslErrorHandler handler, SslError error) {
                     // Ignore expired/untrusted intermediate certificates on free streaming CDNs & IPTV

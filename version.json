@@ -6,18 +6,18 @@
   "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
   "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
   "phone": {
-    "version": "3.9.2",
-    "versionCode": 229,
+    "version": "3.9.3",
+    "versionCode": 230,
     "packageId": "com.ajo.phone",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
-    "changelog": "v3.9.2 fix: direct streams now play correctly on the phone (relayed with the required headers). This was the playback error.",
+    "changelog": "v3.9.3: ad blocker for the phone player. Movie mirrors were loading YouTube ad popups when you opened a title — those are now blocked at the network level. No more YouTube ads.",
     "size_mb": 3.4,
-    "sha256": "84fa41bd9d819f4c8e5c346ffd522d573a44ddee8c2609668b782ad3d1596c55",
+    "sha256": "e3efe889ba83f1b28b43ced71c247c0b4c2a987050dec37a21465a5398270253",
     "releaseDate": "2026-10-18",
-    "size": 3599857
+    "size": 3601325
   },
   "tv": {
     "version": "3.17.2",
