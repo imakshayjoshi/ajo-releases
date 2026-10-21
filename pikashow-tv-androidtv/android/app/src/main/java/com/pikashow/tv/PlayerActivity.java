@@ -434,6 +434,12 @@ public class PlayerActivity extends AppCompatActivity {
 
     private boolean useTextureViewFallback = false;
     private boolean softwareDecoderRetryDone = false;
+    // v3.17.12: when the hardware decoder (e.g. OMX.realtek) rejects a stream's
+    // H.264 profile, rebuild the player with platform SOFTWARE codecs
+    // (OMX.google/c2.android) — the old "TextureView fallback" swapped the
+    // surface but kept the same broken decoder, so SD/interlaced live channels
+    // (Star Sports relay etc.) could never play on Realtek boxes.
+    private boolean forceSoftwareDecoder = false;
     // v3.10.0: web-engine (iframe/embed) load watchdog. A dead mirror or a
     // hung Cloudflare interstitial never finishes loading, so the spinner
     // used to spin forever. After WEB_LOAD_TIMEOUT_MS we fail over.
@@ -698,6 +704,7 @@ public class PlayerActivity extends AppCompatActivity {
         if (serverQueue.isEmpty()) return;
 
         softwareDecoderRetryDone = false;
+        forceSoftwareDecoder = false;
         resumePositionMs = C.TIME_UNSET;
         freezeRecoveryAttempts = 0;
 
@@ -2681,11 +2688,27 @@ public class PlayerActivity extends AppCompatActivity {
             firstFrameRendered = false;
             hasVideoTrack = false;
 
+            androidx.media3.exoplayer.mediacodec.MediaCodecSelector codecSelector =
+                    androidx.media3.exoplayer.mediacodec.MediaCodecSelector.DEFAULT;
+            if (forceSoftwareDecoder) {
+                codecSelector = (mimeType, requiresSecureDecoder, requiresTunneling) -> {
+                    java.util.List<androidx.media3.exoplayer.mediacodec.MediaCodecInfo> all =
+                            androidx.media3.exoplayer.mediacodec.MediaCodecSelector.DEFAULT
+                                    .getDecoderInfos(mimeType, requiresSecureDecoder, requiresTunneling);
+                    java.util.List<androidx.media3.exoplayer.mediacodec.MediaCodecInfo> sw = new ArrayList<>();
+                    for (androidx.media3.exoplayer.mediacodec.MediaCodecInfo info : all) {
+                        String n = info.name == null ? "" : info.name.toLowerCase(java.util.Locale.US);
+                        if (n.startsWith("omx.google.") || n.startsWith("c2.android.")) sw.add(info);
+                    }
+                    return sw.isEmpty() ? all : sw;
+                };
+            }
+
             DefaultRenderersFactory renderersFactory = new DefaultRenderersFactory(getApplicationContext())
                     .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_OFF)
                     .setEnableDecoderFallback(true)
                     .setAllowedVideoJoiningTimeMs(15000L)
-                    .setMediaCodecSelector(androidx.media3.exoplayer.mediacodec.MediaCodecSelector.DEFAULT);
+                    .setMediaCodecSelector(codecSelector);
 
             androidx.media3.exoplayer.upstream.DefaultBandwidthMeter bandwidthMeter =
                     new androidx.media3.exoplayer.upstream.DefaultBandwidthMeter.Builder(getApplicationContext())
@@ -3145,6 +3168,24 @@ public class PlayerActivity extends AppCompatActivity {
         public void onPlayerError(@NonNull PlaybackException error) {
             Log.e(TAG, "PLAYER_ERROR on server " + (currentServerIdx + 1) + ": " + error.getMessage() + " (code " + error.errorCode + ")", error);
             bufferSpinner.setVisibility(View.GONE);
+
+            // v3.17.12: decoder errors get a SOFTWARE-decoder rebuild FIRST,
+            // for live AND vod — the live resync branch used to swallow these,
+            // and the old fallback only swapped the surface, never the codec.
+            boolean decoderError = error.errorCode == PlaybackException.ERROR_CODE_DECODER_INIT_FAILED
+                    || error.errorCode == PlaybackException.ERROR_CODE_DECODING_FAILED
+                    || error.errorCode == PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED
+                    || (error.getCause() instanceof androidx.media3.exoplayer.video.MediaCodecVideoDecoderException)
+                    || (error.getCause() instanceof androidx.media3.exoplayer.mediacodec.MediaCodecDecoderException);
+            if (decoderError && !forceSoftwareDecoder) {
+                forceSoftwareDecoder = true;
+                Log.w(TAG, "Hardware decoder failed — retrying with software codecs");
+                Toast.makeText(PlayerActivity.this,
+                        "Switching to compatible video engine...", Toast.LENGTH_SHORT).show();
+                showOsd();
+                initializeExoPlayer();
+                return;
+            }
 
             if (isLive) {
                 // Live channels: re-sync to live broadcast edge without burning through server queue

@@ -1,0 +1,13 @@
+{
+  "appId": "com.ajo.phone",
+  "appName": "AJO Phone",
+  "webDir": "dist",
+  "bundledWebRuntime": false,
+  "server": {
+    "cleartext": false,
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": true
+  }
+}

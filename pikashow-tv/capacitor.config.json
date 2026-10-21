@@ -1,0 +1,13 @@
+{
+  "appId": "com.ajo.tv",
+  "appName": "AJO TV",
+  "webDir": "../pikashow-tv-build",
+  "bundledWebRuntime": false,
+  "server": {
+    "cleartext": false,
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": true
+  }
+}
