@@ -6,6 +6,8 @@ import {
   getLiveBroadcasts,
   normalizeMediaItem
 } from './api/pikashow';
+import { getLiveChannels, isPopularLiveChannel, squashLiveName } from './api/live';
+import { getTmdbCatalogDeep } from './api/tmdb';
 import { getWatchHistory, getFavorites, saveProgress, filterAliveItems } from './api/history';
 import { runStreamHealthSweep } from './utils/streamHealth';
 import { MobileHeader } from './components/MobileHeader';
@@ -166,11 +168,28 @@ export default function App() {
       const agg = aggLive.status === 'fulfilled' && Array.isArray(aggLive.value) ? aggLive.value : [];
       const seenLive = new Map();
       for (const ch of agg) {
-        const key = String(ch.title_en || ch.title || '').toLowerCase().trim();
+        const key = squashLiveName(ch.title_en || ch.title || '');
         if (key) seenLive.set(key, ch);
       }
-      for (const ch of oldLive) {
-        const key = String(ch.title_en || ch.title || '').toLowerCase().trim();
+      // v3.9.9: the legacy broadcast feed is unfiltered (880 junk/foreign
+      // channels). It must pass the SAME whitelist as the aggregator,
+      // like the TV apps do — previously it flooded the phone with ~860
+      // unwatchable channels.
+      const oldClean = oldLive.filter((ch) => isPopularLiveChannel({
+        name: ch.title_en || ch.title || ch.name,
+        name_en: ch.title_en || '',
+        category: ch.category,
+        lang: ch.lang,
+        country: ch.country,
+        tvg_country: ch.tvg_country,
+        url: ch.url,
+        players: ch.players,
+        player: ch.player,
+        stream_url: ch.stream_url,
+        stream: ch.stream,
+      }));
+      for (const ch of oldClean) {
+        const key = squashLiveName(ch.title_en || ch.title || ch.name || '');
         if (!key || seenLive.has(key)) continue;
         seenLive.set(key, ch);
       }

@@ -107,12 +107,18 @@ export function SearchView({ onSelectItem }) {
     >{k}</button>
   );
 
+  // v3.9.9: phone layout — the 470px TV column + QWERTY keyboard overflowed
+  // a 390px phone screen and squeezed results into nothing. On touch/small
+  // screens hide the on-screen keyboard (the native one pops up anyway) and
+  // stack search bar over full-width results.
+  const isPhone = (typeof window !== 'undefined') && (window.matchMedia('(pointer: coarse)').matches || window.innerWidth < 768);
+
   return (
-    <div className="tv-search-container" style={{ padding: '0 24px' }}>
-      <div style={{ display: 'flex', gap: '32px', alignItems: 'flex-start', marginTop: '8px' }}>
+    <div className="tv-search-container" style={{ padding: isPhone ? '0 14px' : '0 24px' }}>
+      <div style={{ display: 'flex', flexDirection: isPhone ? 'column' : 'row', gap: isPhone ? '14px' : '32px', alignItems: 'flex-start', marginTop: '8px' }}>
         {/* Left Column: Search Bar & QWERTY Keyboard */}
-        <div style={{ width: '470px', flexShrink: 0 }}>
-          <div className="tv-search-input-box" style={{ marginBottom: '14px' }}>
+        <div style={{ width: isPhone ? '100%' : '470px', flexShrink: 0 }}>
+          <div className="tv-search-input-box" style={{ marginBottom: '14px', display: 'flex', alignItems: 'center', gap: 10, width: '100%', boxSizing: 'border-box', background: 'rgba(15, 20, 31, 0.85)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, padding: '12px 14px' }}>
             <SearchIcon size={22} color="#00BB7F" />
             <input
               ref={inputRef}
@@ -123,6 +129,7 @@ export function SearchView({ onSelectItem }) {
               onChange={(e) => setQuery(e.target.value)}
               onBlur={() => commitSearch(query)}
               tabIndex={0}
+              style={{ flex: 1, minWidth: 0, background: 'transparent', border: 'none', outline: 'none', color: '#fff', fontSize: '1rem' }}
             />
             {query && (
               <button className="tv-cat-btn" onClick={handleClear} tabIndex={0} style={{ padding: '4px 10px', fontSize: '0.8rem' }}>
@@ -131,7 +138,8 @@ export function SearchView({ onSelectItem }) {
             )}
           </div>
 
-          {/* QWERTY keyboard */}
+          {/* QWERTY keyboard — TV only; phones use the native keyboard */}
+          {!isPhone && (
           <div style={{
             display: 'flex',
             flexDirection: 'column',
@@ -171,6 +179,7 @@ export function SearchView({ onSelectItem }) {
               >Search</button>
             </div>
           </div>
+          )}
 
           {/* Recent searches */}
           {recents.length > 0 && !query && (
@@ -192,11 +201,13 @@ export function SearchView({ onSelectItem }) {
             </div>
           )}
 
+          {!isPhone && (
           <div style={{ marginTop: '12px', color: '#64748b', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <span>💡 Tip: Press</span>
             <span style={{ background: 'rgba(255,255,255,0.1)', padding: '2px 6px', borderRadius: '4px', color: '#00BB7F', fontWeight: 700 }}>Right ▶</span>
             <span>on remote to jump straight to results</span>
           </div>
+          )}
         </div>
 
         {/* Right Column: Live Search Results */}

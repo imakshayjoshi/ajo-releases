@@ -16,7 +16,7 @@
  */
 
 const LIVE_URL = 'https://new.ajo.co.in/live/channels.json';
-const CACHE_KEY = 'ajo_live_channels_v2';
+const CACHE_KEY = 'ajo_live_channels_v3';
 const TTL = 10 * 60 * 1000; // 10 min client cache (server refreshes 15 min)
 
 // v3.9.7: user's explicit live-TV whitelist (Oct 21 2026). Same strict
@@ -39,7 +39,7 @@ aaj tak|abp news|india tv|ndtv india|republic bharat|news18 india|zee news|times
 times now|republic tv|india today|cnn-news18|ndtv 24x7|mirror now|wion|dd india|bbc world news|cnn international|al jazeera english|cnbc-tv18|et now|ndtv profit
 `;
 
-function squashLiveName(name) {
+export function squashLiveName(name) {
   return String(name || '')
     .toLowerCase()
     .replace(/[^a-z0-9+& ]/g, ' ')
@@ -75,10 +75,18 @@ export function isPopularLiveChannel(raw) {
 
 export function normalizeLiveChannel(raw) {
   if (!raw || !raw.url) return null;
-  // v3.9.8: the phone's web player is HLS-only — DASH/ClearKey channels
-  // (jio) can't play here, so they're left to the TV's native player.
-  if (String(raw.kind || 'hls').toLowerCase() === 'dash') return null;
-  if (raw.drm) return null;
+  // v3.9.9: the phone's web player is HLS-only. DASH/ClearKey primaries
+  // (jio official) can't play here — but the aggregator now carries plain
+  // HLS mirrors as alt_urls, so swap one in as the phone's primary instead
+  // of dropping the channel entirely. This is what puts Star Sports on phone.
+  let url = raw.url;
+  let kind = String(raw.kind || 'hls').toLowerCase();
+  if (kind === 'dash' || raw.drm) {
+    const alt = Array.isArray(raw.alt_urls) ? raw.alt_urls.find((u) => typeof u === 'string' && /\.m3u8/i.test(u)) : null;
+    if (!alt) return null;
+    url = alt;
+    kind = 'hls';
+  }
   const name = String(raw.name || 'Live Channel').trim();
   return {
     id: raw.id || name.toLowerCase().replace(/\s+/g, '-'),
@@ -89,14 +97,14 @@ export function normalizeLiveChannel(raw) {
     logo: raw.logo || '',
     category: raw.category || 'Entertainment',
     lang: raw.lang || '',
-    url: raw.url,
-    players: [{ url: raw.url, label: 'Live', drm: raw.drm, headers: raw.headers, kind: raw.kind }],
+    url,
+    players: [{ url, label: 'Live', drm: null, headers: null, kind }],
     is_live: true,
     type: 'live',
     year: 'LIVE',
-    drm: raw.drm || null,
-    headers: raw.headers || null,
-    kind: raw.kind || 'hls',
+    drm: null,
+    headers: null,
+    kind,
     source: raw.source || 'ajo-live'
   };
 }
