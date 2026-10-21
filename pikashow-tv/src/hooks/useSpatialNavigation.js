@@ -518,15 +518,14 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
       const keyCode = e.keyCode;
 
       // 1. Back Key Handling
-      // v3.10.0 FIX: Backspace (keyCode 8) must NOT act as remote Back while
-      // the user is typing in a text field — it would navigate home and wipe
-      // their search. Only KEYCODE_BACK (4) and Escape are global Back.
-      const ae = document.activeElement;
-      const typing = ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA') && ae.value.length > 0;
+      // v3.17.9: KEYCODE_DEL (Backspace) REMOVED as a Back trigger. A phantom
+      // Backspace storm (deviceId=-1, injected by the system IME or an
+      // accessory) was raining on launch, each one counted as "Back", and on
+      // the home tab that called exitApp() — the app "never opened". Real
+      // remotes send KEYCODE_BACK (4); soft-keyboard Del still deletes text
+      // inside inputs natively (typing guard below).
       const isGlobalBack = key === 'Escape' || keyCode === 4 || keyCode === 27;
-      const isTypingBackspace = typing && (key === 'Backspace' || keyCode === 8);
-      if ((isGlobalBack || (key === 'Backspace' || keyCode === 8)) && onBack) {
-        if (isTypingBackspace) return; // let the field delete characters
+      if (isGlobalBack && onBack) {
         e.preventDefault();
         e.stopPropagation();
         onBack();

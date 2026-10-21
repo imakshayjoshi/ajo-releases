@@ -1015,8 +1015,9 @@ export function TVPlayer({
       const key = e.key;
       const keyCode = e.keyCode;
 
-      // Back key exits player cleanly
-      if (key === 'Escape' || key === 'Backspace' || keyCode === 4 || keyCode === 27 || keyCode === 8) {
+      // Back key exits player cleanly (v3.17.9: Backspace dropped — phantom
+      // DEL storms from the system IME must never kill playback)
+      if (key === 'Escape' || keyCode === 4 || keyCode === 27) {
         e.preventDefault();
         e.stopPropagation();
         if (showDrawer) {
