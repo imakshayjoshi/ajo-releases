@@ -29,8 +29,8 @@
     "minimumVersionCode": 1,
     "changelog": "v3.17.15: Star Sports back for real — official Jio streams (all Star/Sports18/Eurosport), auto-failover to mirrors, deeper live buffer, channels refresh on every app open, search keyboard flow fixed.",
     "size_mb": 7.1,
-    "sha256": "68466cb0d253d3d31a9f8433df6ed28926e9805325df8b1ef1ce2e2f1e0a1dba",
-    "size": 7474564,
+    "sha256": "d29ec31533d90c695f66406f37513eab784909bec5eb3f2dc0f0b19fb8a4deaf",
+    "size": 7474731,
     "releaseDate": "2026-10-21"
   },
   "android_tv": {
@@ -43,10 +43,10 @@
     "minimumVersionCode": 1,
     "changelog": "v3.17.15: Star Sports back for real — official Jio streams (all Star/Sports18/Eurosport), auto-failover to mirrors, deeper live buffer, channels refresh on every app open, search keyboard flow fixed.",
     "size_mb": 7.1,
-    "sha256": "dca110f98cfe4b48e5cd9e84636fdd6a23df9168e6885f83ed665e848558c201",
+    "sha256": "57855e31d09b3fa1254ba1675755052d2bba241e9fa0bd2a42b81604f4bb66d7",
     "releaseDate": "2026-10-21",
-    "size": 7486645
+    "size": 7486552
   },
   "changelog": "v3.17.15: Star Sports back for real — official Jio streams (all Star/Sports18/Eurosport), auto-failover to mirrors, deeper live buffer, channels refresh on every app open, search keyboard flow fixed.",
-  "sha256": "68466cb0d253d3d31a9f8433df6ed28926e9805325df8b1ef1ce2e2f1e0a1dba"
+  "sha256": "d29ec31533d90c695f66406f37513eab784909bec5eb3f2dc0f0b19fb8a4deaf"
 }
