@@ -735,10 +735,6 @@ html, body, #root {
 
 .tv-rail {
   margin-bottom: 28px;
-  /* v3.17.3: skip rendering off-screen rails — big scroll/render win on
-     weak TV GPUs (content-visibility is a no-op where unsupported). */
-  content-visibility: auto;
-  contain-intrinsic-size: auto 340px;
 }
 
 .tv-rail-header {

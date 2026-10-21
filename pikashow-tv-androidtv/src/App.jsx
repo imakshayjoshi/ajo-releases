@@ -3,7 +3,7 @@ import { getBollywoodCatalog, getHollywoodCatalog, getSerialsCatalog, getLiveBro
 import { getLiveChannels, isPopularLiveChannel, classifyLiveChannel, hasWorkingPlayer, applyLiveSourceOverride, probeLiveChannels, guessLiveLogo } from './api/live';
 import { LiveView } from './components/LiveView';
 import { getLiveSportsEvents } from './api/sports';
-import { getWatchHistory, saveProgress, getWatchProgress, filterAliveItems } from './api/history';
+import { getWatchHistory, saveProgress, getWatchProgress, filterAliveItems, syncContinueToNative } from './api/history';
 import { runStreamHealthSweep } from './utils/streamHealth';
 import { checkForAppUpdates } from './api/otaUpdate';
 import { getTmdbTrending, getTmdbCatalog, getTmdbCatalogDeep, getTmdbNowPlaying, getBecauseYouWatched } from './api/tmdb';
@@ -24,6 +24,7 @@ import { ProviderRow, ProviderCatalog } from './components/ProviderCatalog';
 import { useSpatialNavigation } from './hooks/useSpatialNavigation';
 import { shouldPreferNativePlayer, playInNativePlayer, isNativePlaybackActive, nativePlayerControl, setNativePlaybackActive } from './utils/nativePlayer';
 import { generateUniversalServers } from './utils/streamingEngines';
+import { consumeDeepLink, onDeepLink } from './api/deepLink';
 // v3.9.0 PERF: castSync lazy-loaded — the 27KB module was parsed eagerly on
 // every startup even though cast is only used when a phone is actually paired.
 import { Play, Sparkles } from 'lucide-react';
@@ -68,6 +69,9 @@ export default function App() {
   const [liveViewMode, setLiveViewMode] = useState('grid'); // 'grid' (high performance default) | 'epg'
   const [otaPrompt, setOtaPrompt] = useState(null);
   const [downloadProgress, setDownloadProgress] = useState(null);
+  // v3.17.7: ajo:// deep links from the Home launcher
+  const [searchPrefill, setSearchPrefill] = useState('');
+  const pendingLiveRef = useRef(null);
 
   // v3.10.0: remember which card had focus before a modal/player opened so
   // closing it returns the user to the exact same spot instead of dumping
@@ -561,6 +565,68 @@ export default function App() {
     // the old first-card behavior when the element is gone.
     restoreFocus();
   }, [activePlayback, restoreFocus]);
+
+  // v3.17.7: ajo:// deep links from the Home launcher — live channel cards, Continue Watching
+  // resume rows, and voice search. Cold links arrive via consumeDeepLink on mount, warm links via
+  // window.__ajoOnDeepLink.
+  const routeDeepLink = useCallback((dl) => {
+    if (!dl || !dl.route) return;
+    try {
+      if (dl.route === 'search') {
+        setSearchPrefill(dl.q || '');
+        setActiveTab('search');
+        return;
+      }
+      if (dl.route === 'watch') {
+        // Prefer the full history entry (keeps provider context + season/episode + resume point);
+        // fabricate a minimal item only when history no longer has it.
+        const norm = (s) => String(s || '');
+        const found = getWatchHistory().find((h) =>
+          (dl.id && norm(h.id) === norm(dl.id)) ||
+          (dl.tmdb && norm(h.tmdb_id) === norm(dl.tmdb)) ||
+          (dl.title && (h.title === dl.title || h.name === dl.title || h.title_en === dl.title)));
+        const tmdbId = dl.tmdb || (String(dl.id || '').match(/tmdb-(?:ep-)?(\d+)/) || [])[1] || '';
+        const item = found || {
+          id: dl.id || (tmdbId ? `tmdb-${tmdbId}` : ''),
+          tmdb_id: tmdbId || undefined,
+          type: dl.type || '',
+          title: dl.title || '',
+          name: dl.title || '',
+        };
+        handleStartPlayback(item);
+        return;
+      }
+      if (dl.route === 'live') {
+        pendingLiveRef.current = dl;
+        setActiveTab('live');
+        if (!liveLoaded) loadLiveTV();
+        const decode = (s) => { try { return decodeURIComponent(String(s || '')); } catch { return String(s || ''); } };
+        const ch = (liveItems || []).find((c) =>
+          (dl.id && (c.id === dl.id || decode(c.id) === dl.id || decode(c.id) === decode(dl.id))) ||
+          (dl.name && (c.name === dl.name || c.title === dl.name || c.title_en === dl.name)));
+        if (ch) { pendingLiveRef.current = null; handleItemClick(ch); }
+      }
+    } catch { /* a bad link must never break the app */ }
+  }, [liveItems, liveLoaded, loadLiveTV, handleItemClick, handleStartPlayback]);
+
+  // The live catalog may land after the link did.
+  useEffect(() => {
+    const dl = pendingLiveRef.current;
+    if (!dl || !liveItems || liveItems.length === 0) return;
+    const decode = (s) => { try { return decodeURIComponent(String(s || '')); } catch { return String(s || ''); } };
+    const ch = liveItems.find((c) =>
+      (dl.id && (c.id === dl.id || decode(c.id) === dl.id || decode(c.id) === decode(dl.id))) ||
+      (dl.name && (c.name === dl.name || c.title === dl.name || c.title_en === dl.name)));
+    if (ch) { pendingLiveRef.current = null; handleItemClick(ch); }
+  }, [liveItems, handleItemClick]);
+
+  useEffect(() => {
+    const dl = consumeDeepLink();
+    if (dl) routeDeepLink(dl);
+    onDeepLink((link) => routeDeepLink(link));
+    // Seed the Home rail with the existing watch history on every app start.
+    syncContinueToNative();
+  }, [routeDeepLink]);
 
   // Global Remote Back Handler
   const handleBack = useCallback(() => {
@@ -1156,7 +1222,7 @@ export default function App() {
 
             {/* 🔍 SEARCH TAB */}
             {activeTab === 'search' && (
-              <SearchView onSelectItem={handleItemClick} />
+              <SearchView onSelectItem={handleItemClick} initialQuery={searchPrefill} />
             )}
 
             {/* ⚙️ SETTINGS TAB */}

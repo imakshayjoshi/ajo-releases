@@ -31,8 +31,8 @@ function saveRecents(list) {
   try { localStorage.setItem(RECENTS_KEY, JSON.stringify(list.slice(0, MAX_RECENTS))); } catch {}
 }
 
-export function SearchView({ onSelectItem }) {
-  const [query, setQuery] = useState('');
+export function SearchView({ onSelectItem, initialQuery }) {
+  const [query, setQuery] = useState(initialQuery || '');
   const [results, setResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
   const [recents, setRecents] = useState(loadRecents);

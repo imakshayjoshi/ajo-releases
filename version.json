@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "version": "3.17.6",
-  "versionCode": 262,
+  "version": "3.17.7",
+  "versionCode": 263,
   "releaseDate": "2026-10-21",
   "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
   "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
@@ -20,33 +20,33 @@
     "size": 3704572
   },
   "tv": {
-    "version": "3.17.6",
-    "versionCode": 262,
+    "version": "3.17.7",
+    "versionCode": 263,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
-    "changelog": "v3.17.6: new professional app icon (all sizes, adaptive, TV banner) + live TV trimmed to your 45-channel curated list — every one tested live.",
+    "changelog": "v3.17.7: navigation focus fixed — the home spotlight no longer steals/loses focus mid-rotation, and a rendering shortcut that confused the focus engine was removed. D-pad movement is stable and predictable.",
     "size_mb": 7.1,
-    "sha256": "5d2af575b1bfbac2c39690d96be0a2916f5e18888c69dc347e739b162ee810a2",
-    "size": 7472032,
+    "sha256": "4744ea3b020d7c25ddd12b86edfb84b1b6336912c758af3a534c84d28c83419e",
+    "size": 7473950,
     "releaseDate": "2026-10-21"
   },
   "android_tv": {
-    "version": "3.17.6",
-    "versionCode": 262,
+    "version": "3.17.7",
+    "versionCode": 263,
     "packageId": "com.ajo.androidtv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
-    "changelog": "v3.17.6: new professional app icon (all sizes, adaptive, TV banner) + live TV trimmed to your 45-channel curated list — every one tested live.",
+    "changelog": "v3.17.7: navigation focus fixed — the home spotlight no longer steals/loses focus mid-rotation, and a rendering shortcut that confused the focus engine was removed. D-pad movement is stable and predictable.",
     "size_mb": 7.1,
-    "sha256": "8b5a39b71db393ce6088075712ff4de254582c7cfa1af4262e7e59d80be3727d",
+    "sha256": "b78658c802f2100d0260ca6157c1f1cd6a4dd85718e55108ceecf51bfedf59d6",
     "releaseDate": "2026-10-21",
-    "size": 7483122
+    "size": 7486698
   },
-  "changelog": "v3.17.6: new professional app icon (all sizes, adaptive, TV banner) + live TV trimmed to your 45-channel curated list — every one tested live.",
-  "sha256": "5d2af575b1bfbac2c39690d96be0a2916f5e18888c69dc347e739b162ee810a2"
+  "changelog": "v3.17.7: navigation focus fixed — the home spotlight no longer steals/loses focus mid-rotation, and a rendering shortcut that confused the focus engine was removed. D-pad movement is stable and predictable.",
+  "sha256": "4744ea3b020d7c25ddd12b86edfb84b1b6336912c758af3a534c84d28c83419e"
 }

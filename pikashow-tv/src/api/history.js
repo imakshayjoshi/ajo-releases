@@ -11,6 +11,45 @@ function normalizeTitle(t) {
   return String(t || '').toLowerCase().trim().replace(/[^a-z0-9]/g, '');
 }
 
+// ==========================================
+// CONTINUE WATCHING -> HOME LAUNCHER BRIDGE
+// ==========================================
+// The Home launcher's Continue Watching rail reads content://com.ajo.androidtv/continue,
+// which serves exactly what we push here on every history change.
+function continuePosterOf(it) {
+  return it.poster || it.posterUrl || it.poster_url || it.backdrop || it.image || it.logo || '';
+}
+
+function continueIdOf(it) {
+  return it.id || it.tmdb_id || it.imdb_id || '';
+}
+
+export function syncContinueToNative() {
+  try {
+    if (typeof window === 'undefined' || !window.AjoLink || !window.AjoLink.setContinueJson) return;
+    const items = getWatchHistory().slice(0, 12).map((h) => {
+      const title = h.title_en || h.title || h.name || '';
+      const id = continueIdOf(h);
+      const tmdb = h.tmdb_id || (String(id).match(/tmdb-(?:ep-)?(\d+)/) || [])[1] || '';
+      const subTitle = h.season_number
+        ? `S${h.season_number} E${h.episode_number || 1}`
+        : (h.year ? String(h.year) : '');
+      return {
+        title,
+        subTitle,
+        poster: continuePosterOf(h),
+        deepLink: `ajo://watch/${encodeURIComponent(id)}?type=${encodeURIComponent(h.type || '')}&title=${encodeURIComponent(title)}&tmdb=${encodeURIComponent(tmdb)}`,
+        package: 'com.ajo.androidtv',
+        updatedAt: h.lastWatched || Date.now(),
+        progress: h.duration > 0 ? Math.min(1, h.currentTime / h.duration) : -1,
+        source: 'AJO TV'
+      };
+    }).filter((i) => i.title && !i.deepLink.includes('watch/?') && !i.deepLink.endsWith('watch/'));
+    window.AjoLink.setContinueJson(JSON.stringify({ items }));
+  } catch { /* bridge absent on web builds */ }
+}
+
+
 export function matchMediaItem(a, b) {
   if (!a || !b) return false;
   const idA = a.id || a.tmdb_id || a.imdb_id || a.kinopoisk_id || a.movie_id;
@@ -60,6 +99,7 @@ export function saveProgress(item, currentTime, duration) {
     history.unshift(historyEntry);
 
     localStorage.setItem(HISTORY_KEY, JSON.stringify(history.slice(0, 30)));
+    syncContinueToNative();
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('ajo-watch-history-updated', { detail: historyEntry }));
     }
@@ -97,6 +137,7 @@ export function deleteHistoryItem(item) {
     const history = getWatchHistory();
     const filtered = history.filter(h => !matchMediaItem(h, item));
     localStorage.setItem(HISTORY_KEY, JSON.stringify(filtered));
+    syncContinueToNative();
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('ajo-watch-history-updated'));
     }
@@ -106,6 +147,7 @@ export function deleteHistoryItem(item) {
 export function clearWatchHistory() {
   try {
     localStorage.removeItem(HISTORY_KEY);
+    syncContinueToNative();
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('ajo-watch-history-updated'));
     }

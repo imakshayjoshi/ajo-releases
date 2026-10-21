@@ -29,14 +29,29 @@ export function HeroBanner({ items = [], onPlay, onSelectInfo }) {
   // Pause on focus/interaction, resume on blur
   const handleFocus = () => setIsPaused(true);
   const handleBlur = () => setIsPaused(false);
+  // v3.17.7: D-pad focus pause. The old pause only listened to the MOUSE —
+  // on a TV the carousel kept rotating while a slide held focus; rotation
+  // flips the focused slide to tabIndex -1, focus falls to <body>, and the
+  // next keypress fired the nearest-neighbor recovery = "focus jumps
+  // anywhere". Blur only resumes when focus LEFT the carousel entirely.
+  const rootRef = useRef(null);
+  const handleFocusIn = () => setIsPaused(true);
+  const handleFocusOut = (e) => {
+    const rt = e.relatedTarget;
+    if (rootRef.current && rt && rootRef.current.contains(rt)) return;
+    setIsPaused(false);
+  };
 
   if (carouselItems.length === 0) return null;
 
   return (
     <div
+      ref={rootRef}
       className="tv-hero-carousel"
       onMouseEnter={handleFocus}
       onMouseLeave={handleBlur}
+      onFocus={handleFocusIn}
+      onBlur={handleFocusOut}
     >
       {carouselItems.map((item, idx) => {
         const isActive = idx === activeIndex;
