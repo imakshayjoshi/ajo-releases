@@ -404,7 +404,11 @@ export default function App() {
               fallbacks,
               logo: ch.logo || ch.poster || ch.image || '',
               category: ch.category || ch.genre || ch.group || '',
-              channelNumber: idx + 1
+              channelNumber: idx + 1,
+              // v3.17.15: carry DRM + per-channel headers so the native player
+              // can tune ClearKey (jio) channels when zapping too
+              drm: ch.drm || null,
+              headers: ch.headers || null,
             };
           }).filter(ch => ch.url);
         }

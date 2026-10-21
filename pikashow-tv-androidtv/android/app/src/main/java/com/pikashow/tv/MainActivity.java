@@ -336,6 +336,11 @@ public class MainActivity extends BridgeActivity {
 
                 @JavascriptInterface
                 public void playLiveStreamWithChannels(final String url, final String title, final boolean isLive, final String fallbacksJson, final long startPositionMs, final String channelsJson, final int channelIndex) {
+                    playLiveStreamWithChannelsAndDrm(url, title, isLive, fallbacksJson, startPositionMs, channelsJson, channelIndex, null);
+                }
+
+                @JavascriptInterface
+                public void playLiveStreamWithChannelsAndDrm(final String url, final String title, final boolean isLive, final String fallbacksJson, final long startPositionMs, final String channelsJson, final int channelIndex, final String drmJson) {
                     if (url == null || url.isEmpty()) return;
                     runOnUiThread(() -> {
                         try {
@@ -354,6 +359,9 @@ public class MainActivity extends BridgeActivity {
                             }
                             if (startPositionMs > 0) {
                                 intent.putExtra("startPositionMs", startPositionMs);
+                            }
+                            if (drmJson != null && !drmJson.isEmpty()) {
+                                intent.putExtra("drm", drmJson);
                             }
                             intent.putExtra("channelIndex", channelIndex);
                             startActivity(intent);

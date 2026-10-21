@@ -73,6 +73,9 @@ const LIVE_WHITELIST_ALIASES = {
 function isWhitelistedLiveName(rawName) {
   const sq = squashLiveName(rawName);
   if (!sq) return false;
+  // "&tv" squashes to "tv" — only match when the original really had the &
+  // (a Cyrillic "Дніпро TV" squashes to "tv" too and must NOT pass)
+  if (sq === 'tv' && !String(rawName || '').includes('&')) return false;
   if (LIVE_WHITELIST.has(sq)) return true;
   // alias: whitelist contains the alias target squashed
   for (const [from, to] of Object.entries(LIVE_WHITELIST_ALIASES)) {
@@ -477,7 +480,9 @@ export function normalizeLiveChannel(raw) {
     category: classifyLiveChannel(name),
     lang: raw.lang || '',
     url: raw.url,
-    players: [{ url: raw.url, label: 'Live', drm: raw.drm, headers: raw.headers, kind: raw.kind }],
+    players: [{ url: raw.url, label: 'Live', drm: raw.drm, headers: raw.headers, kind: raw.kind },
+      // v3.17.15: collision-merged fallback servers from other feeds
+      ...(Array.isArray(raw.alt_urls) ? raw.alt_urls.filter(Boolean).map((u) => ({ url: u, label: 'Live (Mirror)', kind: 'hls' })) : [])],
     is_live: true,
     type: 'live',
     year: 'LIVE',
@@ -488,19 +493,28 @@ export function normalizeLiveChannel(raw) {
   };
 }
 
-export async function getLiveChannels() {
-  // localStorage cache first (stick is slow; the curated payload is tiny)
-  try {
-    const cached = localStorage.getItem(CACHE_KEY);
-    if (cached) {
-      const { t, channels } = JSON.parse(cached);
-      if (Date.now() - t < TTL && Array.isArray(channels) && channels.length) {
-        return channels.filter(isPopularLiveChannel).map(normalizeLiveChannel).filter(Boolean);
-      }
-    }
-  } catch { /* corrupt cache — refetch */ }
+// v3.17.15: first call per app launch always fetches FRESH (user rule: links
+// refresh every time the app opens). The localStorage cache only serves
+// in-session repeats (tab switches) within the TTL.
+let coldStartFetchDone = false;
 
-  const res = await fetch(LIVE_URL, { signal: AbortSignal.timeout ? AbortSignal.timeout(15000) : undefined });
+export async function getLiveChannels() {
+  const isColdStart = !coldStartFetchDone;
+  coldStartFetchDone = true;
+  if (!isColdStart) {
+    // localStorage cache first (stick is slow; the curated payload is tiny)
+    try {
+      const cached = localStorage.getItem(CACHE_KEY);
+      if (cached) {
+        const { t, channels } = JSON.parse(cached);
+        if (Date.now() - t < TTL && Array.isArray(channels) && channels.length) {
+          return channels.filter(isPopularLiveChannel).map(normalizeLiveChannel).filter(Boolean);
+        }
+      }
+    } catch { /* corrupt cache — refetch */ }
+  }
+
+  const res = await fetch(LIVE_URL + (LIVE_URL.includes('?') ? '&' : '?') + '_=' + Date.now(), { signal: AbortSignal.timeout ? AbortSignal.timeout(15000) : undefined, cache: 'no-store' });
   if (!res.ok) throw new Error('live catalog http ' + res.status);
   const data = await res.json();
   const channels = (Array.isArray(data.channels) ? data.channels : []).filter(isPopularLiveChannel);

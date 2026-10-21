@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "version": "3.17.12",
-  "versionCode": 268,
+  "version": "3.17.15",
+  "versionCode": 271,
   "releaseDate": "2026-10-21",
   "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
   "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
@@ -13,40 +13,40 @@
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
-    "changelog": "v3.9.8: http stream sources now play in the web player (mixed content allowed).",
+    "changelog": "v3.9.8: live channel list cleaned (unplayable formats hidden on phone), http streams allowed.",
     "size_mb": 3.5,
     "sha256": "4b781943c3f6addb485e31c27f5f4c10911340ffc4d2e9fa9402af1c6a35e16f",
     "releaseDate": "2026-10-21",
     "size": 3704576
   },
   "tv": {
-    "version": "3.17.12",
-    "versionCode": 268,
+    "version": "3.17.15",
+    "versionCode": 271,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
-    "changelog": "v3.17.12: Star/Sony sports channels now play — automatic software-decoder fallback when the TV's chip can't decode a stream (verified: Star Sports 2 playing).",
+    "changelog": "v3.17.15: Star Sports back for real — official Jio streams (all Star/Sports18/Eurosport), auto-failover to mirrors, deeper live buffer, channels refresh on every app open, search keyboard flow fixed.",
     "size_mb": 7.1,
-    "sha256": "307abe14b1e9884efba2a81ecc47632d3e634e3bc2cfc4426a7703cdfbddce3c",
-    "size": 7472830,
+    "sha256": "68466cb0d253d3d31a9f8433df6ed28926e9805325df8b1ef1ce2e2f1e0a1dba",
+    "size": 7474564,
     "releaseDate": "2026-10-21"
   },
   "android_tv": {
-    "version": "3.17.12",
-    "versionCode": 268,
+    "version": "3.17.15",
+    "versionCode": 271,
     "packageId": "com.ajo.androidtv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
-    "changelog": "v3.17.12: Star/Sony sports channels now play — automatic software-decoder fallback when the TV's chip can't decode a stream (verified: Star Sports 2 playing).",
+    "changelog": "v3.17.15: Star Sports back for real — official Jio streams (all Star/Sports18/Eurosport), auto-failover to mirrors, deeper live buffer, channels refresh on every app open, search keyboard flow fixed.",
     "size_mb": 7.1,
-    "sha256": "68faed94157a6368afe01501547411f435640d6e78833ac5be35d43f57a7fadf",
+    "sha256": "dca110f98cfe4b48e5cd9e84636fdd6a23df9168e6885f83ed665e848558c201",
     "releaseDate": "2026-10-21",
-    "size": 7485718
+    "size": 7486645
   },
-  "changelog": "v3.17.12: Star/Sony sports channels now play — automatic software-decoder fallback when the TV's chip can't decode a stream (verified: Star Sports 2 playing).",
-  "sha256": "307abe14b1e9884efba2a81ecc47632d3e634e3bc2cfc4426a7703cdfbddce3c"
+  "changelog": "v3.17.15: Star Sports back for real — official Jio streams (all Star/Sports18/Eurosport), auto-failover to mirrors, deeper live buffer, channels refresh on every app open, search keyboard flow fixed.",
+  "sha256": "68466cb0d253d3d31a9f8433df6ed28926e9805325df8b1ef1ce2e2f1e0a1dba"
 }

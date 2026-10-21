@@ -302,6 +302,28 @@ export function playInNativePlayer(url, title, isLive, fallbackUrls = [], startP
     // but was never called — the list was built in App.jsx and dropped here.
     if (Array.isArray(channels) && channels.length > 0 && typeof api.playLiveStreamWithChannels === 'function') {
       const channelsJson = JSON.stringify(channels);
+      // v3.17.15: the tapped channel may carry ClearKey + headers (jio Cookie)
+      // — forward them so the native player opens DRM channels directly.
+      const cur = channels[channelIndex] || {};
+      const hasDrm = cur.drm && Array.isArray(cur.drm.keys) && cur.drm.keys.length > 0;
+      const hasHdrs = cur.headers && Object.keys(cur.headers).length > 0;
+      const drmJson = (hasDrm || hasHdrs)
+        ? JSON.stringify({ ...(hasDrm ? { keys: cur.drm.keys } : {}), ...(hasHdrs ? { headers: cur.headers } : {}) })
+        : '';
+      if (drmJson && typeof api.playLiveStreamWithChannelsAndDrm === 'function') {
+        api.playLiveStreamWithChannelsAndDrm(
+          String(url),
+          String(title || (isLive ? 'Live Channel' : 'Video Stream')),
+          Boolean(isLive),
+          urlsJson,
+          Number(startPositionMs) || 0,
+          channelsJson,
+          Number(channelIndex) || 0,
+          drmJson
+        );
+        nativePlaybackActive = true;
+        return true;
+      }
       api.playLiveStreamWithChannels(
         String(url),
         String(title || (isLive ? 'Live Channel' : 'Video Stream')),

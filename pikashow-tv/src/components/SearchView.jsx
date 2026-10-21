@@ -190,6 +190,20 @@ export function SearchView({ onSelectItem, initialQuery }) {
           onKeyDown={(e) => {
             if (e.key === 'ArrowDown') return; // fall through to spatial nav
             if (e.key === 'Backspace' || e.key === 'Delete') e.stopPropagation();
+            // v3.17.15: the TV IME eats D-pad keys while open — Enter submits,
+            // dismisses the keyboard, and lands focus on the first result.
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              commitSearch(query);
+              try { inputRef.current?.blur(); } catch {}
+              setTimeout(() => {
+                try {
+                  const first = document.querySelector('.tv-search-container .tv-rail .tv-card')
+                    || document.querySelector('.tv-search-container .tv-cat-btn');
+                  first?.focus({ preventScroll: true });
+                } catch {}
+              }, 150);
+            }
           }}
           tabIndex={0}
           style={{ flex: 1 }}

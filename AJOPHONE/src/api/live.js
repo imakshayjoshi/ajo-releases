@@ -75,6 +75,10 @@ export function isPopularLiveChannel(raw) {
 
 export function normalizeLiveChannel(raw) {
   if (!raw || !raw.url) return null;
+  // v3.9.8: the phone's web player is HLS-only — DASH/ClearKey channels
+  // (jio) can't play here, so they're left to the TV's native player.
+  if (String(raw.kind || 'hls').toLowerCase() === 'dash') return null;
+  if (raw.drm) return null;
   const name = String(raw.name || 'Live Channel').trim();
   return {
     id: raw.id || name.toLowerCase().replace(/\s+/g, '-'),

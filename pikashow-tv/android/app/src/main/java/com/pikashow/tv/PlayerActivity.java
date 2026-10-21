@@ -352,6 +352,10 @@ public class PlayerActivity extends AppCompatActivity {
         public String logo;
         public String category;
         public int channelNumber;
+        // v3.17.15: per-channel ClearKey + headers (jio Cookie) so channel
+        // zapping carries each channel's own DRM, not just the first opened.
+        public List<String[]> drmKeys = null;
+        public Map<String, String> headers = null;
 
         public LiveChannelItem(String title, String url, List<String> fallbacks, String logo, String category, int channelNumber) {
             this.title = title != null ? title : "Live Channel";
@@ -389,7 +393,34 @@ public class PlayerActivity extends AppCompatActivity {
                             }
                         }
                         if (!TextUtils.isEmpty(u)) {
-                            liveChannelsList.add(new LiveChannelItem(t, u, fbs, logo, cat, chNum));
+                            LiveChannelItem lci = new LiveChannelItem(t, u, fbs, logo, cat, chNum);
+                            try {
+                                JSONObject drmObj = obj.optJSONObject("drm");
+                                if (drmObj != null) {
+                                    JSONArray keys = drmObj.optJSONArray("keys");
+                                    if (keys != null && keys.length() > 0) {
+                                        List<String[]> pairs = new ArrayList<>();
+                                        for (int j = 0; j < keys.length(); j++) {
+                                            JSONArray pair = keys.optJSONArray(j);
+                                            if (pair != null && pair.length() >= 2) {
+                                                pairs.add(new String[]{pair.optString(0), pair.optString(1)});
+                                            }
+                                        }
+                                        if (!pairs.isEmpty()) lci.drmKeys = pairs;
+                                    }
+                                }
+                                JSONObject hdrObj = obj.optJSONObject("headers");
+                                if (hdrObj != null) {
+                                    Map<String, String> hdrs = new HashMap<>();
+                                    for (java.util.Iterator<String> it = hdrObj.keys(); it.hasNext(); ) {
+                                        String k = it.next();
+                                        String v = hdrObj.optString(k, "");
+                                        if (!TextUtils.isEmpty(k) && !TextUtils.isEmpty(v)) hdrs.put(k, v);
+                                    }
+                                    if (!hdrs.isEmpty()) lci.headers = hdrs;
+                                }
+                            } catch (Exception ignored) {}
+                            liveChannelsList.add(lci);
                         }
                     }
                 }
@@ -440,6 +471,8 @@ public class PlayerActivity extends AppCompatActivity {
     // surface but kept the same broken decoder, so SD/interlaced live channels
     // (Star Sports relay etc.) could never play on Realtek boxes.
     private boolean forceSoftwareDecoder = false;
+    private long lastLiveResyncAt = 0;
+    private int liveResyncStreak = 0;
     // v3.10.0: web-engine (iframe/embed) load watchdog. A dead mirror or a
     // hung Cloudflare interstitial never finishes loading, so the spinner
     // used to spin forever. After WEB_LOAD_TIMEOUT_MS we fail over.
@@ -2120,6 +2153,11 @@ public class PlayerActivity extends AppCompatActivity {
             }
         }
         currentServerIdx = 0;
+        // v3.17.15: apply this channel's own DRM keys + headers (or clear a
+        // previous DRM channel's) before building the player.
+        drmKeyPairs = item.drmKeys;
+        streamHeaders = item.headers;
+        forceSoftwareDecoder = false;
         applyStreamMetadataToUi();
         playCurrentStream();
     }
@@ -2727,10 +2765,10 @@ public class PlayerActivity extends AppCompatActivity {
             DefaultLoadControl loadControl = new DefaultLoadControl.Builder()
                     .setAllocator(new androidx.media3.exoplayer.upstream.DefaultAllocator(true, 64 * 1024))
                     .setBufferDurationsMs(
-                            /* minBufferMs= */ isLive ? 3500 : 25000,
-                            /* maxBufferMs= */ isLive ? 15000 : 50000,
-                            /* bufferForPlaybackMs= */ isLive ? 1000 : 2500,
-                            /* bufferForPlaybackAfterRebufferMs= */ isLive ? 2000 : 5000)
+                            /* minBufferMs= */ isLive ? 10000 : 25000,
+                            /* maxBufferMs= */ isLive ? 60000 : 50000,
+                            /* bufferForPlaybackMs= */ isLive ? 3000 : 2500,
+                            /* bufferForPlaybackAfterRebufferMs= */ isLive ? 6000 : 5000)
                     // v3.12.49 FIX (the whole-stick freeze): cap the buffer to
                     // the device's RAM class. Uncapped default target can exceed
                     // 200MB on 1080p streams; with the resident WebView +
@@ -2829,6 +2867,13 @@ public class PlayerActivity extends AppCompatActivity {
                     new MediaItem.LiveConfiguration.Builder()
                             .setMinPlaybackSpeed(1.0f)
                             .setMaxPlaybackSpeed(1.0f)
+                            // v3.17.13: hold 10s behind the live edge (default
+                            // ~3s). Congested free relays starve in bursts —
+                            // a deeper target offset rides them out instead of
+                            // freezing on a stale frame.
+                            .setTargetOffsetMs(10000)
+                            .setMinOffsetMs(6000)
+                            .setMaxOffsetMs(60000)
                             .build());
         }
         // v3.13.0 (ported from the Fire TV line v3.12.64): ClearKey DRM —
@@ -3117,6 +3162,10 @@ public class PlayerActivity extends AppCompatActivity {
         uiHandler.removeCallbacks(firstFrameWatchdog);
         if (currentServerIdx + 1 < serverQueue.size()) {
             currentServerIdx++;
+            // v3.17.15: mirrors are plain HLS — the failed primary's ClearKey
+            // config/cookies must not bleed into them.
+            drmKeyPairs = null;
+            streamHeaders = null;
             uiHandler.post(() -> {
                 String name = getServerDisplayName(serverQueue.get(currentServerIdx), currentServerIdx);
                 Toast.makeText(PlayerActivity.this, "Auto-switching to " + name + "...", Toast.LENGTH_SHORT).show();
@@ -3188,10 +3237,31 @@ public class PlayerActivity extends AppCompatActivity {
             }
 
             if (isLive) {
+                // v3.17.15: a hard HTTP failure (404/410/403 on the manifest)
+                // means this server is DEAD — resyncing it loops forever.
+                // Fail over to the next server (mirror) instead.
+                boolean hardHttpDead = error.errorCode == PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS
+                        || error.errorCode == PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND
+                        || error.errorCode == PlaybackException.ERROR_CODE_IO_NO_PERMISSION;
+                if (hardHttpDead && currentServerIdx + 1 < serverQueue.size()) {
+                    Log.w(TAG, "Live server hard-dead (" + error.errorCode + "), failing over to mirror");
+                    failoverToNextServer();
+                    return;
+                }
                 // Live channels: re-sync to live broadcast edge without burning through server queue
                 Log.w(TAG, "Live channel error (" + error.errorCode + "), resyncing to live broadcast...");
                 if (player != null) {
                     try {
+                        // v3.17.13 rev2: this relay rotates segment tokens fast
+                        // (1002/2008 every ~10s) — a seek inside the stale source
+                        // loops forever. Rebuild the media source (fresh
+                        // manifest+tokens) on every such error, max 1 per 4s.
+                        long now = System.currentTimeMillis();
+                        if (now - lastLiveResyncAt > 4000) {
+                            lastLiveResyncAt = now;
+                            Log.w(TAG, "Live window slipped — rebuilding media source fresh");
+                            player.setMediaSource(buildMediaSource(streamUrl));
+                        }
                         player.seekToDefaultPosition();
                         player.prepare();
                         player.play();
