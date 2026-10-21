@@ -3,7 +3,7 @@ import { getBollywoodCatalog, getHollywoodCatalog, getSerialsCatalog, getLiveBro
 import { getLiveChannels, isPopularLiveChannel, classifyLiveChannel, hasWorkingPlayer, applyLiveSourceOverride, probeLiveChannels, guessLiveLogo } from './api/live';
 import { LiveView } from './components/LiveView';
 import { getLiveSportsEvents } from './api/sports';
-import { getWatchHistory, saveProgress, getWatchProgress, filterAliveItems } from './api/history';
+import { getWatchHistory, saveProgress, getWatchProgress, filterAliveItems, syncContinueToNative } from './api/history';
 import { runStreamHealthSweep } from './utils/streamHealth';
 import { checkForAppUpdates } from './api/otaUpdate';
 import { getTmdbTrending, getTmdbCatalog, getTmdbCatalogDeep, getTmdbNowPlaying, getBecauseYouWatched } from './api/tmdb';
@@ -624,6 +624,8 @@ export default function App() {
     const dl = consumeDeepLink();
     if (dl) routeDeepLink(dl);
     onDeepLink((link) => routeDeepLink(link));
+    // Seed the Home rail with the existing watch history on every app start.
+    syncContinueToNative();
   }, [routeDeepLink]);
 
   // Global Remote Back Handler

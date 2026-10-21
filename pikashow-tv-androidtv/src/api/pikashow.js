@@ -146,7 +146,7 @@ function readCachedCatalog() {
   return null;
 }
 
-async function loadCatalog() {
+export async function loadCatalog() {
   const cached = readCachedCatalog();
   if (cached) return cached;
 
