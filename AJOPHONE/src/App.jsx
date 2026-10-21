@@ -62,6 +62,7 @@ export default function App() {
   
   // OTA Update Startup Notice State
   const [otaNotice, setOtaNotice] = useState(null);
+  const [otaDismissed, setOtaDismissed] = useState(false);
   const [isUpdatingOta, setIsUpdatingOta] = useState(false);
   const [otaProgress, setOtaProgress] = useState(0);
 
@@ -71,6 +72,9 @@ export default function App() {
       checkForAppUpdates('phone', false).then(info => {
         if (info && info.hasUpdate) {
           setOtaNotice(info);
+          // v3.9.10: the nudge auto-dismisses after 12s — it never parks on
+          // top of the header anymore; the update stays in Settings.
+          setTimeout(() => { setOtaDismissed(true); setOtaNotice(null); }, 12000);
         }
       }).catch(() => {});
     }, 1500);
@@ -846,57 +850,55 @@ export default function App() {
         />
       )}
 
-      {/* Sleek Floating Startup App Update Notification */}
-      {otaNotice && otaNotice.hasUpdate && (
+      {/* v3.9.10: update nudge — slim bottom pill above the nav bar, NOT a
+          top overlay that covered the whole header. Auto-dismisses after
+          12s; the update stays available in Settings. */}
+      {otaNotice && otaNotice.hasUpdate && !otaDismissed && (
         <div 
           className="ota-update-banner"
           style={{
             position: 'fixed',
-            top: '14px',
+            bottom: '78px',
             left: '50%',
             transform: 'translateX(-50%)',
-            zIndex: 9999,
+            zIndex: 800,
             width: 'calc(100% - 28px)',
-            maxWidth: '520px',
-            background: 'rgba(10, 15, 29, 0.96)',
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)',
-            border: '1.5px solid rgba(56, 189, 248, 0.6)',
-            borderRadius: '18px',
-            padding: '10px 14px',
+            maxWidth: '420px',
+            background: 'rgba(22, 26, 34, 0.97)',
+            border: '1px solid rgba(0, 187, 127, 0.4)',
+            borderRadius: '12px',
+            padding: '10px 12px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            gap: '12px',
-            boxShadow: '0 12px 36px rgba(0, 0, 0, 0.85), 0 0 24px rgba(56, 189, 248, 0.3)',
-            animation: 'slideDown 0.3s ease-out'
+            gap: '10px',
+            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.6)'
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
             <div style={{
-              width: '36px',
-              height: '36px',
-              borderRadius: '10px',
-              background: 'linear-gradient(135deg, #00875f 0%, #00BB7F 100%)',
+              width: '32px',
+              height: '32px',
+              borderRadius: '9px',
+              background: 'linear-gradient(135deg, #00BB7F 0%, #00875F 100%)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              flexShrink: 0,
-              boxShadow: '0 4px 12px rgba(56, 189, 248, 0.4)'
+              flexShrink: 0
             }}>
-              <Rocket size={18} color="#06090e" />
+              <Rocket size={16} color="#0f1014" />
             </div>
             <div style={{ minWidth: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span style={{ fontSize: '13px', fontWeight: 900, color: '#fff' }}>
+                <span style={{ fontSize: '12px', fontWeight: 900, color: '#fff' }}>
                   Update Available
                 </span>
-                <span style={{ fontSize: '10px', fontWeight: 800, padding: '1px 6px', borderRadius: '8px', background: '#22c55e', color: '#06090e' }}>
+                <span style={{ fontSize: '10px', fontWeight: 800, padding: '1px 6px', borderRadius: '6px', background: 'rgba(0,187,127,0.2)', color: '#00BB7F', border: '1px solid rgba(0,187,127,0.4)' }}>
                   v{otaNotice.latestVersion}
                 </span>
               </div>
               <p style={{ fontSize: '11px', color: '#94a3b8', margin: '2px 0 0 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {isUpdatingOta ? `Downloading APK: ${otaProgress}%` : `Tap Update Now to install new features & fixes`}
+                {isUpdatingOta ? `Downloading APK: ${otaProgress}%` : 'New features & fixes'}
               </p>
             </div>
           </div>
@@ -918,22 +920,21 @@ export default function App() {
                 );
               }}
               style={{
-                background: 'linear-gradient(135deg, #00BB7F 0%, #00875f 100%)',
-                color: '#06090e',
+                background: '#00BB7F',
+                color: '#0f1014',
                 border: 'none',
-                borderRadius: '12px',
-                padding: '7px 14px',
+                borderRadius: '8px',
+                padding: '7px 13px',
                 fontSize: '12px',
                 fontWeight: 900,
-                cursor: 'pointer',
-                boxShadow: '0 2px 10px rgba(56, 189, 248, 0.4)'
+                cursor: 'pointer'
               }}
             >
-              {isUpdatingOta ? `${otaProgress}%` : 'Update Now'}
+              {isUpdatingOta ? `${otaProgress}%` : 'Update'}
             </button>
 
             <button
-              onClick={() => setOtaNotice(null)}
+              onClick={() => { setOtaDismissed(true); setOtaNotice(null); }}
               style={{
                 background: 'transparent',
                 border: 'none',

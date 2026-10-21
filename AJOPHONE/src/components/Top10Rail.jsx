@@ -1,6 +1,5 @@
 import React from 'react';
 import { Film, Flame } from 'lucide-react';
-import { getSourceProvider } from '../utils/sourceProvider';
 
 export function Top10Rail({ title = "🔥 Top 10 in India Today", items = [], onSelectItem }) {
   if (!items || items.length === 0) return null;
@@ -45,13 +44,14 @@ export function Top10Rail({ title = "🔥 Top 10 in India Today", items = [], on
         touchAction: 'pan-x pan-y',
         padding: '0 16px 10px 16px',
         scrollSnapType: 'x mandatory',
-        scrollbarWidth: 'none'
+        scrollbarWidth: 'none',
+        // v3.9.10: first card's rank numeral no longer hangs off the left edge
+        scrollPaddingLeft: 16
       }}>
         {top10.map((item, index) => {
           const rank = index + 1;
           const poster = item.poster_url || item.poster || item.logo || '';
           const itemTitle = item.title_en || item.title || item.name || 'Untitled';
-          const provider = getSourceProvider(item);
 
           return (
             <div
@@ -69,17 +69,20 @@ export function Top10Rail({ title = "🔥 Top 10 in India Today", items = [], on
                 userSelect: 'none'
               }}
             >
-              {/* Massive Stylized Outlined Rank Number */}
-              <div className="mobile-top10-rank-number" style={{
-                fontSize: '94px',
+              {/* Netflix-style rank numeral — dark fill + VISIBLE gray
+                  outline (the v3.9.10 dark-on-dark stroke read as invisible);
+                  margin overlap kept inside the scroll padding so #1 never
+                  clips at the left edge. */}
+              <div className="mobile-top10-rank-number" aria-hidden="true" style={{
+                fontSize: '88px',
                 fontWeight: 900,
-                lineHeight: '0.8',
-                color: '#06090e',
-                WebkitTextStroke: '3px #596579',
-                marginRight: '-18px',
+                lineHeight: '0.78',
+                color: '#16181f',
+                WebkitTextStroke: '2.5px #5b6472',
+                marginRight: '-16px',
                 zIndex: 1,
-                fontFamily: 'Impact, sans-serif, system-ui',
-                letterSpacing: '-6px'
+                letterSpacing: '-4px',
+                flexShrink: 0
               }}>
                 {rank}
               </div>
@@ -89,11 +92,11 @@ export function Top10Rail({ title = "🔥 Top 10 in India Today", items = [], on
                 position: 'relative',
                 width: '125px',
                 aspectRatio: '2 / 3',
-                borderRadius: '8px',
+                borderRadius: '10px',
                 overflow: 'hidden',
-                background: '#111827',
-                border: '1px solid rgba(255, 255, 255, 0.15)',
-                boxShadow: '0 8px 24px rgba(0, 0, 0, 0.6)',
+                background: '#10101a',
+                border: '1px solid rgba(255, 255, 255, 0.10)',
+                boxShadow: '0 4px 16px rgba(0, 0, 0, 0.4)',
                 zIndex: 2
               }}>
                 {poster ? (
@@ -105,12 +108,12 @@ export function Top10Rail({ title = "🔥 Top 10 in India Today", items = [], on
                     referrerPolicy="no-referrer"
                   />
                 ) : (
-                  <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0f172a' }}>
+                  <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#10101a' }}>
                     <Film size={28} color="#00BB7F" />
                   </div>
                 )}
 
-                {/* Recently Added / Top 10 Badge */}
+                {/* Top 10 badge — TV parity red tag */}
                 <div style={{
                   position: 'absolute',
                   top: '6px',
@@ -124,23 +127,6 @@ export function Top10Rail({ title = "🔥 Top 10 in India Today", items = [], on
                   letterSpacing: '0.5px'
                 }}>
                   TOP 10
-                </div>
-
-                {/* Source Badge */}
-                <div style={{
-                  position: 'absolute',
-                  bottom: '6px',
-                  right: '6px',
-                  width: '20px',
-                  height: '20px',
-                  borderRadius: '5px',
-                  background: provider.color || '#00BB7F',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '10px'
-                }}>
-                  {provider.icon}
                 </div>
               </div>
             </div>

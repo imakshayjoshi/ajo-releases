@@ -100,19 +100,25 @@ export function HeroBanner({ featuredItem, featuredItems, onPlay, onSelectInfo, 
         );
       })}
 
-      {/* gradient into page bg */}
+      {/* gradient into page bg — a slate gradient under everything so the
+          hero is never a pure black void while poster art loads (v3.9.10) */}
+      <div style={{
+        position: 'absolute', inset: 0,
+        background: 'linear-gradient(180deg, #171a22 0%, #131519 55%, #0f1014 100%)',
+        pointerEvents: 'none', zIndex: 1
+      }} />
       <div style={{
         position: 'absolute',
         inset: 0,
         background: 'linear-gradient(180deg, rgba(15,16,20,0.08) 0%, rgba(15,16,20,0.18) 40%, rgba(15,16,20,0.78) 74%, #0f1014 100%)',
-        pointerEvents: 'none'
+        pointerEvents: 'none', zIndex: 2
       }} />
 
       <div style={{ position: 'relative', zIndex: 3, padding: '0 18px 22px', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left' }}>
         {/* badge (tv-hero-badge) */}
         <span style={{
           display: 'inline-flex', alignItems: 'center', gap: 6,
-          background: '#00BB7F', color: '#0f1014',
+          background: '#E50914', color: '#fff',
           fontSize: 11, fontWeight: 900, textTransform: 'uppercase',
           padding: '3px 10px', borderRadius: 4, marginBottom: 10, letterSpacing: 0.8
         }}>
@@ -155,7 +161,7 @@ export function HeroBanner({ featuredItem, featuredItems, onPlay, onSelectInfo, 
               display: 'inline-flex', alignItems: 'center', gap: 8,
               padding: '12px 26px', background: '#00BB7F', color: '#0f1014',
               fontWeight: 800, fontSize: 15, borderRadius: 8, border: 'none',
-              cursor: 'pointer', boxShadow: '0 4px 16px rgba(0,187,127,0.4)'
+              cursor: 'pointer'
             }}
           >
             <Play size={17} fill="#0f1014" /> Play

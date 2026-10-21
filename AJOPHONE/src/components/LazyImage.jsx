@@ -87,6 +87,7 @@ export function LazyImage({
           src={src}
           alt={alt}
           referrerPolicy="no-referrer"
+          draggable={false}
           onLoad={handleLoad}
           onError={handleError}
           style={{

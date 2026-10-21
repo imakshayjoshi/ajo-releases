@@ -1,12 +1,9 @@
 import React, { useState } from 'react';
-import { Star, Radio, Play, Tv } from 'lucide-react';
-import { getSourceProvider } from '../utils/sourceProvider';
-import { castEngine } from '../api/castSync';
+import { Star, Radio } from 'lucide-react';
 import { LazyImage } from './LazyImage';
 
 export const LandscapeMediaCard = React.memo(function LandscapeMediaCard({ item, onClick, onFocus }) {
   const [imgError, setImgError] = useState(false);
-  const [castSuccess, setCastSuccess] = useState(false);
 
   if (!item) return null;
 
@@ -14,19 +11,6 @@ export const LandscapeMediaCard = React.memo(function LandscapeMediaCard({ item,
   const rating = item.ratings?.mlab?.rating || item.ratings?.imdb?.rating;
   const isLive = item.is_live || item.type === 'live' || item.year === 'LIVE';
   const logo = item.logo || item.poster_url || item.poster || item.image || '';
-  const provider = getSourceProvider(item);
-
-  const handleCastDirectly = (e) => {
-    e.stopPropagation();
-    castEngine.castMedia(item, {
-      server: item.players?.[0] || item.player?.[0] || (item.url ? { url: item.url, source: 'm3u8' } : null)
-    }).catch(() => {});
-    setCastSuccess(true);
-    setTimeout(() => setCastSuccess(false), 2500);
-    if (navigator.vibrate) {
-      try { navigator.vibrate([40, 30, 40]); } catch (_) {}
-    }
-  };
 
   return (
     <div
@@ -40,9 +24,9 @@ export const LandscapeMediaCard = React.memo(function LandscapeMediaCard({ item,
         aspectRatio: '16 / 9',
         borderRadius: '12px',
         overflow: 'hidden',
-        background: '#111827',
-        border: '1px solid rgba(255, 255, 255, 0.12)',
-        boxShadow: '0 4px 14px rgba(0, 0, 0, 0.6)'
+        background: '#10101a',
+        border: '1px solid rgba(255, 255, 255, 0.10)',
+        boxShadow: '0 4px 16px rgba(0, 0, 0, 0.4)'
       }}>
         {!imgError && logo ? (
           <LazyImage
@@ -63,84 +47,20 @@ export const LandscapeMediaCard = React.memo(function LandscapeMediaCard({ item,
 
         <div className="mobile-card-gradient" style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.1) 0%, transparent 40%, rgba(0,0,0,0.85) 100%)', pointerEvents: 'none' }} />
 
-        {/* Live Badge */}
+        {/* Live Badge — TV parity red tag */}
         <div className="mobile-live-badge" style={{
           position: 'absolute',
           top: '6px',
           left: '6px',
-          background: 'rgba(239, 68, 68, 0.95)',
+          background: '#E50914',
           padding: '2px 6px',
-          borderRadius: '5px',
+          borderRadius: '4px',
           display: 'flex',
           alignItems: 'center',
           gap: '4px'
         }}>
           <span className="mobile-live-dot" style={{ width: '4px', height: '4px', background: '#fff', borderRadius: '50%' }} />
-          <span style={{ fontSize: '9px', fontWeight: 900, color: '#fff' }}>LIVE</span>
-        </div>
-
-        {/* 1-Tap Play on TV Button */}
-        <button
-          onClick={handleCastDirectly}
-          className="mobile-card-tv-cast-btn"
-          title="Play on TV"
-          style={{
-            position: 'absolute',
-            top: '6px',
-            right: '6px',
-            width: '28px',
-            height: '28px',
-            borderRadius: '50%',
-            background: castSuccess ? 'rgba(34, 197, 94, 0.95)' : 'rgba(15, 23, 42, 0.85)',
-            backdropFilter: 'blur(8px)',
-            border: castSuccess ? '1px solid rgba(74, 222, 128, 0.8)' : '1px solid rgba(255, 255, 255, 0.25)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer',
-            zIndex: 30,
-            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.7)',
-            transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
-          }}
-        >
-          <Tv size={14} color={castSuccess ? '#ffffff' : '#00BB7F'} />
-        </button>
-
-        {/* Play Icon on Bottom */}
-        <div className="mobile-landscape-play-overlay" style={{
-          position: 'absolute',
-          bottom: '6px',
-          left: '6px',
-          width: '24px',
-          height: '24px',
-          borderRadius: '50%',
-          background: 'rgba(0, 187, 127, 0.9)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center'
-        }}>
-          <Play size={13} fill="#06090e" color="#06090e" style={{ marginLeft: '1px' }} />
-        </div>
-
-        {/* Broadcaster Badge */}
-        <div 
-          className="mobile-landscape-provider"
-          style={{
-            position: 'absolute',
-            bottom: '6px',
-            right: '6px',
-            width: '22px',
-            height: '22px',
-            borderRadius: '6px',
-            background: provider.color || '#00BB7F',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '11px',
-            boxShadow: '0 2px 6px rgba(0,0,0,0.6)'
-          }}
-        >
-          <span>{provider.icon}</span>
+          <span style={{ fontSize: '9px', fontWeight: 900, color: '#fff', letterSpacing: '0.5px' }}>LIVE</span>
         </div>
       </div>
 
@@ -169,8 +89,6 @@ export const LandscapeMediaCard = React.memo(function LandscapeMediaCard({ item,
           gap: '4px'
         }}>
           <span>{item.category || 'Live Channel'}</span>
-          <span>•</span>
-          <span>1080p HD</span>
         </div>
       </div>
     </div>

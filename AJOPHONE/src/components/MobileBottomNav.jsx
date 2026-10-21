@@ -1,6 +1,8 @@
 import React from 'react';
-import { Home, Film, Tv, Radio, Search, Cast, Download } from 'lucide-react';
+import { Home, Film, Tv, Radio, Search, Download } from 'lucide-react';
 
+// v3.9.10 TV parity: 6 tabs — TV Cast moved to the header (it was a header
+// button all along too); 7 tabs crammed labels at 390px.
 export function MobileBottomNav({ activeTab, onTabChange }) {
   const tabs = [
     { id: 'home', label: 'Home', icon: Home },
@@ -8,7 +10,6 @@ export function MobileBottomNav({ activeTab, onTabChange }) {
     { id: 'shows', label: 'Shows', icon: Tv },
     { id: 'downloads', label: 'Downloads', icon: Download },
     { id: 'epg', label: 'Live TV', icon: Radio },
-    { id: 'remote', label: 'TV Cast', icon: Cast },
     { id: 'search', label: 'Search', icon: Search },
   ];
 
@@ -49,7 +50,7 @@ export function MobileBottomNav({ activeTab, onTabChange }) {
               <span className="mobile-nav-label" style={{
                 color: isActive ? '#00BB7F' : '#94a3b8',
                 fontWeight: isActive ? 800 : 600,
-                fontSize: '10px'
+                fontSize: '11px'
               }}>
                 {tab.label}
               </span>

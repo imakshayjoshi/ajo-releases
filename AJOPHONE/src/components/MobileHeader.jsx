@@ -48,20 +48,19 @@ export function MobileHeader({ activeTab, onTabChange }) {
             onClick={() => onTabChange('home')}
             style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}
           >
-            {/* Netflix Stylized Red "A" Logo */}
+            {/* Brand mark — app green identity (v3.9.10: was Netflix red) */}
             <div style={{
               width: '28px',
               height: '32px',
-              background: 'linear-gradient(135deg, #E50914 0%, #B81D24 100%)',
-              borderRadius: '4px',
+              background: 'linear-gradient(135deg, #00BB7F 0%, #00875F 100%)',
+              borderRadius: '6px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               fontWeight: 900,
               fontSize: '18px',
-              color: '#ffffff',
-              fontFamily: 'Impact, sans-serif',
-              boxShadow: '0 2px 10px rgba(229, 9, 20, 0.5)'
+              color: '#0f1014',
+              letterSpacing: '-0.5px'
             }}>
               A
             </div>
@@ -75,14 +74,14 @@ export function MobileHeader({ activeTab, onTabChange }) {
                 AJO
               </span>
               <span style={{
-                color: '#ef4444',
+                color: '#00BB7F',
                 fontSize: '11px',
                 fontWeight: 900,
                 letterSpacing: '0.5px',
-                background: 'rgba(239, 68, 68, 0.18)',
+                background: 'rgba(0, 187, 127, 0.14)',
                 padding: '2px 6px',
                 borderRadius: '4px',
-                border: '1px solid rgba(239, 68, 68, 0.35)'
+                border: '1px solid rgba(0, 187, 127, 0.35)'
               }}>
                 PHONE
               </span>

@@ -72,9 +72,12 @@ html, body, #root {
   inset: 0;
   background-size: cover;
   background-position: center top;
-  opacity: 0.22;
-  transform: scale(1.05) translateZ(0);
-  will-change: background-image, opacity;
+  /* v3.9.10: dimmed — at 0.22 the baked-in poster TITLE text showed through
+     as stray floating words near the bottom nav. Blur added so it reads as
+     pure ambience, not content. */
+  opacity: 0.12;
+  filter: blur(22px) saturate(0.85);
+  transform: scale(1.08);
   transition: opacity 0.5s ease;
 }
 
@@ -148,8 +151,9 @@ html, body, #root {
   /* pan-x pan-y: rails + category chips inside must be swipeable horizontally */
   touch-action: pan-x pan-y !important;
   overscroll-behavior-y: contain;
-  transform: translateZ(0);
-  will-change: scroll-position;
+  /* v3.9.10: removed will-change:scroll-position + transform:translateZ(0) —
+     the composited scroll layer froze nested rail scrolling on some Android
+     WebViews. Plain scrolling is faster and actually scrolls. */
   scroll-behavior: auto !important;
   padding-bottom: 110px;
 }
@@ -165,7 +169,6 @@ html, body, #root {
   overflow-y: visible !important;
   touch-action: pan-x pan-y !important;
   -webkit-overflow-scrolling: touch !important;
-  transform: translateZ(0);
 }
 
 /* Horizontal scrolling rails on mobile */
@@ -183,7 +186,8 @@ html, body, #root {
   -webkit-overflow-scrolling: touch !important;
   touch-action: pan-x pan-y !important;
   overscroll-behavior-x: contain;
-  transform: translateZ(0);
+  /* v3.9.10: no translateZ(0) here — forced compositing on the scroll
+     container made Android WebView drop the touch scroll region. */
   scroll-behavior: auto !important;
   padding: 0 16px;
   scrollbar-width: none;
@@ -208,6 +212,14 @@ html, body, #root {
   transform: translateZ(0);
   backface-visibility: hidden;
   touch-action: manipulation;
+}
+
+/* v3.9.10: Android WebView treats a swipe that starts ON an image as an
+   image DRAG, not a scroll — every rail card is a poster, so rails felt
+   frozen. Kill image dragging app-wide. */
+img {
+  -webkit-user-drag: none;
+  user-select: none;
 }
 
 /* Google TV Top Header Navigation Bar */
