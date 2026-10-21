@@ -34,18 +34,18 @@
     "releaseDate": "2026-10-21"
   },
   "android_tv": {
-    "version": "3.17.8",
-    "versionCode": 264,
+    "version": "3.17.9",
+    "versionCode": 265,
     "packageId": "com.ajo.androidtv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
-    "changelog": "v3.17.8: search rebuilt — full-width results grouped into Movies / Series / Live TV / Anime / YouTube rails, no on-screen keyboard (the TV's own keyboard opens), results appear faster.",
+    "changelog": "v3.17.9: fix — the app instantly closed on some TVs (a phantom key storm counted as Back). Also one app icon only now.",
     "size_mb": 7.1,
-    "sha256": "4758234f102024efb513ec176ee2e6b4f106a451fc11d6d7786786464a80fdc5",
+    "sha256": "70f3d3a61cb601f9c099f6c65f808c576134e2b642aeee73608f060395f5c075",
     "releaseDate": "2026-10-21",
-    "size": 7485702
+    "size": 7485552
   },
   "changelog": "v3.17.9: fix — the app instantly closed on some TVs (a phantom key storm counted as Back). Also one app icon only now.",
   "sha256": "49cc7f1f2d59254682a3366b929c857866678ef0cd99125295b0573cb4fefd5f"
