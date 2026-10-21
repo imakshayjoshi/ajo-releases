@@ -16,7 +16,7 @@
  */
 
 const LIVE_URL = 'https://new.ajo.co.in/live/channels.json';
-const CACHE_KEY = 'ajo_live_channels_v4';
+const CACHE_KEY = 'ajo_live_channels_v5';
 const TTL = 10 * 60 * 1000; // 10 min client cache (server refreshes 15 min)
 
 /**
@@ -29,38 +29,59 @@ const TTL = 10 * 60 * 1000; // 10 min client cache (server refreshes 15 min)
  *   - Discovery, Epic, Animal Planet, Nat Geo, History
  *   - Entertainment & movies: Marathi, Hindi, English only
  */
-export const KEEP_CHANNEL_PATTERNS = [
-  // Star family
-  'star plus', 'star bharat', 'star pravah', 'star gold', 'star utsav',
-  'star movies', 'star world', 'star sports', 'star cricket', 'star suvarna',
-  // Sony family (all incl. sports)
-  'sony', 'set hd', 'set india', 'ten 1', 'ten 2', 'ten 3', 'ten 4', 'ten 5',
-  'sony sports', 'sony ten', 'sony six', 'sony wah', 'sony max', 'sony pal',
-  'sony sab', 'sony pix', 'sony yay', 'sony bbc earth', 'sony marathi',
-  // ESPN
-  'espn',
-  // Colors family
-  'colors',
-  // Zee family (incl. &tv/&pictures which are Zee brands)
-  'zee', '&tv', '&pictures', 'and tv', 'andpictures',
-  // Hindi / Marathi / English news
-  'aaj tak', 'ndtv', 'republic', 'abp', 'tv9', 'india today', 'times now',
-  'news18', 'wion', 'dd news', 'dd india', 'dd national', 'mirror now',
-  'news9', 'news 9', 'india tv', 'newsx', 'lokmat', 'saam tv', 'jai maharashtra',
-  'zee 24 taas', 'zee business', 'zee news', 'zee hindustan',
-  // Infotainment / documentary
-  'discovery', 'animal planet', 'national geographic', 'nat geo', 'history tv',
-  'epic', 'sony bbc earth', 'travelxp', 'tlc', 'discovery turbo', 'discovery science',
-  // Entertainment & movies (Marathi / Hindi / English)
-  'zee cinema', 'zee marathi', 'zee anmol', 'zee talkies', 'zee studio',
-  'zee cafe', 'zee classic', 'zee action', 'zee lf', 'goldmines', 'dangal',
-  'enter10', 'enterr10', 'manoranjan', 'shemaroo', 'b4u', '9x', 'fakt marathi',
-  'sangeet marathi', 'movies now', 'mn+', 'mn+', 'sony max 2', 'picture',
-  'star gold', 'star utsav', 'hungama', 'pogo', 'cartoon network', 'nickelodeon',
-  'nick', 'sonic', 'disney', 'colors cineplex', 'colors infinity', 'colors rishtey',
-  'colors marathi', 'colours', 'rishtey', 'utv movies', 'utv action',
-  'hindi cinema', 'bollywood', 'marathi', 'sony pix'
-];
+// v3.17.6: the user's explicit live-TV whitelist (Oct 21 2026) — replaces the
+// loose pattern list. Exact channel names, SD/HD variants kept via core-name
+// matching, Marathi/Hindi/English only (regional feeds dropped by the guards
+// below). Names are squashed (lowercase, no spaces/symbols) for matching.
+const LIVE_WHITELIST_RAW = `
+star sports 1|star sports 2|star sports 3|star sports select 1|star sports select 2|star sports 1 hindi|star sports 2 hindi|star sports khel|star sports 1 marathi|sports18 1|sports18 2|sports18 3|sports18 khel|sony sports ten 1|sony sports ten 2|sony sports ten 3|sony sports ten 5|eurosport|dd sports
+star pravah|zee marathi|colors marathi|sony marathi|sun marathi|dd sahyadri
+zee talkies|pravah picture|zee chitramandir|shemaroo marathibana|fakt marathi|chumbak tv
+abp majha|tv9 marathi|zee 24 taas|news18 lokmat|saam tv|ndtv marathi|jai maharashtra|lokshahi marathi|pudhari news
+9x jhakaas|sangeet marathi|maiboli
+star plus|sony entertainment television|set|sony sab|colors tv|zee tv|&tv|and tv|star bharat|dangal|dangal 2|sony pal|zee anmol|colors rishtey|star utsav|shemaroo umang|shemaroo tv|big magic|ishara tv|nazara tv|dd national|mtv india|good times
+zee cafe|colors infinity
+sony max|sony max 2|sony wah|star gold|star gold 2|star gold romance|star gold thrills|stargold select|star utsav movies|zee cinema|zee classic|zee action|zee bollywood|zee anmol cinema|&pictures|and pictures|&xplor hd|colors cineplex|colors cineplex bollywood|colors cineplex superhits|goldmines|goldmines bollywood|goldmines movies|b4u movies|b4u kadak|manoranjan tv
+star movies|star movies select|sony pix|&flix|and flix|&prive hd|movies now|mnx|mn+ hd|romedy now
+9xm|mastiii|mtv beats|b4u music|zoom|zing|sony mix|showbox|e24|vh1|9xo
+discovery channel|animal planet|discovery science|discovery turbo|investigation discovery|national geographic|nat geo|nat geo wild|history tv18|sony bbc earth|epic tv|tlc|fox life|travelxp
+cartoon network|pogo|nickelodeon|nick|sonic|nick jr|disney channel|disney junior|hungama tv|super hungama|sony yay|discovery kids|gubbare|etv bal bharat|cbeebies
+aaj tak|abp news|india tv|ndtv india|republic bharat|news18 india|zee news|times now navbharat|good news today|news24|news nation|bharat24|dd news|sansad tv|cnbc awaaz|zee business|et now swadesh|ndtv profit hindi
+times now|republic tv|india today|cnn-news18|ndtv 24x7|mirror now|wion|dd india|bbc world news|cnn international|al jazeera english|cnbc-tv18|et now|ndtv profit
+`;
+
+function squashLiveName(name) {
+  return String(name || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9+& ]/g, ' ')
+    .replace(/\b(hd|fhd|sd|uhd|4k|india|in|\+1|live)\b/g, ' ')
+    .replace(/[^a-z0-9+]/g, '') // squash: drop spaces + & (kept + for mn+)
+    .trim();
+}
+
+const LIVE_WHITELIST = new Set(
+  LIVE_WHITELIST_RAW.split(/[|\n]/)
+    .map((w) => squashLiveName(w))
+    .filter(Boolean)
+);
+
+// feed-name aliases whose squash differs from the whitelist entry
+const LIVE_WHITELIST_ALIASES = {
+  ndtvgoodtimes: 'goodtimes',
+};
+
+function isWhitelistedLiveName(rawName) {
+  const sq = squashLiveName(rawName);
+  if (!sq) return false;
+  if (LIVE_WHITELIST.has(sq)) return true;
+  // alias: whitelist contains the alias target squashed
+  for (const [from, to] of Object.entries(LIVE_WHITELIST_ALIASES)) {
+    if (sq === from && LIVE_WHITELIST.has(to)) return true;
+  }
+  return false;
+}
+
+
 
 /**
  * v3.12.70: the Sony feed logos point at sonypicturesnetworks.com which 403s
@@ -404,12 +425,12 @@ export function isPopularLiveChannel(raw) {
   // Foreign/geo variants and non-Indian Pluto/other-region feeds
   if (/al jazeera|czech|romania|russia|español|espanol|pluto tv|mbc bollywood|afroland|nagaland|travelxp russia|south flix|zee one\b/.test(name)) return false;
   // v3.12.71: Spanish/European league feeds leaking into Sports via iptv-org sports.m3u
-  if (/movistar|liga de campeones|deportes|plus\+|gol|teledeporte|liga/.test(name)) return false;
+  if (/movistar|liga de campeones|deportes|plus\+|\bgol\b|teledeporte|liga/.test(name)) return false;
   // Regional state channels (not Hindi/Marathi/English national news)
   if (/news18 kerala|news18 punjab|news18 rajasthan|news18 uttar pradesh|zee punjab|zee uttar pradesh|zee rajasthan|zee cinemalu|zee cinema apac/.test(name)) return false;
   // Language guard: non Hindi/Marathi/English channels are out even if brand matches
   if (lang && !/^(hin|hi|hindi|mar|mr|marathi|eng|en|english)/.test(lang)) return false;
-  return KEEP_CHANNEL_PATTERNS.some((p) => name.includes(p));
+  return isWhitelistedLiveName(raw.name || raw.title || raw.title_en || '');
 }
 
 /**
