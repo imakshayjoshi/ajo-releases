@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "version": "3.17.9",
-  "versionCode": 265,
+  "version": "3.17.10",
+  "versionCode": 266,
   "releaseDate": "2026-10-21",
   "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
   "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
@@ -20,33 +20,33 @@
     "size": 3704572
   },
   "tv": {
-    "version": "3.17.9",
-    "versionCode": 265,
+    "version": "3.17.10",
+    "versionCode": 266,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
-    "changelog": "v3.17.9: fix — the app instantly closed on some TVs (a phantom key storm counted as Back). Also one app icon only now.",
+    "changelog": "v3.17.10: sports fixed — Star Sports Select 1/2 HD, Star Sports 2, Sony Ten 1/2/3/5, DD Sports, Eurosport, Willow and more. Every sports channel tested live; dead ones removed.",
     "size_mb": 7.1,
-    "sha256": "49cc7f1f2d59254682a3366b929c857866678ef0cd99125295b0573cb4fefd5f",
-    "size": 7472801,
+    "sha256": "220d0f3e0c639f9eb2e47b8518d19891b774aac8986ddf194bdcac39932fbc42",
+    "size": 7472544,
     "releaseDate": "2026-10-21"
   },
   "android_tv": {
-    "version": "3.17.9",
-    "versionCode": 265,
+    "version": "3.17.10",
+    "versionCode": 266,
     "packageId": "com.ajo.androidtv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
-    "changelog": "v3.17.9: fix — the app instantly closed on some TVs (a phantom key storm counted as Back). Also one app icon only now.",
+    "changelog": "v3.17.10: sports fixed — Star Sports Select 1/2 HD, Star Sports 2, Sony Ten 1/2/3/5, DD Sports, Eurosport, Willow and more. Every sports channel tested live; dead ones removed.",
     "size_mb": 7.1,
-    "sha256": "70f3d3a61cb601f9c099f6c65f808c576134e2b642aeee73608f060395f5c075",
+    "sha256": "2432bac8c495271e461b8df8ebef0a3c9f2309c8d6570b1c7c52c6251e666dce",
     "releaseDate": "2026-10-21",
-    "size": 7485552
+    "size": 7485299
   },
-  "changelog": "v3.17.9: fix — the app instantly closed on some TVs (a phantom key storm counted as Back). Also one app icon only now.",
-  "sha256": "49cc7f1f2d59254682a3366b929c857866678ef0cd99125295b0573cb4fefd5f"
+  "changelog": "v3.17.10: sports fixed — Star Sports Select 1/2 HD, Star Sports 2, Sony Ten 1/2/3/5, DD Sports, Eurosport, Willow and more. Every sports channel tested live; dead ones removed.",
+  "sha256": "220d0f3e0c639f9eb2e47b8518d19891b774aac8986ddf194bdcac39932fbc42"
 }

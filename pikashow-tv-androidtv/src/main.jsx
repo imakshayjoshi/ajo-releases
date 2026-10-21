@@ -61,7 +61,7 @@ class ErrorBoundary extends React.Component {
       } else {
         window.location.reload();
       }
-    } else if (e.key === 'Escape' || e.key === 'Backspace' || e.keyCode === 27 || e.keyCode === 8) {
+    } else if (e.key === 'Escape' || e.keyCode === 27) {
       if (window.AndroidNativePlayer?.exitApp) {
         window.AndroidNativePlayer.exitApp();
       } else {
