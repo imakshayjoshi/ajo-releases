@@ -1,7 +1,10 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { Film, Flame } from 'lucide-react';
+import { useTouchDragScroll } from '../hooks/useTouchDragScroll';
 
 export function Top10Rail({ title = "🔥 Top 10 in India Today", items = [], onSelectItem }) {
+  const scrollRef = useRef(null);
+  useTouchDragScroll(scrollRef); // v3.9.12: manual drag scroll
   if (!items || items.length === 0) return null;
 
   const top10 = items.slice(0, 10);
@@ -34,7 +37,7 @@ export function Top10Rail({ title = "🔥 Top 10 in India Today", items = [], on
         </div>
       </div>
 
-      <div className="mobile-top10-scroll" style={{
+      <div ref={scrollRef} className="mobile-top10-scroll" style={{
         position: 'relative',
         zIndex: 20,
         display: 'flex',
@@ -43,7 +46,7 @@ export function Top10Rail({ title = "🔥 Top 10 in India Today", items = [], on
         WebkitOverflowScrolling: 'touch',
         touchAction: 'pan-x pan-y',
         padding: '0 16px 10px 16px',
-        scrollSnapType: 'x mandatory',
+        scrollSnapType: 'x proximity', // v3.9.12: was 'x mandatory' — mandatory snap fought the drag-scroll momentum and could snap BACK after a swipe
         scrollbarWidth: 'none',
         // v3.9.10: first card's rank numeral no longer hangs off the left edge
         scrollPaddingLeft: 16

@@ -1,9 +1,12 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { MediaCard } from './MediaCard';
 import { LandscapeMediaCard } from './LandscapeMediaCard';
 import { ChevronRight, Sparkles, Flame, Film, Tv, Radio, Newspaper } from 'lucide-react';
+import { useTouchDragScroll } from '../hooks/useTouchDragScroll';
 
 export function MediaRail({ title, items, landscape = false, onSelectItem, onFocusItem, onSeeAll }) {
+  const scrollRef = useRef(null);
+  useTouchDragScroll(scrollRef); // v3.9.12: manual drag — WebView-proof horizontal scroll
   const safeItems = Array.isArray(items) ? items : (items && Array.isArray(items.results) ? items.results : []);
   if (safeItems.length === 0) return null;
 
@@ -67,7 +70,7 @@ export function MediaRail({ title, items, landscape = false, onSelectItem, onFoc
         )}
       </div>
 
-      <div className={`mobile-rail-scroll ${landscape ? 'is-landscape' : 'is-portrait'}`} style={{ position: 'relative', zIndex: 20 }}>
+      <div ref={scrollRef} className={`mobile-rail-scroll ${landscape ? 'is-landscape' : 'is-portrait'}`} style={{ position: 'relative', zIndex: 20 }}>
         {safeItems.map((item, index) => {
           const key = item.kinopoisk_id || item.id || item.movie_id || `${item.title}-${index}`;
           return landscape ? (

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
   SlidersHorizontal, 
   Globe2, 
@@ -11,6 +11,7 @@ import {
   RotateCcw,
   Sparkles
 } from 'lucide-react';
+import { useTouchDragScroll } from '../hooks/useTouchDragScroll';
 
 export const WORLDWIDE_REGIONS = [
   { id: 'all', label: 'All Regions', flag: '🌐' },
@@ -83,6 +84,8 @@ export const SORT_OPTIONS = [
 ];
 
 export function WorldwideFilterBar({ filters, onFilterChange, totalResults = null }) {
+  const stripRef = useRef(null);
+  useTouchDragScroll(stripRef); // v3.9.12: manual drag scroll for filter chips
   const [modalOpen, setModalOpen] = useState(false);
 
   const activeRegion = filters.region || 'all';
@@ -113,7 +116,7 @@ export function WorldwideFilterBar({ filters, onFilterChange, totalResults = nul
   return (
     <div className="worldwide-filter-container" style={{ margin: '0 0 16px 0', width: '100%' }}>
       {/* Top Quick Bar */}
-      <div style={{
+      <div ref={stripRef} style={{
         display: 'flex',
         alignItems: 'center',
         gap: '8px',

@@ -148,6 +148,35 @@ export function TVPlayer({
   // 3.5s auto-clearing "Stream offline" toast that left a dead black player.
   const [allServersDead, setAllServersDead] = useState(null); // { reason, at }
 
+  // v3.9.12: auto-rotate to landscape + true fullscreen on phones when
+  // playback opens. Portrait phone + landscape video = tiny letterboxed
+  // player; locking orientation matches every streaming app's behavior.
+  // Gated to small coarse-pointer devices so TVs/desktop are untouched.
+  // Restores portrait + exits fullscreen on close.
+  useEffect(() => {
+    const isPhone = typeof window !== 'undefined'
+      && window.matchMedia && window.matchMedia('(pointer: coarse)').matches
+      && Math.min(window.innerWidth, window.innerHeight) < 900;
+    if (!isPhone) return;
+    const lock = async () => {
+      try {
+        if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+          await document.documentElement.requestFullscreen({ navigationUI: 'hide' });
+        }
+      } catch (_) { /* fullscreen unavailable — try lock anyway */ }
+      try {
+        await screen.orientation.lock('landscape');
+      } catch (_) { /* lock refused without fullscreen — acceptable */ }
+    };
+    lock();
+    return () => {
+      try { screen.orientation.unlock(); } catch (_) {}
+      try {
+        if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen();
+      } catch (_) {}
+    };
+  }, []);
+
   // Match requested server prop to currentServerIndex
   useEffect(() => {
     if (server && orderedServers.length > 0) {

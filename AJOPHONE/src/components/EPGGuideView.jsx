@@ -16,8 +16,11 @@ import { getCurrentAndNextProgram } from '../api/epg';
 import { getIPTVChannels } from '../api/iptv';
 import { toggleFavoriteChannel, isFavoriteChannel } from '../api/history';
 import { castEngine } from '../api/castSync';
+import { useTouchDragScroll } from '../hooks/useTouchDragScroll';
 
 export function EPGGuideView({ channels = [], onSelectChannel }) {
+  const catStripRef = useRef(null);
+  useTouchDragScroll(catStripRef); // v3.9.12: manual drag scroll for category pills
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchFilter, setSearchFilter] = useState('');
   const [favRefreshCount, setFavRefreshCount] = useState(0);
@@ -226,7 +229,7 @@ export function EPGGuideView({ channels = [], onSelectChannel }) {
       </div>
 
       {/* Category Pills Bar (Including ⭐ Favorites) */}
-      <div style={{
+      <div ref={catStripRef} style={{
         position: 'relative',
         zIndex: 25,
         display: 'flex',

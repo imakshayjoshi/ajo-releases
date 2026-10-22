@@ -6,18 +6,18 @@
   "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
   "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
   "phone": {
-    "version": "3.9.11",
-    "versionCode": 238,
+    "version": "3.9.12",
+    "versionCode": 239,
     "packageId": "com.ajo.phone",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
-    "changelog": "v3.9.11: 650+ new live channels — full Indian free-to-air catalog (Tamil, Telugu, Kannada, Malayalam, Bengali, Marathi, Punjabi + Hindi/English) powered by the BHOOM TV directory, auto health-checked.",
+    "changelog": "v3.9.12: horizontal rail scrolling now guaranteed — manual touch-drag engine (immune to WebView quirks) on every rail and chip strip; Top 10 snap no longer fights your swipe; videos auto-rotate to landscape fullscreen when you press play.",
     "size_mb": 3.5,
-    "sha256": "9b878df31102522b827942e391796fe99f5a9feb437f0296dab57712e14cba4c",
+    "sha256": "e1d494cd98ffb7e061f588397455408edf0d9bcafbd41165a98d663f13f0b17e",
     "releaseDate": "2026-10-22",
-    "size": 3705652
+    "size": 3706444
   },
   "tv": {
     "version": "3.17.16",
