@@ -94,6 +94,8 @@ const DEAD_HOSTS = [
   /vidbinge\.dev/i,           // TLS cert error
   /sus\.stream/i,             // ENOTFOUND
   /filmxy\.wafflehacker/i,    // ENOTFOUND
+  /autoembed\.co/i,           // v3.9.14: blank shell for every title, onLoad hangs (8s tax per play)
+  /player\.autoembed\.co/i,   // same family
 ];
 
 export function isDeadHost(url) {
@@ -212,9 +214,10 @@ export function generateUniversalServers(item, episodeInfo = null) {
   if (targetId) {
     if (isSeries) {
       if (tmdbId) {
+        // v3.9.14: same reorder as movies — autoembed removed (blank shell).
         raw.push({
-          url: `https://autoembed.co/tv/tmdb/${tmdbId}-${season}-${episode}?lang=hi`,
-          name: 'Server 1: AutoEmbed (🇮🇳 Hindi Dubbed & Multi / Fast)',
+          url: `https://www.vidy.st/tv/${tmdbId}/${season}/${episode}`,
+          name: 'Server 1: Vidy (Multi-Server HD)',
           source: 'embed',
           quality: '1080p'
         });
@@ -224,34 +227,33 @@ export function generateUniversalServers(item, episodeInfo = null) {
           source: 'embed',
           quality: '1080p'
         });
+        raw.push({ url: `https://embed.vidrift.in/embed/tv/${tmdbId}/${season}/${episode}`, name: 'Server 3: Vidrift (HD)', source: 'embed', quality: '1080p' });
         raw.push({
           url: `https://vidlink.pro/tv/${tmdbId}/${season}/${episode}?primaryColor=38bdf8&autoplay=true&audio=hi`,
-          name: 'Server 3: VidLink Pro (HD Mirror)',
+          name: 'Server 4: VidLink Pro (HD Mirror)',
           source: 'embed',
           quality: '1080p'
         });
-        raw.push({ url: `https://embed.vidrift.in/embed/tv/${tmdbId}/${season}/${episode}`, name: 'Server 4: Vidrift (HD)', source: 'embed', quality: '1080p' });
-        raw.push({ url: `https://www.vidy.st/tv/${tmdbId}/${season}/${episode}`, name: 'Server 5: Vidy (Multi-Server HD)', source: 'embed', quality: '1080p' });
       }
       if (imdbId) {
         raw.push({
-          url: `https://autoembed.co/tv/imdb/${imdbId}?s=${season}&e=${episode}`,
-          name: 'Server 6: AutoEmbed IMDb (Primary)',
-          source: 'embed',
-          quality: '1080p'
-        });
-        raw.push({
           url: `https://www.2embed.cc/embedtv/${imdbId}?s=${season}&e=${episode}`,
-          name: 'Server 7: 2Embed CC (Backup)',
+          name: 'Server 5: 2Embed CC (IMDb Backup)',
           source: 'embed',
           quality: '1080p'
         });
       }
     } else {
       if (tmdbId) {
+        // v3.9.14: chain reordered by observed reliability — vidy.st rendered a
+        // full multi-server 1080p player even for a fresh Netflix title
+        // (Gandhari 2026), vidsrc.pm and vidrift loaded, vidlink 200-but-empty
+        // for new titles. autoembed REMOVED: renders a blank shell for every
+        // title (verified Oct 22 with Deadpool & Wolverine) and its hanging
+        // resources delayed iframe onLoad, taxing every play ~8s before failover.
         raw.push({
-          url: `https://autoembed.co/movie/tmdb/${tmdbId}?lang=hi`,
-          name: 'Server 1: AutoEmbed (🇮🇳 Hindi Dubbed & Multi / Fast)',
+          url: `https://www.vidy.st/movie/${tmdbId}`,
+          name: 'Server 1: Vidy (Multi-Server HD)',
           source: 'embed',
           quality: '1080p'
         });
@@ -261,25 +263,18 @@ export function generateUniversalServers(item, episodeInfo = null) {
           source: 'embed',
           quality: '1080p'
         });
+        raw.push({ url: `https://embed.vidrift.in/embed/movie/${tmdbId}`, name: 'Server 3: Vidrift (HD)', source: 'embed', quality: '1080p' });
         raw.push({
           url: `https://vidlink.pro/movie/${tmdbId}?primaryColor=38bdf8&autoplay=true&audio=hi`,
-          name: 'Server 3: VidLink Pro (HD Mirror)',
+          name: 'Server 4: VidLink Pro (HD Mirror)',
           source: 'embed',
           quality: '1080p'
         });
-        raw.push({ url: `https://embed.vidrift.in/embed/movie/${tmdbId}`, name: 'Server 4: Vidrift (HD)', source: 'embed', quality: '1080p' });
-        raw.push({ url: `https://www.vidy.st/movie/${tmdbId}`, name: 'Server 5: Vidy (Multi-Server HD)', source: 'embed', quality: '1080p' });
       }
       if (imdbId) {
         raw.push({
-          url: `https://autoembed.co/movie/imdb/${imdbId}?lang=hi`,
-          name: 'Server 6: AutoEmbed IMDb (🇮🇳 Hindi)',
-          source: 'embed',
-          quality: '1080p'
-        });
-        raw.push({
           url: `https://www.2embed.cc/embed/${imdbId}`,
-          name: 'Server 7: 2Embed CC (Backup)',
+          name: 'Server 5: 2Embed CC (IMDb Backup)',
           source: 'embed',
           quality: '1080p'
         });

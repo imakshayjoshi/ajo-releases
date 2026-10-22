@@ -147,6 +147,9 @@ export function TVPlayer({
   // v3.12.61: terminal failure state — persistent, with Retry. Replaces the
   // 3.5s auto-clearing "Stream offline" toast that left a dead black player.
   const [allServersDead, setAllServersDead] = useState(null); // { reason, at }
+  // v3.9.14: per-server failure log — shown on the dead screen so a report
+  // says exactly WHICH mirrors failed and WHY, not just "all failed".
+  const failLogRef = useRef([]); // [{ name, reason, at }]
 
   // v3.9.13: auto-rotate to landscape on phones when playback opens.
   // PRIMARY: window.AndroidOrientation — the native JavascriptInterface
@@ -403,7 +406,9 @@ export function TVPlayer({
     // v3.12.61: remember this server failed this session — retries and the
     // native handoff must never land on a mirror we already burned.
     const failedUrl = orderedServers[currentServerIndex]?.url;
+    const failedName = orderedServers[currentServerIndex]?.name || 'Unknown server';
     if (failedUrl) markMirrorFailed(failedUrl);
+    failLogRef.current = [...failLogRef.current.slice(-9), { name: failedName, reason, at: Date.now() }];
     if (orderedServers.length > 1 && currentServerIndex < orderedServers.length - 1) {
       const nextIdx = currentServerIndex + 1;
       const nextName = orderedServers[nextIdx]?.name || `Server ${nextIdx + 1}`;
@@ -799,6 +804,19 @@ export function TVPlayer({
                 bufferingDuration = 0;
                 if (!handOffToNative('Buffering timeout, switching to hardware player...')) {
                   handleFailover('Stream buffering timed out');
+                }
+              }
+            } else if (!video.paused && video.readyState < 2) {
+              // v3.9.14: manifest/segment hang with play() pending. The old
+              // watchdogs only watched paused=true (rs<3) or !paused+rs>=2, so
+              // a hanging HLS manifest (readyState 0, play pending) sat
+              // forever with zero frames and no failover. 10s of nothing ->
+              // move on.
+              bufferingDuration += 2;
+              if (bufferingDuration >= 10) {
+                bufferingDuration = 0;
+                if (!handOffToNative('Stream never started, switching...')) {
+                  handleFailover('Stream never started');
                 }
               }
             } else if (!video.paused && video.readyState >= 2) {
@@ -1254,6 +1272,20 @@ export function TVPlayer({
             {allServersDead.reason || 'Every mirror timed out or refused the connection.'}
             <br />Mirrors recover constantly — a retry usually works.
           </div>
+          {/* v3.9.14: which mirrors burned, and why — turns the next report
+              from "doesn't work" into actionable data. */}
+          {failLogRef.current.length > 0 && (
+            <div style={{
+              maxWidth: 520, maxHeight: 120, overflowY: 'auto',
+              fontSize: 12, color: '#64748b', textAlign: 'left',
+              background: 'rgba(255,255,255,0.04)', borderRadius: 8,
+              padding: '8px 12px', fontFamily: 'monospace'
+            }}>
+              {failLogRef.current.map((f, i) => (
+                <div key={i}>✕ {f.name} — {String(f.reason).slice(0, 60)}</div>
+              ))}
+            </div>
+          )}
           <div style={{ display: 'flex', gap: 16, marginTop: 8 }}>
             <button
               className="tv-player-btn"

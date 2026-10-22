@@ -40,8 +40,9 @@ test('v3.12.50: tmdb-ep episode id uses the SERIES tmdb id, not the trailing epi
 test('v3.12.50: episode item with season_number/episode_number binds without episodeInfo', () => {
   const panchayatEp = { id: 'tmdb-ep-101416-2-3', tmdb_id: 101416, season_number: 2, episode_number: 3, title: 'Kranti', type: 'series' };
   const servers = generateUniversalServers(panchayatEp);
-  const autoembed = servers.find(s => s.url.includes('autoembed.co'));
-  assert.ok(autoembed && autoembed.url.includes('101416-2-3'), `AutoEmbed must carry S2E3: ${autoembed?.url}`);
+  // v3.9.14: autoembed removed (dead blank shell); vidy leads and carries S/E.
+  const vidy = servers.find(s => s.url.includes('vidy.st'));
+  assert.ok(vidy && vidy.url.includes('/tv/101416/2/3'), `Vidy must carry S2E3: ${vidy?.url}`);
   const vidsrc = servers.find(s => s.url.includes('vidsrc.pm'));
   assert.ok(vidsrc && vidsrc.url.includes('/tv/101416/2/3'), `VidSrc must carry S2E3: ${vidsrc?.url}`);
 });
@@ -53,17 +54,17 @@ test('v3.12.50: PIKASHOW-style string season/episode fields are honored', () => 
     'String S/E fields from the API must bind mirrors to S3 E11');
 });
 
-test('v3.12.50: AutoEmbed leads the embed mirrors, VidLink demoted (Cloudflare 522)', () => {
+test('v3.9.14: Vidy leads the embed mirrors (autoembed removed — blank shell)', () => {
   const movieServers = generateUniversalServers({ tmdb_id: 550, type: 'movie' });
+  assert.ok(!movieServers.some(s => s.url.includes('autoembed.co')), 'autoembed must be gone from the movie chain');
   const firstMovieEmbed = movieServers.find(s => s.source === 'embed');
-  assert.ok(firstMovieEmbed.url.includes('autoembed.co'), `Movie Server 1 must be AutoEmbed, got ${firstMovieEmbed.url}`);
-  assert.ok(movieServers.findIndex(s => s.url.includes('vidlink.pro')) > movieServers.findIndex(s => s.url.includes('autoembed.co')),
-    'VidLink must sort after AutoEmbed for movies');
+  assert.ok(firstMovieEmbed.url.includes('vidy.st'), `Movie Server 1 must be Vidy, got ${firstMovieEmbed.url}`);
+  assert.ok(movieServers.findIndex(s => s.url.includes('vidsrc.pm')) > movieServers.findIndex(s => s.url.includes('vidy.st')),
+    'VidSrc PM must sort after Vidy for movies');
 
   const epServers = generateUniversalServers({ tmdb_id: 101416, type: 'series', season_number: 2, episode_number: 3 });
+  assert.ok(!epServers.some(s => s.url.includes('autoembed.co')), 'autoembed must be gone from the episode chain');
   const firstEpEmbed = epServers.find(s => s.source === 'embed');
-  assert.ok(firstEpEmbed.url.includes('autoembed.co'), `Episode Server 1 must be AutoEmbed, got ${firstEpEmbed.url}`);
-  assert.ok(epServers.findIndex(s => s.url.includes('vidlink.pro')) > epServers.findIndex(s => s.url.includes('autoembed.co')),
-    'VidLink must sort after AutoEmbed for episodes');
+  assert.ok(firstEpEmbed.url.includes('vidy.st'), `Episode Server 1 must be Vidy, got ${firstEpEmbed.url}`);
 });
 
