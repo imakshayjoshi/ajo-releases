@@ -148,28 +148,45 @@ export function TVPlayer({
   // 3.5s auto-clearing "Stream offline" toast that left a dead black player.
   const [allServersDead, setAllServersDead] = useState(null); // { reason, at }
 
-  // v3.9.12: auto-rotate to landscape + true fullscreen on phones when
-  // playback opens. Portrait phone + landscape video = tiny letterboxed
-  // player; locking orientation matches every streaming app's behavior.
-  // Gated to small coarse-pointer devices so TVs/desktop are untouched.
-  // Restores portrait + exits fullscreen on close.
+  // v3.9.13: auto-rotate to landscape on phones when playback opens.
+  // PRIMARY: window.AndroidOrientation — the native JavascriptInterface
+  // already in MainActivity (setRequestedOrientation direct; no fullscreen
+  // requirement; works even when the phone's system auto-rotate is OFF —
+  // the raw Web API screen.orientation.lock silently fails in Capacitor's
+  // WebView, that was the v3.9.12 bug). FALLBACKS: @capacitor/screen-orientation
+  // plugin, then web API + fullscreen. Restore = setAuto() (respects the
+  // phone's own rotation setting) on close.
   useEffect(() => {
     const isPhone = typeof window !== 'undefined'
       && window.matchMedia && window.matchMedia('(pointer: coarse)').matches
       && Math.min(window.innerWidth, window.innerHeight) < 900;
     if (!isPhone) return;
-    const lock = async () => {
-      try {
-        if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
-          await document.documentElement.requestFullscreen({ navigationUI: 'hide' });
-        }
-      } catch (_) { /* fullscreen unavailable — try lock anyway */ }
-      try {
-        await screen.orientation.lock('landscape');
-      } catch (_) { /* lock refused without fullscreen — acceptable */ }
-    };
-    lock();
+    const viaBridge = typeof window.AndroidOrientation?.setLandscape === 'function';
+    if (viaBridge) {
+      try { window.AndroidOrientation.setLandscape(); } catch (_) {}
+    } else {
+      (async () => {
+        try {
+          const { ScreenOrientation } = await import('@capacitor/screen-orientation');
+          await ScreenOrientation.lock({ orientation: 'landscape' });
+          return;
+        } catch (_) {}
+        try {
+          if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+            await document.documentElement.requestFullscreen({ navigationUI: 'hide' });
+          }
+        } catch (_) {}
+        try { await screen.orientation.lock('landscape'); } catch (_) {}
+      })();
+    }
     return () => {
+      if (viaBridge) {
+        try { window.AndroidOrientation.setAuto(); } catch (_) {}
+        return;
+      }
+      import('@capacitor/screen-orientation')
+        .then(({ ScreenOrientation }) => ScreenOrientation.unlock().catch(() => {}))
+        .catch(() => {});
       try { screen.orientation.unlock(); } catch (_) {}
       try {
         if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen();

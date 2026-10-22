@@ -1,6 +1,6 @@
 {
   "name": "ajo-phone",
-  "version": "3.9.12",
+  "version": "3.9.13",
   "private": true,
   "description": "AJO Phone entertainment client",
   "type": "module",
@@ -13,6 +13,7 @@
   "dependencies": {
     "@capacitor/app": "^8.1.2",
     "@capacitor/core": "^8.5.0",
+    "@capacitor/screen-orientation": "^8.0.2",
     "clsx": "^2.1.1",
     "esbuild": "^0.28.2",
     "hls.js": "^1.6.15",
