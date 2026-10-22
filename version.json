@@ -29,8 +29,8 @@
     "minimumVersionCode": 1,
     "changelog": "v3.17.19: the remote gear/menu button finally works — opens Settings as a right-side pane over the current screen (Back closes it). Movie/series server chain rebuilt: dead AutoEmbed removed, Vidy leads, VidSrc/Vidrift next — new titles (e.g. Gandhari) play on the first servers now. Includes the logo-reveal launch film + new home-screen banner.",
     "size_mb": 10.7,
-    "sha256": "9fa417dcc95d8e0b73f4f8b2f66fadb3e51e3a06f7b239b16b08117d3bf69174",
-    "size": 11255027,
+    "sha256": "a13591b28907e5654f3f505e3fe2c90f56b0488ae8b7b53d0c651abcbcee2c08",
+    "size": 11255476,
     "releaseDate": "2026-10-22"
   },
   "android_tv": {
@@ -43,9 +43,9 @@
     "minimumVersionCode": 1,
     "changelog": "v3.17.19: the remote gear/menu button finally works — opens Settings as a right-side pane over the current screen (Back closes it). Movie/series server chain rebuilt: dead AutoEmbed removed, Vidy leads, VidSrc/Vidrift next — new titles (e.g. Gandhari) play on the first servers now. Includes the logo-reveal launch film + new home-screen banner.",
     "size_mb": 10.7,
-    "sha256": "9fa417dcc95d8e0b73f4f8b2f66fadb3e51e3a06f7b239b16b08117d3bf69174",
+    "sha256": "a13591b28907e5654f3f505e3fe2c90f56b0488ae8b7b53d0c651abcbcee2c08",
     "releaseDate": "2026-10-22",
-    "size": 11255027
+    "size": 11255476
   },
   "changelog": "v3.17.15: Star Sports back for real — official Jio streams (all Star/Sports18/Eurosport), auto-failover to mirrors, deeper live buffer, channels refresh on every app open, search keyboard flow fixed.",
   "sha256": "d29ec31533d90c695f66406f37513eab784909bec5eb3f2dc0f0b19fb8a4deaf"
