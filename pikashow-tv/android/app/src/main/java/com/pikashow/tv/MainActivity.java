@@ -847,6 +847,20 @@ public class MainActivity extends BridgeActivity {
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
         int keyCode = event.getKeyCode();
+        // v3.17.19: remote gear/menu buttons (KEYCODE_SETTINGS=176 on most
+        // Android TV remotes, KEYCODE_MENU=82 on others) never reached the
+        // WebView — the settings panel was unreachable from the remote.
+        // Forward as a DOM event; the app toggles the settings overlay.
+        if (keyCode == KeyEvent.KEYCODE_SETTINGS || keyCode == KeyEvent.KEYCODE_MENU) {
+            if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                if (getBridge() != null && getBridge().getWebView() != null) {
+                    getBridge().getWebView().evaluateJavascript(
+                            "(function(){ window.dispatchEvent(new KeyboardEvent('keydown', {key: 'ContextMenu', code: 'ContextMenu', keyCode: 93, which: 93, bubbles: true, cancelable: true})); window.dispatchEvent(new CustomEvent('ajo-settings-key')); })();",
+                            null);
+                }
+            }
+            return true;
+        }
         if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_ESCAPE) {
             if (event.getAction() == KeyEvent.ACTION_DOWN) {
                 if (getBridge() != null && getBridge().getWebView() != null) {

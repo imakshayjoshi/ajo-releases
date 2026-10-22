@@ -9,22 +9,26 @@ import { isNativePlayableUrl, isDirectMediaUrl, shouldPreferNativePlayer, playIn
 import { getPairingRoom, setPairingRoom, remoteCommandToKeyboard, injectRemoteCommandKey } from '../src/api/castSync.js';
 
 // --- BUG H2: autoembed.co TV URL must use query string, not dash -----------
-test('Bug H2: autoembed.co series URL uses query string', () => {
+test('Bug H2 (v3.17.19): series S/E bind — autoembed removed, vidy + 2embed carry it', () => {
   const sources = generateUniversalServers(
     {
       id: 'tt1234567',
+      tmdb_id: 9999,
       title: 'Test Series',
       type: 'series',
       category: 'serials'
     },
     { season: 2, episode: 5 }
   );
-  const autoembed = sources.find((s) => /autoembed\.co/.test(s.url));
-  assert.ok(autoembed, 'autoembed mirror should be present');
+  assert.ok(!sources.some((s) => /autoembed\.co/.test(s.url)), 'autoembed must be gone');
+  const vidy = sources.find((s) => /vidy\.st/.test(s.url));
+  assert.ok(vidy, 'vidy mirror should be present');
+  assert.equal(vidy.url, 'https://www.vidy.st/tv/9999/2/5', 'vidy TV path must carry S/E');
+  const twoembed = sources.find((s) => /2embed\.cc/.test(s.url));
   assert.equal(
-    autoembed.url,
-    'https://autoembed.co/tv/imdb/tt1234567?s=2&e=5',
-    'autoembed.co TV path must use ?s= and ?e= query params'
+    twoembed.url,
+    'https://www.2embed.cc/embedtv/tt1234567?s=2&e=5',
+    '2embed.cc TV path must use ?s= and ?e= query params'
   );
 });
 
@@ -132,7 +136,7 @@ test('Bug C2: getPairingRoom / setPairingRoom persist correctly', () => {
 // --- v3.12.52 STABILITY REGRESSION TESTS -----------------------------------
 test('v3.12.52: OTA version and code are bumped', async () => {
   const ota = await import('../src/api/otaUpdate.js');
-  assert.equal(ota.CURRENT_APP_VERSION, '3.17.18');
+  assert.equal(ota.CURRENT_APP_VERSION, '3.17.19');
   assert.equal(ota.CURRENT_VERSION_CODE, 271);
   // v3.12.82: the -androidtv release-tag suffix must never confuse the
   // version compare (the OTA banner silently no-shows if a source wins with a
@@ -171,8 +175,11 @@ test('v3.12.46: Panchayat / TMDB series episode servers point to specific season
   assert.ok(vidlink.url.includes('/tv/101416/2/3'), `VidLink must point to /tv/101416/2/3, got ${vidlink.url}`);
 
   const autoembed = servers.find(s => s.url.includes('autoembed.co'));
-  assert.ok(autoembed, 'AutoEmbed server must be present');
-  assert.ok(autoembed.url.includes('101416-2-3'), `AutoEmbed must point to 101416-2-3, got ${autoembed.url}`);
+  assert.ok(!autoembed, 'v3.17.19: AutoEmbed removed (dead blank shell)');
+
+  const vidy = servers.find(s => s.url.includes('vidy.st'));
+  assert.ok(vidy, 'Vidy server must be present');
+  assert.ok(vidy.url.includes('/tv/101416/2/3'), `Vidy must point to /tv/101416/2/3, got ${vidy.url}`);
 
   const vidsrc = servers.find(s => s.url.includes('vidsrc.pm'));
   assert.ok(vidsrc, 'VidSrc server must be present');
@@ -216,7 +223,7 @@ test('v3.12.50: cast payload season/episode fields rebuild episode-exact mirrors
     : null;
   const servers = generateUniversalServers(castItem, castEpisode);
   assert.ok(servers.some(s => s.url.includes('/tv/205753/1/8')), 'path-style mirrors must carry S1 E8');
-  assert.ok(servers.some(s => s.url.includes('205753-1-8')), 'dash-style mirrors must carry S1 E8');
+  // v3.17.19: the dash-style host (autoembed) was removed; 2embed imdb path covers query-style S/E
   assert.ok(!servers.some(s => /\/tv\/8\/1\/1(?:\/|\?|$)/.test(s.url)), 'episode digit must never masquerade as series id');
 });
 
@@ -227,9 +234,11 @@ test('v3.14.2: chain keeps only render-tested-live hosts; dead ones are gone', (
   for (const dead of [/videasy/, /2embed\.skin/, /vidbolt/, /filmu/, /cinezo/, /apiplayer\.ru/, /vidjoy/]) {
     assert.ok(!urls.some(u => dead.test(u)), `dead host must be absent: ${dead}`);
   }
-  for (const good of [/autoembed\.co/, /vidsrc\.pm/, /vidlink\.pro/, /vidrift\.in/, /vidy\.st/]) {
+  for (const good of [/vidsrc\.pm/, /vidlink\.pro/, /vidrift\.in/, /vidy\.st/]) {
     assert.ok(urls.some(u => good.test(u)), `proven-live host must be present: ${good}`);
   }
+  // v3.17.19: autoembed joined the dead list (blank shell, hangs onLoad)
+  assert.ok(!urls.some(u => /autoembed\.co/.test(u)), 'autoembed.co must be absent');
 });
 
 test('v3.14.1: anime items get bingr-mirror servers with bingr id', () => {

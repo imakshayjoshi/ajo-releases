@@ -20,32 +20,32 @@
     "size": 7483213
   },
   "tv": {
-    "version": "3.17.18",
-    "versionCode": 274,
+    "version": "3.17.19",
+    "versionCode": 275,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
-    "changelog": "v3.17.18: launch now plays the AJO logo-reveal film (6s, with sound) — any key skips; falls back to the classic splash if the video cannot play.",
+    "changelog": "v3.17.19: the remote gear/menu button finally works — opens Settings as a right-side pane over the current screen (Back closes it). Movie/series server chain rebuilt: dead AutoEmbed removed, Vidy leads, VidSrc/Vidrift next — new titles (e.g. Gandhari) play on the first servers now. Includes the logo-reveal launch film + new home-screen banner.",
     "size_mb": 10.7,
-    "sha256": "86ce081828753f1f9aae83f0a6526a62ab691d0df3bd27c95a69188c30891f3b",
-    "size": 11254601,
+    "sha256": "9fa417dcc95d8e0b73f4f8b2f66fadb3e51e3a06f7b239b16b08117d3bf69174",
+    "size": 11255027,
     "releaseDate": "2026-10-22"
   },
   "android_tv": {
-    "version": "3.17.18",
-    "versionCode": 274,
+    "version": "3.17.19",
+    "versionCode": 275,
     "packageId": "com.ajo.androidtv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
-    "changelog": "v3.17.18: launch now plays the AJO logo-reveal film (6s, with sound) — any key skips; falls back to the classic splash if the video cannot play.",
+    "changelog": "v3.17.19: the remote gear/menu button finally works — opens Settings as a right-side pane over the current screen (Back closes it). Movie/series server chain rebuilt: dead AutoEmbed removed, Vidy leads, VidSrc/Vidrift next — new titles (e.g. Gandhari) play on the first servers now. Includes the logo-reveal launch film + new home-screen banner.",
     "size_mb": 10.7,
-    "sha256": "86ce081828753f1f9aae83f0a6526a62ab691d0df3bd27c95a69188c30891f3b",
+    "sha256": "9fa417dcc95d8e0b73f4f8b2f66fadb3e51e3a06f7b239b16b08117d3bf69174",
     "releaseDate": "2026-10-22",
-    "size": 11254601
+    "size": 11255027
   },
   "changelog": "v3.17.15: Star Sports back for real — official Jio streams (all Star/Sports18/Eurosport), auto-failover to mirrors, deeper live buffer, channels refresh on every app open, search keyboard flow fixed.",
   "sha256": "d29ec31533d90c695f66406f37513eab784909bec5eb3f2dc0f0b19fb8a4deaf"
