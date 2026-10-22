@@ -1,0 +1,1284 @@
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { getBollywoodCatalog, getHollywoodCatalog, getSerialsCatalog, getLiveBroadcasts } from './api/pikashow';
+import { getLiveChannels, isPopularLiveChannel, classifyLiveChannel, hasWorkingPlayer, applyLiveSourceOverride, probeLiveChannels, guessLiveLogo, squashLiveName } from './api/live';
+import { LiveView } from './components/LiveView';
+import { getLiveSportsEvents } from './api/sports';
+import { getWatchHistory, saveProgress, getWatchProgress, filterAliveItems, syncContinueToNative } from './api/history';
+import { runStreamHealthSweep } from './utils/streamHealth';
+import { checkForAppUpdates } from './api/otaUpdate';
+import { getTmdbTrending, getTmdbCatalog, getTmdbCatalogDeep, getTmdbNowPlaying, getBecauseYouWatched } from './api/tmdb';
+import { getRankedServers } from './api/mirrorHealth';
+import { getBingrAnimeDeep } from './api/bingr';
+import { getAddonCatalogs, getAddonStreams } from './api/stremio';
+import { GoogleTVHeader } from './components/GoogleTVHeader';
+import { HeroBanner } from './components/HeroBanner';
+import { SplashScreen } from './components/SplashScreen';
+import { MediaRail } from './components/MediaRail';
+import { MediaGridView } from './components/MediaGridView';
+import { MediaDetailsModal } from './components/MediaDetailsModal';
+import { SearchView } from './components/SearchView';
+import { SettingsView } from './components/SettingsView';
+import { EPGGuideView } from './components/EPGGuideView';
+import { TVPlayer } from './components/TVPlayer';
+import { ProviderRow, ProviderCatalog } from './components/ProviderCatalog';
+import { useSpatialNavigation } from './hooks/useSpatialNavigation';
+import { shouldPreferNativePlayer, playInNativePlayer, isNativePlaybackActive, nativePlayerControl, setNativePlaybackActive } from './utils/nativePlayer';
+import { generateUniversalServers } from './utils/streamingEngines';
+import { consumeDeepLink, onDeepLink } from './api/deepLink';
+// v3.9.0 PERF: castSync lazy-loaded — the 27KB module was parsed eagerly on
+// every startup even though cast is only used when a phone is actually paired.
+import { Play, Sparkles } from 'lucide-react';
+
+export default function App() {
+  const [activeTab, setActiveTab] = useState(() => new URLSearchParams(window.location.search).get('tab') || 'home');
+  const [activeSubTab, setActiveSubTab] = useState('trending');
+  const [activeProvider, setActiveProvider] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  // Catalogs
+  const [bollywoodItems, setBollywoodItems] = useState([]);
+  const [hollywoodItems, setHollywoodItems] = useState([]);
+  const [seriesItems, setSeriesItems] = useState([]);
+  const [sportsItems, setSportsItems] = useState([]);
+  const [continueWatching, setContinueWatching] = useState([]);
+  const [tmdbTrending, setTmdbTrending] = useState([]);
+  const [tmdbMovies, setTmdbMovies] = useState([]);
+  const [tmdbSeries, setTmdbSeries] = useState([]);
+  const [nowPlaying, setNowPlaying] = useState([]);
+  const [animeItems, setAnimeItems] = useState([]);
+  const [kidsItems, setKidsItems] = useState([]);
+  // v3.11.0: IPTV (9+ playlists) is heavy — load it AFTER first paint so the
+  // app opens fast on low-RAM Fire TV sticks instead of blocking on playlists.
+  const [liveItems, setLiveItems] = useState([]);
+  const [liveLoaded, setLiveLoaded] = useState(false);
+  const [addonCatalogItems, setAddonCatalogItems] = useState([]);
+  const [moviboxItems, setMoviboxItems] = useState([]);
+  const [becauseYouWatched, setBecauseYouWatched] = useState([]);
+  const [watchlist, setWatchlist] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('ajo_watchlist_v1') || '[]'); } catch { return []; }
+  });
+
+
+  // Active Modals / Player
+  const [selectedItem, setSelectedItem] = useState(null);
+  const selectedItemRef = useRef(null);
+  useEffect(() => { selectedItemRef.current = selectedItem; }, [selectedItem]);
+  const [activePlayback, setActivePlayback] = useState(null); // { item, server, episodes, episodeIndex }
+  // v3.17.1: Netflix-style cold-start splash — once per process, any key skips
+  const [showSplash, setShowSplash] = useState(() => !window.__ajoSplashShown);
+  const [liveViewMode, setLiveViewMode] = useState('grid'); // 'grid' (high performance default) | 'epg'
+  const [otaPrompt, setOtaPrompt] = useState(null);
+  const [downloadProgress, setDownloadProgress] = useState(null);
+  // v3.17.7: ajo:// deep links from the Home launcher
+  const [searchPrefill, setSearchPrefill] = useState('');
+  const pendingLiveRef = useRef(null);
+
+  // v3.10.0: remember which card had focus before a modal/player opened so
+  // closing it returns the user to the exact same spot instead of dumping
+  // focus on the Home pill or the first card in the DOM.
+  const lastFocusedBeforeOverlayRef = useRef(null);
+  const prevTabRef = useRef(null);
+
+  const rememberFocus = useCallback(() => {
+    try {
+      const el = document.activeElement;
+      if (el && el !== document.body && el.focus) {
+        lastFocusedBeforeOverlayRef.current = el;
+      }
+    } catch {}
+  }, []);
+
+  const restoreFocus = useCallback(() => {
+    const target = lastFocusedBeforeOverlayRef.current;
+    lastFocusedBeforeOverlayRef.current = null;
+    setTimeout(() => {
+      const el = target && document.contains(target) ? target : null;
+      if (el) {
+        try { el.focus({ preventScroll: true }); el.scrollIntoView({ block: 'nearest', inline: 'nearest' }); return; } catch {}
+      }
+      const fallback = document.querySelector('.tv-card, .tv-nav-pill.active, .tv-hero');
+      if (fallback) { try { fallback.focus(); } catch {} }
+    }, 60);
+  }, []);
+
+  // Load all catalogs on startup
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [bolly, holly, serials, sports, trending, popMovies, popTv, newReleases, anime, kids, kidsTv] = await Promise.allSettled([
+        getBollywoodCatalog(),
+        getHollywoodCatalog(),
+        getSerialsCatalog(),
+        getLiveSportsEvents(),
+        getTmdbTrending('all', 'week'),
+        getTmdbCatalog('movie', 'popular'),
+        getTmdbCatalog('tv', 'popular'),
+        getTmdbNowPlaying(20),
+        getTmdbCatalogDeep('movie', 30, (items) => setTmdbMovies(filterAliveItems(items))),
+        getTmdbCatalogDeep('tv', 30, (items) => setTmdbSeries(filterAliveItems(items))),
+        // v3.14.0: anime now comes from bingr.one's open API (AniList-sourced,
+        // real anime catalog with its own player mirrors) instead of TMDB's
+        // generic animation genre, which mixed Pixar into "anime".
+        getBingrAnimeDeep(3),
+        // v3.12.77: kids' row must include BOTH animation genres — movie-only
+        // '10751,16' excluded kids' TV (Doraemon etc.), so kids' titles 404'd.
+        getTmdbCatalog('movie', 'popular', 1, { with_genres: '16,10751' }),
+        getTmdbCatalog('tv', 'popular', 1, { with_genres: '16,10762,10751' })
+      ]);
+
+      if (bolly.status === 'fulfilled') setBollywoodItems(filterAliveItems(bolly.value || []));
+      if (holly.status === 'fulfilled') setHollywoodItems(filterAliveItems(holly.value || []));
+      if (serials.status === 'fulfilled') setSeriesItems(filterAliveItems(serials.value || []));
+      if (sports.status === 'fulfilled') setSportsItems(sports.value || []);
+      if (newReleases.status === 'fulfilled') setNowPlaying(filterAliveItems(newReleases.value || []));
+      if (trending.status === 'fulfilled') setTmdbTrending(trending.value || []);
+      if (popMovies.status === 'fulfilled') setTmdbMovies(filterAliveItems(popMovies.value || []));
+      if (popTv.status === 'fulfilled') setTmdbSeries(filterAliveItems(popTv.value || []));
+      if (anime.status === 'fulfilled') setAnimeItems(filterAliveItems(anime.value || []));
+      if (kids.status === 'fulfilled' || kidsTv.status === 'fulfilled') {
+        // v3.12.77: merge kids' movies + kids' TV (Doraemon etc.) into one row,
+        // title-deduped, so kids' content actually plays from the Kids tab.
+        const km = kids.status === 'fulfilled' ? (kids.value || []) : [];
+        const kt = kidsTv.status === 'fulfilled' ? (kidsTv.value || []) : [];
+        const seenKids = new Set();
+        const mergedKids = [];
+        for (const item of [...km, ...kt]) {
+          const key = String(item.title_en || item.title || '').toLowerCase().trim();
+          if (!key || seenKids.has(key)) continue;
+          seenKids.add(key);
+          mergedKids.push(item);
+        }
+        setKidsItems(mergedKids);
+      }
+      
+      
+      // Addon catalogs (only loads when addons are installed — no-op otherwise)
+      getAddonCatalogs().then(cats => {
+        const items = cats.flatMap(c => c.items);
+        setAddonCatalogItems(items.slice(0, 30));
+      }).catch(() => {});
+      // "Because you watched" personalization from watch history
+      getBecauseYouWatched(getWatchHistory() || []).then(recs => {
+        setBecauseYouWatched(recs || []);
+      }).catch(() => {});
+      import('./api/movibox').then((m) => m.getMoviboxCatalog()).then((items) => {
+        setMoviboxItems(filterAliveItems((items || []).map(m.normalizeMovibox).filter(Boolean).slice(0, 30)));
+      }).catch(() => {});
+      setContinueWatching(getWatchHistory() || []);
+
+      // v3.12.93: background stream-health sweep — probe the first direct
+      // source of on-screen titles; a hard 404/410 pulls the title from the
+      // catalog. Ambiguous errors never hide content. Once per load.
+      try {
+        const sweepPool = [
+          ...(bolly.status === 'fulfilled' ? (bolly.value || []) : []),
+          ...(holly.status === 'fulfilled' ? (holly.value || []) : []),
+          ...(serials.status === 'fulfilled' ? (serials.value || []) : [])
+        ];
+        runStreamHealthSweep(sweepPool);
+      } catch {}
+    } catch (err) {
+      console.error('Error loading catalogs:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const lastLaunchedItemRef = useRef(null);
+
+  // v3.12.30: Save progress and refresh Continue Watching when native player closes
+  useEffect(() => {
+    const handleNativeClosed = (e) => {
+      setNativePlaybackActive(false);
+      const curTime = e?.detail?.currentTime || 0;
+      const dur = e?.detail?.duration || 0;
+      if (lastLaunchedItemRef.current && curTime > 5 && dur > 0) {
+        saveProgress(lastLaunchedItemRef.current, curTime, dur);
+        setContinueWatching(getWatchHistory() || []);
+      }
+    };
+    const handleHistoryUpdated = () => {
+      setContinueWatching(getWatchHistory() || []);
+    };
+    window.addEventListener('ajo-native-player-closed', handleNativeClosed);
+    window.addEventListener('ajo-watch-history-updated', handleHistoryUpdated);
+    return () => {
+      window.removeEventListener('ajo-native-player-closed', handleNativeClosed);
+      window.removeEventListener('ajo-watch-history-updated', handleHistoryUpdated);
+    };
+  }, []);
+
+  // v3.11.0 PERF: IPTV (16 playlists) no longer blocks startup. Kick it off
+  // 1.2s after first paint so the Home tab renders instantly on low-RAM Fire
+  // TV sticks; the Live TV tab forces an immediate load when opened.
+  const loadLiveTV = useCallback(async (retryCount = 0) => {
+    const [merged, legacy] = await Promise.allSettled([getLiveChannels(), getLiveBroadcasts()]);
+    // v3.12.74 (Lumio crash hardening): a failed network boot used to render
+    // an empty wall even though a retry one second later would succeed. Keep
+    // the first paint alive and retry instead of dying on one failed fetch.
+    if (retryCount < 2) {
+      const aggEmpty = merged.status !== 'fulfilled' || !merged.value.length;
+      const oldEmpty = legacy.status !== 'fulfilled' || !legacy.value.length;
+      if (aggEmpty && oldEmpty) {
+        setTimeout(() => loadLiveTV(retryCount + 1), 1000 * (retryCount + 1));
+        return;
+      }
+    }
+    try {
+      // v3.12.75: ported from the Fire TV fork (v3.12.69) — strict
+      // popular-only curation on BOTH sources. This tree previously merged
+      // the legacy iptv-org list raw (~900 junk/foreign FAST channels on top
+      // of the aggregator), which is why the wall showed ~1,000 channels.
+      const agg = merged.status === 'fulfilled' ? merged.value : [];
+      const oldRaw = legacy.status === 'fulfilled' ? legacy.value : [];
+      const old = oldRaw.filter((ch) => isPopularLiveChannel({
+        name: ch.title_en || ch.title || ch.name,
+        lang: ch.lang || '',
+      })).map((ch) => ({ ...ch, category: classifyLiveChannel(ch.title_en || ch.title || ch.name) }));
+      const seen = new Map();
+      const seenIds = new Set();
+      const push = (ch, fallbackSource) => {
+        // v3.17.15: squash-key dedupe — "Star Sports 1 HD Hindi" (aggregator,
+        // jio official) and "Star Sports 1 Hindi HD" (legacy junk mirror) are
+        // the SAME channel. Aggregator entries are pushed first and win.
+        const nameKey = squashLiveName(ch.title_en || ch.title || ch.name || '');
+        if (!nameKey) return;
+        const id = String(ch.id || ch.name || nameKey).trim();
+        // v3.12.66: duplicate ids (e.g. DisneyJunior.in@SD) broke React keys.
+        // Keep the FIRST copy — feed order is trust order — and de-dupe by
+        // title at the same time.
+        if (seenIds.has(id) || seen.has(nameKey)) return;
+        seenIds.add(id);
+        seen.set(nameKey, ch.id ? ch : { ...ch, id, source: ch.source || fallbackSource });
+      };
+      for (const ch of agg) push(ch, 'ajo-live');
+      // v3.12.70: drop channels whose every player sits on a dead host, and
+      // swap in the probed-live HD mirror for Star channels where one exists.
+      for (const ch of old) {
+        if (!hasWorkingPlayer(ch)) continue;
+        push(applyLiveSourceOverride(ch), 'legacy-live');
+      }
+      // v3.12.69: sort popular-first so the wall opens on Sony/Star/Zee/Colors
+      // instead of whatever order the feeds merged in.
+      const popularityRank = (ch) => {
+        const n = String(ch.title_en || ch.title || ch.name || '').toLowerCase();
+        if (n.includes('sony sports') || n.includes('star sports') || n.includes('ten 1') || n.includes('ten 2') || n.includes('ten 3')) return 0;
+        if (n.includes('sony') || n.includes('star plus') || n.includes('star bharat') || n.includes('star pravah')) return 1;
+        if (n.includes('colors')) return 2;
+        if (n.includes('zee')) return 3;
+        if (n.includes('aaj tak') || n.includes('ndtv') || n.includes('republic') || n.includes('abp')) return 4;
+        if (n.includes('discovery') || n.includes('national geographic') || n.includes('history') || n.includes('animal planet') || n.includes('epic')) return 5;
+        return 9;
+      };
+      const sorted = Array.from(seen.values()).sort((a, b) => {
+        const pa = popularityRank(a);
+        const pb = popularityRank(b);
+        if (pa !== pb) return pa - pb;
+        return String(a.title_en || a.title || '').localeCompare(String(b.title_en || b.title || ''));
+      });
+      // v3.12.84: fill missing logos from the channel NAME (tv-logos repo,
+      // verified file list). The legacy/iptv sources carry no logo field, so
+      // the wall opened on initials tiles for every Sony/Star/Colors/Zee.
+      for (const ch of sorted) {
+        if (!ch.logo) {
+          const g = guessLiveLogo(ch.title_en || ch.title || ch.name || '');
+          if (g) { ch.logo = g; ch.poster = ch.poster || g; }
+        }
+      }
+      // v3.12.72: runtime liveness probe — static dead-lists can't keep up
+      // with relays that 404 mid-week. Probe unique manifest URLs (30 min
+      // cache) and drop channels with zero live players. Render the pre-probe
+      // wall first, then re-render the pruned set so the tab never blocks.
+      setLiveItems(sorted);
+      probeLiveChannels(sorted)
+        .then((alive) => {
+          if (alive.length && alive.length < sorted.length) {
+            console.info('[live] runtime probe dropped ' + (sorted.length - alive.length) + ' dead channels');
+          }
+          setLiveItems(alive.length ? alive : sorted);
+        })
+        .catch(() => {});
+    } catch (e) {
+      console.error('Error loading live TV:', e);
+      setLiveItems(legacy.status === 'fulfilled' ? legacy.value : []);
+    } finally {
+      setLiveLoaded(true);
+    }
+  }, []);
+  useEffect(() => {
+    const t = setTimeout(() => { if (!liveLoaded) loadLiveTV(); }, 1200);
+    return () => clearTimeout(t);
+  }, [liveLoaded, loadLiveTV]);
+  // User opened the Live TV tab before the lazy tick fired — load immediately.
+  useEffect(() => {
+    if (activeTab === 'live' && !liveLoaded) loadLiveTV();
+  }, [activeTab, liveLoaded, loadLiveTV]);
+
+  useEffect(() => {
+    loadData();
+    // Check for updates in background, then re-check every 4h + on app resume
+    const runUpdateCheck = () => {
+      const targetType = 'android_tv';
+      checkForAppUpdates(targetType).then((res) => {
+        if (res && res.hasUpdate && !downloadProgress) {
+          if (res.targetSigning === 'release' && !res.isReleaseSigned) {
+            res.needsReinstall = true;
+          }
+          setOtaPrompt(res);
+        }
+      }).catch(() => {});
+    };
+    runUpdateCheck();
+    // v3.12.48: 4h like the Fire TV fork (was 3 min — 4 OTA requests + re-prompt
+    // every tab change hammered the sources and nagged users).
+    const updateInterval = setInterval(runUpdateCheck, 4 * 60 * 60 * 1000);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') runUpdateCheck();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+
+    window.onAJOUpdateProgress = (percent) => {
+      setDownloadProgress({ percent });
+    };
+    window.onAJOUpdateStatus = (status) => {
+      if (status === 'READY_TO_INSTALL') {
+        setDownloadProgress({ percent: 100, ready: true });
+      }
+    };
+    window.onAJOUpdateError = () => {
+      setDownloadProgress(null);
+    };
+    return () => {
+      clearInterval(updateInterval);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [loadData]);
+
+  useEffect(() => {
+    if (!otaPrompt && !downloadProgress) {
+      checkForAppUpdates('android_tv').then((res) => {
+        if (res && res.hasUpdate && !downloadProgress) {
+          if (res.targetSigning === 'release' && !res.isReleaseSigned) {
+            res.needsReinstall = true;
+          }
+          setOtaPrompt(res);
+        }
+      }).catch(() => {});
+    }
+  }, [activeTab]);
+
+
+  // Handle item click (Live TV plays directly, Movies open details)
+  const handleItemClick = useCallback((item) => {
+    rememberFocus();
+    if (item.is_live || item.type === 'live' || item.year === 'LIVE') {
+      const allServers = Array.isArray(item.players) && item.players.length > 0
+        ? item.players
+        : Array.isArray(item.player) && item.player.length > 0
+          ? item.player
+          : (item.url ? [{ url: item.url, source: 'm3u8' }] : []);
+      const server = allServers[0];
+      const url = server?.url || item.url;
+
+      // Android TV / Fire TV: go straight to native ExoPlayer activity with fallbacks and channel list
+      if (url && shouldPreferNativePlayer()) {
+        const title = item.title_en || item.title || item.name || 'Live Channel';
+        let channelIndex = 0;
+        let channelsList = [];
+        if (Array.isArray(liveItems) && liveItems.length > 0) {
+          channelIndex = liveItems.findIndex(ch =>
+            (ch.id && item.id && ch.id === item.id) ||
+            (ch.url && item.url && ch.url === item.url) ||
+            (ch.name && item.name && ch.name === item.name) ||
+            (ch.title && item.title && ch.title === item.title)
+          );
+          if (channelIndex < 0) channelIndex = 0;
+          channelsList = liveItems.map((ch, idx) => {
+            const chServers = Array.isArray(ch.players) && ch.players.length > 0
+              ? ch.players
+              : Array.isArray(ch.player) && ch.player.length > 0
+                ? ch.player
+                : (ch.url ? [{ url: ch.url, source: 'm3u8' }] : []);
+            const chUrl = chServers[0]?.url || ch.url;
+            const fallbacks = chServers.slice(1).map(s => s.url).filter(Boolean);
+            return {
+              title: ch.title_en || ch.title || ch.name || `Channel ${idx + 1}`,
+              url: chUrl,
+              fallbacks,
+              logo: ch.logo || ch.poster || ch.image || '',
+              category: ch.category || ch.genre || ch.group || '',
+              channelNumber: idx + 1,
+              // v3.17.15: carry DRM + per-channel headers so the native player
+              // can tune ClearKey (jio) channels when zapping too
+              drm: ch.drm || null,
+              headers: ch.headers || null,
+            };
+          }).filter(ch => ch.url);
+        }
+        if (playInNativePlayer(url, title, true, allServers, 0, channelsList, channelIndex, item.drm || null, item.headers || null)) return;
+      }
+
+      setActivePlayback({ item, server });
+    } else {
+      setSelectedItem(item);
+    }
+  }, [rememberFocus, liveItems]);
+
+  // Start playback from modal or details
+  const handleStartPlayback = useCallback(async (item, server = null, episodes = [], episodeIndex = 0) => {
+    rememberFocus();
+    setSelectedItem(null);
+
+    // AUTO-ID-RESOLUTION (unlock): if the item has a TMDB id but no IMDb id,
+    // resolve it now so generateUniversalServers() builds the FULL mirror
+    // queue. This is what makes every TMDB catalog title playable.
+    let resolvedItem = item;
+    try {
+      const { enrichWithImdb } = await import('./api/tmdb');
+      resolvedItem = await enrichWithImdb(item);
+    } catch {}
+
+    const episodeInfo = Array.isArray(episodes) && episodes[episodeIndex]
+      ? episodes[episodeIndex]
+      : (resolvedItem.season_number || resolvedItem.episode_number ? resolvedItem : null);
+    let allServers = generateUniversalServers(resolvedItem, episodeInfo);
+    // v3.16.0: dual direct-stream resolvers (vidy HLS + vidsrc MP4) — raw video
+    // in OUR player: no ads, no embed pages, real seek. Prepended, fail-soft.
+    try {
+      const resolverTmdbId = resolvedItem.tmdb_id
+        || (typeof resolvedItem.id === 'string' ? Number((resolvedItem.id.match(/tmdb-(?:ep-)?(\d+)/) || [])[1]) : null);
+      if (resolverTmdbId && Number.isFinite(resolverTmdbId)) {
+        const { resolveVidyDirect, resolveVidsrcDirect, resolveVidriftDirect } = await import('./api/directResolver');
+        const isSeriesItem = Boolean(episodeInfo) || resolvedItem.type === 'series' || resolvedItem.type === 'tv' || resolvedItem.category === 'serials';
+        const mediaType = isSeriesItem ? 'tv' : 'movie';
+        const season = episodeInfo?.season_number || episodeInfo?.season || resolvedItem.season_number || 1;
+        const episode = episodeInfo?.episode_number || episodeInfo?.episode || resolvedItem.episode_number || 1;
+        const budget = new Promise((res) => setTimeout(() => res('timeout'), 4000));
+        let hevcOk = true;
+        try { hevcOk = !!(window.MediaSource && MediaSource.isTypeSupported('video/mp4; codecs="hvc1.1.6.L120.90"')); } catch {}
+        const [vidy, vidsrc, vidrift] = await Promise.all([
+          Promise.race([
+            resolveVidyDirect({
+              title: resolvedItem.series_title || resolvedItem.title_en || resolvedItem.title || resolvedItem.name || '',
+              year: parseInt(resolvedItem.year, 10) || '',
+              tmdbId: resolverTmdbId,
+              imdbId: resolvedItem.imdb_id || resolvedItem.imdb || '',
+              mediaType, season, episode,
+            }),
+            budget,
+          ]).then(r => (Array.isArray(r) ? r : [])),
+          Promise.race([
+            resolveVidsrcDirect({ tmdbId: resolverTmdbId, mediaType, season, episode }),
+            budget,
+          ]).then(r => (Array.isArray(r) ? r : [])),
+          Promise.race([
+            resolveVidriftDirect({ tmdbId: resolverTmdbId, mediaType, season, episode, hevcOk }),
+            budget,
+          ]).then(r => (Array.isArray(r) ? r : [])),
+        ]);
+        const direct = [...vidy, ...vidrift, ...vidsrc];
+        if (direct.length > 0) {
+          allServers = [...direct.map((s, i) => ({
+            id: `direct-${i}`,
+            name: s.label,
+            url: s.url,
+            // web path (hls.js/<video>) can't send Referer — VPS proxy can
+            proxyUrl: s.headers?.Referer
+              ? `https://new.ajo.co.in/movibox/stream?url=${encodeURIComponent(s.url)}&ref=${encodeURIComponent(s.headers.Referer)}`
+              : undefined,
+            source: s.source || 'hls',
+            quality: s.quality,
+            headers: s.headers,
+            subtitles: s.subtitles || [],
+            provider: s.source === 'mp4' ? 'vidsrc-direct' : 'vidy-direct'
+          })), ...allServers];
+        }
+      }
+    } catch {}
+    try {
+      if (resolvedItem?.moviboxId) {
+        const { getMoviboxStreams } = await import('./api/movibox');
+        const streams = await getMoviboxStreams(resolvedItem, episodeInfo);
+        const moviboxServers = streams.map((s, i) => ({
+          id: `movibox-${s.resolution}-${i}`,
+          name: `Movibox ${s.resolution}p${Number(s.resolution) >= 1080 ? ' HD' : ''}`,
+          url: s.url,
+          source: 'mp4',
+          quality: `${s.resolution}p`,
+          provider: 'movibox'
+        }));
+        if (moviboxServers.length > 0) allServers = [...moviboxServers, ...allServers];
+      }
+    } catch {}
+    // VPS health ranking: healthy mirrors first, dead ones last
+    try {
+      allServers = await getRankedServers(allServers);
+    } catch {}
+    // Stremio addon streams: append direct-playable URLs from installed addons
+    try {
+      const addonStreams = await getAddonStreams(resolvedItem);
+      for (const s of addonStreams) {
+        allServers.push({
+          id: `addon-${s.addonName}-${allServers.length}`,
+          name: `${s.name}${s.quality ? ' (' + s.quality + ')' : ''}`,
+          url: s.url,
+          source: s.source,
+          quality: s.quality || 'Auto',
+          provider: s.addonName
+        });
+      }
+    } catch {}
+
+    let selectedSrv = server;
+    if (episodeInfo && selectedSrv) {
+      const epSeason = episodeInfo.season_number || episodeInfo.season || 1;
+      const epEpisode = episodeInfo.episode_number || episodeInfo.episode || (episodeIndex + 1);
+      const srvUrl = selectedSrv.url || '';
+      const containsCorrectSeason = srvUrl.includes(`/${epSeason}/`) || srvUrl.includes(`-${epSeason}-`) || srvUrl.includes(`s=${epSeason}`);
+      const containsCorrectEpisode = srvUrl.includes(`/${epEpisode}`) || srvUrl.includes(`-${epEpisode}`) || srvUrl.includes(`e=${epEpisode}`);
+      if (!containsCorrectSeason || !containsCorrectEpisode) {
+        selectedSrv = allServers[0];
+      }
+    } else if (!selectedSrv) {
+      selectedSrv = allServers[0];
+    }
+    const url = selectedSrv?.url || item?.url;
+    const isLiveItem = Boolean(item?.is_live || item?.type === 'live' || item?.year === 'LIVE');
+    lastLaunchedItemRef.current = resolvedItem;
+    if (url && shouldPreferNativePlayer()) {
+      const title = item?.title_en || item?.title || item?.name || 'Video Stream';
+      const progress = getWatchProgress(resolvedItem);
+      const startMs = progress && progress.currentTime ? progress.currentTime * 1000 : 0;
+      if (playInNativePlayer(url, title, isLiveItem, allServers, startMs)) return;
+    }
+
+    setActivePlayback({ item: resolvedItem, server: selectedSrv, allServers, episodes, episodeIndex });
+  }, [rememberFocus]);
+
+  // v3.12.77: the details modal was staying MOUNTED under the native player
+  // (the ghost-text bleed-through behind the OSD). Dismiss it the moment a
+  // stream starts — on a TV, two stacked surfaces are a focus + render bug.
+  useEffect(() => {
+    if (activePlayback && selectedItem) setSelectedItem(null);
+  }, [activePlayback]); // eslint-disable-line react-hooks/exhaustive-deps
+  const handleClosePlayer = useCallback((lastTime, duration) => {
+    if (activePlayback && typeof lastTime === 'number' && lastTime > 5 && duration > 0) {
+      saveProgress(activePlayback.item, lastTime, duration);
+      setContinueWatching(getWatchHistory() || []);
+    }
+    setActivePlayback(null);
+
+    // Re-focus the card the user launched from (v3.10.0), falling back to
+    // the old first-card behavior when the element is gone.
+    restoreFocus();
+  }, [activePlayback, restoreFocus]);
+
+  // v3.17.7: ajo:// deep links from the Home launcher — live channel cards, Continue Watching
+  // resume rows, and voice search. Cold links arrive via consumeDeepLink on mount, warm links via
+  // window.__ajoOnDeepLink.
+  const routeDeepLink = useCallback((dl) => {
+    if (!dl || !dl.route) return;
+    try {
+      if (dl.route === 'search') {
+        setSearchPrefill(dl.q || '');
+        setActiveTab('search');
+        return;
+      }
+      if (dl.route === 'watch') {
+        // Prefer the full history entry (keeps provider context + season/episode + resume point);
+        // fabricate a minimal item only when history no longer has it.
+        const norm = (s) => String(s || '');
+        const found = getWatchHistory().find((h) =>
+          (dl.id && norm(h.id) === norm(dl.id)) ||
+          (dl.tmdb && norm(h.tmdb_id) === norm(dl.tmdb)) ||
+          (dl.title && (h.title === dl.title || h.name === dl.title || h.title_en === dl.title)));
+        const tmdbId = dl.tmdb || (String(dl.id || '').match(/tmdb-(?:ep-)?(\d+)/) || [])[1] || '';
+        const item = found || {
+          id: dl.id || (tmdbId ? `tmdb-${tmdbId}` : ''),
+          tmdb_id: tmdbId || undefined,
+          type: dl.type || '',
+          title: dl.title || '',
+          name: dl.title || '',
+        };
+        handleStartPlayback(item);
+        return;
+      }
+      if (dl.route === 'live') {
+        pendingLiveRef.current = dl;
+        setActiveTab('live');
+        if (!liveLoaded) loadLiveTV();
+        const decode = (s) => { try { return decodeURIComponent(String(s || '')); } catch { return String(s || ''); } };
+        const ch = (liveItems || []).find((c) =>
+          (dl.id && (c.id === dl.id || decode(c.id) === dl.id || decode(c.id) === decode(dl.id))) ||
+          (dl.name && (c.name === dl.name || c.title === dl.name || c.title_en === dl.name)));
+        if (ch) { pendingLiveRef.current = null; handleItemClick(ch); }
+      }
+    } catch { /* a bad link must never break the app */ }
+  }, [liveItems, liveLoaded, loadLiveTV, handleItemClick, handleStartPlayback]);
+
+  // The live catalog may land after the link did.
+  useEffect(() => {
+    const dl = pendingLiveRef.current;
+    if (!dl || !liveItems || liveItems.length === 0) return;
+    const decode = (s) => { try { return decodeURIComponent(String(s || '')); } catch { return String(s || ''); } };
+    const ch = liveItems.find((c) =>
+      (dl.id && (c.id === dl.id || decode(c.id) === dl.id || decode(c.id) === decode(dl.id))) ||
+      (dl.name && (c.name === dl.name || c.title === dl.name || c.title_en === dl.name)));
+    if (ch) { pendingLiveRef.current = null; handleItemClick(ch); }
+  }, [liveItems, handleItemClick]);
+
+  useEffect(() => {
+    const dl = consumeDeepLink();
+    if (dl) routeDeepLink(dl);
+    onDeepLink((link) => routeDeepLink(link));
+    // Seed the Home rail with the existing watch history on every app start.
+    syncContinueToNative();
+  }, [routeDeepLink]);
+
+  // Global Remote Back Handler
+  const handleBack = useCallback(() => {
+    // v3.10.0 FIX: with the player's channels/servers/audio drawer open, Back
+    // must close the drawer first — not kill playback and lose the resume
+    // position. TVPlayer's own keydown handler performs the close.
+    if (activePlayback && window.__ajoPlayerDrawerOpen) return;
+    if (activePlayback) {
+      const video = document.querySelector('video');
+      const curTime = video ? (video.currentTime || 0) : 0;
+      const dur = video ? (video.duration || 0) : 0;
+      handleClosePlayer(curTime, dur);
+      return;
+    }
+    if (otaPrompt) {
+      setOtaPrompt(null);
+      return;
+    }
+    if (selectedItem) {
+      setSelectedItem(null);
+      restoreFocus();
+      return;
+    }
+    if (activeTab === 'search') {
+      // First Back in Search releases the input focus (for the on-screen
+      // keyboard), second Back leaves the tab. Prevents accidental ejection.
+      const ae = document.activeElement;
+      if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA')) {
+        try { ae.blur(); } catch {}
+        return;
+      }
+    }
+    if (activeTab !== 'home') {
+      setActiveTab('home');
+      return;
+    }
+    // On Home tab with nothing open: exit app cleanly via native interface
+    if (window.AndroidNativePlayer && typeof window.AndroidNativePlayer.exitApp === 'function') {
+      window.AndroidNativePlayer.exitApp();
+    }
+  }, [activePlayback, otaPrompt, selectedItem, activeTab, handleClosePlayer, restoreFocus]);
+
+  // ---- CAST RECEIVER (bug fix): the TV app previously never listened for
+  // cast messages, so the phone's "Play on TV" button did nothing. Handle
+  // PLAY_MEDIA (play the exact item+server the phone sent), REMOTE_COMMAND
+  // (play/pause/seek/back), NAV_TAB and UNPAIR.
+  // v3.9.0 PERF: lazy-load castSync only when needed
+  useEffect(() => {
+    let unsubscribe = null;
+    import('./api/castSync').then(({ castEngine, ensureTvRole, injectRemoteCommandKey }) => {
+      // v3.11.1: ALWAYS run as the TV-side cast peer with a persisted room
+      // code (regardless of UA/display-mode detection) or phones can never
+      // pair — the engine drops every inbound message if the room/role is
+      // wrong, and this used to fail silently on some Fire TV WebViews.
+      const bootRoom = new URLSearchParams(window.location.search).get('room');
+      ensureTvRole(bootRoom || undefined);
+      unsubscribe = castEngine.subscribe((msg) => {
+        try {
+          if (msg.type === 'PLAY_MEDIA' && msg.item) {
+            const castItem = msg.item;
+            // v3.12.50: the phone sends season/episode as top-level payload fields —
+            // feed them into the engine so casting episode 8 rebuilds S8-exact
+            // mirrors instead of silently falling back to Season 1 Episode 1.
+            const castEpisode = (msg.seasonNumber || msg.episodeNumber)
+              ? { season_number: Number(msg.seasonNumber) || 1, episode_number: Number(msg.episodeNumber) || 1, tmdb_id: msg.tmdbId || castItem.tmdb_id || null }
+              : null;
+            const servers = generateUniversalServers(castItem, castEpisode);
+            const chosen = msg.server && msg.server.url ? msg.server : servers[0];
+            const url = chosen?.url || castItem.url;
+            if (!url) return;
+            const title = castItem.title_en || castItem.title || castItem.name || 'Cast from Phone';
+            const isLiveItem = Boolean(castItem.is_live || castItem.type === 'live' || castItem.year === 'LIVE');
+            setSelectedItem(null);
+            setActivePlayback(null);
+            if (shouldPreferNativePlayer()) {
+              if (playInNativePlayer(url, title, isLiveItem, servers)) return;
+            }
+            setActivePlayback({ item: castItem, server: chosen });
+          } else if (msg.type === 'REMOTE_COMMAND') {
+            const cmd = String(msg.command || '');
+            // v3.11.1: when the native ExoPlayer owns playback, the WebView
+            // <video> element isn't playing — route commands to the hardware
+            // player through the Java bridge instead.
+            if (isNativePlaybackActive()) {
+              switch (cmd) {
+                case 'PLAY': nativePlayerControl('PLAY'); break;
+                case 'PAUSE': nativePlayerControl('PAUSE'); break;
+                case 'PLAY_PAUSE': nativePlayerControl('PLAY_PAUSE'); break;
+                case 'SEEK_FORWARD': nativePlayerControl('SEEK_FORWARD', 10); break;
+                case 'SEEK_BACK': nativePlayerControl('SEEK_BACK', 10); break;
+                case 'STOP': nativePlayerControl('STOP'); break;
+                case 'BACK': nativePlayerControl('STOP'); break;
+                // v3.12.50: D-pad & Home from the phone remote while ExoPlayer owns
+                // the screen — map them to the media controls the Java bridge speaks.
+                case 'DPAD_CENTER': nativePlayerControl('PLAY_PAUSE'); break;
+                case 'DPAD_LEFT': nativePlayerControl('SEEK_BACK', 10); break;
+                case 'DPAD_RIGHT': nativePlayerControl('SEEK_FORWARD', 10); break;
+                case 'HOME': nativePlayerControl('STOP'); handleClosePlayer(); setActiveTab('home'); break;
+                default: break;
+              }
+              return;
+            }
+            const video = document.querySelector('video');
+            switch (cmd) {
+              case 'PLAY': if (video) video.play().catch(() => {}); break;
+              case 'PAUSE': if (video) video.pause(); break;
+              case 'PLAY_PAUSE':
+                if (video) { video.paused ? video.play().catch(() => {}) : video.pause(); }
+                break;
+              case 'SEEK_FORWARD': if (video) video.currentTime = Math.min((video.currentTime || 0) + 10, video.duration || Infinity); break;
+              case 'SEEK_BACK': if (video) video.currentTime = Math.max((video.currentTime || 0) - 10, 0); break;
+              case 'BACK': handleBack(); break;
+              case 'HOME': handleClosePlayer(); setActiveTab('home'); break;
+              // v3.12.50: D-pad navigation and channel zapping used to fall into
+              // `default:` and vanish — re-publish them as keyboard events so the
+              // spatial navigator and TVPlayer react exactly like to a hardware remote.
+              case 'DPAD_UP':
+              case 'DPAD_DOWN':
+              case 'DPAD_LEFT':
+              case 'DPAD_RIGHT':
+              case 'DPAD_CENTER':
+              case 'CHANNEL_UP':
+              case 'CHANNEL_DOWN':
+                injectRemoteCommandKey(cmd);
+                break;
+              default: break;
+            }
+          } else if (msg.type === 'NAV_TAB' && msg.tab) {
+            setActiveTab(String(msg.tab));
+          } else if (msg.type === 'WATCHLIST_SYNC' && Array.isArray(msg.items)) {
+            import('./api/watchlistSync').then(({ mergeRemoteWatchlist }) => {
+              const merged = mergeRemoteWatchlist(msg.items);
+              setWatchlist(merged);
+            }).catch(() => {});
+          }
+        } catch (err) {
+          console.warn('[AJO-CAST] handler error:', err);
+        }
+      });
+    }).catch(() => {});
+    return () => { if (unsubscribe) unsubscribe(); };
+  }, [handleBack]);
+
+  // Spatial Navigation Hook
+  const hasAnyModal = Boolean(selectedItem || activePlayback || otaPrompt);
+  const { focusInitial } = useSpatialNavigation({
+    onBack: handleBack,
+    isModalOpen: hasAnyModal,
+    modalSelector: selectedItem ? '.tv-modal-card' : activePlayback ? '.tv-player-container' : '.tv-modal-card, .modal-card, .worldwide-filter-modal-content',
+  });
+
+  // Focus initial element ONLY when the tab actually changed (v3.10.0).
+  // Previously this fired whenever any modal/player closed too, yanking
+  // focus away from the card being restored and onto the Home pill.
+  useEffect(() => {
+    if (prevTabRef.current === activeTab) return;
+    prevTabRef.current = activeTab;
+    if (!selectedItem && !activePlayback) {
+      // v3.12.66: Search is a TYPE-FIRST screen — focus the input so typed
+      // characters land in the field instead of vanishing into the page.
+      if (activeTab === 'search') {
+        focusInitial('.tv-search-input, .tv-nav-pill.active');
+      } else {
+        focusInitial('.tv-nav-pill.active, .tv-hero, .tv-card');
+      }
+    }
+  }, [activeTab, selectedItem, activePlayback, focusInitial]);
+
+
+  // Featured Spotlight Hero Items — MovieBox-style multi-item carousel
+  const featuredItems = useMemo(() => {
+    const pool = [];
+    // Mix trending + now playing + popular for a diverse carousel
+    if (tmdbTrending.length > 0) pool.push(...tmdbTrending.slice(0, 3));
+    if (nowPlaying.length > 0) pool.push(...nowPlaying.slice(0, 2));
+    if (bollywoodItems.length > 0) pool.push(bollywoodItems[0]);
+    if (hollywoodItems.length > 0) pool.push(hollywoodItems[0]);
+    // Deduplicate by title
+    const seen = new Set();
+    return pool.filter(item => {
+      if (!item) return false;
+      const key = (item.title_en || item.title || '').toLowerCase().trim();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    }).slice(0, 7);
+  }, [tmdbTrending, nowPlaying, bollywoodItems, hollywoodItems]);
+
+  const featuredItem = featuredItems[0] || null;
+
+  // v3.12.83 (StreamFlix structure): the Home feed needs SEPARATE trending
+  // movie + series rails (the reference mixes them). Split the blended
+  // tmdbTrending list by resolved type so each rail shows the right content.
+  const trendingMovies = useMemo(() => {
+    return (tmdbTrending || []).filter(it => {
+      if (it.type === 'series' || it.type === 'serial' || it.type === 'tv') return false;
+      if (it.first_air_date && !it.release_date) return false;
+      return true;
+    });
+  }, [tmdbTrending]);
+
+  const trendingSeries = useMemo(() => {
+    return (tmdbTrending || []).filter(it => {
+      if (it.type === 'series' || it.type === 'serial' || it.type === 'tv') return true;
+      if (it.first_air_date && !it.release_date) return true;
+      return false;
+    });
+  }, [tmdbTrending]);
+
+  // v3.9.0 PERF: removed YouTube trailer iframe from hero banner.
+  // On Fire TV Stick 4K (1.5GB RAM) the iframe consumed ~150MB (Chromium
+  // sub-renderer), competed for GPU with the WebView, and broke D-pad focus.
+
+  // All Movies combined (upstream catalog + TMDB popular, strictly movies only)
+  const allMovies = useMemo(() => {
+    const seen = new Set();
+    const merged = [];
+    for (const item of [...moviboxItems, ...bollywoodItems, ...hollywoodItems, ...tmdbMovies]) {
+      // v3.12.80: exclude anything series-shaped. Rely on the resolved TYPE
+      // (not category) so a mislabeled 'Web Series' category can't leak a
+      // movie in here, and a series can't slip past because its category
+      // happened to be blank.
+      const cat = String(item.category || '').toLowerCase();
+      if (item.type === 'series' || item.type === 'serial' || item.type === 'tv') continue;
+      if (cat === 'serials' || cat === 'series' || cat === 'web series') continue;
+      if (Array.isArray(item.episodes) && item.episodes.length > 0) continue;
+      const key = String(item.title_en || item.title || '').toLowerCase().trim();
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      merged.push(item);
+    }
+    return merged;
+  }, [moviboxItems, bollywoodItems, hollywoodItems, tmdbMovies]);
+
+  // Series: upstream + TMDB, strictly episodic/series only
+  const allSeries = useMemo(() => {
+    const seen = new Set();
+    const merged = [];
+    for (const item of [...moviboxItems, ...seriesItems, ...tmdbSeries]) {
+      // v3.12.80: a card with a movie TYPE belongs in Movies even if it came
+      // through the serials pipeline (mixed-up catalog). Only keep genuine
+      // series/episodic entries.
+      const isSeriesShape = item.type === 'series' || item.type === 'serial' || item.type === 'tv'
+        || (Array.isArray(item.episodes) && item.episodes.length > 0);
+      if (!isSeriesShape) continue;
+      const key = String(item.title_en || item.title || '').toLowerCase().trim();
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      merged.push(item);
+    }
+    return merged;
+  }, [moviboxItems, seriesItems, tmdbSeries]);
+
+  return (
+    <div className="tv-app">
+      {showSplash && (
+        <SplashScreen onDone={() => { window.__ajoSplashShown = true; setShowSplash(false); }} />
+      )}
+      {/* Top MovieBox-Style Navigation Bar with Sub-tabs */}
+      <GoogleTVHeader
+        activeTab={activeTab}
+        onSelectTab={(tab) => {
+          setActiveTab(tab);
+          setActiveProvider(null);
+          // v3.12.88: every tab opens at its TOP. Without this the new page
+          // kept the old scroll position (or auto-recover scrolled mid-page),
+          // and content above the fold looked "hidden" (Settings' cast card).
+          try {
+            const sc = document.querySelector('.tv-main-content');
+            if (sc) sc.scrollTop = 0;
+          } catch (_) {}
+        }}
+        activeSubTab={activeSubTab}
+        onSelectSubTab={(sub) => { setActiveSubTab(sub); setActiveProvider(null); }}
+      />
+
+      {/* OTA Update Toast Banner */}
+      {otaPrompt && (
+        <div className="tv-ota-rail tv-rail" style={{
+          background: otaPrompt.needsReinstall
+            ? 'linear-gradient(90deg, #b45309, #f59e0b)'
+            : 'linear-gradient(90deg, #2563eb, #38bdf8)',
+          color: '#ffffff',
+          padding: '10px 48px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          fontWeight: 700,
+          fontSize: '0.95rem'
+        }}>
+          <span>
+            {downloadProgress
+              ? (downloadProgress.ready ? '⚡ Update downloaded! Launching installer...' : `📥 Downloading: ${downloadProgress.percent || 0}%`)
+              : (otaPrompt.isPhoneSwitch
+                ? `📱 Phone detected! Tap to install the touch-friendly AJO Phone app (v${otaPrompt.latestVersion})`
+                : (otaPrompt.needsReinstall
+                  ? '⚠ AJO is switching to its permanent release key — this update needs a quick one-time reinstall.'
+                  : `🚀 New Update Available: v${otaPrompt.latestVersion} (Android TV Edition)`))}
+          </span>
+          <div style={{ display: 'flex', gap: 10 }}>
+            {!downloadProgress && (
+              <button
+                tabIndex={0}
+                className="tv-btn-primary"
+                style={{ padding: '6px 16px', fontSize: '0.85rem' }}
+                onClick={() => {
+                  setDownloadProgress({ percent: 0 });
+                  if (window.AndroidUpdater?.downloadAndInstall) {
+                    window.AndroidUpdater.downloadAndInstall(otaPrompt.apkUrl);
+                  } else {
+                    window.open(otaPrompt.apkUrl, '_blank');
+                  }
+                }}
+              >
+                {otaPrompt.isPhoneSwitch ? 'Install Phone App' : (otaPrompt.needsReinstall ? 'One-Time Reinstall' : 'Update Now')}
+              </button>
+            )}
+            <button
+              tabIndex={0}
+              className="tv-btn-secondary"
+              style={{ padding: '6px 16px', fontSize: '0.85rem' }}
+              onClick={() => setOtaPrompt(null)}
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Main Content Area */}
+      <main className="tv-main-content">
+        {loading ? (
+          <div className="tv-center-state">
+            <div className="tv-spinner" />
+            <p style={{ fontWeight: 700, marginTop: 16 }}>Loading Catalog & Live Channels...</p>
+          </div>
+        ) : (
+          <>
+            {/* 🏠 HOME TAB — StreamFlix-style curated feed (v3.12.83): one
+                cinematic hero banner, then clean content-type rails in
+                engagement order. No cluttered sub-tab bar. */}
+            {activeTab === 'home' && (
+              <>
+                {activeProvider ? (
+                  <ProviderCatalog
+                    provider={activeProvider}
+                    onSelectItem={handleItemClick}
+                    onBack={() => setActiveProvider(null)}
+                  />
+                ) : (
+                  <>
+                    {/* Cinematic hero banner (StreamFlix-style): one featured
+                        title with metadata + Watch Now / More Info CTAs. */}
+                    {featuredItems.length > 0 && (
+                      <HeroBanner
+                        items={featuredItems}
+                        onPlay={(item) => handleStartPlayback(item)}
+                        onSelectInfo={(item) => { rememberFocus(); setSelectedItem(item); }}
+                      />
+                    )}
+
+                    {/* Continue Watching */}
+                    {continueWatching.length > 0 && (
+                      <MediaRail
+                        title="Continue Watching"
+                        items={continueWatching}
+                        onSelectItem={handleItemClick}
+                      />
+                    )}
+
+                    {/* Live TV */}
+                    {liveItems.length > 0 && (
+                      <MediaRail
+                        title={`Live TV (${liveItems.length} channels)`}
+                        items={liveItems.slice(0, 20)}
+                        isLive={true}
+                        onSelectItem={handleItemClick}
+                        onSeeAll={() => setActiveTab('live')}
+                      />
+                    )}
+
+                    {/* Trending Movies */}
+                    {trendingMovies.length > 0 && (
+                      <MediaRail
+                        title="Trending Movies"
+                        items={trendingMovies.slice(0, 20)}
+                        onSelectItem={handleItemClick}
+                        onSeeAll={() => setActiveTab('movies')}
+                      />
+                    )}
+
+                    {/* Popular Series */}
+                    {trendingSeries.length > 0 && (
+                      <MediaRail
+                        title="Popular Series"
+                        items={trendingSeries.slice(0, 20)}
+                        onSelectItem={handleItemClick}
+                        onSeeAll={() => setActiveTab('series')}
+                      />
+                    )}
+
+                    {/* Trending Anime (v3.14.0: bingr.one catalog) */}
+                    {animeItems.length > 0 && (
+                      <MediaRail
+                        title="Trending Anime"
+                        items={animeItems.slice(0, 20)}
+                        onSelectItem={handleItemClick}
+                        onSeeAll={() => setActiveTab('anime')}
+                      />
+                    )}
+
+                    {/* Because You Watched */}
+                    {becauseYouWatched.length > 0 && (
+                      <MediaRail
+                        title={`Because you watched ${becauseYouWatched[0]?.becauseOf || 'recent titles'}`}
+                        items={becauseYouWatched}
+                        onSelectItem={handleItemClick}
+                      />
+                    )}
+
+                    {/* My Watchlist */}
+                    {watchlist.length > 0 && (
+                      <MediaRail
+                        title="My Watchlist"
+                        items={watchlist}
+                        onSelectItem={handleItemClick}
+                      />
+                    )}
+
+                    {/* New Releases */}
+                    {nowPlaying.length > 0 && (
+                      <MediaRail
+                        title="New Releases"
+                        items={nowPlaying}
+                        onSelectItem={handleItemClick}
+                      />
+                    )}
+
+                    {/* Bollywood */}
+                    {bollywoodItems.length > 0 && (
+                      <MediaRail
+                        title="Bollywood Blockbusters"
+                        items={bollywoodItems.slice(0, 20)}
+                        onSelectItem={handleItemClick}
+                        onSeeAll={() => setActiveTab('movies')}
+                      />
+                    )}
+
+                    {/* Hollywood */}
+                    {hollywoodItems.length > 0 && (
+                      <MediaRail
+                        title="Hollywood Cinema"
+                        items={hollywoodItems.slice(0, 20)}
+                        onSelectItem={handleItemClick}
+                        onSeeAll={() => setActiveTab('movies')}
+                      />
+                    )}
+
+                    {/* Browse by Streaming Service */}
+                    <ProviderRow
+                      onSelectProvider={(p) => setActiveProvider(p)}
+                      activeProviderId={null}
+                    />
+                  </>
+                )}
+              </>
+            )}
+
+
+            {/* 🏆 LIVE SPORTS — folded into Live TV tab (v3.12.83). Kept as a
+                route alias in case a cast/old link sends 'sports': it renders
+                the live wall. The standalone nav pill is gone from the header. */}
+            {activeTab === 'sports' && (
+              <MediaGridView
+                title="Live Sports"
+                items={sportsItems}
+                isLive={true}
+                onSelectItem={handleItemClick}
+              />
+            )}
+
+            {/* 🎬 MOVIES TAB */}
+            {activeTab === 'movies' && (
+              <MediaGridView
+                title="🎬 All Movies (Bollywood & Hollywood)"
+                items={allMovies}
+                onSelectItem={handleItemClick}
+              />
+            )}
+
+            {/* 📺 WEB SERIES TAB */}
+            {activeTab === 'series' && (
+              <MediaGridView
+                title="📺 Complete Web Series Vault"
+                items={allSeries}
+                onSelectItem={handleItemClick}
+              />
+            )}
+
+            {/* ✨ ANIME TAB (v3.14.0: bingr.one catalog + mirrors) */}
+            {activeTab === 'anime' && (
+              <MediaGridView
+                title="✨ Anime"
+                items={animeItems}
+                onSelectItem={handleItemClick}
+              />
+            )}
+
+            {/* 🔴 LIVE TV TAB */}
+            {activeTab === 'live' && (
+              <>
+                <div className="live-toolbar" style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '12px 32px 14px 32px',
+                  borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+                  marginBottom: '12px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ fontSize: '1.4rem' }}>📡</span>
+                    <h2 style={{ fontSize: '1.35rem', fontWeight: 800, margin: 0, color: '#ffffff' }}>
+                      Live Television ({liveItems.length} Channels)
+                    </h2>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <button
+                      tabIndex={0}
+                      className={`tv-cat-btn ${liveViewMode === 'grid' ? 'active' : ''}`}
+                      onClick={() => setLiveViewMode('grid')}
+                      style={{
+                        padding: '8px 18px',
+                        fontSize: '0.9rem',
+                        fontWeight: 800,
+                        borderRadius: '20px',
+                        border: liveViewMode === 'grid' ? '2px solid #38bdf8' : '1px solid rgba(255,255,255,0.15)',
+                        background: liveViewMode === 'grid' ? 'linear-gradient(135deg, #38bdf8, #0284c7)' : 'rgba(15, 23, 42, 0.85)',
+                        color: liveViewMode === 'grid' ? '#06090e' : '#ffffff'
+                      }}
+                    >
+                      ▦ All Channels (Grid)
+                    </button>
+                    <button
+                      tabIndex={0}
+                      className={`tv-cat-btn ${liveViewMode === 'epg' ? 'active' : ''}`}
+                      onClick={() => setLiveViewMode('epg')}
+                      style={{
+                        padding: '8px 18px',
+                        fontSize: '0.9rem',
+                        fontWeight: 800,
+                        borderRadius: '20px',
+                        border: liveViewMode === 'epg' ? '2px solid #38bdf8' : '1px solid rgba(255,255,255,0.15)',
+                        background: liveViewMode === 'epg' ? 'linear-gradient(135deg, #38bdf8, #0284c7)' : 'rgba(15, 23, 42, 0.85)',
+                        color: liveViewMode === 'epg' ? '#06090e' : '#ffffff'
+                      }}
+                    >
+                      📅 TV Guide (EPG)
+                    </button>
+                  </div>
+                </div>
+
+                {liveLoaded && liveItems.length === 0 ? (
+                  <div className="tv-empty-state" style={{ textAlign: 'center', marginTop: 80 }}>
+                    <p style={{ color: '#9aa3b2', fontSize: 19, marginBottom: 20 }}>
+                      Couldn't load channels right now. Check your internet and try again.
+                    </p>
+                    <button
+                      className="tv-retry-btn"
+                      style={{
+                        padding: '12px 34px', fontSize: 18, fontWeight: 700,
+                        background: '#e50914', color: '#fff', borderRadius: 8, border: 'none', cursor: 'pointer'
+                      }}
+                      onClick={() => { setLiveLoaded(false); loadLiveTV(); }}
+                    >
+                      ↻ Retry Loading Channels
+                    </button>
+                  </div>
+                ) : liveViewMode === 'epg' ? (
+                  <EPGGuideView
+                    channels={liveItems}
+                    onSelectChannel={handleItemClick}
+                  />
+                ) : (
+                  <LiveView
+                    channels={liveItems}
+                    loading={!liveLoaded}
+                    onSelectItem={handleItemClick}
+                  />
+                )}
+              </>
+            )}
+
+            {/* 🔍 SEARCH TAB */}
+            {activeTab === 'search' && (
+              <SearchView onSelectItem={handleItemClick} initialQuery={searchPrefill} />
+            )}
+
+            {/* ⚙️ SETTINGS TAB */}
+            {activeTab === 'settings' && (
+              <SettingsView />
+            )}
+          </>
+        )}
+      </main>
+
+      {/* Media Details Popup Modal */}
+      {selectedItem && (
+        <MediaDetailsModal
+          item={selectedItem}
+          onClose={() => setSelectedItem(null)}
+          onStartPlayback={handleStartPlayback}
+        />
+      )}
+
+      {/* Fullscreen TV Player */}
+      {activePlayback && (
+        <TVPlayer
+          item={activePlayback.item}
+          server={activePlayback.server}
+          allServers={activePlayback.allServers}
+          channels={liveItems}
+          episodes={activePlayback.episodes}
+          currentEpisodeIndex={activePlayback.episodeIndex}
+          onSelectEpisode={(ep, idx) => {
+            const seriesItem = activePlayback.item;
+            const fullEpItem = {
+              ...seriesItem,
+              ...ep,
+              title: `${seriesItem.series_title || seriesItem.title?.split(' - S')[0] || seriesItem.name} - S${ep.season_number || 1}E${ep.episode_number || (idx + 1)}${ep.name && !ep.name.startsWith('Episode') ? `: ${ep.name}` : ''}`,
+              series_title: seriesItem.series_title || seriesItem.title?.split(' - S')[0] || seriesItem.name,
+              season: ep.season_number || 1,
+              season_number: ep.season_number || 1,
+              episode: ep.episode_number || (idx + 1),
+              episode_number: ep.episode_number || (idx + 1),
+              type: 'series',
+              category: 'serials',
+              tmdb_id: seriesItem.tmdb_id || ep.tmdb_id
+            };
+            handleStartPlayback(fullEpItem, null, activePlayback.episodes, idx);
+          }}
+          onSelectChannel={(ch) => handleItemClick(ch)}
+          onClose={handleClosePlayer}
+        />
+      )}
+    </div>
+  );
+}

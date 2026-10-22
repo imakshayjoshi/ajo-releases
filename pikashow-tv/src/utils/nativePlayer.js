@@ -279,7 +279,7 @@ export function setNativePlaybackActive(active) {
   nativePlaybackActive = Boolean(active);
 }
 
-export function playInNativePlayer(url, title, isLive, fallbackUrls = [], startPositionMs = 0, channels = null, channelIndex = 0) {
+export function playInNativePlayer(url, title, isLive, fallbackUrls = [], startPositionMs = 0, channels = null, channelIndex = 0, tappedDrm = null, tappedHeaders = null) {
   const api = bridge();
   if (!api || !url) return false;
   if (!isNativePlayableUrl(url)) return false;
@@ -304,11 +304,15 @@ export function playInNativePlayer(url, title, isLive, fallbackUrls = [], startP
       const channelsJson = JSON.stringify(channels);
       // v3.17.15: the tapped channel may carry ClearKey + headers (jio Cookie)
       // — forward them so the native player opens DRM channels directly.
+      // Prefer the explicit tapped-item DRM (channelIndex can mismatch when
+      // the tap came from a rail that isn't liveItems).
       const cur = channels[channelIndex] || {};
-      const hasDrm = cur.drm && Array.isArray(cur.drm.keys) && cur.drm.keys.length > 0;
-      const hasHdrs = cur.headers && Object.keys(cur.headers).length > 0;
-      const drmJson = (hasDrm || hasHdrs)
-        ? JSON.stringify({ ...(hasDrm ? { keys: cur.drm.keys } : {}), ...(hasHdrs ? { headers: cur.headers } : {}) })
+      const effDrm = (tappedDrm && Array.isArray(tappedDrm.keys) && tappedDrm.keys.length > 0) ? tappedDrm
+        : (cur.drm && Array.isArray(cur.drm.keys) && cur.drm.keys.length > 0) ? cur.drm : null;
+      const effHdrs = (tappedHeaders && Object.keys(tappedHeaders).length > 0) ? tappedHeaders
+        : (cur.headers && Object.keys(cur.headers).length > 0) ? cur.headers : null;
+      const drmJson = (effDrm || effHdrs)
+        ? JSON.stringify({ ...(effDrm ? { keys: effDrm.keys } : {}), ...(effHdrs ? { headers: effHdrs } : {}) })
         : '';
       if (drmJson && typeof api.playLiveStreamWithChannelsAndDrm === 'function') {
         api.playLiveStreamWithChannelsAndDrm(

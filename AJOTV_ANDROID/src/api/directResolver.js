@@ -1,0 +1,239 @@
+// v3.15.0: vidy.st direct-stream resolver.
+// Their player loads embed pages that fetch ENCRYPTED source lists from
+// api.wecollege.net /{city}/sources. The full scheme (ported from their
+// shipped chunk 122, Oct 18 2026):
+//   1. GET /seed?mediaId={tmdbId}           -> {seed, ttlMs} (30s TTL)
+//   2. GET /miami/sources?...&enc=2&seed=.. -> base64url blob
+//   3. blob XOR keystream(seed, tmdbId) -> 'mvm1' magic + utf8 JSON
+//      {sources:[{file|url,label|quality}], subtitles, thumbnail}
+// Decrypted sources are raw HLS (moon.zenoak.top) = they play in our own
+// player: no ads, no embed UI, real seek + ABR.
+
+const L = [1116352408, 1899447441, 3049323471, 3921009573, 961987163, 1508970993, 2453635748, 2870763221, 3624381080, 310598401, 607225278, 1426881987, 1925078388, 2162078206, 2614888103, 3248222580];
+const MAGIC = [109, 118, 109, 49]; // 'mvm1'
+const GOLDEN = 2654435769;
+
+function m(e) {
+  e >>>= 0; e ^= e >>> 16; e = Math.imul(e, 2246822507) >>> 0; e ^= e >>> 13; e = Math.imul(e, 3266489909) >>> 0; return (e ^= e >>> 16) >>> 0;
+}
+function rotl(e, t) {
+  e >>>= 0; t &= 31; return t === 0 ? e >>> 0 : ((e << t) | (e >>> (32 - t))) >>> 0;
+}
+function fnv(str) {
+  let t = 2166136261;
+  for (let a = 0; a < str.length; a++) t = Math.imul(t ^ str.charCodeAt(a), 16777619) >>> 0;
+  return m(t);
+}
+
+function keyState(seed, mediaId) {
+  // Their RC4 branch is dead code (I(x) is never true for real lengths).
+  const a = new Array(61); // sparse on purpose — `d in a` is used below
+  let s = m(fnv(String(seed)) ^ m((mediaId >>> 0) ^ GOLDEN)) >>> 0;
+  for (let e = 0; e < 8; e++) {
+    const t = s % 61;
+    s = rotl((s + GOLDEN) >>> 0, 7 + (7 & e));
+    a[t] = (s ^ m(s)) >>> 0;
+    s = m((s + t) >>> 0);
+  }
+  return { S: a, acc: m(2779096485 ^ s) >>> 0 };
+}
+
+function nextWord(state, n) {
+  const S = state.S;
+  const acc = state.acc;
+  const d = acc % 61;
+  const inS = (d in S);
+  const r = 0 - Number(inS);
+  const i = (inS ? S[d] : 0) >>> 0;
+  const s2 = (i ^ Math.imul(GOLDEN, n + 1)) >>> 0;
+  const a2 = acc;
+  let l = ((((a2 ^ s2) >>> 0) | ((a2 & s2 & r) >>> 0)) >>> 0);
+  l = (rotl((l + acc) >>> 0, 31 & d) ^ rotl(acc, 31 & Math.imul(d, 7))) >>> 0;
+  const nacc = m((l + GOLDEN) >>> 0);
+  S[d] = nacc >>> 0;
+  state.acc = nacc;
+  return nacc >>> 0;
+}
+
+function keyStream(seed, mediaId, len) {
+  const state = keyState(seed, mediaId);
+  const out = new Uint8Array(len);
+  let n = 0, e = 0;
+  while (e < len) {
+    const t = nextWord(state, n++);
+    out[e++] = 255 & t;
+    if (e < len) out[e++] = (t >>> 8) & 255;
+    if (e < len) out[e++] = (t >>> 16) & 255;
+    if (e < len) out[e++] = (t >>> 24) & 255;
+  }
+  return out;
+}
+
+function b64urlDecode(str) {
+  const t = String(str).replace(/-/g, '+').replace(/_/g, '/').padEnd(4 * Math.ceil(String(str).length / 4), '=');
+  const bin = atob(t);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+
+export function vidyDecrypt(payload, seed, mediaId) {
+  const bytes = b64urlDecode(payload);
+  const ks = keyStream(seed, mediaId, bytes.length);
+  for (let i = 0; i < bytes.length; i++) bytes[i] ^= ks[i];
+  for (let i = 0; i < MAGIC.length; i++) {
+    if (bytes[i] !== MAGIC[i]) throw new Error('vidy decrypt failed: bad seed or tampered payload');
+  }
+  return new TextDecoder('utf-8').decode(bytes.subarray(MAGIC.length));
+}
+
+const VIDY_API = 'https://api.wecollege.net';
+const VIDY_CITIES = ['miami', 'boise', 'vegas', 'reno', 'oakland', 'seattle', 'phoenix', 'dallas'];
+
+const seedCache = new Map();
+
+async function getSeed(tmdbId) {
+  const cached = seedCache.get(tmdbId);
+  if (cached && cached.expiresAt - 5000 > Date.now()) return cached.seed;
+  const res = await fetch(`${VIDY_API}/seed?mediaId=${tmdbId}`);
+  if (!res.ok) throw new Error('vidy seed failed');
+  const data = await res.json();
+  if (!data || !data.seed) throw new Error('vidy seed empty');
+  seedCache.set(tmdbId, { seed: data.seed, expiresAt: Date.now() + (data.ttlMs || 30000) });
+  return data.seed;
+}
+
+/**
+ * Resolve direct HLS sources for a title via vidy.st's API.
+ * Returns [{ url, quality, label, headers }] — empty on any failure.
+ * Callers must treat this as best-effort and keep the embed chain as backup.
+ */
+export async function resolveVidyDirect({ title, year, tmdbId, imdbId, mediaType, season, episode }) {
+  if (!tmdbId) return [];
+  try {
+    const seed = await getSeed(tmdbId);
+    const params = new URLSearchParams({
+      title: encodeURIComponent(title || ''),
+      mediaType: mediaType === 'tv' ? 'tv' : 'movie',
+      year: String(year || ''),
+      episodeId: String(episode || 1),
+      seasonId: String(season || 1),
+      tmdbId: String(tmdbId),
+      imdbId: imdbId || '',
+      enc: '2',
+      seed,
+    });
+    // miami first (their default), boise as second opinion
+    for (const city of VIDY_CITIES.slice(0, 2)) {
+      try {
+        const res = await fetch(`${VIDY_API}/${city}/sources?${params}`, { headers: { Referer: 'https://www.vidy.st/' } });
+        if (!res.ok) continue;
+        const blob = await res.text();
+        const json = JSON.parse(vidyDecrypt(blob, seed, tmdbId));
+        const list = Array.isArray(json?.sources) ? json.sources : [];
+        const out = [];
+        for (const s of list) {
+          const url = s.file || s.url || '';
+          if (!/^https:\/\//.test(url)) continue;
+          out.push({
+            url,
+            quality: s.label || s.quality || '1080p',
+            label: `⚡ Direct ${s.label || s.quality || 'HD'} (No Ads)`,
+            source: 'hls',
+            headers: { Referer: 'https://www.vidy.st/', Origin: 'https://www.vidy.st' },
+          });
+        }
+        if (out.length) return out;
+      } catch { /* next city */ }
+    }
+    return [];
+  } catch {
+    return [];
+  }
+}
+
+// v3.16.0: vidsrc.pm vidora API (found Oct 18 2026 in their /assets/main-*.js).
+// Static x-player-key from the bundle (rotates with their deploys — re-extract
+// from https://vidsrc.pm/assets/main-*.js if this starts 401ing).
+// Returns proxied MP4s (vidspark-relay workers -> bcdn.hakunaymatata.com, the
+// same CDN family as movibox) + subtitle tracks. Proxy needs Referer vidsrc.pm.
+const VIDSRC_KEY = 'f3b72e73c80c9a996574379798703796a1936efa3516a7105cb0e43048b46b5a';
+const VIDSRC_HEADERS = { 'x-player-key': VIDSRC_KEY, Referer: 'https://vidsrc.pm/' };
+
+export async function resolveVidsrcDirect({ tmdbId, mediaType, season, episode }) {
+  if (!tmdbId) return [];
+  try {
+    const path = mediaType === 'tv'
+      ? `/api/vidora/v1/tv/${tmdbId}/${season || 1}/${episode || 1}?source=oreon`
+      : `/api/vidora/v1/movie/${tmdbId}?source=oreon`;
+    const res = await fetch(`https://vidsrc.pm${path}`, { headers: VIDSRC_HEADERS });
+    if (!res.ok) return [];
+    const data = await res.json().catch(() => null);
+    if (!data?.result || !Array.isArray(data.sources)) return [];
+    const out = [];
+    for (const s of data.sources) {
+      const url = s.url || '';
+      if (!/^https:\/\//.test(url)) continue;
+      out.push({
+        url,
+        quality: '1080p',
+        label: '⚡ Direct MP4 (No Ads)',
+        source: 'mp4',
+        headers: { Referer: 'https://vidsrc.pm/' },
+        subtitles: Array.isArray(s.tracks) ? s.tracks.filter(t => t && (t.file || t.url)) : [],
+      });
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
+// v3.17.0: vidrift orion API (cracked Oct 18 2026). Flow, all from public data:
+//   1. GET /embed/{movie|tv}/... HTML -> embedMeta.playbackToken (2-part signed
+//      token, handed to every page visitor)
+//   2. GET /api/source/{movie|tv}/...?token=..&provider=orion -> streams[] with
+//      /api/orion/{hash}/master.m3u8 adaptive HLS (HEVC; multiple language
+//      variants incl. Hindi). Playlists+segments play with Referer=embed page.
+const VIDRIFT_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36';
+
+export async function resolveVidriftDirect({ tmdbId, mediaType, season, episode, hevcOk = true }) {
+  if (!tmdbId) return [];
+  try {
+    const isTv = mediaType === 'tv';
+    const embedUrl = isTv
+      ? `https://embed.vidrift.in/embed/tv/${tmdbId}/${season || 1}/${episode || 1}`
+      : `https://embed.vidrift.in/embed/movie/${tmdbId}`;
+    const pageRes = await fetch(embedUrl, { headers: { 'User-Agent': VIDRIFT_UA } });
+    if (!pageRes.ok) return [];
+    const html = await pageRes.text();
+    const tokMatch = html.match(/"playbackToken":"([^"]+)"/);
+    if (!tokMatch) return [];
+    const path = isTv ? `tv/${tmdbId}/${season || 1}/${episode || 1}` : `movie/${tmdbId}`;
+    const apiRes = await fetch(
+      `https://embed.vidrift.in/api/source/${path}?token=${encodeURIComponent(tokMatch[1])}&provider=orion${hevcOk ? '' : '&hevc=0'}`,
+      { headers: { Referer: embedUrl, 'User-Agent': VIDRIFT_UA } }
+    );
+    if (!apiRes.ok) return [];
+    const data = await apiRes.json().catch(() => null);
+    if (!Array.isArray(data?.streams)) return [];
+    const out = [];
+    for (const s of data.streams) {
+      if (s.type !== 'hls' || !s.url) continue;
+      const url = s.url.startsWith('http') ? s.url : `https://embed.vidrift.in${s.url}`;
+      const maxRung = (s.rungs || []).reduce((m2, r) => Math.max(m2, r?.height || 0), 0);
+      const quality = maxRung >= 1000 ? '1080p' : maxRung >= 700 ? '720p' : '480p';
+      const lang = /hindi/i.test(s.name || '') ? ' 🇮🇳 Hindi' : '';
+      out.push({
+        url,
+        quality,
+        label: `⚡ Direct ${quality}${lang} (No Ads)`,
+        source: 'hls',
+        headers: { Referer: embedUrl },
+      });
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { getBollywoodCatalog, getHollywoodCatalog, getSerialsCatalog, getLiveBroadcasts } from './api/pikashow';
-import { getLiveChannels, isPopularLiveChannel, classifyLiveChannel, hasWorkingPlayer, applyLiveSourceOverride, probeLiveChannels, guessLiveLogo } from './api/live';
+import { getLiveChannels, isPopularLiveChannel, classifyLiveChannel, hasWorkingPlayer, applyLiveSourceOverride, probeLiveChannels, guessLiveLogo, squashLiveName } from './api/live';
 import { LiveView } from './components/LiveView';
 import { getLiveSportsEvents } from './api/sports';
 import { getWatchHistory, saveProgress, getWatchProgress, filterAliveItems, syncContinueToNative } from './api/history';
@@ -238,7 +238,10 @@ export default function App() {
       const seen = new Map();
       const seenIds = new Set();
       const push = (ch, fallbackSource) => {
-        const nameKey = String(ch.title_en || ch.title || ch.name || '').toLowerCase().trim();
+        // v3.17.15: squash-key dedupe — "Star Sports 1 HD Hindi" (aggregator,
+        // jio official) and "Star Sports 1 Hindi HD" (legacy junk mirror) are
+        // the SAME channel. Aggregator entries are pushed first and win.
+        const nameKey = squashLiveName(ch.title_en || ch.title || ch.name || '');
         if (!nameKey) return;
         const id = String(ch.id || ch.name || nameKey).trim();
         // v3.12.66: duplicate ids (e.g. DisneyJunior.in@SD) broke React keys.
@@ -412,7 +415,7 @@ export default function App() {
             };
           }).filter(ch => ch.url);
         }
-        if (playInNativePlayer(url, title, true, allServers, 0, channelsList, channelIndex)) return;
+        if (playInNativePlayer(url, title, true, allServers, 0, channelsList, channelIndex, item.drm || null, item.headers || null)) return;
       }
 
       setActivePlayback({ item, server });

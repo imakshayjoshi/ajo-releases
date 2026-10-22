@@ -50,7 +50,7 @@ aaj tak|abp news|india tv|ndtv india|republic bharat|news18 india|zee news|times
 times now|republic tv|india today|cnn-news18|ndtv 24x7|mirror now|wion|dd india|bbc world news|cnn international|al jazeera english|cnbc-tv18|et now|ndtv profit
 `;
 
-function squashLiveName(name) {
+export function squashLiveName(name) {
   return String(name || '')
     .toLowerCase()
     .replace(/[^a-z0-9+& ]/g, ' ')
@@ -320,16 +320,11 @@ export const DEAD_STREAM_HOST_PATTERNS = [
  * v3.12.70: known-live HD mirrors for channels whose primary feed is dead.
  * Applied after merge so legacy iptv entries get a working server first.
  */
-export const LIVE_SOURCE_OVERRIDES = [
-  { match: /star sports 1(?!.*(hindi|tamil|telugu))/i, url: 'https://cdn.buzogezapimuyoku.cc/live/star-sports-1-hindi-hd/index.m3u8', label: 'Server 1 (Verified HD)' },
-  { match: /star sports 2(?!.*(hindi|tamil|telugu|english))/i, url: 'http://103.151.60.162:2122/play/a00v/index.m3u8?hls', label: 'Server 1 (Verified HD)' },
-  { match: /star gold hd/i, url: 'http://103.185.24.134:3001/Star-Gold/index.m3u8', label: 'Server 1 (Verified HD)' },
-  { match: /star gold 2 hd/i, url: 'http://103.151.60.162:2122/play/a01v/index.m3u8?hls', label: 'Server 1 (Verified HD)' },
-  { match: /star pravah hd/i, url: 'https://da86m1sqpm3o0.cloudfront.net/28072023/smil:starpravah.smil/chunklist_b1928000.m3u8', label: 'Server 1 (Verified HD)' },
-  { match: /star sports select 1/i, url: 'http://103.151.60.162:2122/play/a026/index.m3u8?hls', label: 'Server 1 (Verified HD)' },
-  { match: /star sports select 2/i, url: 'http://103.151.60.162:2122/play/a027/index.m3u8?hls', label: 'Server 1 (Verified HD)' },
-  { match: /star plus hd/i, url: 'http://38.96.178.205/STARPLUS/index.m3u8', label: 'Server 1 (Verified HD)' }
-];
+// v3.17.15: OVERRIDE TABLE EMPTIED. These hardcoded "Verified HD" mirrors
+// (buzogezapimuyoku junk host playing 3s loops, the congested 103.151 relay)
+// predated the official Jio ClearKey streams, which are now the real primary
+// source via the aggregator. Forcing these URLs only poisoned playback.
+export const LIVE_SOURCE_OVERRIDES = [];
 
 const DEAD_STREAM_URL_SUBSTRINGS = [
   '/play/a029/index.m3u8', // Star Sports 3 playlist path — 404 (probed)
@@ -416,6 +411,9 @@ export function applyLiveSourceOverride(ch) {
 }
 
 export function isPopularLiveChannel(raw) {
+  // v3.17.16: bhoom-sourced channels are pre-curated Indian free-to-air —
+  // bypass the whitelist (it exists to filter junk legacy feeds only).
+  if (raw && (raw.source === 'bhoom' || String(raw.id || '').startsWith('bhoom-'))) return true;
   if (!raw) return false;
   const name = String(raw.name || raw.title || raw.title_en || '').toLowerCase();
   const lang = String(raw.lang || raw.language || '').toLowerCase().trim();

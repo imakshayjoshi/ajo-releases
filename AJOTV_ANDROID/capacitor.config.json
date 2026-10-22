@@ -1,0 +1,13 @@
+{
+  "appId": "com.ajo.androidtv",
+  "appName": "AJO TV",
+  "webDir": "dist",
+  "bundledWebRuntime": false,
+  "server": {
+    "cleartext": false,
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": true
+  }
+}

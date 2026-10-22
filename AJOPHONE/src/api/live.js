@@ -57,6 +57,11 @@ const LIVE_WHITELIST_ALIASES = { ndtvgoodtimes: 'goodtimes' };
 const BANNED_LANG_RE = /bangla|bengali|ananda|aath|kannada|gujarati|asmita|telugu|tamil|malayalam|punjabi|bhojpuri|bihar jharkhand|madhya pradesh|chhattisgarh|delhi ncr haryana|up uk|rajasthan|gujarat|odia|assam/;
 
 export function isPopularLiveChannel(raw) {
+  // v3.9.11: bhoom-sourced channels are pre-curated Indian free-to-air
+  // (1,000+ channels from the BHOOM TV directory scrape) — they bypass the
+  // 45-name English/Hindi whitelist that exists to filter the junk legacy
+  // iptv-org feeds. The VPS feed health-checks them every 10 min.
+  if (raw && (raw.source === 'bhoom' || String(raw.id || '').startsWith('bhoom-'))) return true;
   if (!raw) return false;
   const name = String(raw.name || raw.title || '').toLowerCase();
   if (/^episode \d+/.test(name)) return false;

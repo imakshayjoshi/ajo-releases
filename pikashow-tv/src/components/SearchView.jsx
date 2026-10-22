@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Search as SearchIcon, X } from 'lucide-react';
-import { loadCatalog, getLiveBroadcasts } from '../api/pikashow';
+import { loadCatalog } from '../api/pikashow';
+import { getLiveChannels } from '../api/live';
 import { filterAliveItems } from '../api/history.js';
 import { MediaRail } from './MediaRail';
 
@@ -127,9 +128,12 @@ export function SearchView({ onSelectItem, initialQuery }) {
       };
 
       // 1. Local catalog + live (fast, already cached after home load)
-      Promise.allSettled([loadCatalog(), getLiveBroadcasts()]).then(([cat, live]) => {
+      Promise.allSettled([loadCatalog(), getLiveChannels()]).then(([cat, live]) => {
+        // v3.17.15: the mapi catalog carries its OWN junk live-channel entries
+        // (dead mirror URLs, no DRM). Live authority is getLiveBroadcasts()
+        // only — catalog live items are excluded from search results.
         const localItems = [
-          ...(cat.status === 'fulfilled' ? (cat.value.all || []) : []),
+          ...(cat.status === 'fulfilled' ? (cat.value.all || []).filter((i) => !(i.is_live || i.type === 'live' || i.year === 'LIVE')) : []),
           ...(live.status === 'fulfilled' ? live.value : []),
         ];
         push(localItems.filter((item) =>
