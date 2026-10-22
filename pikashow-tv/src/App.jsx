@@ -31,10 +31,6 @@ import { Play, Sparkles } from 'lucide-react';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState(() => new URLSearchParams(window.location.search).get('tab') || 'home');
-  // v3.17.19: settings as a right-pane overlay, toggled by the remote's
-  // gear/menu button (forwarded by MainActivity as 'ajo-settings-key') or the
-  // ContextMenu DOM key. Overlays the current screen; Back closes it first.
-  const [settingsOverlayOpen, setSettingsOverlayOpen] = useState(false);
   const [activeSubTab, setActiveSubTab] = useState('trending');
   const [activeProvider, setActiveProvider] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -639,36 +635,8 @@ export default function App() {
     syncContinueToNative();
   }, [routeDeepLink]);
 
-  // v3.17.19: remote gear/menu -> settings overlay. MainActivity forwards
-  // KEYCODE_SETTINGS/KEYCODE_MENU as 'ajo-settings-key' (plus a ContextMenu
-  // keydown for web/test paths). Not while the player is up — the player's
-  // own drawers own the keys there.
-  useEffect(() => {
-    const toggle = () => {
-      if (activePlayback) return;
-      setSettingsOverlayOpen((v) => !v);
-    };
-    const onKey = (e) => {
-      if (e.key === 'ContextMenu' || e.keyCode === 93) {
-        e.preventDefault();
-        toggle();
-      }
-    };
-    window.addEventListener('ajo-settings-key', toggle);
-    window.addEventListener('keydown', onKey);
-    return () => {
-      window.removeEventListener('ajo-settings-key', toggle);
-      window.removeEventListener('keydown', onKey);
-    };
-  }, [activePlayback]);
-
   // Global Remote Back Handler
   const handleBack = useCallback(() => {
-    // v3.17.19: settings overlay eats Back first.
-    if (settingsOverlayOpen) {
-      setSettingsOverlayOpen(false);
-      return;
-    }
     // v3.10.0 FIX: with the player's channels/servers/audio drawer open, Back
     // must close the drawer first — not kill playback and lose the resume
     // position. TVPlayer's own keydown handler performs the close.
@@ -706,7 +674,7 @@ export default function App() {
     if (window.AndroidNativePlayer && typeof window.AndroidNativePlayer.exitApp === 'function') {
       window.AndroidNativePlayer.exitApp();
     }
-  }, [activePlayback, otaPrompt, selectedItem, activeTab, settingsOverlayOpen, handleClosePlayer, restoreFocus]);
+  }, [activePlayback, otaPrompt, selectedItem, activeTab, handleClosePlayer, restoreFocus]);
 
   // ---- CAST RECEIVER (bug fix): the TV app previously never listened for
   // cast messages, so the phone's "Play on TV" button did nothing. Handle
@@ -1279,34 +1247,6 @@ export default function App() {
           onClose={() => setSelectedItem(null)}
           onStartPlayback={handleStartPlayback}
         />
-      )}
-
-      {/* v3.17.19: ⚙️ SETTINGS OVERLAY — right pane over the current screen,
-          toggled by the remote gear/menu button. Backdrop click / Back closes. */}
-      {settingsOverlayOpen && (
-        <div
-          onClick={() => setSettingsOverlayOpen(false)}
-          style={{
-            position: 'fixed', inset: 0, zIndex: 260,
-            background: 'rgba(4, 8, 16, 0.6)',
-            backdropFilter: 'blur(3px)'
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              position: 'absolute', top: 0, right: 0, bottom: 0,
-              width: 'min(460px, 92vw)',
-              background: 'linear-gradient(180deg, #12151d 0%, #0c0d11 100%)',
-              borderLeft: '1px solid rgba(255,255,255,0.08)',
-              boxShadow: '-24px 0 60px rgba(0,0,0,0.55)',
-              overflowY: 'auto',
-              animation: 'ajo-settings-slide-in 0.22s ease-out'
-            }}
-          >
-            <SettingsView />
-          </div>
-        </div>
       )}
 
       {/* Fullscreen TV Player */}

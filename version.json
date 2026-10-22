@@ -27,10 +27,10 @@
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
-    "changelog": "v3.17.19: the remote gear/menu button finally works — opens Settings as a right-side pane over the current screen (Back closes it). Movie/series server chain rebuilt: dead AutoEmbed removed, Vidy leads, VidSrc/Vidrift next — new titles (e.g. Gandhari) play on the first servers now. Includes the logo-reveal launch film + new home-screen banner.",
+    "changelog": "v3.17.19: movie/series server chain rebuilt — dead AutoEmbed removed, Vidy leads, VidSrc/Vidrift next (new titles like Gandhari play immediately). Includes the logo-reveal launch film + new home-screen banner.",
     "size_mb": 10.7,
-    "sha256": "a13591b28907e5654f3f505e3fe2c90f56b0488ae8b7b53d0c651abcbcee2c08",
-    "size": 11255476,
+    "sha256": "c82c02f22e0640979fe2f26298f6cdb0f3880784e17c94a4836316dfde84d17b",
+    "size": 11254380,
     "releaseDate": "2026-10-22"
   },
   "android_tv": {
@@ -41,11 +41,11 @@
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
-    "changelog": "v3.17.19: the remote gear/menu button finally works — opens Settings as a right-side pane over the current screen (Back closes it). Movie/series server chain rebuilt: dead AutoEmbed removed, Vidy leads, VidSrc/Vidrift next — new titles (e.g. Gandhari) play on the first servers now. Includes the logo-reveal launch film + new home-screen banner.",
+    "changelog": "v3.17.19: movie/series server chain rebuilt — dead AutoEmbed removed, Vidy leads, VidSrc/Vidrift next (new titles like Gandhari play immediately). Includes the logo-reveal launch film + new home-screen banner.",
     "size_mb": 10.7,
-    "sha256": "a13591b28907e5654f3f505e3fe2c90f56b0488ae8b7b53d0c651abcbcee2c08",
+    "sha256": "c82c02f22e0640979fe2f26298f6cdb0f3880784e17c94a4836316dfde84d17b",
     "releaseDate": "2026-10-22",
-    "size": 11255476
+    "size": 11254380
   },
   "changelog": "v3.17.15: Star Sports back for real — official Jio streams (all Star/Sports18/Eurosport), auto-failover to mirrors, deeper live buffer, channels refresh on every app open, search keyboard flow fixed.",
   "sha256": "d29ec31533d90c695f66406f37513eab784909bec5eb3f2dc0f0b19fb8a4deaf"
