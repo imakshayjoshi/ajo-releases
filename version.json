@@ -15,9 +15,9 @@
     "minimumVersionCode": 1,
     "changelog": "v3.9.14: movie server chain rebuilt — dead AutoEmbed removed (was taxing every play 8s), Vidy multi-server leads, Vidrift/VidSrc next; streams that hang with zero frames now fail over in 10s; the all-servers-failed screen now lists exactly which servers failed and why.",
     "size_mb": 3.5,
-    "sha256": "bffe0c698e6b34749d69f46a4253271eb2af59a43c86325330d7b0bab000773f",
+    "sha256": "c861b2242b8b23559a1fd3f328efdecb640caf1f6886a2970c5c054b1087f496",
     "releaseDate": "2026-10-22",
-    "size": 3708326
+    "size": 3708386
   },
   "tv": {
     "version": "3.17.16",
