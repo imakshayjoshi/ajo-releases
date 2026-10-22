@@ -1,18 +1,61 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
-// v3.17.3: Netflix-style cold-start splash — polished pass.
-// Dark stage, breathing green glow, letters land one by one with a tracking
-// ease, a hairline accent draws underneath, light sweep across the wordmark,
-// then a gentle zoom settles and the whole thing cross-fades into the app.
-// ~1.45s total, tap/any key to skip, once per cold start (window flag).
-// Content loads underneath in parallel, so home is warm when the splash lifts.
+// v3.17.18: launch = the AJO logo-reveal FILM (public/logo-reveal.mp4, 6s,
+// 1080p, own audio). Plays once per cold start (App gates on
+// window.__ajoSplashShown). Any key / tap / click skips with a quick fade.
+// If the video can't play (asset missing, codec hiccup), the original CSS
+// wordmark splash takes over automatically, so launch can never black-screen.
+// Hard cap: 9s no matter what the video does.
 export function SplashScreen({ onDone }) {
   const [leaving, setLeaving] = useState(false);
+  const [videoFailed, setVideoFailed] = useState(false);
+  const videoRef = useRef(null);
+  const doneRef = useRef(false);
 
-  // v3.17.5: the "ta-dum" — AJO's own synthesized two-hit chime, bundled
-  // locally (public/startup.wav, 45KB). WebAudio first (no gesture needed on
-  // our WebViews), HTMLAudio fallback, total silence on any failure.
+  const finish = (fadeMs = 320) => {
+    if (doneRef.current) return;
+    doneRef.current = true;
+    setLeaving(true);
+    setTimeout(() => onDone && onDone(), fadeMs);
+  };
+
+  // Hard cap — a stalled video must never trap the launch.
   useEffect(() => {
+    const t = setTimeout(() => finish(200), 9000);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Skip on any remote key / tap.
+  useEffect(() => {
+    const onKey = () => finish(200);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Autoplay policy: the Android WebView allows sound (mediaPlaybackRequiresUserGesture=false),
+  // but anywhere it's blocked the reveal must still PLAY — retry muted instead
+  // of freezing on frame 0 until the hard cap.
+  useEffect(() => {
+    if (videoFailed) return;
+    const v = videoRef.current;
+    if (!v) return;
+    const tryPlay = () => {
+      v.play().catch(() => {
+        try { v.muted = true; } catch {}
+        v.play().catch(() => {});
+      });
+    };
+    if (v.readyState >= 2) tryPlay();
+    v.addEventListener('canplay', tryPlay, { once: true });
+    return () => v.removeEventListener('canplay', tryPlay);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [videoFailed]);
+
+  // Fallback chime for the CSS-splash path (video missing/broken).
+  useEffect(() => {
+    if (!videoFailed) return;
     let stopped = false;
     (async () => {
       try {
@@ -28,34 +71,40 @@ export function SplashScreen({ onDone }) {
           src.connect(gain).connect(ctx.destination);
           src.start(0);
           src.onended = () => { try { ctx.close(); } catch {} };
-          return;
         }
       } catch {}
-      try {
-        if (stopped) return;
-        const audio = new Audio('/startup.wav');
-        audio.volume = 0.85;
-        audio.play().catch(() => {});
-      } catch {}
     })();
-    return () => { stopped = true; };
-  }, []);
+    const t = setTimeout(() => finish(280), 1480);
+    return () => { stopped = true; clearTimeout(t); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [videoFailed]);
 
-  useEffect(() => {
-    const t1 = setTimeout(() => setLeaving(true), 1200);
-    const t2 = setTimeout(() => onDone && onDone(), 1480);
-    return () => { clearTimeout(t1); clearTimeout(t2); };
-  }, [onDone]);
+  if (!videoFailed) {
+    return (
+      <div
+        className={`ajo-splash ajo-splash-video${leaving ? ' ajo-splash-leave' : ''}`}
+        onClick={() => finish(200)}
+        aria-label="AJO"
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#000' }}
+      >
+        <video
+          ref={videoRef}
+          src="/logo-reveal.mp4"
+          autoPlay
+          playsInline
+          onEnded={() => finish(320)}
+          onError={() => setVideoFailed(true)}
+          style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#000' }}
+        />
+      </div>
+    );
+  }
 
-  const skip = () => {
-    setLeaving(true);
-    setTimeout(() => onDone && onDone(), 220);
-  };
-
+  // Original CSS wordmark splash (fallback only)
   return (
     <div
       className={`ajo-splash${leaving ? ' ajo-splash-leave' : ''}`}
-      onClick={skip}
+      onClick={() => finish(220)}
       aria-label="AJO"
     >
       <div className="ajo-splash-glow" />
