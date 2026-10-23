@@ -17,7 +17,8 @@
     "size_mb": 5.8,
     "sha256": "a0515f3ffab0859f19bd95a6a2a951410d2c0ec73598e9c8256a89e527aa337b",
     "releaseDate": "2026-10-23",
-    "size": 6118681
+    "size": 6118681,
+    "downloadUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.17.20/AJO_PHONE.apk"
   },
   "tv": {
     "version": "3.17.20",
@@ -31,7 +32,8 @@
     "size_mb": 9.4,
     "sha256": "3394bdf2fbc6c99d73158966584473adba71c94d900e253abcf638aa76a9e6e8",
     "size": 9889907,
-    "releaseDate": "2026-10-23"
+    "releaseDate": "2026-10-23",
+    "downloadUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.17.20/AJO_TV.apk"
   },
   "android_tv": {
     "version": "3.17.20",
@@ -45,7 +47,8 @@
     "size_mb": 9.4,
     "sha256": "3394bdf2fbc6c99d73158966584473adba71c94d900e253abcf638aa76a9e6e8",
     "releaseDate": "2026-10-23",
-    "size": 9889907
+    "size": 9889907,
+    "downloadUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.17.20/AJO_ANDROID_TV.apk"
   },
   "changelog": "v3.17.15: Star Sports back for real — official Jio streams (all Star/Sports18/Eurosport), auto-failover to mirrors, deeper live buffer, channels refresh on every app open, search keyboard flow fixed.",
   "sha256": "d29ec31533d90c695f66406f37513eab784909bec5eb3f2dc0f0b19fb8a4deaf"
