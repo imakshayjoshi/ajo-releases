@@ -53,6 +53,19 @@ export function SplashScreen({ onDone }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [videoFailed]);
 
+  // Stall detector: on boxes where the WebView can't decode the video the
+  // element sits on a gray placeholder until the 9s cap — unacceptable at
+  // launch. If currentTime hasn't advanced after 2.5s, drop to the CSS splash.
+  useEffect(() => {
+    if (videoFailed) return;
+    const t = setTimeout(() => {
+      const v = videoRef.current;
+      if (v && v.currentTime < 0.1) setVideoFailed(true);
+    }, 2500);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [videoFailed]);
+
   // Fallback chime for the CSS-splash path (video missing/broken).
   useEffect(() => {
     if (!videoFailed) return;
