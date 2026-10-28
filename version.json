@@ -21,34 +21,34 @@
     "downloadUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.17.21/AJO_PHONE.apk"
   },
   "tv": {
-    "version": "3.17.21",
-    "versionCode": 277,
+    "version": "3.17.22",
+    "versionCode": 278,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
-    "changelog": "v3.17.21: OkHttp redirect fix for channels behind 302 (Sony Sports etc.); launch film fix; faster server chain.",
+    "changelog": "v3.17.22: loading screen now clears in ~12s instead of 60s (deep catalog fetches moved to background). Sony Sports + all 302-redirect channels stream via OkHttp redirect fix. Launch film fix. Faster server chain.",
     "size_mb": 9.4,
-    "sha256": "0f9ac3e66fceacf73d83187e1dea0615ec3f3488e3374c0603e8268c29973eec",
-    "size": 9889886,
+    "sha256": "b09f33675f77c4461fc38145733426ad9607af8faf93a2602708c27136e267e4",
+    "size": 9889850,
     "releaseDate": "2026-10-28",
-    "downloadUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.17.21/AJO_TV.apk"
+    "downloadUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.17.22/AJO_TV.apk"
   },
   "android_tv": {
-    "version": "3.17.21",
-    "versionCode": 277,
+    "version": "3.17.22",
+    "versionCode": 278,
     "packageId": "com.ajo.androidtv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
-    "changelog": "v3.17.21: OkHttp redirect fix for channels behind 302 (Sony Sports etc.); launch film fix; faster server chain.",
+    "changelog": "v3.17.22: loading screen now clears in ~12s instead of 60s (deep catalog fetches moved to background). Sony Sports + all 302-redirect channels stream via OkHttp redirect fix. Launch film fix. Faster server chain.",
     "size_mb": 9.4,
-    "sha256": "0f9ac3e66fceacf73d83187e1dea0615ec3f3488e3374c0603e8268c29973eec",
+    "sha256": "b09f33675f77c4461fc38145733426ad9607af8faf93a2602708c27136e267e4",
     "releaseDate": "2026-10-28",
-    "size": 9889886,
-    "downloadUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.17.21/AJO_ANDROID_TV.apk"
+    "size": 9889850,
+    "downloadUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.17.22/AJO_ANDROID_TV.apk"
   },
   "changelog": "v3.17.15: Star Sports back for real — official Jio streams (all Star/Sports18/Eurosport), auto-failover to mirrors, deeper live buffer, channels refresh on every app open, search keyboard flow fixed.",
   "sha256": "d29ec31533d90c695f66406f37513eab784909bec5eb3f2dc0f0b19fb8a4deaf"
