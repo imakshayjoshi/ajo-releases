@@ -30,8 +30,8 @@
     "minimumVersionCode": 1,
     "changelog": "v3.17.26: buffer health + persistent server memory + EPG relative times. Buffer monitor pre-warms next server when buffer <3s. Server health cache persists across restarts (24h TTL). EPG shows \"in 2h\"/\"started 1h ago\" labels. Includes all v3.17.23-25 fixes (speed, new sources, smart failover, UX).",
     "size_mb": 9.4,
-    "sha256": "870faff1e702abe1204f14ffa99528ddbd97bb72f5b4f7602441648b20e5bc61",
-    "size": 9893396,
+    "sha256": "80b407ae304de03a4640e90ad31fe6b37c0ccc645e19dcf9d03ba3dd2e3a0914",
+    "size": 9893398,
     "releaseDate": "2026-10-31",
     "downloadUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.17.26/AJO_TV.apk"
   },
@@ -45,9 +45,9 @@
     "minimumVersionCode": 1,
     "changelog": "v3.17.26: buffer health + persistent server memory + EPG relative times. Buffer monitor pre-warms next server when buffer <3s. Server health cache persists across restarts (24h TTL). EPG shows \"in 2h\"/\"started 1h ago\" labels. Includes all v3.17.23-25 fixes (speed, new sources, smart failover, UX).",
     "size_mb": 9.4,
-    "sha256": "870faff1e702abe1204f14ffa99528ddbd97bb72f5b4f7602441648b20e5bc61",
+    "sha256": "80b407ae304de03a4640e90ad31fe6b37c0ccc645e19dcf9d03ba3dd2e3a0914",
     "releaseDate": "2026-10-31",
-    "size": 9893396,
+    "size": 9893398,
     "downloadUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.17.26/AJO_ANDROID_TV.apk"
   },
   "changelog": "v3.17.15: Star Sports back for real — official Jio streams (all Star/Sports18/Eurosport), auto-failover to mirrors, deeper live buffer, channels refresh on every app open, search keyboard flow fixed.",
@@ -55,8 +55,8 @@
   "fire_tv": {
     "version": "3.17.26",
     "versionCode": 283,
-    "sha256": "a80d35662c81ca1124561c77af54288da9d57a9c3a52b6809c556f8d082d4251",
-    "size": 9892697,
+    "sha256": "341944a02418961bbbe9fafdc3a06b7aaefdf5554aab2e41157983265ea19d74",
+    "size": 9892690,
     "size_mb": 9.4,
     "releaseDate": "2026-10-31",
     "downloadUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.17.26/AJO_TV_FIRE.apk",
