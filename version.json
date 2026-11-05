@@ -21,45 +21,45 @@
     "downloadUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.17.26/AJO_PHONE.apk"
   },
   "tv": {
-    "version": "3.17.26",
-    "versionCode": 283,
+    "version": "3.17.27",
+    "versionCode": 284,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
-    "changelog": "v3.17.26: buffer health + persistent server memory + EPG relative times. Buffer monitor pre-warms next server when buffer <3s. Server health cache persists across restarts (24h TTL). EPG shows \"in 2h\"/\"started 1h ago\" labels. Includes all v3.17.23-25 fixes (speed, new sources, smart failover, UX).",
+    "changelog": "v3.17.27: Catalog fallback fix — TMDB proxy (new.ajo.co.in) was timing out, blanking movies/series rails. Added direct API fallback: if proxy fails, app uses api.themoviedb.org directly. Catalog NEVER goes blank.",
     "size_mb": 9.4,
-    "sha256": "80b407ae304de03a4640e90ad31fe6b37c0ccc645e19dcf9d03ba3dd2e3a0914",
-    "size": 9893398,
+    "sha256": "45c43e8506f998b8a042dfb6774452d3395315085c3e53c485e32b591ba69654",
+    "size": 9893482,
     "releaseDate": "2026-10-31",
-    "downloadUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.17.26/AJO_TV.apk"
+    "downloadUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.17.27/AJO_TV.apk"
   },
   "android_tv": {
-    "version": "3.17.26",
-    "versionCode": 283,
+    "version": "3.17.27",
+    "versionCode": 284,
     "packageId": "com.ajo.androidtv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
-    "changelog": "v3.17.26: buffer health + persistent server memory + EPG relative times. Buffer monitor pre-warms next server when buffer <3s. Server health cache persists across restarts (24h TTL). EPG shows \"in 2h\"/\"started 1h ago\" labels. Includes all v3.17.23-25 fixes (speed, new sources, smart failover, UX).",
+    "changelog": "v3.17.27: Catalog fallback fix — TMDB proxy (new.ajo.co.in) was timing out, blanking movies/series rails. Added direct API fallback: if proxy fails, app uses api.themoviedb.org directly. Catalog NEVER goes blank.",
     "size_mb": 9.4,
-    "sha256": "80b407ae304de03a4640e90ad31fe6b37c0ccc645e19dcf9d03ba3dd2e3a0914",
+    "sha256": "45c43e8506f998b8a042dfb6774452d3395315085c3e53c485e32b591ba69654",
     "releaseDate": "2026-10-31",
-    "size": 9893398,
-    "downloadUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.17.26/AJO_ANDROID_TV.apk"
+    "size": 9893482,
+    "downloadUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.17.27/AJO_ANDROID_TV.apk"
   },
   "changelog": "v3.17.15: Star Sports back for real — official Jio streams (all Star/Sports18/Eurosport), auto-failover to mirrors, deeper live buffer, channels refresh on every app open, search keyboard flow fixed.",
   "sha256": "d29ec31533d90c695f66406f37513eab784909bec5eb3f2dc0f0b19fb8a4deaf",
   "fire_tv": {
-    "version": "3.17.26",
-    "versionCode": 283,
-    "sha256": "341944a02418961bbbe9fafdc3a06b7aaefdf5554aab2e41157983265ea19d74",
-    "size": 9892690,
+    "version": "3.17.27",
+    "versionCode": 284,
+    "sha256": "d4069102b101814fc666b00cf1232f4b2a2eaa2712257a7a9d8a40dc6a17bee1",
+    "size": 9892774,
     "size_mb": 9.4,
     "releaseDate": "2026-10-31",
-    "downloadUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.17.26/AJO_TV_FIRE.apk",
-    "changelog": "v3.17.26: buffer health + persistent server memory + EPG relative times. Buffer monitor pre-warms next server when buffer <3s. Server health cache persists across restarts (24h TTL). EPG shows \"in 2h\"/\"started 1h ago\" labels. Includes all v3.17.23-25 fixes (speed, new sources, smart failover, UX)."
+    "downloadUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.17.27/AJO_TV_FIRE.apk",
+    "changelog": "v3.17.27: Catalog fallback fix — TMDB proxy (new.ajo.co.in) was timing out, blanking movies/series rails. Added direct API fallback: if proxy fails, app uses api.themoviedb.org directly. Catalog NEVER goes blank."
   }
 }
