@@ -6,19 +6,19 @@
   "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
   "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
   "phone": {
-    "version": "3.9.21",
-    "versionCode": 248,
+    "version": "3.9.22",
+    "versionCode": 249,
     "packageId": "com.ajo.phone",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
-    "changelog": "v3.9.21: new streaming sources (vidsrc.io/fyi + superembed) for instant playback.",
+    "changelog": "v3.9.22: new sources (vidsrc.io/fyi + superembed) for instant playback. Buffer health + persistent server memory.",
     "size_mb": 3.5,
-    "sha256": "961880aed352bd82ab0412105de5e22f71e6fab8262381f95285c137c4010bb2",
+    "sha256": "930318e8c6fb6eddff3eb698eff39edb675851a09c0ac3b3c85ddc332c9660d1",
     "releaseDate": "2026-10-31",
-    "size": 3708618,
-    "downloadUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.17.25/AJO_PHONE.apk"
+    "size": 3709158,
+    "downloadUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.17.26/AJO_PHONE.apk"
   },
   "tv": {
     "version": "3.17.26",
