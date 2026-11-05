@@ -6,19 +6,19 @@
   "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
   "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
   "phone": {
-    "version": "3.9.19",
-    "versionCode": 246,
+    "version": "3.9.20",
+    "versionCode": 247,
     "packageId": "com.ajo.phone",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
-    "changelog": "v3.9.19: 2-3x faster startup. Deep catalog 30→15 pages, timeouts 8s→3s. Same perf fixes as TV v3.17.23.",
+    "changelog": "v3.9.20: speed fixes (deep catalog 15p, timeouts 3s) + UX polish.",
     "size_mb": 3.5,
-    "sha256": "2e1b1825666f8f8a8123e498412dc93b10bf91bb33dac8faa44a09a24c14a28a",
+    "sha256": "9ed8f532c0a31e80a78a060d88fbb1375baf79b4b372a5cf71252510c6d050bf",
     "releaseDate": "2026-10-31",
     "size": 3708618,
-    "downloadUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.17.23/AJO_PHONE.apk"
+    "downloadUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.17.24/AJO_PHONE.apk"
   },
   "tv": {
     "version": "3.17.24",
