@@ -21,44 +21,45 @@
     "downloadUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.17.25/AJO_PHONE.apk"
   },
   "tv": {
-    "version": "3.17.25",
-    "versionCode": 282,
+    "version": "3.17.26",
+    "versionCode": 283,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
-    "changelog": "v3.17.25: MovieBox-style instant streaming + smart failover. New sources vidsrc.io/fyi (built-in multi-server failover) + superembed (10+ servers). Server health prober skips dead servers before playback. Try-everything failover matrix (server→native→engine-toggle→dead). Per-server failure reasons. Graceful buffering messages. Exit-confirm dialog. Media keys + double-tap seek. Backdrop-blur removed.",
+    "changelog": "v3.17.26: buffer health + persistent server memory + EPG relative times. Buffer monitor pre-warms next server when buffer <3s. Server health cache persists across restarts (24h TTL). EPG shows \"in 2h\"/\"started 1h ago\" labels. Includes all v3.17.23-25 fixes (speed, new sources, smart failover, UX).",
     "size_mb": 9.4,
-    "sha256": "4a8aff2fc7c071ac28f3fdc6ef45db57447f409bc7e98617f187cd3b02a9bae2",
-    "size": 9891867,
+    "sha256": "870faff1e702abe1204f14ffa99528ddbd97bb72f5b4f7602441648b20e5bc61",
+    "size": 9893396,
     "releaseDate": "2026-10-31",
-    "downloadUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.17.25/AJO_TV.apk"
+    "downloadUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.17.26/AJO_TV.apk"
   },
   "android_tv": {
-    "version": "3.17.25",
-    "versionCode": 282,
+    "version": "3.17.26",
+    "versionCode": 283,
     "packageId": "com.ajo.androidtv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
-    "changelog": "v3.17.25: MovieBox-style instant streaming + smart failover. New sources vidsrc.io/fyi (built-in multi-server failover) + superembed (10+ servers). Server health prober skips dead servers before playback. Try-everything failover matrix (server→native→engine-toggle→dead). Per-server failure reasons. Graceful buffering messages. Exit-confirm dialog. Media keys + double-tap seek. Backdrop-blur removed.",
+    "changelog": "v3.17.26: buffer health + persistent server memory + EPG relative times. Buffer monitor pre-warms next server when buffer <3s. Server health cache persists across restarts (24h TTL). EPG shows \"in 2h\"/\"started 1h ago\" labels. Includes all v3.17.23-25 fixes (speed, new sources, smart failover, UX).",
     "size_mb": 9.4,
-    "sha256": "4a8aff2fc7c071ac28f3fdc6ef45db57447f409bc7e98617f187cd3b02a9bae2",
+    "sha256": "870faff1e702abe1204f14ffa99528ddbd97bb72f5b4f7602441648b20e5bc61",
     "releaseDate": "2026-10-31",
-    "size": 9891867,
-    "downloadUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.17.25/AJO_ANDROID_TV.apk"
+    "size": 9893396,
+    "downloadUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.17.26/AJO_ANDROID_TV.apk"
   },
   "changelog": "v3.17.15: Star Sports back for real — official Jio streams (all Star/Sports18/Eurosport), auto-failover to mirrors, deeper live buffer, channels refresh on every app open, search keyboard flow fixed.",
   "sha256": "d29ec31533d90c695f66406f37513eab784909bec5eb3f2dc0f0b19fb8a4deaf",
   "fire_tv": {
-    "version": "3.17.25",
-    "versionCode": 282,
-    "sha256": "22a96ce962f1bd954df458e8917a4928ca6bc8795a3b7a775296d2d4a85ed636",
-    "size": 9891173,
+    "version": "3.17.26",
+    "versionCode": 283,
+    "sha256": "a80d35662c81ca1124561c77af54288da9d57a9c3a52b6809c556f8d082d4251",
+    "size": 9892697,
     "size_mb": 9.4,
     "releaseDate": "2026-10-31",
-    "downloadUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.17.25/AJO_TV_FIRE.apk"
+    "downloadUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.17.26/AJO_TV_FIRE.apk",
+    "changelog": "v3.17.26: buffer health + persistent server memory + EPG relative times. Buffer monitor pre-warms next server when buffer <3s. Server health cache persists across restarts (24h TTL). EPG shows \"in 2h\"/\"started 1h ago\" labels. Includes all v3.17.23-25 fixes (speed, new sources, smart failover, UX)."
   }
 }
