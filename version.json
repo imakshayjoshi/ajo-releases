@@ -28,10 +28,10 @@
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
-    "changelog": "v3.17.27: Catalog fallback fix — TMDB proxy (new.ajo.co.in) was timing out, blanking movies/series rails. Added direct API fallback: if proxy fails, app uses api.themoviedb.org directly. Catalog NEVER goes blank.",
+    "changelog": "v3.17.27: Fixed blank catalog + poster loading + try-everything failover. TMDB API now falls back to direct api.themoviedb.org if VPS proxy is down. Posters load directly from image.tmdb.org (no proxy). Failover now tries: all servers → native handoff → engine toggle, before giving up. Server health cache persists across restarts.",
     "size_mb": 9.4,
-    "sha256": "45c43e8506f998b8a042dfb6774452d3395315085c3e53c485e32b591ba69654",
-    "size": 9893482,
+    "sha256": "f19f1d0e13f2d04453791a024e8e00a1e7d8c8052bcc6d338834328510980d8a",
+    "size": 9893610,
     "releaseDate": "2026-10-31",
     "downloadUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.17.27/AJO_TV.apk"
   },
@@ -43,11 +43,11 @@
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
-    "changelog": "v3.17.27: Catalog fallback fix — TMDB proxy (new.ajo.co.in) was timing out, blanking movies/series rails. Added direct API fallback: if proxy fails, app uses api.themoviedb.org directly. Catalog NEVER goes blank.",
+    "changelog": "v3.17.27: Fixed blank catalog + poster loading + try-everything failover. TMDB API now falls back to direct api.themoviedb.org if VPS proxy is down. Posters load directly from image.tmdb.org (no proxy). Failover now tries: all servers → native handoff → engine toggle, before giving up. Server health cache persists across restarts.",
     "size_mb": 9.4,
-    "sha256": "45c43e8506f998b8a042dfb6774452d3395315085c3e53c485e32b591ba69654",
+    "sha256": "f19f1d0e13f2d04453791a024e8e00a1e7d8c8052bcc6d338834328510980d8a",
     "releaseDate": "2026-10-31",
-    "size": 9893482,
+    "size": 9893610,
     "downloadUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.17.27/AJO_ANDROID_TV.apk"
   },
   "changelog": "v3.17.15: Star Sports back for real — official Jio streams (all Star/Sports18/Eurosport), auto-failover to mirrors, deeper live buffer, channels refresh on every app open, search keyboard flow fixed.",
@@ -55,11 +55,11 @@
   "fire_tv": {
     "version": "3.17.27",
     "versionCode": 284,
-    "sha256": "d4069102b101814fc666b00cf1232f4b2a2eaa2712257a7a9d8a40dc6a17bee1",
-    "size": 9892774,
+    "sha256": "188929ef3cf44138e46e8cf64966fee00c8c6586b52eefcff0b0298f77d28ee6",
+    "size": 9892893,
     "size_mb": 9.4,
     "releaseDate": "2026-10-31",
     "downloadUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.17.27/AJO_TV_FIRE.apk",
-    "changelog": "v3.17.27: Catalog fallback fix — TMDB proxy (new.ajo.co.in) was timing out, blanking movies/series rails. Added direct API fallback: if proxy fails, app uses api.themoviedb.org directly. Catalog NEVER goes blank."
+    "changelog": "v3.17.27: Fixed blank catalog + poster loading + try-everything failover. TMDB API now falls back to direct api.themoviedb.org if VPS proxy is down. Posters load directly from image.tmdb.org (no proxy). Failover now tries: all servers → native handoff → engine toggle, before giving up. Server health cache persists across restarts."
   }
 }
