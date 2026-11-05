@@ -21,34 +21,34 @@
     "downloadUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.17.23/AJO_PHONE.apk"
   },
   "tv": {
-    "version": "3.17.23",
-    "versionCode": 279,
+    "version": "3.17.24",
+    "versionCode": 280,
     "packageId": "com.ajo.tv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
-    "changelog": "v3.17.23: 2-3x faster startup. Deep TMDB catalog reduced 30→15 pages, timeouts 8s→3s, hls.js lazy-loaded (1.2MB out of main bundle), CSS render-blocking font removed, TMDB proxy pre-warmed on boot, card GPU containment. Faster server chain, OkHttp 302-redirect fix, launch film fix.",
+    "changelog": "v3.17.24: UX + player controls. Exit-confirm dialog (no accidental exits), per-server failure reasons on dead screen, media-key support (Play/Pause/Seek/Stop), double-tap seek (±30s), backdrop-blur removed (30-40% GPU relief on low-end TVs), poster shimmer placeholders, image async decoding. Includes v3.17.23 speed fixes.",
     "size_mb": 9.4,
-    "sha256": "ccc86ffa6744ff4e1699e653ab768e599dc4e7b9f66bc4a843859b0291749908",
-    "size": 9889912,
+    "sha256": "a4d083eaf5860d90e3fd9b0063fcd53384a166cd1d22d0d0a2b1497a939c71bd",
+    "size": 9889906,
     "releaseDate": "2026-10-31",
-    "downloadUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.17.23/AJO_TV.apk"
+    "downloadUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.17.24/AJO_TV.apk"
   },
   "android_tv": {
-    "version": "3.17.23",
-    "versionCode": 279,
+    "version": "3.17.24",
+    "versionCode": 280,
     "packageId": "com.ajo.androidtv",
     "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk",
     "mandatory": false,
     "minimumVersionCode": 1,
-    "changelog": "v3.17.23: 2-3x faster startup. Deep TMDB catalog reduced 30→15 pages, timeouts 8s→3s, hls.js lazy-loaded (1.2MB out of main bundle), CSS render-blocking font removed, TMDB proxy pre-warmed on boot, card GPU containment. Faster server chain, OkHttp 302-redirect fix, launch film fix.",
+    "changelog": "v3.17.24: UX + player controls. Exit-confirm dialog (no accidental exits), per-server failure reasons on dead screen, media-key support (Play/Pause/Seek/Stop), double-tap seek (±30s), backdrop-blur removed (30-40% GPU relief on low-end TVs), poster shimmer placeholders, image async decoding. Includes v3.17.23 speed fixes.",
     "size_mb": 9.4,
-    "sha256": "ccc86ffa6744ff4e1699e653ab768e599dc4e7b9f66bc4a843859b0291749908",
+    "sha256": "a4d083eaf5860d90e3fd9b0063fcd53384a166cd1d22d0d0a2b1497a939c71bd",
     "releaseDate": "2026-10-31",
-    "size": 9889912,
-    "downloadUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.17.23/AJO_ANDROID_TV.apk"
+    "size": 9889906,
+    "downloadUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.17.24/AJO_ANDROID_TV.apk"
   },
   "changelog": "v3.17.15: Star Sports back for real — official Jio streams (all Star/Sports18/Eurosport), auto-failover to mirrors, deeper live buffer, channels refresh on every app open, search keyboard flow fixed.",
   "sha256": "d29ec31533d90c695f66406f37513eab784909bec5eb3f2dc0f0b19fb8a4deaf"
