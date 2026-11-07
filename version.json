@@ -1,8 +1,8 @@
 {
   "schemaVersion": 2,
-  "version": "3.17.15",
-  "versionCode": 271,
-  "releaseDate": "2026-10-21",
+  "version": "3.17.46",
+  "versionCode": 303,
+  "releaseDate": "2026-10-31",
   "apkUrl": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
   "apk_url": "https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk",
   "phone": {
@@ -50,7 +50,7 @@
     "size": 9902228,
     "downloadUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.17.46/AJO_ANDROID_TV.apk"
   },
-  "changelog": "v3.17.15: Star Sports back for real — official Jio streams (all Star/Sports18/Eurosport), auto-failover to mirrors, deeper live buffer, channels refresh on every app open, search keyboard flow fixed.",
+  "changelog": "v3.17.46: webtor.io embed fixes + sandbox iframe. OTA banner fix.",
   "sha256": "d29ec31533d90c695f66406f37513eab784909bec5eb3f2dc0f0b19fb8a4deaf",
   "fire_tv": {
     "version": "3.17.46",
@@ -61,5 +61,6 @@
     "releaseDate": "2026-10-31",
     "downloadUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.17.46/AJO_TV_FIRE.apk",
     "changelog": "v3.17.46: webtor.io /show embed with header=false + sandbox iframe (blocks popups). Fixed torrent streaming."
-  }
+  },
+  "signing": "debug"
 }
