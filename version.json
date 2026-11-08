@@ -15,9 +15,9 @@
     "minimumVersionCode": 1,
     "changelog": "v3.9.48: security + stability audit wave (same fixes as TV 3.17.51).",
     "size_mb": 3.4,
-    "sha256": "2c1fdd795e2bda44f675c4b2890f61406bbbab046eb43a26273d1b12341782b7",
+    "sha256": "2cf1289b7dd3e3e00d00876854215c7f6cff1e9a013b6f43c0d8ce140c520c48",
     "releaseDate": "2026-11-08",
-    "size": 3598985,
+    "size": 3599685,
     "downloadUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.17.51/AJO_PHONE.apk"
   },
   "tv": {
@@ -30,8 +30,8 @@
     "minimumVersionCode": 1,
     "changelog": "v3.17.51: security + stability audit wave — OTA URLs strictly whitelisted (spoof-proof), SSL trust scoped to old-TV expiry errors only, dead-mirror skipping actually works, all resolvers have timeouts, native failover keeps your place, fake channel tiles removed, D-pad repeat thrash fixed.",
     "size_mb": 9.5,
-    "sha256": "d5362b861c6eb73af43bd19359bb8053142a33a214f22a52eefd6e268fbaff91",
-    "size": 9914159,
+    "sha256": "e53eed9bc3997444aff5360dce23ff23f6d61fec28eb675c27e9aa09147a404d",
+    "size": 9915185,
     "releaseDate": "2026-11-08",
     "downloadUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.17.51/AJO_TV.apk"
   },
@@ -45,9 +45,9 @@
     "minimumVersionCode": 1,
     "changelog": "v3.17.51: security + stability audit wave — OTA URLs strictly whitelisted (spoof-proof), SSL trust scoped to old-TV expiry errors only, dead-mirror skipping actually works, all resolvers have timeouts, native failover keeps your place, fake channel tiles removed, D-pad repeat thrash fixed.",
     "size_mb": 9.5,
-    "sha256": "d5362b861c6eb73af43bd19359bb8053142a33a214f22a52eefd6e268fbaff91",
+    "sha256": "e53eed9bc3997444aff5360dce23ff23f6d61fec28eb675c27e9aa09147a404d",
     "releaseDate": "2026-11-08",
-    "size": 9914159,
+    "size": 9915185,
     "downloadUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.17.51/AJO_ANDROID_TV.apk"
   },
   "changelog": "v3.17.51: security + stability audit wave — OTA URLs strictly whitelisted (spoof-proof), SSL trust scoped to old-TV expiry errors only, dead-mirror skipping actually works, all resolvers have timeouts, native failover keeps your place, fake channel tiles removed, D-pad repeat thrash fixed.",
@@ -55,8 +55,8 @@
   "fire_tv": {
     "version": "3.17.51",
     "versionCode": 308,
-    "sha256": "3d040b0e174d862c7c61d3f60352c6cfb2a4049722611beed819b550ea0120d6",
-    "size": 9913489,
+    "sha256": "80ba919da518776228997a359579c3c56ef4c73de97b089a652c027bbe54ae9d",
+    "size": 9914356,
     "size_mb": 9.5,
     "releaseDate": "2026-11-08",
     "downloadUrl": "https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.17.51/AJO_TV_FIRE.apk",
