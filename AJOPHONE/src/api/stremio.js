@@ -124,7 +124,9 @@ async function addonFetchJson(url) {
     clearTimeout(timer);
     if (!res.ok) return null;
     const data = await res.json();
-    try { storageSet(cacheKey, JSON.stringify({ at: Date.now(), data })); } catch {}
+    // v3.17.51: storageSet already JSON.stringifies — passing a string here
+    // double-encoded the cache so it never hit and grew localStorage forever.
+    try { storageSet(cacheKey, { at: Date.now(), data }); } catch {}
     return data;
   } catch {
     clearTimeout(timer);
@@ -134,32 +136,30 @@ async function addonFetchJson(url) {
 
 /** Fetch all catalogs from all installed addons, merged. */
 export async function getAddonCatalogs() {
-  const out = [];
+  const tasks = [];
   for (const addon of getInstalledAddons()) {
     for (const cat of addon.catalogs || []) {
-      // Cinemeta's 'top' catalog requires a skip/genre parameter; 'popular' works bare.
-      // Build extra path from declared extras, defaulting to genre=Top for bare 'top'.
-      let extraPath = '';
-      const extras = cat.extra || [];
-      if (extras.some(e => e.fieldName === 'genre')) {
-        extraPath += `/genre=${encodeURIComponent(cat.extraDefault || 'Action')}`;
-      } else if (extras.some(e => e.fieldName === 'skip')) {
-        extraPath += '/skip=0';
-      } else if (cat.id === 'top') {
-        extraPath = '/skip=0';
-      }
-      const url = `${addon.url}/catalog/${cat.type}/${cat.id}${extraPath}.json`;
-      const data = await addonFetchJson(url);
-      if (data?.metas?.length) {
-        out.push({
-          addonId: addon.id,
-          addonName: addon.name,
-          type: cat.type,
-          catalogId: cat.id,
-          catalogName: `${addon.name} · ${cat.name}`,
-          items: data.metas.map(m => normalizeAddonMeta(m, addon))
-        });
-      }
+      const extraQ = cat.extra?.genre ? `&genre=${encodeURIComponent(cat.extra.genre)}` : '';
+      const url = `${addon.url}/catalog/${cat.type}/${cat.id}.json${extraQ}`;
+      // v3.12.80: was a serial await chain (N x timeout on a dead addon held
+      // the whole home screen). All catalogs fetch in parallel now.
+      tasks.push(
+        addonFetchJson(url).then((data) => ({ addon, cat, data })).catch(() => null)
+      );
+    }
+  }
+  const settled = await Promise.all(tasks);
+  const out = [];
+  for (const r of settled) {
+    if (r?.data?.metas?.length) {
+      out.push({
+        addonId: r.addon.id,
+        addonName: r.addon.name,
+        type: r.cat.type,
+        catalogId: r.cat.id,
+        catalogName: `${r.addon.name} · ${r.cat.name}`,
+        items: r.data.metas.map(m => normalizeAddonMeta(m, r.addon))
+      });
     }
   }
   return out;
@@ -228,13 +228,3 @@ export async function getAddonStreams(item) {
   return streams.filter(s => s.url); // only direct-playable for now (torrent needs debrid)
 }
 
-/** Fetch rich meta detail (description, cast, runtime) for a title. */
-export async function getAddonMeta(imdbId, mediaType) {
-  if (!imdbId) return null;
-  for (const addon of getInstalledAddons()) {
-    if (!(addon.types || []).includes(mediaType)) continue;
-    const data = await addonFetchJson(`${addon.url}/meta/${mediaType}/${imdbId}.json`);
-    if (data?.meta) return data.meta;
-  }
-  return null;
-}

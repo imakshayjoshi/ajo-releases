@@ -7,25 +7,36 @@ const CACHE_KEY = 'ajo_catalog_v6';
 const CACHE_TTL = 30 * 60 * 1000;
 let memoryCatalog = null;
 
-// mapi.elochkaigolochla.com sends no CORS headers -> WebView/browser fetch is
-// blocked outright. Route mapi through our VPS proxy (adds CORS + cache).
+// v3.17.50: mapi NOW sends `access-control-allow-origin: *` (verified Nov 7
+// 2026) and answers in ~1.6s. The VPS proxy takes ~7s and its backend is
+// flapping (502s on /health.json + /live/channels.json). Direct is now primary;
+// the proxy remains as a fallback for networks where mapi is blocked.
 const MAPI_PROXY = 'https://new.ajo.co.in/channels/fetch?u=';
 async function fetchJson(url, timeout = 8000) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeout);
-  try {
-    const proxied = url && url.startsWith('https://mapi.elochkaigolochla.com')
-      ? MAPI_PROXY + encodeURIComponent(url)
-      : url;
-    const response = await fetch(proxied, {
-      signal: controller.signal,
-      headers: { Accept: 'application/json' }
-    });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    return await response.json();
-  } finally {
-    clearTimeout(timer);
+  const isMapi = url && url.startsWith('https://mapi.elochkaigolochla.com');
+  const candidates = isMapi
+    ? [url, MAPI_PROXY + encodeURIComponent(url)]
+    : [url];
+  let lastError = null;
+  for (const candidate of candidates) {
+    // v3.17.51: fresh controller per candidate — a shared one meant the proxy
+    // fallback inherited an already-expired timer after a slow direct attempt.
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeout);
+    try {
+      const response = await fetch(candidate, {
+        signal: controller.signal,
+        headers: { Accept: 'application/json' }
+      });
+      if (!response.ok) { lastError = new Error(`HTTP ${response.status}`); continue; }
+      return await response.json();
+    } catch (e) {
+      lastError = e;
+    } finally {
+      clearTimeout(timer);
+    }
   }
+  throw lastError || new Error('fetch failed');
 }
 
 export function normalizeMediaItem(item, category = 'movie') {
@@ -319,47 +330,6 @@ export async function getSerialsCatalog() {
   }
 }
 
-export async function searchAllMedia(query) {
-  const clean = String(query || '').trim().toLowerCase();
-  if (!clean) return [];
-
-  const [catalog, live, tmdbRes, ytRes, moviboxRes] = await Promise.allSettled([
-    loadCatalog(),
-    getLiveBroadcasts(),
-    import('./tmdb.js').then(m => m.searchTmdb(clean)),
-    // v3.12.60: YouTube search results in global search (Piped-backed).
-    import('./youtube.js').then(m => m.searchYouTubeVideos(clean)).catch(() => []),
-    // v3.12.62: movibox catalog search (direct-MP4 source, highest quality).
-    import('./movibox.js').then(m => m.searchMovibox(clean)).catch(() => [])
-  ]);
-
-  const localItems = [
-    ...(catalog.status === 'fulfilled' ? catalog.value.all : []),
-    ...(live.status === 'fulfilled' ? live.value : [])
-  ];
-  const tmdbItems = tmdbRes.status === 'fulfilled' && Array.isArray(tmdbRes.value) ? tmdbRes.value : [];
-  const ytItems = ytRes.status === 'fulfilled' && Array.isArray(ytRes.value) ? ytRes.value : [];
-  const moviboxItems = moviboxRes.status === 'fulfilled' && Array.isArray(moviboxRes.value) ? moviboxRes.value : [];
-
-  const matchedLocal = localItems.filter((item) => {
-    return `${item.title} ${item.category || ''}`.toLowerCase().includes(clean);
-  });
-
-  const seen = new Set();
-  const results = [];
-
-  // v3.12.62: movibox FIRST — direct MP4s beat embed mirrors on speed and
-  // quality when the title exists there.
-  for (const item of [...moviboxItems, ...tmdbItems, ...ytItems, ...matchedLocal]) {
-    const key = (item.title || '').toLowerCase().trim() + ':' + (item.type || 'movie');
-    if (!key || seen.has(key)) continue;
-    seen.add(key);
-    results.push(item);
-  }
-
-  // v3.12.93: dead titles (every source failed before) never surface in search.
-  return filterAliveItems(results);
-}
 
 export async function getSeriesEpisodes(movieId) {
   if (!movieId) return [];

@@ -99,7 +99,7 @@
 .tv-player-progress-fill {
   height: 100%;
   border-radius: 9999px;
-  background: linear-gradient(90deg, #00BB7F, #00875f);
+  background: linear-gradient(90deg, #38bdf8, #0284c7);
   transition: width 0.25s linear;
 }
 
@@ -129,7 +129,7 @@
 .tv-player-btn:focus,
 .tv-player-btn:focus-visible {
   outline: none;
-  border-color: #00BB7F;
+  border-color: #38bdf8;
   background: rgba(56, 189, 248, 0.22);
   transform: scale(1.06);
   box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.35);
@@ -169,7 +169,7 @@
 .tv-drawer-item:focus,
 .tv-drawer-item:focus-visible {
   outline: none;
-  border-color: #00BB7F;
+  border-color: #38bdf8;
   background: rgba(56, 189, 248, 0.28);
   box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.35);
 }
@@ -185,7 +185,7 @@
   height: 56px;
   margin: 0 auto;
   border: 5px solid rgba(56, 189, 248, 0.25);
-  border-top-color: #00BB7F;
+  border-top-color: #38bdf8;
   border-radius: 50%;
   animation: tv-spin 0.9s linear infinite;
 }

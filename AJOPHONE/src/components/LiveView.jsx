@@ -1,17 +1,19 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { getLiveChannels, groupByCategory } from '../api/live';
+import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { groupByCategory, liveLogoProxyUrl, guessLiveLogo } from '../api/live';
 
 /**
- * LiveView — MovieBoxTV-style live channel browser (v3.12.64).
+ * LiveView — MovieBoxTV-style live channel browser.
  *
- * Reverse-engineered UX from MovieBoxTV Premium:
- *  - LEFT rail: country/category selector (vertical, D-pad friendly)
- *  - RIGHT: channel grid with logos, "LIVE" badge, current category name
- *  - Channels grouped like MovieBox's live tab (Sports/News/Entertainment...)
- *
- * Data: Elite Streams' feeds merged + health-checked on the VPS
- * (https://new.ajo.co.in/live/channels.json), so only playable channels
- * reach the stick.
+ * v3.12.66 UX rework:
+ *  - Channel tiles now use `.tv-card` + `.tv-card-live`, so the SAME focus
+ *    halo/scale the rest of the app uses actually applies. The old markup
+ *    used `.media-card`, a class with no focus styles — that is why live
+ *    thumbnails never highlighted on Fire TV/Android TV.
+ *  - Focused tiles scroll into view (centered vertically, nearest edge
+ *    horizontally) — no more tiles focused offscreen.
+ *  - Category rail collapses its own scrollbars; channel grid gets a real
+ *    TV layout instead of a phone-sized auto-fill.
+ *  - Enter is native (`<button>`), so play-on-select works everywhere.
  */
 
 const CATEGORY_ICONS = {
@@ -21,35 +23,109 @@ const CATEGORY_ICONS = {
 };
 
 const ALL = 'All Channels';
+const CATEGORY_ORDER = ['Sports', 'News', 'Entertainment', 'Movies', 'Kids', 'Music', 'Devotional', 'Infotainment', 'Lifestyle', 'Education'];
+
+// v3.12.76 (thumbnails fix): URLs that already failed this session go straight
+// to the fallback tile — previously ch.logo stayed truthy after onError, so any
+// remount (chunked render window, category switch, scrolling) put the broken
+// image back and the tile flickered logo→fallback forever.
+const deadLogoUrls = new Set();
 
 export function LiveView({ channels, onSelectItem, loading }) {
+  const [, bumpLogoVersion] = useReducer((x) => x + 1, 0); // v3.17.52: re-render on logo failure
   const [activeCat, setActiveCat] = useState(ALL);
   const gridRef = useRef(null);
+  const railRef = useRef(null);
 
   const groups = useMemo(() => groupByCategory(channels), [channels]);
   const cats = useMemo(() => {
-    const order = ['Sports', 'News', 'Entertainment', 'Movies', 'Kids', 'Music', 'Devotional', 'Infotainment', 'Lifestyle', 'Education'];
     const present = Array.from(groups.keys());
-    return [ALL, ...order.filter(c => present.includes(c)), ...present.filter(c => !order.includes(c))];
+    return [ALL, ...CATEGORY_ORDER.filter(c => present.includes(c)), ...present.filter(c => !CATEGORY_ORDER.includes(c))];
   }, [groups]);
 
-  const visible = activeCat === ALL ? channels : (groups.get(activeCat) || []);
+  const visible = useMemo(() => (
+    activeCat === ALL ? channels : (groups.get(activeCat) || [])
+  ), [activeCat, channels, groups]);
 
-  // When category switches, move focus into the grid so D-pad works immediately.
+  // v3.12.74 (Lumio 55" crash hardening): never mount a 1,000+ card DOM at
+  // once on low-RAM Android TV WebViews. React still sees the full catalog;
+  // only the rendered window is capped, and D-pad scrolling loads the next
+  // chunk before the focused tile reaches the bottom.
+  const [visibleCount, setVisibleCount] = useState(120);
+  useEffect(() => setVisibleCount(120), [activeCat, channels]);
+  useEffect(() => {
+    const root = gridRef.current;
+    if (!root) return;
+    const onScroll = () => {
+      const nearBottom = root.scrollHeight - root.scrollTop - root.clientHeight < 600;
+      if (nearBottom) setVisibleCount((n) => Math.min(n + 120, visible.length));
+    };
+    root.addEventListener('scroll', onScroll, { passive: true });
+    return () => root.removeEventListener('scroll', onScroll);
+  }, [visible.length]);
+  const rendered = useMemo(() => visible.slice(0, visibleCount), [visible, visibleCount]);
+
+  // Render in steady 120-card chunks: memory stays capped while the wall
+  // continues filling automatically instead of hanging on one giant commit.
+  useEffect(() => {
+    if (visibleCount >= visible.length) return;
+    const t = setTimeout(() => setVisibleCount((n) => Math.min(n + 120, visible.length)), 180);
+    return () => clearTimeout(t);
+  }, [visible.length, visibleCount]);
+
+  // Keep the focused live tile onscreen as D-pad moves through the grid,
+  // and extend the rendered window BEFORE the focus runs past its bottom.
+  useEffect(() => {
+    const root = gridRef.current;
+    if (!root || typeof MutationObserver === 'undefined') return;
+    const observer = new MutationObserver(() => {
+      const el = document.activeElement;
+      if (root.contains(el)) {
+        const rect = el.getBoundingClientRect();
+        if (rect.bottom > root.getBoundingClientRect().bottom - 700) {
+          setVisibleCount((n) => Math.min(n + 120, visible.length));
+        }
+        // v3.12.82 (live-catalog focus-jump fix): the previous build called
+        // el.scrollIntoView({block:'center'}) on EVERY focus change. On a TV
+        // the browser's native scrollIntoView fights the app's own scroller
+        // and yanks the focused card to mid-screen each press — that's the
+        // "focus jumps around the live channel catalog" Akkshay reported.
+        // Now we nudge the page scroller just enough to keep the card inside
+        // the viewport (nearest-edge), never re-centering. The spatial nav
+        // engine's own focusAndScroll does the same, so this stays in lockstep.
+        const scroller = el.closest('.tv-main-content') || document.querySelector('.tv-main-content');
+        if (scroller) {
+          const er = el.getBoundingClientRect();
+          const sr = scroller.getBoundingClientRect();
+          if (er.bottom > sr.bottom - 24) {
+            scroller.scrollTop += (er.bottom - sr.bottom + 24);
+          } else if (er.top < sr.top + 24) {
+            scroller.scrollTop -= (sr.top + 24 - er.top);
+          }
+        }
+        // NO scrollIntoView here — that was the jump source.
+      }
+    });
+    observer.observe(root, { subtree: true, attributes: true, attributeFilter: ['tabindex', 'class'] });
+    return () => observer.disconnect();
+  }, [visible.length]);
+
+  // A category switch replaces the grid: land focus on its first channel
+  // unless the user is still navigating the category rail itself.
   useEffect(() => {
     const t = setTimeout(() => {
-      const first = gridRef.current?.querySelector('[tabindex="0"], button, [role="button"]');
-      if (first && document.activeElement?.closest?.('.live-cat-rail') === null) {
-        // only steal focus if focus is still on the category rail
-      }
-    }, 50);
+      if (railRef.current?.contains(document.activeElement)) return;
+      const first = gridRef.current?.querySelector('.tv-card-live');
+      if (first instanceof HTMLElement) first.focus();
+    }, 60);
     return () => clearTimeout(t);
   }, [activeCat]);
 
   if (loading) {
     return (
       <div className="tv-empty-state" style={{ textAlign: 'center', marginTop: 100 }}>
-        <p style={{ color: '#9aa3b2', fontSize: 20 }}>Loading live channels…</p>
+        <div className="tv-spinner" />
+        <p style={{ color: '#9aa3b2', fontSize: 20, marginTop: 16 }}>Loading live channels…</p>
       </div>
     );
   }
@@ -64,94 +140,106 @@ export function LiveView({ channels, onSelectItem, loading }) {
     );
   }
 
-  const railStyle = {
-    width: 220, flexShrink: 0, padding: '14px 10px',
-    borderRight: '1px solid rgba(255,255,255,0.08)',
-    display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 'calc(100vh - 150px)',
-    overflowY: 'auto'
-  };
-
-  const catBtn = (cat, count) => {
-    const active = activeCat === cat;
-    return (
-      <button
-        key={cat}
-        tabIndex={0}
-        className="tv-cat-btn"
-        onClick={() => setActiveCat(cat)}
-        style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          width: '100%', padding: '11px 16px', fontSize: '1rem', fontWeight: 700,
-          borderRadius: 10, textAlign: 'left',
-          border: active ? '2px solid #00BB7F' : '1px solid transparent',
-          background: active ? 'linear-gradient(135deg, rgba(0,187,127,0.25), rgba(2,132,199,0.18))' : 'transparent',
-          color: active ? '#ffffff' : '#b6c0cf', cursor: 'pointer'
-        }}
-      >
-        <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ fontSize: '1.1rem' }}>{CATEGORY_ICONS[cat] || '📺'}</span>
-          {cat === ALL ? '📺 All' : cat}
-        </span>
-        <span style={{ fontSize: '0.75rem', color: active ? '#00BB7F' : '#71809a', fontWeight: 800 }}>{count}</span>
-      </button>
-    );
-  };
-
   return (
-    <div style={{ display: 'flex', gap: 0, minHeight: 'calc(100vh - 130px)' }}>
-      {/* LEFT: category rail (MovieBox style) */}
-      <div className="live-cat-rail" style={railStyle}>
-        {cats.map(cat => catBtn(cat, cat === ALL ? channels.length : (groups.get(cat) || []).length))}
-      </div>
+    <div className="live-view-shell">
+      {/* LEFT: category rail */}
+      <nav className="live-cat-rail" ref={railRef} aria-label="Live TV categories">
+        {cats.map((cat) => {
+          const active = activeCat === cat;
+          const count = cat === ALL ? channels.length : (groups.get(cat) || []).length;
+          return (
+            <button
+              key={cat}
+              type="button"
+              tabIndex={0}
+              className={`tv-cat-btn live-cat-btn${active ? ' active' : ''}`}
+              aria-current={active ? 'true' : undefined}
+              onClick={() => setActiveCat(cat)}
+            >
+              <span className="live-cat-name">
+                <span>{CATEGORY_ICONS[cat] || '📺'}</span>
+                {cat === ALL ? 'All Channels' : cat}
+              </span>
+              <span className="live-cat-count">{count}</span>
+            </button>
+          );
+        })}
+      </nav>
 
       {/* RIGHT: channel grid */}
-      <div style={{ flex: 1, minWidth: 0, padding: '10px 26px 26px 26px', overflowY: 'auto' }} ref={gridRef}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '6px 0 16px 0' }}>
-          <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#ff3b30', boxShadow: '0 0 10px #ff3b30' }} />
-          <h2 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0, color: '#fff' }}>
+      <section className="live-grid-scroll" ref={gridRef} aria-label={`${activeCat} channels`}>
+        <header className="live-grid-header">
+          <span className="live-dot" aria-hidden="true" />
+          <h2 className="live-grid-title">
             {activeCat === ALL ? 'All Live Channels' : activeCat}
-            <span style={{ color: '#71809a', fontWeight: 600, marginLeft: 10, fontSize: '0.95rem' }}>{visible.length}</span>
+            <span className="live-grid-count">{visible.length}</span>
           </h2>
-        </div>
+        </header>
 
-        <div className="tv-grid" style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
-          gap: 14
-        }}>
-          {visible.map((ch, idx) => (
+        <div className="live-channel-grid" role="list">
+          {rendered.map((ch, idx) => {
+            const logoDead = ch.logo && deadLogoUrls.has(ch.logo);
+            return (
             <button
-              key={ch.id || idx}
+              key={ch.id || `${ch.title}-${idx}`}
+              type="button"
               tabIndex={0}
-              className="media-card"
+              role="listitem"
+              className="tv-card tv-card-live live-channel-card"
+              aria-label={`Play ${ch.title || ch.name}`}
               onClick={() => onSelectItem(ch)}
-              style={{
-                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                gap: 8, padding: '14px 8px', minHeight: 120,
-                background: 'linear-gradient(160deg, rgba(22,32,48,0.92), rgba(12,18,30,0.96))',
-                borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer',
-                position: 'relative'
-              }}
             >
-              {ch.logo ? (
-                <img src={ch.logo} alt="" style={{ width: 64, height: 64, objectFit: 'contain', borderRadius: 8,
-                  background: 'rgba(255,255,255,0.06)', padding: 4 }} loading="lazy" />
-              ) : (
-                <div style={{ width: 64, height: 64, borderRadius: 8, background: 'rgba(0,187,127,0.15)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26 }}>📺</div>
-              )}
-              <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#e8edf5', textAlign: 'center',
-                lineHeight: 1.25, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                {ch.title || ch.name}
-              </span>
-              <span style={{
-                position: 'absolute', top: 8, right: 8, padding: '2px 7px', borderRadius: 4,
-                background: '#e50914', color: '#fff', fontSize: '0.62rem', fontWeight: 900, letterSpacing: 0.5
-              }}>LIVE</span>
+              <div className="tv-card-media tv-card-live-media">
+                {ch.logo && !logoDead ? (
+                  <img
+                    className="live-logo"
+                    src={ch.logo}
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                    onError={(e) => {
+                      // v3.12.84: rescue chain before fallback. (1) name-based
+                      // tv-logos guess (verified file list — never 404s),
+                      // (2) VPS image proxy for hosts it can serve, (3) initials.
+                      const img = e.currentTarget;
+                      const cur = img.getAttribute('src') || '';
+                      const step = Number(img.dataset.logoStep || '0');
+                      if (step === 0) {
+                        img.dataset.logoStep = '1';
+                        const guess = guessLiveLogo(ch.title || ch.name || '');
+                        if (guess && guess !== cur) { img.src = guess; return; }
+                      }
+                      if (step <= 1) {
+                        img.dataset.logoStep = '2';
+                        const proxyUrl = liveLogoProxyUrl(cur);
+                        if (proxyUrl && cur !== proxyUrl) { img.src = proxyUrl; return; }
+                      }
+                      // v3.17.52: mark BOTH the original and the last-tried src
+                      // dead, then re-render — the declarative logoDead check
+                      // renders the fallback. The old replaceChildren mutated
+                      // DOM React owns (reconciliation hazard).
+                      deadLogoUrls.add(ch.logo);
+                      deadLogoUrls.add(cur);
+                      bumpLogoVersion();
+                    }}
+                  />
+                ) : (
+                  <div className="live-logo live-logo-fallback" aria-hidden="true">{String(ch.title || ch.name || '📺').replace(/[^A-Za-z0-9 ]/g, '').trim().slice(0, 2).toUpperCase() || '📺'}</div>
+                )}
+                <span className="tv-badge-live">LIVE</span>
+              </div>
+              <div className="tv-card-info live-card-info">
+                <span className="tv-card-title">{ch.title || ch.name}</span>
+                <span className="live-card-meta">{ch.lang || ch.category || 'Live channel'}</span>
+                {visible.length > visibleCount && idx === rendered.length - 1 && (
+                  <span className="live-more-count">{visible.length - visibleCount} more below</span>
+                )}
+              </div>
             </button>
-          ))}
+            );
+          })}
         </div>
-      </div>
+      </section>
     </div>
   );
 }

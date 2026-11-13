@@ -2,8 +2,8 @@ import { isSafeHttpUrl } from '../utils/streamingEngines.js';
 import { isFavoriteChannel } from './history.js';
 import { parseM3U, normalizeChannelKey } from './iptv.js';
 
-const SPORTS_CACHE_KEY = 'ajo_sports_cache_v3';
-const SPORTS_CACHE_TTL = 15 * 60 * 1000; // 15 minutes
+const SPORTS_CACHE_KEY = 'ajo_sports_cache_v4';
+const SPORTS_CACHE_TTL = 1 * 60 * 1000; // 1 minute (was 15)
 
 // v3.17.10: iptv-org playlist import DISABLED. It flooded the rail with 200+
 // foreign-language channels (Turkish/Serbian/Arabic...) against the user's
@@ -19,7 +19,192 @@ const PLAYLIST_SOURCES = [];
 //   - Star Sports Select 1/2, Ten Cricket from 103.151.60.162 (Sri Lanka relay)
 //   - DD Sports from the same M3U list the app parses anyway
 // Old URLs kept as Server 2 failover where a same-channel URL exists.
-const BUILTIN_SPORTS_CHANNELS = [
+export const BUILTIN_SPORTS_CHANNELS = [
+  {
+    id: 'sonyliv-0',
+    title: 'Sony SAB HD',
+    category: 'Sports',
+    poster: 'https://www.sonypicturesnetworks.com/images/logos/SONY%20SAB%20HD_WHITE.png',
+    url: 'https://sonylifetime.streamxlivenow.workers.dev/sonysabhd.m3u8',
+    players: [{"name": "Server 1", "url": "https://sonylifetime.streamxlivenow.workers.dev/sonysabhd.m3u8", "source": "hls", "quality": "HD"}, {"name": "Server 2", "url": "https://sliv.tgaadi.workers.dev/sabhd.m3u8", "source": "hls", "quality": "SD"}]
+  },
+  {
+    id: 'sonyliv-1',
+    title: 'Sony SAB',
+    category: 'Sports',
+    poster: 'https://www.sonypicturesnetworks.com/images/logos/SONY%20SAB%20SD.png',
+    url: 'https://drk6xq0vhn.gpcdn.net/live/sub_hd_abr/index.m3u8',
+    players: [{"name": "Server 1", "url": "https://drk6xq0vhn.gpcdn.net/live/sub_hd_abr/index.m3u8", "source": "hls", "quality": "HD"}, {"name": "Server 2", "url": "https://sliv.tgaadi.workers.dev/sonysabhd.m3u8", "source": "hls", "quality": "SD"}]
+  },
+  {
+    id: 'sonyliv-2',
+    title: 'SET HD',
+    category: 'Sports',
+    poster: 'https://www.sonypicturesnetworks.com/images/logos/SET-LOGO-HD.png',
+    url: 'https://sonylifetime.streamxlivenow.workers.dev/sethd.m3u8',
+    players: [{"name": "Server 1", "url": "https://sonylifetime.streamxlivenow.workers.dev/sethd.m3u8", "source": "hls", "quality": "HD"}, {"name": "Server 2", "url": "https://sliv.tgaadi.workers.dev/sethd.m3u8", "source": "hls", "quality": "SD"}]
+  },
+  {
+    id: 'sonyliv-3',
+    title: 'Sony Pal',
+    category: 'Sports',
+    poster: 'https://www.sonypicturesnetworks.com/images/logos/SONY%20PAL.png',
+    url: 'https://sonylifetime.streamxlivenow.workers.dev/sonypal.m3u8',
+    players: [{"name": "Server 1", "url": "https://sonylifetime.streamxlivenow.workers.dev/sonypal.m3u8", "source": "hls", "quality": "HD"}, {"name": "Server 2", "url": "https://sliv.tgaadi.workers.dev/sonypalsd.m3u8", "source": "hls", "quality": "SD"}]
+  },
+  {
+    id: 'sonyliv-4',
+    title: 'Sony WAH',
+    category: 'Sports',
+    poster: 'https://www.sonypicturesnetworks.com/images/logos/Sony_WAH.png',
+    url: 'https://sonylifetime.streamxlivenow.workers.dev/sonywah.m3u8',
+    players: [{"name": "Server 1", "url": "https://sonylifetime.streamxlivenow.workers.dev/sonywah.m3u8", "source": "hls", "quality": "HD"}, {"name": "Server 2", "url": "https://sliv.tgaadi.workers.dev/sonywah.m3u8", "source": "hls", "quality": "SD"}]
+  },
+  {
+    id: 'sonyliv-5',
+    title: 'Sony MAX',
+    category: 'Sports',
+    poster: 'https://www.sonypicturesnetworks.com/images/logos/Sony_MAX.png',
+    url: 'https://sonylifetime.streamxlivenow.workers.dev/sonymax.m3u8',
+    players: [{"name": "Server 1", "url": "https://sonylifetime.streamxlivenow.workers.dev/sonymax.m3u8", "source": "hls", "quality": "HD"}, {"name": "Server 2", "url": "https://sliv.tgaadi.workers.dev/sonymaxsd.m3u8", "source": "hls", "quality": "SD"}]
+  },
+  {
+    id: 'sonyliv-6',
+    title: 'Sony Max HD',
+    category: 'Sports',
+    poster: 'https://www.sonypicturesnetworks.com/images/logos/Sony_MAX-HD_WHITE.png',
+    url: 'https://sonylifetime.streamxlivenow.workers.dev/sonymaxhd.m3u8',
+    players: [{"name": "Server 1", "url": "https://sonylifetime.streamxlivenow.workers.dev/sonymaxhd.m3u8", "source": "hls", "quality": "HD"}, {"name": "Server 2", "url": "https://sliv.tgaadi.workers.dev/sonymaxhd.m3u8", "source": "hls", "quality": "SD"}]
+  },
+  {
+    id: 'sonyliv-7',
+    title: 'Sony MAX2',
+    category: 'Sports',
+    poster: 'https://www.sonypicturesnetworks.com/images/logos/Sony_MAX2.png',
+    url: 'https://sonylifetime.streamxlivenow.workers.dev/sonymax2.m3u8',
+    players: [{"name": "Server 1", "url": "https://sonylifetime.streamxlivenow.workers.dev/sonymax2.m3u8", "source": "hls", "quality": "HD"}, {"name": "Server 2", "url": "https://sliv.tgaadi.workers.dev/max2.m3u8", "source": "hls", "quality": "SD"}]
+  },
+  {
+    id: 'sonyliv-8',
+    title: 'Sony Sports Ten 1',
+    category: 'Sports',
+    poster: 'https://www.sonypicturesnetworks.com/images/logos/SONY_SportsTen1_SD_Logo_CLR.png',
+    url: 'https://sonylifetime.streamxlivenow.workers.dev/sonyten1.m3u8',
+    players: [{"name": "Server 1", "url": "https://sonylifetime.streamxlivenow.workers.dev/sonyten1.m3u8", "source": "hls", "quality": "HD"}, {"name": "Server 2", "url": "https://sliv.tgaadi.workers.dev/ten1sd.m3u8", "source": "hls", "quality": "SD"}]
+  },
+  {
+    id: 'sonyliv-9',
+    title: 'Sony Sports Ten 1 HD',
+    category: 'Sports',
+    poster: 'https://www.sonypicturesnetworks.com/images/logos/SONY_SportsTen1_HD_Logo_CLR.png',
+    url: 'https://sonylifetime.streamxlivenow.workers.dev/sonyten1hd.m3u8',
+    players: [{"name": "Server 1", "url": "https://sonylifetime.streamxlivenow.workers.dev/sonyten1hd.m3u8", "source": "hls", "quality": "HD"}, {"name": "Server 2", "url": "https://sliv.tgaadi.workers.dev/ten1hd.m3u8", "source": "hls", "quality": "SD"}]
+  },
+  {
+    id: 'sonyliv-10',
+    title: 'Sony Sports Ten 2',
+    category: 'Sports',
+    poster: 'https://www.sonypicturesnetworks.com/images/logos/SONY_SportsTen2_SD_Logo_CLR.png',
+    url: 'https://sonylifetime.streamxlivenow.workers.dev/sonyten2.m3u8',
+    players: [{"name": "Server 1", "url": "https://sonylifetime.streamxlivenow.workers.dev/sonyten2.m3u8", "source": "hls", "quality": "HD"}, {"name": "Server 2", "url": "https://sliv.tgaadi.workers.dev/ten2sd.m3u8", "source": "hls", "quality": "SD"}]
+  },
+  {
+    id: 'sonyliv-11',
+    title: 'Sony Sports Ten 2 HD',
+    category: 'Sports',
+    poster: 'https://www.sonypicturesnetworks.com/images/logos/SONY_SportsTen2_HD_Logo_CLR.png',
+    url: 'https://sonylifetime.streamxlivenow.workers.dev/sonyten2hd.m3u8',
+    players: [{"name": "Server 1", "url": "https://sonylifetime.streamxlivenow.workers.dev/sonyten2hd.m3u8", "source": "hls", "quality": "HD"}, {"name": "Server 2", "url": "https://sliv.tgaadi.workers.dev/ten2hd.m3u8", "source": "hls", "quality": "SD"}]
+  },
+  {
+    id: 'sonyliv-12',
+    title: 'Sony Sports Ten 3',
+    category: 'Sports',
+    poster: 'https://www.sonypicturesnetworks.com/images/logos/Sony_Sports_Ten_3_Hindi.png',
+    url: 'https://sonylifetime.streamxlivenow.workers.dev/sonyten3.m3u8',
+    players: [{"name": "Server 1", "url": "https://sonylifetime.streamxlivenow.workers.dev/sonyten3.m3u8", "source": "hls", "quality": "HD"}, {"name": "Server 2", "url": "https://sliv.tgaadi.workers.dev/ten3sd.m3u8", "source": "hls", "quality": "SD"}]
+  },
+  {
+    id: 'sonyliv-13',
+    title: 'Sony Sports Ten 3 HD',
+    category: 'Sports',
+    poster: 'https://www.sonypicturesnetworks.com/images/logos/Sony_Sports_Ten_3_Hindi_HD.png',
+    url: 'https://sonylifetime.streamxlivenow.workers.dev/sonyten3hd.m3u8',
+    players: [{"name": "Server 1", "url": "https://sonylifetime.streamxlivenow.workers.dev/sonyten3hd.m3u8", "source": "hls", "quality": "HD"}, {"name": "Server 2", "url": "https://sliv.tgaadi.workers.dev/ten3hd.m3u8", "source": "hls", "quality": "SD"}]
+  },
+  {
+    id: 'sonyliv-14',
+    title: 'Sony Sports Ten 4 Tamil',
+    category: 'Sports',
+    poster: 'https://www.sonypicturesnetworks.com/images/logos/Sony_Sports_Ten_4_Tamil.png',
+    url: 'https://sonylifetime.streamxlivenow.workers.dev/sonyten4.m3u8',
+    players: [{"name": "Server 1", "url": "https://sonylifetime.streamxlivenow.workers.dev/sonyten4.m3u8", "source": "hls", "quality": "HD"}, {"name": "Server 2", "url": "https://sliv.tgaadi.workers.dev/ten4sd.m3u8", "source": "hls", "quality": "SD"}]
+  },
+  {
+    id: 'sonyliv-15',
+    title: 'Sony Sports Ten 4 Telugu',
+    category: 'Sports',
+    poster: 'https://www.sonypicturesnetworks.com/images/logos/Sony_Sports_Ten_4_Telugu.png',
+    url: 'https://sonylifetime.streamxlivenow.workers.dev/sonyten4hd.m3u8',
+    players: [{"name": "Server 1", "url": "https://sonylifetime.streamxlivenow.workers.dev/sonyten4hd.m3u8", "source": "hls", "quality": "HD"}, {"name": "Server 2", "url": "https://sliv.tgaadi.workers.dev/ten4hd.m3u8", "source": "hls", "quality": "SD"}]
+  },
+  {
+    id: 'sonyliv-16',
+    title: 'Sony Sports Ten 5',
+    category: 'Sports',
+    poster: 'https://www.sonypicturesnetworks.com/images/logos/SONY_SportsTen5_SD_Logo_CLR.png',
+    url: 'https://sonylifetime.streamxlivenow.workers.dev/sonyten5.m3u8',
+    players: [{"name": "Server 1", "url": "https://sonylifetime.streamxlivenow.workers.dev/sonyten5.m3u8", "source": "hls", "quality": "HD"}, {"name": "Server 2", "url": "https://sliv.tgaadi.workers.dev/sonysixsd.m3u8", "source": "hls", "quality": "SD"}]
+  },
+  {
+    id: 'sonyliv-17',
+    title: 'Sony Sports Ten 5 HD',
+    category: 'Sports',
+    poster: 'https://www.sonypicturesnetworks.com/images/logos/SONY_SportsTen5_HD_Logo_CLR.png',
+    url: 'https://sonylifetime.streamxlivenow.workers.dev/sonyten5hd.m3u8',
+    players: [{"name": "Server 1", "url": "https://sonylifetime.streamxlivenow.workers.dev/sonyten5hd.m3u8", "source": "hls", "quality": "HD"}, {"name": "Server 2", "url": "https://sliv.tgaadi.workers.dev/sonysixhd.m3u8", "source": "hls", "quality": "SD"}]
+  },
+  {
+    id: 'sonyliv-18',
+    title: 'Sony Yay',
+    category: 'Sports',
+    poster: 'https://www.sonypicturesnetworks.com/images/logos/SONY%20YAY.png',
+    url: 'https://sonylifetime.streamxlivenow.workers.dev/sonyyay.m3u8',
+    players: [{"name": "Server 1", "url": "https://sonylifetime.streamxlivenow.workers.dev/sonyyay.m3u8", "source": "hls", "quality": "HD"}, {"name": "Server 2", "url": "https://sliv.tgaadi.workers.dev/sonyyaysd.m3u8", "source": "hls", "quality": "SD"}]
+  },
+  {
+    id: 'sonyliv-19',
+    title: 'Sony BBC Earth HD',
+    category: 'Sports',
+    poster: 'https://www.sonypicturesnetworks.com/images/logos/SBBCE_LOGO_NEW_PNG.png',
+    url: 'https://sonylifetime.streamxlivenow.workers.dev/bbcearthhd.m3u8',
+    players: [{"name": "Server 1", "url": "https://sonylifetime.streamxlivenow.workers.dev/bbcearthhd.m3u8", "source": "hls", "quality": "HD"}, {"name": "Server 2", "url": "https://sliv.tgaadi.workers.dev/sonybbcearthhd.m3u8", "source": "hls", "quality": "SD"}]
+  },
+  {
+    id: 'sonyliv-20',
+    title: 'Sony PIX HD',
+    category: 'Sports',
+    poster: 'https://www.sonypicturesnetworks.com/images/logos/PIX%20HD_WHITE.png',
+    url: 'https://sonylifetime.streamxlivenow.workers.dev/sonypixhd.m3u8',
+    players: [{"name": "Server 1", "url": "https://sonylifetime.streamxlivenow.workers.dev/sonypixhd.m3u8", "source": "hls", "quality": "HD"}, {"name": "Server 2", "url": "https://sliv.tgaadi.workers.dev/pixhd.m3u8", "source": "hls", "quality": "SD"}]
+  },
+  {
+    id: 'sonyliv-21',
+    title: 'Sony Marathi',
+    category: 'Sports',
+    poster: 'https://www.sonypicturesnetworks.com/images/logos/Sony_MARATHI.png',
+    url: 'https://sonylifetime.streamxlivenow.workers.dev/sonymarathi.m3u8',
+    players: [{"name": "Server 1", "url": "https://sonylifetime.streamxlivenow.workers.dev/sonymarathi.m3u8", "source": "hls", "quality": "HD"}, {"name": "Server 2", "url": "https://sliv.tgaadi.workers.dev/sonymarathi.m3u8", "source": "hls", "quality": "SD"}]
+  },
+  {
+    id: 'sonyliv-22',
+    title: 'Sony Aath',
+    category: 'Sports',
+    poster: 'https://www.sonypicturesnetworks.com/images/logos/SONY%20AATH.png',
+    url: 'https://sonylifetime.streamxlivenow.workers.dev/sonyaath.m3u8',
+    players: [{"name": "Server 1", "url": "https://sonylifetime.streamxlivenow.workers.dev/sonyaath.m3u8", "source": "hls", "quality": "HD"}, {"name": "Server 2", "url": "https://sliv.tgaadi.workers.dev/sonyaathsd.m3u8", "source": "hls", "quality": "SD"}]
+  },
+
   // v3.17.10: every URL below probe-verified LIVE 2026-10-21 (curl, 200/206).
   // Dead cloudplay-sonyliv Sony URLs + dead relay DD Sports/Khel REMOVED.
   // Star Sports 2/3/Hindi variants on ayna hosts 404 — only verified entries ship.

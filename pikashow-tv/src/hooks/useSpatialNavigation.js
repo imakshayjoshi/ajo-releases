@@ -1,4 +1,5 @@
 import { useEffect, useRef, useCallback } from 'react';
+import { getContainerRevealScrollTop } from '../utils/scrollMath.js';
 
 /**
  * Ultra-High Performance 60FPS TV Spatial Navigation
@@ -7,10 +8,8 @@ import { useEffect, useRef, useCallback } from 'react';
  */
 export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelector = null }) {
   const lastFocusedRef = useRef(null);
-  // v3.12.84: dock model state. The nav is a position:fixed BOTTOM capsule, so
-  // the engine must know (a) which CONTENT element to return to when the user
-  // presses UP from the dock, and (b) the last focused rect for nearest-
-  // neighbor recovery when a grid re-render unmounts the focused card.
+  // v3.17.53: left-rail model state. The engine remembers the last content
+  // target so RIGHT from the rail returns to exactly where the user was.
   const lastContentRef = useRef(null);
   const lastRectRef = useRef(null);
 
@@ -58,22 +57,20 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
   const findNextElement = useCallback((current, direction, elements) => {
     if (!current || elements.length === 0) return elements[0] || null;
 
-    // v3.12.84: dock helpers. The nav is a BOTTOM-anchored capsule, so:
-    //  - content bottom edge + DOWN = the only way INTO the dock
-    //  - UP from the dock returns to the content element you came from
-    //  - the dock never wins a geometric scan mid-page (that was the jumping)
-    const dockPillNear = (fromEl) => {
+    // v3.17.53: the fixed left rail is reachable from the first item in every
+    // row. Prefer the active destination; vertical proximity is the fallback.
+    const navItemNear = (fromEl) => {
       const headerEls = getFocusableElements(document.querySelector('.tv-header'));
       const pool = headerEls.filter((el) => elements.includes(el));
       if (!pool.length) return null;
       const active = pool.find((el) => el.classList && el.classList.contains('tv-nav-pill') && el.classList.contains('active'));
       if (active) return active;
       const fr = fromEl ? fromEl.getBoundingClientRect() : null;
-      const fx = fr ? fr.left + fr.width / 2 : window.innerWidth / 2;
+      const fy = fr ? fr.top + fr.height / 2 : window.innerHeight / 2;
       let best = pool[0], bd = Infinity;
       for (const p of pool) {
         const r = p.getBoundingClientRect();
-        const d = Math.abs(r.left + r.width / 2 - fx);
+        const d = Math.abs(r.top + r.height / 2 - fy);
         if (d < bd) { bd = d; best = p; }
       }
       return best;
@@ -98,30 +95,30 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
       return mainEls[0];
     };
 
-    // v3.12.84: dock fast-path. The header capsule sits at the BOTTOM of the
-    // screen. LEFT/RIGHT move inside it; UP returns to content; DOWN stays.
+    // v3.17.53: fixed LEFT rail. UP/DOWN move within the menu, RIGHT returns
+    // to content, and LEFT stays in the rail.
     const inHeaderZone = current.closest('.tv-header');
     if (inHeaderZone) {
       if (current.closest('.tv-logo-section')) {
-        if (direction === 'ArrowRight') {
+        if (direction === 'ArrowDown') {
           const pill = document.querySelector('.tv-header .tv-nav-pill.active') || document.querySelector('.tv-header .tv-nav-pill');
           if (pill) return pill;
         }
       } else if (current.closest('.tv-nav-pills')) {
         const pills = Array.from(document.querySelectorAll('.tv-header .tv-nav-pill'));
         const idx = pills.indexOf(current);
-        if (direction === 'ArrowLeft' && idx <= 0) {
+        if (direction === 'ArrowUp' && idx <= 0) {
           const logo = document.querySelector('.tv-header .tv-logo-badge');
           if (logo) return logo;
         }
-        if (direction === 'ArrowLeft' && idx > 0) return pills[idx - 1];
-        if (direction === 'ArrowRight' && idx >= 0 && idx < pills.length - 1) return pills[idx + 1];
+        if (direction === 'ArrowUp' && idx > 0) return pills[idx - 1];
+        if (direction === 'ArrowDown' && idx >= 0 && idx < pills.length - 1) return pills[idx + 1];
       }
-      if (direction === 'ArrowUp') {
+      if (direction === 'ArrowRight') {
         const back = contentReturnTarget();
         if (back) return back;
       }
-      // DOWN from the dock: nothing below — stay. Any other unhandled key: stay.
+      // LEFT and unhandled edge presses stay inside the rail.
       return current;
     }
 
@@ -144,10 +141,7 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
       if (firstCard) return firstCard;
     }
     if (direction === 'ArrowLeft' && current.closest('.live-cat-rail')) {
-      // v3.12.86: the rail is the leftmost element on the screen — the generic
-      // sibling fast-path would otherwise walk UP the category list on a LEFT
-      // press (a sideways key moving focus vertically is pure confusion).
-      return current;
+      return navItemNear(current) || current;
     }
 
     // 1. FAST-PATH: Intra-rail horizontal navigation (O(1) sibling traversal)
@@ -162,6 +156,11 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
       while (sibling) {
         if (elements.includes(sibling)) return sibling;
         sibling = sibling.previousElementSibling;
+      }
+      // First item in a row: LEFT always opens the persistent navigation rail.
+      if (current.closest('.tv-main-content')) {
+        const navTarget = navItemNear(current);
+        if (navTarget) return navTarget;
       }
     }
 
@@ -355,10 +354,8 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
           .filter((el) => el !== current && !el.disabled && el.offsetParent !== null);
       }
     }
-    // v3.12.84: the dock is position:fixed at the BOTTOM of the viewport, so
-    // geometrically it is "below" EVERYTHING — the 2D scan kept snapping to it
-    // from the middle of the page (the "focus jumps for no reason" complaint).
-    // Dock entry is only via the explicit bottom-edge fallback after the scan.
+    // The left rail is excluded from the generic 2D scan. It is entered only by
+    // the explicit LEFT-edge rule above, so vertical navigation never jumps.
     let scanEls = liveGridEls || elements;
     if (!inHeaderZone) {
       scanEls = scanEls.filter((el) => !el.closest('.tv-header'));
@@ -425,13 +422,9 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
       }
     }
 
-    // v3.12.84: bottom edge of content = the ONLY way into the dock. The scan
-    // above excluded dock elements, so "nothing found below" means the user is
-    // genuinely at the bottom of the page — land on the nearest nav pill.
-    if (!bestCandidate && direction === 'ArrowDown' && !inHeaderZone) {
-      const dock = dockPillNear(current);
-      if (dock && dock !== current) return dock;
-    }
+    // Bottom edge stays in content. Navigation is no longer hidden below the
+    // page; LEFT opens the rail from any row.
+    if (!bestCandidate && direction === 'ArrowDown' && current.closest('.tv-main-content')) return current;
 
     // v3.12.79: in the live area, pressing DOWN with no channel below stays
     // put — never escapes to the toolbar (the dock fallback above handles the
@@ -469,11 +462,8 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
     }
 
     // 2. Vertical alignment within the main scroll area
-    // v3.12.84 (pane-jump fix): the nav dock is position:fixed at the BOTTOM,
-    // outside .tv-main-content. The old `|| document.querySelector('.tv-main-content')`
-    // fallback scrolled the page for elements that were never inside it — every
-    // keypress on the dock dragged the content pane ("the screen pane moves for
-    // no reason"). Only scroll a container the element actually lives in.
+    // The fixed navigation rail lives outside .tv-main-content. Only scroll a
+    // container the focused element actually lives in.
     const isLiveCard = el.closest && el.closest('.live-channel-grid, .live-cat-rail');
     // v3.12.89: .tv-search-results is a nested scroller inside the page —
     // closest() picks it (nearest ancestor) so result cards scroll into view
@@ -489,6 +479,11 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
           scroller.scrollTop -= (sr.top + 24 - er.top);
         } else if (er.bottom > sr.bottom - 24) {
           scroller.scrollTop += (er.bottom - sr.bottom + 24);
+        }
+        const revealContainer = el.closest('.tv-hero, .tv-hero-carousel, .tv-hero-grid');
+        if (revealContainer) {
+          const cr = revealContainer.getBoundingClientRect();
+          scroller.scrollTop = getContainerRevealScrollTop(scroller.scrollTop, cr.top, sr.top, 16);
         }
         // v3.12.88: inside a settings card, also reveal the CARD's top — the
         // title/Room Code/QR sit ABOVE the first focusable button, so focusing
@@ -513,6 +508,11 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
   }, []);
 
   useEffect(() => {
+    // v3.17.51: throttle key-repeat. Held-down D-pad keys fire keydown at OS
+    // repeat rate (~20/s) and each press used to run a document-wide
+    // querySelectorAll + getComputedStyle sweep — layout thrash on 1GB TVs.
+    let lastNavAt = 0;
+    const NAV_MIN_INTERVAL_MS = 90;
     const handleKeyDown = (e) => {
       const key = e.key;
       const keyCode = e.keyCode;
@@ -534,6 +534,10 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
 
       // 2. D-Pad Directional Navigation
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(key) || [19, 20, 21, 22, 37, 38, 39, 40].includes(keyCode)) {
+        // v3.17.51: drop key-repeat floods — single presses always pass.
+        const now = Date.now();
+        if (now - lastNavAt < NAV_MIN_INTERVAL_MS) { e.preventDefault(); return; }
+        lastNavAt = now;
         // Normalize keyCode to direction string FIRST so `dir` is available
         // for the INPUT/TEXTAREA guard below (v3.12.4 TDZ fix).
         let dir = key;
@@ -575,14 +579,14 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
               const lr = lastRectRef.current;
               let bd = Infinity;
               for (const el of elements) {
-                if (el.closest('.tv-header')) continue; // never recover INTO the dock
+                if (el.closest('.tv-header')) continue; // never recover into the rail
                 const r = el.getBoundingClientRect();
                 const d = Math.abs(r.left + r.width / 2 - lr.x) + Math.abs(r.top + r.height / 2 - lr.y);
                 if (d < bd) { bd = d; target = el; }
               }
             }
             if (!target) {
-              // Last resort: the first CONTENT element (never the dock).
+              // Last resort: the first CONTENT element (never the rail).
               target = elements.find((el) => !el.closest('.tv-header')) || null;
             }
             focusAndScroll(target || elements[0]);
@@ -598,7 +602,7 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
           focusAndScroll(next);
           lastFocusedRef.current = next;
           // v3.12.84: track where focus is + the last CONTENT element, so the
-          // dock's UP can return to it and recovery can stay in-neighborhood.
+          // rail's RIGHT can return to it and recovery can stay in-neighborhood.
           try {
             const r = next.getBoundingClientRect();
             lastRectRef.current = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
@@ -621,7 +625,12 @@ export function useSpatialNavigation({ onBack, isModalOpen = false, modalSelecto
             };
             window.addEventListener('keyup', onUp, true);
             // Safety: clear even if keyup is missed (remote repeat quirks).
-            setTimeout(() => track.style.setProperty('--stretch', '0px'), 600);
+            // v3.17.51: also REMOVE the listener — a missed keyup used to leak
+            // one window listener per rail-edge press.
+            setTimeout(() => {
+              track.style.setProperty('--stretch', '0px');
+              window.removeEventListener('keyup', onUp, true);
+            }, 600);
           }
         }
       }

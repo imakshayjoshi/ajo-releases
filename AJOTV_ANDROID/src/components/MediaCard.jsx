@@ -53,6 +53,17 @@ function createLiveChannelBadge(t = 'TV', _cat = 'Live') {
 const VOD_FALLBACK_POSTER =
   'data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%22200%22%20height%3D%22300%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Crect%20width%3D%22100%25%22%20height%3D%22100%25%22%20fill%3D%22%23151c2c%22%2F%3E%3Ctext%20x%3D%2250%25%22%20y%3D%2250%25%22%20fill%3D%22%2364748b%22%20dominant-baseline%3D%22middle%22%20text-anchor%3D%22middle%22%20font-family%3D%22sans-serif%22%20font-size%3D%2214%22%3ENo%20Poster%3C%2Ftext%3E%3C%2Fsvg%3E';
 
+// v3.17.28: content relevance — "Why am I seeing this?" tooltip
+function getRelevanceReason(item) {
+  const reasons = [];
+  if (item?.trending) reasons.push('Trending now');
+  if (item?.reason) reasons.push(item.reason);
+  if (item?.genres?.length) reasons.push(item.genres.slice(0, 2).join(' · '));
+  if (item?.rating && parseFloat(item.rating) >= 7.5) reasons.push(`★ ${item.rating}`);
+  if (item?.year && item.year !== 'LIVE') reasons.push(String(item.year));
+  return reasons.length > 0 ? reasons.join(' · ') : null;
+}
+
 export function MediaCard({ item, onClick, isLive = false }) {
   if (!item) return null;
 
@@ -99,13 +110,14 @@ export function MediaCard({ item, onClick, isLive = false }) {
       tabIndex={0}
       className="tv-card"
       onClick={() => onClick && onClick(item)}
+      title={getRelevanceReason(item) ? `Why this? ${getRelevanceReason(item)}` : undefined}
     >
       <div style={{ position: 'relative', width: '100%', overflow: 'hidden', borderRadius: '8px' }}>
         <img
           src={poster || fallbackPoster}
           alt={title}
           className={isLive ? 'tv-card-poster tv-card-live-poster' : 'tv-card-poster'}
-          loading="lazy"
+          loading="lazy" decoding="async"
           onError={(e) => {
             if (e.target.dataset.fallbackTried) return;
             e.target.dataset.fallbackTried = 'true';

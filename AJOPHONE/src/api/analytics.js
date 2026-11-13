@@ -68,9 +68,12 @@ function deviceId() {
 
 function appVersion() {
   try {
-    const mod = window.__ajoAnalyticsVersion;
-    return mod || '3.12.59';
-  } catch { return '3.12.59'; }
+    return window.__ajoAnalyticsVersion || '3.12.74';
+  } catch { return '3.12.74'; }
+}
+
+export function setAnalyticsVersion(version) {
+  try { if (typeof window !== 'undefined') window.__ajoAnalyticsVersion = String(version); } catch {}
 }
 
 /** Record one event. Fire-and-forget; never throws. */

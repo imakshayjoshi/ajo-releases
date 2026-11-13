@@ -28,6 +28,7 @@ import {
   playInNativePlayerWithDrm,
   preflightEmbedUrl
 } from '../utils/nativePlayer';
+import { getResumeStartMs } from '../utils/scrollMath.js';
 import { saveProgress, getWatchHistory, getWatchProgress, markItemDead } from '../api/history';
 import {
   trackPlaybackStart, trackPlaybackEngine, trackFailover,
@@ -59,6 +60,7 @@ export function TVPlayer({
 }) {
   const videoRef = useRef(null);
   const hlsRef = useRef(null);
+  const hlsFatalRetriesRef = useRef(0); // v3.17.51: bound fatal-error retries
   const iframeRef = useRef(null);
   const embedWatchdogRef = useRef(null);
   const showDrawerRef = useRef(null);
@@ -149,7 +151,11 @@ export function TVPlayer({
   const [currentServerIndex, setCurrentServerIndex] = useState(0);
   // v3.12.61: terminal failure state — persistent, with Retry. Replaces the
   // 3.5s auto-clearing "Stream offline" toast that left a dead black player.
-  const [allServersDead, setAllServersDead] = useState(null); // { reason, at }
+  const [allServersDead, setAllServersDead] = useState(null); // { reason, at, failures: [{name, reason}] }
+  const failLogRef = useRef([]);
+  const engineTriedRef = useRef(false);
+  const bufferingStartRef = useRef(null);
+  const bufferWarmedRef = useRef(false);
 
   // Match requested server prop to currentServerIndex
   useEffect(() => {
@@ -359,50 +365,63 @@ export function TVPlayer({
   }, [bingeCountdown, currentEpisodeIndex, episodes, onSelectEpisode]);
 
   // Auto failover to next server if current server fails
+  // v3.17.27: "try everything before giving up" checklist:
+  //   1. Try next server (normal failover)
+  //   2. All servers exhausted -> try native ExoPlayer handoff
+  //   3. Already handed off -> try engine toggle (hls <-> native)
+  //   4. Full matrix exhausted -> terminal dead state with failure table
   const handleFailover = useCallback((reason = 'Stream connection error') => {
-    trackFailover(reason); // v3.12.59: analytics funnel
-    // v3.12.61: remember this server failed this session — retries and the
-    // native handoff must never land on a mirror we already burned.
+    trackFailover(reason);
     const failedUrl = orderedServers[currentServerIndex]?.url;
     if (failedUrl) markMirrorFailed(failedUrl);
+    failLogRef.current.push({ name: orderedServers[currentServerIndex]?.name || ('Server ' + (currentServerIndex+1)), reason });
+
+    // 1. Try next server
     if (orderedServers.length > 1 && currentServerIndex < orderedServers.length - 1) {
       const nextIdx = currentServerIndex + 1;
       const nextName = orderedServers[nextIdx]?.name || `Server ${nextIdx + 1}`;
       setErrorMessage(`⚡ ${reason}. Switching to ${nextName}...`);
       setCurrentServerIndex(nextIdx);
       setTimeout(() => setErrorMessage(null), 3000);
-    } else {
-      // v3.12.43: terminal branch — clear the stall/black-screen watchdogs so the
-      // failure path stops re-entering every 8s (re-marking dead + re-flashing
-      // the toast forever).
-      if (stallWatchdogRef.current) {
-        clearInterval(stallWatchdogRef.current);
-        stallWatchdogRef.current = null;
-      }
-      if (blackScreenWatchdogRef.current) {
-        clearInterval(blackScreenWatchdogRef.current);
-        blackScreenWatchdogRef.current = null;
-      }
-      if (item && (item.is_live || item.type === 'live' || item.year === 'LIVE')) {
-        const failedUrl = orderedServers[currentServerIndex]?.url || item.url;
-        if (failedUrl) markChannelDead(failedUrl);
-      }
-      trackPlaybackError(reason); // v3.12.59: analytics funnel
-      // v3.12.93: every source failed — blocklist the title so it leaves the
-      // catalog/search until sources recover (14-day TTL in history.js).
-      // Live channels exempt: they have their own dead-channel handling.
-      if (item && !(item.is_live || item.type === 'live' || item.year === 'LIVE') && item.id) {
-        markItemDead(item.id);
-      }
-      // v3.12.61 FIX (black screen after "all servers dead"): the terminal
-      // message contained no 'Failed'/'Error' keyword, so the 3.5s auto-clear
-      // effect wiped it, leaving a silent dead black player. Now the terminal
-      // state is explicit, persistent, and offers a retry that skips dead
-      // mirrors (failure memory below).
-      setAllServersDead({ reason, at: Date.now() });
-      setIsBuffering(false);
+      return;
     }
-  }, [orderedServers, currentServerIndex]);
+
+    // 2. All servers exhausted -> try native ExoPlayer handoff
+    if (!nativeHandoffDoneRef.current && handOffToNative(`All web servers failed: ${reason}`)) {
+      return;
+    }
+
+    // 3. Already handed off -> try engine toggle
+    if (!engineTriedRef.current) {
+      engineTriedRef.current = true;
+      const alt = videoEngine === 'hls' ? 'native' : 'hls';
+      setVideoEngine(alt);
+      setErrorMessage(`⚡ Last attempt — switching to ${alt === 'hls' ? 'HLS.js' : 'Native'} player...`);
+      setTimeout(() => setErrorMessage(null), 4000);
+      setStreamEpoch(e => e + 1);
+      return;
+    }
+
+    // 4. Full matrix exhausted -> terminal dead state
+    if (stallWatchdogRef.current) {
+      clearInterval(stallWatchdogRef.current);
+      stallWatchdogRef.current = null;
+    }
+    if (blackScreenWatchdogRef.current) {
+      clearInterval(blackScreenWatchdogRef.current);
+      blackScreenWatchdogRef.current = null;
+    }
+    if (item && (item.is_live || item.type === 'live' || item.year === 'LIVE')) {
+      const fu = orderedServers[currentServerIndex]?.url || item.url;
+      if (fu) markChannelDead(fu);
+    }
+    trackPlaybackError(reason);
+    if (item && !(item.is_live || item.type === 'live' || item.year === 'LIVE') && item.id) {
+      markItemDead(item.id);
+    }
+    setAllServersDead({ reason, at: Date.now(), failures: [...failLogRef.current] });
+    setIsBuffering(false);
+  }, [orderedServers, currentServerIndex, videoEngine]);
 
   // v3.12.61: Retry from the terminal dead state. Reorders so failed mirrors
   // (marked during this session) sort last, then restarts from the best
@@ -480,6 +499,10 @@ export function TVPlayer({
     if (!streamUrl) return false;
     if (!isNativePlayableUrl(streamUrl)) return false;
 
+    // v3.17.51: carry the live position into the native player — a mid-movie
+    // failover used to restart at 0:00.
+    const startMs = getResumeStartMs(videoRef.current?.currentTime || 0, resumePositionRef.current, lastPositionRef.current || 0);
+
     // Release the decoder first, then launch. Order matters here.
     teardownWebPlayback();
 
@@ -488,8 +511,8 @@ export function TVPlayer({
     // route through the headers-aware bridge when the server carries them.
     const activeHeaders = orderedServers[currentServerIndex]?.headers;
     const launched = (activeHeaders && Object.keys(activeHeaders).length > 0)
-      ? playInNativePlayerWithDrm(streamUrl, title, isLive, fallbackUrls, null, activeHeaders)
-      : playInNativePlayer(streamUrl, title, isLive, fallbackUrls);
+      ? playInNativePlayerWithDrm(streamUrl, title, isLive, fallbackUrls, null, activeHeaders, startMs)
+      : playInNativePlayer(streamUrl, title, isLive, fallbackUrls, startMs);
     if (!launched) return false;
 
     nativeHandoffDoneRef.current = streamUrl;
@@ -558,13 +581,18 @@ export function TVPlayer({
     }
 
     nativeHandoffDoneRef.current = streamUrl;
-    handOffToNative('▶ Opening in hardware player...');
-  }, [streamUrl, handOffToNative, orderedServers, currentServerIndex]);
+    // v3.17.51: if the native launch fails here, web playback is already torn
+    // down — without a failover the user gets a permanent black screen.
+    if (!handOffToNative('▶ Opening in hardware player...')) {
+      handleFailover('Native launch failed');
+    }
+  }, [streamUrl, handOffToNative, orderedServers, currentServerIndex, handleFailover]);
 
   // v3.12.16: Embed mirrors mount immediately so video player starts right away
   useEffect(() => {
     if (!streamUrl) return;
     if (nativeActiveRef.current) return;
+    hlsFatalRetriesRef.current = 0;
     setEmbedReady(true);
     setErrorMessage(null);
     // v3.12.61: any stream change leaves the terminal dead state — we are
@@ -577,6 +605,7 @@ export function TVPlayer({
     if (!streamUrl) {
       setIsBuffering(false);
       setErrorMessage('No valid stream URL found.');
+      hlsFatalRetriesRef.current = 0;
       return;
     }
 
@@ -739,6 +768,16 @@ export function TVPlayer({
   
         hls.on(Hls.Events.ERROR, (event, data) => {
           if (data.fatal) {
+            // v3.17.51: fatal retries were UNBOUNDED (the comment claimed
+            // 'bounded'; nothing bounded it). After 3 fatal errors on the same
+            // stream, walk the server chain instead of retrying forever.
+            hlsFatalRetriesRef.current += 1;
+            if (hlsFatalRetriesRef.current > 3) {
+              hls.destroy();
+              hlsRef.current = null;
+              handleFailover('Stream keeps failing');
+              return;
+            }
             switch (data.type) {
               case Hls.ErrorTypes.NETWORK_ERROR:
                 if (!handOffToNative('Network error, switching to hardware player...')) {
@@ -781,12 +820,45 @@ export function TVPlayer({
               }
             } else if (!video.paused && video.readyState >= 2) {
               bufferingDuration = 0;
-              if (video.currentTime === lastProgressTime && isLive) {
+              // v3.17.26: buffer health — if buffer drops below 3s, pre-warm next server
+              try {
+                if (video.buffered && video.buffered.length > 0) {
+                  const bufferedEnd = video.buffered.end(video.buffered.length - 1);
+                  const bufferedAhead = bufferedEnd - video.currentTime;
+                  if (bufferedAhead < 3 && !bufferWarmedRef.current) {
+                    bufferWarmedRef.current = true;
+                    // Pre-warm next server's DNS + manifest in background
+                    const nextServer = orderedServers[currentServerIndex + 1];
+                    if (nextServer?.url) {
+                      import('../utils/streamingEngines').then(m => m.probeServerHealth(nextServer.url)).catch(() => {});
+                    }
+                  } else if (bufferedAhead > 10) {
+                    bufferWarmedRef.current = false;
+                  }
+                }
+              } catch {}
+              // v3.17.29: VOD stall detection — conservative thresholds (30s stall,
+              // only when NOT buffering). The v3.17.28 10s threshold caused false
+              // failovers on slow connections where buffering legitimately takes
+              // 10-20s. Now we check readyState and buffering state.
+              if (video.currentTime === lastProgressTime && !video.paused && !video.seeking) {
                 stallDuration += 2;
-                if (stallDuration >= 8) {
+                // Only treat as stall if we have data and are not buffering
+                const isBuffering = video.readyState < 3;
+                if (stallDuration >= 30 && !isBuffering) {
                   stallDuration = 0;
-                  hls?.recoverMediaError();
-                  video.play().catch(() => {});
+                  if (isLive) {
+                    hls?.recoverMediaError();
+                    video.play().catch(() => {});
+                  } else if (!video.paused && video.readyState >= 2) {
+                    hls?.recoverMediaError();
+                    video.play().catch(() => {});
+                    setTimeout(() => {
+                      if (video && !video.paused && !video.seeking && video.currentTime === lastProgressTime) {
+                        handleFailover('Stream stalled (VOD)');
+                      }
+                    }, 15000);
+                  }
                 }
               } else {
                 stallDuration = 0;
@@ -1009,6 +1081,7 @@ export function TVPlayer({
 
   // TV Remote KeyDown Controller
   useEffect(() => {
+    let lastLeftAt = 0; let lastRightAt = 0;
     const handleKeyDown = (e) => {
       pingOsd();
 
@@ -1060,10 +1133,23 @@ export function TVPlayer({
       if (!showDrawer && !navHandled) {
         if (key === 'ArrowLeft' || keyCode === 21 || keyCode === 37) {
           if (!isLive) { e.preventDefault(); e.stopPropagation(); }
-          handleSeek(-10);
+          const now = Date.now();
+          if (now - lastLeftAt < 350) { handleSeek(-30); lastLeftAt = 0; } else { handleSeek(-10); lastLeftAt = now; }
         } else if (key === 'ArrowRight' || keyCode === 22 || keyCode === 39) {
           if (!isLive) { e.preventDefault(); e.stopPropagation(); }
-          handleSeek(10);
+          const now = Date.now();
+          if (now - lastRightAt < 350) { handleSeek(30); lastRightAt = 0; } else { handleSeek(10); lastRightAt = now; }
+        }
+        // v3.17.24: Media keys (remote media buttons)
+        else if (key === 'MediaPlayPause' || keyCode === 85) {
+          e.preventDefault(); e.stopPropagation(); togglePlayPause();
+        } else if (key === 'MediaSkipForward' || keyCode === 90) {
+          e.preventDefault(); e.stopPropagation(); handleSeek(30);
+        } else if (key === 'MediaSkipBackward' || keyCode === 88) {
+          e.preventDefault(); e.stopPropagation(); handleSeek(-30);
+        } else if (key === 'MediaStop' || keyCode === 86) {
+          e.preventDefault(); e.stopPropagation();
+          if (onClose) { const v = videoRef.current; teardownWebPlayback(); onClose(v?.currentTime || 0, v?.duration || 0); }
         }
       }
 
@@ -1111,7 +1197,7 @@ export function TVPlayer({
         playsInline
         autoPlay
         style={videoStyle}
-        onWaiting={() => setIsBuffering(true)}
+        onWaiting={() => { if (!bufferingStartRef.current) bufferingStartRef.current = Date.now(); setIsBuffering(true); }}
         onPlaying={() => {
           setIsBuffering(false);
           setIsPlaying(true);
@@ -1122,7 +1208,7 @@ export function TVPlayer({
             trackPlaybackStart(item, nativeActive ? 'native' : videoEngine, orderedServers[currentServerIndex]?.name);
           }
         }}
-        onCanPlay={() => setIsBuffering(false)}
+        onCanPlay={() => { bufferingStartRef.current = null; setIsBuffering(false); }}
         onTimeUpdate={handleTimeUpdate}
         // v3.12.56 FIX: (a) crossOrigin="anonymous" was FORCING a CORS check
         // on direct <video> sources — mirrors that don't send
@@ -1134,24 +1220,30 @@ export function TVPlayer({
         onError={() => handleFailover('Direct stream failed')}
       />
 
-      {/* Buffering Spinner */}
-      {isBuffering && !isEmbedStream && (
-        <div
-          className="tv-center-state"
-          style={{
-            position: 'absolute',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            textAlign: 'center',
-            pointerEvents: 'none',
-            zIndex: 80
-          }}
-        >
-          <div className="tv-spinner" />
-          <p style={{ fontWeight: 700, color: '#38bdf8', marginTop: 12 }}>Buffering Stream...</p>
-        </div>
-      )}
+      {/* Buffering Spinner — v3.17.25: graceful messages instead of generic spinner */}
+      {isBuffering && !isEmbedStream && !allServersDead && (() => {
+        const elapsed = Date.now() - (bufferingStartRef.current || Date.now());
+        const msg = elapsed > 8000 ? 'Some servers are slow right now. Trying the next one — hang tight…'
+          : elapsed > 4000 ? 'Loading… the first few seconds can take a moment on TV.'
+          : 'Loading your stream…';
+        return (
+          <div
+            className="tv-center-state"
+            style={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              textAlign: 'center',
+              pointerEvents: 'none',
+              zIndex: 80
+            }}
+          >
+            <div className="tv-spinner" />
+            <p style={{ fontWeight: 700, color: '#38bdf8', marginTop: 12, maxWidth: 400 }}>{msg}</p>
+          </div>
+        );
+      })()}
 
       {/* Error Message Toast */}
       {errorMessage && (
@@ -1182,9 +1274,13 @@ export function TVPlayer({
           ref={iframeRef}
           src={streamUrl}
           title={title}
-          allow="autoplay *; encrypted-media *; fullscreen *; picture-in-picture *; clipboard-write *"
+          allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
           allowFullScreen
-          referrerPolicy="no-referrer-when-downgrade"
+          referrerPolicy="no-referrer"
+          // v3.17.49: NO sandbox. The native WebView already blocks popup
+          // windows/ad redirects (MainActivity onCreateWindow -> false), and
+          // sandboxed frames break webtor plus most embed players.
+
           loading="eager"
           style={{
             position: 'absolute',
@@ -1233,6 +1329,19 @@ export function TVPlayer({
             {allServersDead.reason || 'Every mirror timed out or refused the connection.'}
             <br />Mirrors recover constantly — a retry usually works.
           </div>
+          {allServersDead.failures && allServersDead.failures.length > 0 && (
+            <div style={{ maxWidth: 480, width: '100%', background: 'rgba(255,255,255,0.04)', borderRadius: 10, padding: '12px 16px', border: '1px solid rgba(255,255,255,0.08)' }}>
+              {allServersDead.failures.slice(0, 8).map((f, i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#94a3b8', marginBottom: 4 }}>
+                  <span style={{ fontWeight: 600, color: '#e2e8f0' }}>{f.name}</span>
+                  <span>{f.reason}</span>
+                </div>
+              ))}
+              {allServersDead.failures.length > 8 && (
+                <div style={{ fontSize: 12, color: '#64748b', marginTop: 4 }}>...and {allServersDead.failures.length - 8} more</div>
+              )}
+            </div>
+          )}
           <div style={{ display: 'flex', gap: 16, marginTop: 8 }}>
             <button
               className="tv-player-btn"
@@ -1283,8 +1392,7 @@ export function TVPlayer({
           position: 'absolute',
           bottom: 120,
           right: 48,
-          background: 'rgba(15, 23, 42, 0.95)',
-          backdropFilter: 'blur(16px)',
+          background: 'rgba(15, 23, 42, 0.97)',
           border: '1px solid rgba(56, 189, 248, 0.5)',
           borderRadius: '16px',
           padding: '20px 24px',

@@ -1,335 +1,199 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { MediaCard } from './MediaCard';
-import { LandscapeMediaCard } from './LandscapeMediaCard';
-import { Film, Tv, Radio, Sparkles, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
-import { WorldwideFilterBar } from './WorldwideFilterBar';
-import { usePagination } from '../hooks/usePagination';
 
-export function MediaGridView({
-  title,
-  icon: Icon = Film,
-  items = [],
-  type = 'movies', // 'movies' | 'shows' | 'channels' | 'shorts'
-  onSelectItem,
-  onFocusItem,
-  onLoadMore,
-  hasMore = false,
-  isLoadingMore = false
-}) {
-  const [filters, setFilters] = useState({
-    region: 'all',
-    language: 'all',
-    genre: 'all',
-    year: 'all',
-    sort: 'popular'
-  });
+const PAGE_SIZE = 30;
+const GENRE_CHIP_CAP = 24; // unbounded chips render thousands of focusable buttons on TV
 
-  const bottomObserverRef = useRef(null);
+/**
+ * MediaGridView — full-catalog grid for Movies / Series / Sports.
+ *
+ * v3.12.83 (Apple-TV scoped browse): genre chips + a sort control on top of
+ * the existing category pills. The user asked for "proper categories or search
+ * like Apple TV" — this gives every catalog screen a genre rail (All / Action /
+ * Comedy / ...) plus a sort toggle (Popular / Newest / A-Z), all D-pad
+ * reachable, while keeping the existing category filter and infinite scroll.
+ */
+export function MediaGridView({ title, items = [], isLive = false, onSelectItem }) {
+  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [selectedGenre, setSelectedGenre] = useState('All');
+  const [sortBy, setSortBy] = useState('popular');
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const sentinelRef = useRef(null);
 
-  const filteredItems = useMemo(() => {
-    let result = items.filter(item => {
-      if (!item) return false;
-
-      const titleLower = (item.title_en || item.title || item.title_ru || item.name || '').toLowerCase();
-      const catLower = (item.category || '').toLowerCase();
-      const netLower = (item.network || '').toLowerCase();
-      const genres = (item.genres || []).map(g => (g.name || '').toLowerCase()).join(' ');
-      const desc = (item.description || '').toLowerCase();
-      const itemCountry = (item.country || '').toLowerCase();
-      const itemLang = (item.language || '').toLowerCase();
-      const yearStr = String(item.year || '');
-
-      // 1. Region Filter
-      if (filters.region !== 'all') {
-        const reg = filters.region;
-        if (reg === 'india') {
-          const isIndia = catLower.includes('bolly') || catLower.includes('south') || catLower.includes('hindi') || catLower.includes('marathi') || catLower.includes('tamil') || catLower.includes('telugu') || catLower.includes('punjabi') || itemCountry.includes('india') || desc.includes('india') || desc.includes('hindi');
-          if (!isIndia) return false;
-        } else if (reg === 'hollywood') {
-          const isHolly = catLower.includes('holly') || itemCountry.includes('usa') || desc.includes('hollywood') || desc.includes('american') || desc.includes('english');
-          if (!isHolly) return false;
-        } else if (reg === 'korea') {
-          const isKorea = catLower.includes('korea') || catLower.includes('kdrama') || itemCountry.includes('korea') || desc.includes('korea');
-          if (!isKorea) return false;
-        } else if (reg === 'japan') {
-          const isJapan = catLower.includes('anime') || itemCountry.includes('japan') || netLower.includes('crunchyroll') || desc.includes('anime') || desc.includes('japan');
-          if (!isJapan) return false;
-        } else if (reg === 'uk') {
-          const isUK = netLower.includes('bbc') || itemCountry.includes('uk') || desc.includes('british') || desc.includes('london');
-          if (!isUK) return false;
-        } else if (reg === 'china') {
-          const isChina = itemCountry.includes('china') || desc.includes('china') || desc.includes('chinese');
-          if (!isChina) return false;
-        } else if (reg === 'nollywood') {
-          const isNolly = catLower.includes('nolly') || itemCountry.includes('nigeria') || desc.includes('lagos') || desc.includes('nollywood');
-          if (!isNolly) return false;
-        } else if (reg === 'spain') {
-          const isSpain = itemCountry.includes('spain') || desc.includes('spanish');
-          if (!isSpain) return false;
-        } else if (reg === 'france') {
-          const isFrance = itemCountry.includes('france') || desc.includes('french');
-          if (!isFrance) return false;
-        } else if (reg === 'turkey') {
-          const isTurkey = itemCountry.includes('turkey') || desc.includes('turkish');
-          if (!isTurkey) return false;
-        }
-      }
-
-      // 2. Language Filter
-      if (filters.language !== 'all') {
-        const lang = filters.language;
-        const matchesLang = itemLang.includes(lang) || desc.includes(lang) || catLower.includes(lang) || titleLower.includes(lang);
-        if (!matchesLang) return false;
-      }
-
-      // 3. Genre Filter
-      if (filters.genre !== 'all') {
-        const g = filters.genre;
-        if (g === 'short_tv') {
-          if (item.type !== 'short_tv' && !catLower.includes('short')) return false;
-        } else if (g === 'documentary') {
-          const isDoc = catLower.includes('docu') || desc.includes('investigat') || desc.includes('documentary');
-          if (!isDoc) return false;
-        } else if (g === 'anime') {
-          const isAnime = catLower.includes('anime') || desc.includes('anime') || netLower.includes('crunchyroll');
-          if (!isAnime) return false;
-        } else {
-          const matchesGenre = genres.includes(g) || catLower.includes(g) || desc.includes(g);
-          if (!matchesGenre) return false;
-        }
-      }
-
-      // 4. Release Year Filter
-      if (filters.year !== 'all') {
-        const y = filters.year;
-        if (y === '2026') {
-          if (yearStr !== '2026') return false;
-        } else if (y === '2025') {
-          if (yearStr !== '2025') return false;
-        } else if (y === '2024') {
-          if (yearStr !== '2024') return false;
-        } else if (y === '2023') {
-          if (yearStr !== '2023') return false;
-        } else if (y === '2022') {
-          if (yearStr !== '2022') return false;
-        } else if (y === '2021') {
-          if (yearStr !== '2021') return false;
-        } else if (y === '2020s') {
-          const numYear = parseInt(yearStr, 10);
-          if (isNaN(numYear) || numYear < 2020) return false;
-        } else if (y === '2010s') {
-          const numYear = parseInt(yearStr, 10);
-          if (isNaN(numYear) || numYear < 2010 || numYear > 2019) return false;
-        } else if (y === 'classic') {
-          const numYear = parseInt(yearStr, 10);
-          if (isNaN(numYear) || numYear >= 2010) return false;
-        }
-      }
-
-      return true;
+  // Extract unique categories
+  const categories = useMemo(() => {
+    const set = new Set(['All']);
+    if (isLive) {
+      set.add('Marathi (मराठी)');
+    }
+    items.forEach((item) => {
+      if (item.category) set.add(item.category);
     });
+    return Array.from(set);
+  }, [items, isLive]);
 
-    // 5. Sort Filter
-    if (filters.sort === 'top_rated') {
-      result = [...result].sort((a, b) => {
-        const ra = Number(a.ratings?.mlab?.rating || a.ratings?.imdb?.rating || a.rating || 0);
-        const rb = Number(b.ratings?.mlab?.rating || b.ratings?.imdb?.rating || b.rating || 0);
-        return rb - ra;
+  // v3.12.83: genre chips derived from the items' own genre lists (most-common
+  // first), capped so the rail stays D-pad navigable on a low-RAM stick.
+  const genres = useMemo(() => {
+    const counts = new Map();
+    items.forEach((item) => {
+      const gs = Array.isArray(item.genres) ? item.genres : [];
+      gs.forEach((g) => {
+        const name = typeof g === 'object' ? g?.name : g;
+        if (name) counts.set(name, (counts.get(name) || 0) + 1);
       });
-    } else if (filters.sort === 'newest') {
-      result = [...result].sort((a, b) => {
-        const ya = parseInt(String(a.year || '0'), 10);
-        const yb = parseInt(String(b.year || '0'), 10);
-        return yb - ya;
+    });
+    const sorted = Array.from(counts.entries()).sort((a, b) => b[1] - a[1]).map(([n]) => n);
+    return ['All', ...sorted.slice(0, GENRE_CHIP_CAP)];
+  }, [items]);
+
+  // Filter by category, then genre
+  const filteredItems = useMemo(() => {
+    let pool = items;
+    if (selectedCategory === 'Marathi (मराठी)') {
+      pool = pool.filter(item => {
+        const cat = (item.category || '').toLowerCase();
+        const title = (item.title || item.name || '').toLowerCase();
+        return cat.includes('marathi') || title.includes('marathi') || title.includes('majha') || title.includes('taas') || title.includes('jhakaas') || title.includes('lokmat') || title.includes('saam') || title.includes('pravah') || title.includes('sahyadri');
+      });
+    } else if (selectedCategory !== 'All') {
+      pool = pool.filter((item) => item.category === selectedCategory);
+    }
+    if (selectedGenre !== 'All') {
+      pool = pool.filter((item) => {
+        const gs = Array.isArray(item.genres) ? item.genres : [];
+        return gs.some((g) => (typeof g === 'object' ? g?.name : g) === selectedGenre);
       });
     }
+    return pool;
+  }, [items, selectedCategory, selectedGenre]);
 
-    return result;
-  }, [items, filters]);
+  // v3.12.83: sort. Popular = source order (already popularity-ranked by the
+  // APIs); Newest sorts by year desc; A-Z by title.
+  const sortedItems = useMemo(() => {
+    const arr = [...filteredItems];
+    if (sortBy === 'newest') {
+      arr.sort((a, b) => {
+        const ya = parseInt(a.year || (a.release_date || '').split('-')[0] || '0', 10) || 0;
+        const yb = parseInt(b.year || (b.release_date || '').split('-')[0] || '0', 10) || 0;
+        return yb - ya;
+      });
+    } else if (sortBy === 'az') {
+      arr.sort((a, b) => String(a.title_en || a.title || a.name || '').localeCompare(String(b.title_en || b.title || b.name || '')));
+    }
+    return arr;
+  }, [filteredItems, sortBy]);
 
-  // Pagination: 20 items initially, load more on demand
-  const {
-    items: paginatedItems,
-    currentPage,
-    totalPages,
-    hasNext,
-    nextPage,
-    hasPrev,
-    prevPage
-  } = usePagination(filteredItems, 20);
-
-  // Infinite Scroll Trigger
+  // Reset visible count when any filter changes
   useEffect(() => {
-    if (!onLoadMore || !hasMore || isLoadingMore) return;
+    setVisibleCount(PAGE_SIZE);
+  }, [selectedCategory, selectedGenre, sortBy]);
 
+  // Slice to visible count for progressive rendering
+  const visibleItems = useMemo(
+    () => sortedItems.slice(0, visibleCount),
+    [sortedItems, visibleCount]
+  );
+
+  const hasMore = visibleCount < sortedItems.length;
+
+  // IntersectionObserver to auto-load more when user scrolls near the bottom
+  useEffect(() => {
+    if (!hasMore || !sentinelRef.current) return;
     const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && hasMore && !isLoadingMore) {
-          onLoadMore();
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setVisibleCount(prev => Math.min(prev + PAGE_SIZE, sortedItems.length));
         }
       },
-      { threshold: 0.1, rootMargin: '300px' }
+      { rootMargin: '200px' }
     );
-
-    const target = bottomObserverRef.current;
-    if (target) observer.observe(target);
-
-    return () => {
-      if (target) observer.unobserve(target);
-    };
-  }, [onLoadMore, hasMore, isLoadingMore]);
-
-  const isChannels = type === 'channels';
+    observer.observe(sentinelRef.current);
+    return () => observer.disconnect();
+  }, [hasMore, sortedItems.length]);
 
   return (
-    <div className="mobile-grid-container" style={{ position: 'relative', zIndex: 20, padding: '14px 14px 90px 14px', width: '100%', boxSizing: 'border-box' }}>
-      {/* Top Page Header Banner */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        marginBottom: '12px',
-        padding: '0 2px'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{
-            width: '34px',
-            height: '34px',
-            borderRadius: '10px',
-            background: 'linear-gradient(135deg, #00BB7F 0%, #06b6d4 100%)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: '0 4px 14px rgba(0, 187, 127, 0.5)'
-          }}>
-            <Icon size={18} color="#ffffff" />
-          </div>
-          <div>
-            <h1 style={{ fontSize: '20px', fontWeight: 900, color: '#ffffff', letterSpacing: '-0.4px', margin: 0, textShadow: '0 2px 8px rgba(0,0,0,0.8)' }}>
-              {title}
-            </h1>
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span style={{ fontSize: '11px', fontWeight: 800, color: '#00BB7F', background: 'rgba(0, 187, 127, 0.15)', padding: '3px 8px', borderRadius: '12px' }}>
-            {filteredItems.length} Titles
-          </span>
-        </div>
+    <div className="tv-grid-view">
+      <div className="tv-rail-header" style={{ marginBottom: 12 }}>
+        <h2 className="tv-rail-title">{title}</h2>
+        <span className="tv-rail-count">{sortedItems.length} available</span>
       </div>
 
-      {/* Worldwide Multi-Dimensional Filter Bar */}
-      <WorldwideFilterBar
-        filters={filters}
-        onFilterChange={setFilters}
-        totalResults={filteredItems.length}
-      />
-
-      {/* Grid Layout */}
-      <div
-        className={isChannels ? "mobile-landscape-grid" : "mobile-portrait-grid"}
-        style={{
-          position: 'relative',
-          zIndex: 20,
-          display: 'grid',
-          gridTemplateColumns: isChannels ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)',
-          gap: '12px',
-          width: '100%'
-        }}
-      >
-        {paginatedItems.map((item, idx) => {
-          const key = item.id || item.kinopoisk_id || `${item.title}-${idx}`;
-          return isChannels ? (
-            <LandscapeMediaCard
-              key={key}
-              item={item}
-              onClick={onSelectItem}
-            />
-          ) : (
-            <MediaCard
-              key={key}
-              item={item}
-              onClick={onSelectItem}
-            />
-          );
-        })}
+      {/* v3.12.83: Sort control (Apple-TV style) — D-pad reachable pills. */}
+      <div className="tv-sort-bar">
+        <span className="tv-sort-label">Sort</span>
+        {[
+          { id: 'popular', label: 'Most Popular' },
+          { id: 'newest', label: 'Newest' },
+          { id: 'az', label: 'A to Z' },
+        ].map((opt) => (
+          <button
+            key={opt.id}
+            tabIndex={0}
+            className={`tv-cat-btn tv-sort-btn ${sortBy === opt.id ? 'active' : ''}`}
+            onClick={() => setSortBy(opt.id)}
+          >
+            {opt.label}
+          </button>
+        ))}
       </div>
 
-      {/* Pagination Controls */}
-      {totalPages > 1 && (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', marginTop: '20px', paddingBottom: '40px' }}>
-          <button
-            onClick={prevPage}
-            disabled={!hasPrev}
-            style={{
-              padding: '8px 16px',
-              borderRadius: '10px',
-              background: hasPrev ? 'rgba(0, 187, 127, 0.2)' : 'rgba(255, 255, 255, 0.05)',
-              border: hasPrev ? '1px solid #00BB7F' : '1px solid rgba(255, 255, 255, 0.1)',
-              color: hasPrev ? '#00BB7F' : '#64748b',
-              fontWeight: 800,
-              fontSize: '13px',
-              cursor: hasPrev ? 'pointer' : 'not-allowed',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}
-          >
-            <ChevronLeft size={16} />
-            <span>Prev</span>
-          </button>
-          <span style={{ color: '#cbd5e1', fontWeight: 800, fontSize: '14px' }}>
-            Page {currentPage} of {totalPages}
-          </span>
-          <button
-            onClick={nextPage}
-            disabled={!hasNext}
-            style={{
-              padding: '8px 16px',
-              borderRadius: '10px',
-              background: hasNext ? 'rgba(0, 187, 127, 0.2)' : 'rgba(255, 255, 255, 0.05)',
-              border: hasNext ? '1px solid #00BB7F' : '1px solid rgba(255, 255, 255, 0.1)',
-              color: hasNext ? '#00BB7F' : '#64748b',
-              fontWeight: 800,
-              fontSize: '13px',
-              cursor: hasNext ? 'pointer' : 'not-allowed',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}
-          >
-            <span>Next</span>
-            <ChevronRight size={16} />
-          </button>
+      {/* Category Pills Bar (existing source/category filter) */}
+      {categories.length > 1 && (
+        <div className="tv-category-bar">
+          {categories.map((cat) => (
+            <button
+              key={cat}
+              tabIndex={0}
+              className={`tv-cat-btn ${selectedCategory === cat ? 'active' : ''}`}
+              onClick={() => setSelectedCategory(cat)}
+            >
+              {cat}
+            </button>
+          ))}
         </div>
       )}
 
-      {/* Infinite Scroll Anchor & Loader (for remote load more) */}
-      {hasMore && (
-        <div ref={bottomObserverRef} style={{ position: 'relative', zIndex: 20, padding: '24px 0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          {isLoadingMore ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#00BB7F', fontWeight: 800, fontSize: '13px' }}>
-              <Loader2 size={20} className="spin-animation" />
-              <span>Loading more titles...</span>
-            </div>
-          ) : (
-            <button
-              onClick={onLoadMore}
-              style={{
-                padding: '10px 22px',
-                borderRadius: '12px',
-                background: 'rgba(255, 255, 255, 0.08)',
-                border: '1px solid rgba(255, 255, 255, 0.15)',
-                color: '#fff',
-                fontWeight: 800,
-                fontSize: '13px',
-                cursor: 'pointer'
-              }}
-            >
-              Load More
-            </button>
-          )}
+      {/* v3.12.83: Genre chips (the Apple-TV scoped-browse rail) */}
+      {genres.length > 1 && (
+        <div className="tv-genre-bar">
+          <span className="tv-genre-label">Genre</span>
+          <div className="tv-genre-chips">
+            {genres.map((g) => (
+              <button
+                key={g}
+                tabIndex={0}
+                className={`tv-cat-btn tv-genre-chip ${selectedGenre === g ? 'active' : ''}`}
+                onClick={() => setSelectedGenre(g)}
+              >
+                {g}
+              </button>
+            ))}
+          </div>
         </div>
+      )}
+
+      {/* Media Grid — progressively rendered */}
+      <div className="tv-grid">
+        {visibleItems.map((item, idx) => (
+          <MediaCard
+            key={item.id || idx}
+            item={item}
+            isLive={isLive}
+            onClick={onSelectItem}
+          />
+        ))}
+      </div>
+
+      {sortedItems.length === 0 && (
+        <div className="tv-center-state">
+          <p style={{ color: '#8a8a9a', fontSize: 17 }}>Nothing matches this filter. Try a different genre or category.</p>
+        </div>
+      )}
+
+      {/* Sentinel element for infinite scroll */}
+      {hasMore && (
+        <div ref={sentinelRef} style={{ height: 1, width: '100%' }} />
       )}
     </div>
   );

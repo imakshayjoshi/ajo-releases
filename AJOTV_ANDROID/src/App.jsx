@@ -9,9 +9,11 @@ import { checkForAppUpdates } from './api/otaUpdate';
 import { getTmdbTrending, getTmdbCatalog, getTmdbCatalogDeep, getTmdbNowPlaying, getBecauseYouWatched } from './api/tmdb';
 import { getRankedServers } from './api/mirrorHealth';
 import { getBingrAnimeDeep } from './api/bingr';
+import { getTamilmvLatest } from './api/tamilmv';
 import { getAddonCatalogs, getAddonStreams } from './api/stremio';
 import { GoogleTVHeader } from './components/GoogleTVHeader';
 import { HeroBanner } from './components/HeroBanner';
+import { OtaBanner } from './components/OtaBanner';
 import { SplashScreen } from './components/SplashScreen';
 import { MediaRail } from './components/MediaRail';
 import { MediaGridView } from './components/MediaGridView';
@@ -27,7 +29,6 @@ import { generateUniversalServers } from './utils/streamingEngines';
 import { consumeDeepLink, onDeepLink } from './api/deepLink';
 // v3.9.0 PERF: castSync lazy-loaded — the 27KB module was parsed eagerly on
 // every startup even though cast is only used when a phone is actually paired.
-import { Play, Sparkles } from 'lucide-react';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState(() => new URLSearchParams(window.location.search).get('tab') || 'home');
@@ -46,7 +47,7 @@ export default function App() {
   const [tmdbSeries, setTmdbSeries] = useState([]);
   const [nowPlaying, setNowPlaying] = useState([]);
   const [animeItems, setAnimeItems] = useState([]);
-  const [kidsItems, setKidsItems] = useState([]);
+  const [tamilmvItems, setTamilmvItems] = useState([]);
   // v3.11.0: IPTV (9+ playlists) is heavy — load it AFTER first paint so the
   // app opens fast on low-RAM Fire TV sticks instead of blocking on playlists.
   const [liveItems, setLiveItems] = useState([]);
@@ -61,14 +62,17 @@ export default function App() {
 
   // Active Modals / Player
   const [selectedItem, setSelectedItem] = useState(null);
-  const selectedItemRef = useRef(null);
-  useEffect(() => { selectedItemRef.current = selectedItem; }, [selectedItem]);
   const [activePlayback, setActivePlayback] = useState(null); // { item, server, episodes, episodeIndex }
   // v3.17.1: Netflix-style cold-start splash — once per process, any key skips
   const [showSplash, setShowSplash] = useState(() => !window.__ajoSplashShown);
+  // v3.17.24: exit confirmation dialog state
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
+  const confirmExitRef = useRef(false);
   const [liveViewMode, setLiveViewMode] = useState('grid'); // 'grid' (high performance default) | 'epg'
   const [otaPrompt, setOtaPrompt] = useState(null);
-  const [downloadProgress, setDownloadProgress] = useState(null);
+  // v3.17.52: downloadProgress moved INTO OtaBanner (percent ticks were
+  // re-rendering the whole app). The update-check guard reads the window flag
+  // the banner sets while a download is in flight.
   // v3.17.7: ajo:// deep links from the Home launcher
   const [searchPrefill, setSearchPrefill] = useState('');
   const pendingLiveRef = useRef(null);
@@ -105,7 +109,8 @@ export default function App() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [bolly, holly, serials, sports, trending, popMovies, popTv, newReleases, anime, kids, kidsTv] = await Promise.allSettled([
+      // v3.17.52: kids catalog fetches removed — kidsItems was never rendered.
+      const [bolly, holly, serials, sports, trending, popMovies, popTv, newReleases, anime, tamilmv] = await Promise.allSettled([
         getBollywoodCatalog(),
         getHollywoodCatalog(),
         getSerialsCatalog(),
@@ -114,17 +119,15 @@ export default function App() {
         getTmdbCatalog('movie', 'popular'),
         getTmdbCatalog('tv', 'popular'),
         getTmdbNowPlaying(20),
-        getTmdbCatalogDeep('movie', 30, (items) => setTmdbMovies(filterAliveItems(items))),
-        getTmdbCatalogDeep('tv', 30, (items) => setTmdbSeries(filterAliveItems(items))),
-        // v3.14.0: anime now comes from bingr.one's open API (AniList-sourced,
-        // real anime catalog with its own player mirrors) instead of TMDB's
-        // generic animation genre, which mixed Pixar into "anime".
         getBingrAnimeDeep(3),
-        // v3.12.77: kids' row must include BOTH animation genres — movie-only
-        // '10751,16' excluded kids' TV (Doraemon etc.), so kids' titles 404'd.
-        getTmdbCatalog('movie', 'popular', 1, { with_genres: '16,10751' }),
-        getTmdbCatalog('tv', 'popular', 1, { with_genres: '16,10762,10751' })
+        getTamilmvLatest(3)
       ]);
+
+      // Deep catalogs (15 pages) run in the background with a 3s timeout so
+      // the home feed renders fast — onPage updates state progressively.
+      const deepMovieCall = getTmdbCatalogDeep('movie', 15, (items) => setTmdbMovies(filterAliveItems(items)));
+      const deepTvCall = getTmdbCatalogDeep('tv', 15, (items) => setTmdbSeries(filterAliveItems(items)));
+      Promise.race([Promise.allSettled([deepMovieCall, deepTvCall]), new Promise(r => setTimeout(() => r([]), 3000))]).then(() => {}).catch(() => {});
 
       if (bolly.status === 'fulfilled') setBollywoodItems(filterAliveItems(bolly.value || []));
       if (holly.status === 'fulfilled') setHollywoodItems(filterAliveItems(holly.value || []));
@@ -134,22 +137,8 @@ export default function App() {
       if (trending.status === 'fulfilled') setTmdbTrending(trending.value || []);
       if (popMovies.status === 'fulfilled') setTmdbMovies(filterAliveItems(popMovies.value || []));
       if (popTv.status === 'fulfilled') setTmdbSeries(filterAliveItems(popTv.value || []));
-      if (anime.status === 'fulfilled') setAnimeItems(filterAliveItems(anime.value || []));
-      if (kids.status === 'fulfilled' || kidsTv.status === 'fulfilled') {
-        // v3.12.77: merge kids' movies + kids' TV (Doraemon etc.) into one row,
-        // title-deduped, so kids' content actually plays from the Kids tab.
-        const km = kids.status === 'fulfilled' ? (kids.value || []) : [];
-        const kt = kidsTv.status === 'fulfilled' ? (kidsTv.value || []) : [];
-        const seenKids = new Set();
-        const mergedKids = [];
-        for (const item of [...km, ...kt]) {
-          const key = String(item.title_en || item.title || '').toLowerCase().trim();
-          if (!key || seenKids.has(key)) continue;
-          seenKids.add(key);
-          mergedKids.push(item);
-        }
-        setKidsItems(mergedKids);
-      }
+      if (anime.status === 'fulfilled') setAnimeItems(anime.value || []);
+      if (tamilmv.status === 'fulfilled') setTamilmvItems(tamilmv.value || []);
       
       
       // Addon catalogs (only loads when addons are installed — no-op otherwise)
@@ -211,7 +200,15 @@ export default function App() {
   // v3.11.0 PERF: IPTV (16 playlists) no longer blocks startup. Kick it off
   // 1.2s after first paint so the Home tab renders instantly on low-RAM Fire
   // TV sticks; the Live TV tab forces an immediate load when opened.
+  // v3.17.52: in-flight guard. The 1.2s lazy timer AND the tab-open effect can
+  // both fire while a slow load is running (liveLoaded only flips at the END)
+  // — that double-loaded the wall and raced the probe writes.
+  const liveLoadingRef = useRef(false);
+
   const loadLiveTV = useCallback(async (retryCount = 0) => {
+    if (liveLoadingRef.current) return;
+    liveLoadingRef.current = true;
+    try {
     const [merged, legacy] = await Promise.allSettled([getLiveChannels(), getLiveBroadcasts()]);
     // v3.12.74 (Lumio crash hardening): a failed network boot used to render
     // an empty wall even though a retry one second later would succeed. Keep
@@ -304,6 +301,11 @@ export default function App() {
     } finally {
       setLiveLoaded(true);
     }
+    } finally {
+      // v3.17.52: release the in-flight guard (the delayed retry path returns
+      // early but still passes through here, so retries are not blocked).
+      liveLoadingRef.current = false;
+    }
   }, []);
   useEffect(() => {
     const t = setTimeout(() => { if (!liveLoaded) loadLiveTV(); }, 1200);
@@ -316,11 +318,19 @@ export default function App() {
 
   useEffect(() => {
     loadData();
+    // v3.17.23: pre-warm the TMDB proxy on app start so the first catalog
+    // fetch doesn't wait for Traefik → :3005 cold-start latency.
+    fetch('https://new.ajo.co.in/tmdb/trending/all/day?api_key=5b458cad0b474d21129c717626038657', { method: 'HEAD' }).catch(() => {});
     // Check for updates in background, then re-check every 4h + on app resume
     const runUpdateCheck = () => {
       const targetType = 'android_tv';
       checkForAppUpdates(targetType).then((res) => {
-        if (res && res.hasUpdate && !downloadProgress) {
+        if (res && res.hasUpdate && !window.__ajoOtaDownloading) {
+          // v3.17.34: don't show if user dismissed this version
+          const dismissed = localStorage.getItem('ajo_update_dismissed');
+          const dismissedCode = localStorage.getItem('ajo_update_dismissed_code');
+          if (dismissed === res.latestVersion) return;
+          if (res.targetCode && dismissedCode === String(res.targetCode)) return;
           if (res.targetSigning === 'release' && !res.isReleaseSigned) {
             res.needsReinstall = true;
           }
@@ -337,40 +347,48 @@ export default function App() {
     };
     document.addEventListener('visibilitychange', onVisible);
 
-    window.onAJOUpdateProgress = (percent) => {
-      setDownloadProgress({ percent });
-    };
-    window.onAJOUpdateStatus = (status) => {
-      if (status === 'READY_TO_INSTALL') {
-        setDownloadProgress({ percent: 100, ready: true });
-      }
-    };
-    window.onAJOUpdateError = () => {
-      setDownloadProgress(null);
-    };
+    // v3.17.52: progress/status callbacks live in OtaBanner now.
     return () => {
       clearInterval(updateInterval);
       document.removeEventListener('visibilitychange', onVisible);
     };
   }, [loadData]);
 
-  useEffect(() => {
-    if (!otaPrompt && !downloadProgress) {
-      checkForAppUpdates('android_tv').then((res) => {
-        if (res && res.hasUpdate && !downloadProgress) {
-          if (res.targetSigning === 'release' && !res.isReleaseSigned) {
-            res.needsReinstall = true;
-          }
-          setOtaPrompt(res);
-        }
-      }).catch(() => {});
+  const dismissOtaPrompt = () => {
+    if (otaPrompt?.latestVersion) {
+      localStorage.setItem('ajo_update_dismissed', otaPrompt.latestVersion);
+      // v3.17.47: also key the dismissal by build code so a re-check with a
+      // different code can't resurrect a dismissed prompt.
+      if (otaPrompt.targetCode) {
+        localStorage.setItem('ajo_update_dismissed_code', String(otaPrompt.targetCode));
+      }
     }
-  }, [activeTab]);
+    setOtaPrompt(null);
+  };
+
+  // v3.17.52: the duplicate tab-change OTA check that used to live here is
+  // REMOVED — it drifted from the primary check (wrong deps, stale
+  // downloadProgress guard) and SettingsView runs its own check anyway.
 
 
   // Handle item click (Live TV plays directly, Movies open details)
   const handleItemClick = useCallback((item) => {
     rememberFocus();
+    // v3.17.47: 1tamilmv torrent items play directly via the webtor.io embed.
+    // No details modal (there are no TMDB ids to enrich) — straight to player.
+    if (item.source === 'tamilmv' && Array.isArray(item.embedUrls) && item.embedUrls.length > 0) {
+      const server = {
+        id: 'webtor-0',
+        name: 'Torrent Stream (webtor.io)',
+        url: item.embedUrls[0],
+        source: 'embed',
+        type: 'embed',
+        quality: item.language ? item.language + ' HD' : 'HD',
+        provider: 'webtor.io',
+      };
+      setActivePlayback({ item, server });
+      return;
+    }
     if (item.is_live || item.type === 'live' || item.year === 'LIVE') {
       const allServers = Array.isArray(item.players) && item.players.length > 0
         ? item.players
@@ -453,7 +471,7 @@ export default function App() {
         const mediaType = isSeriesItem ? 'tv' : 'movie';
         const season = episodeInfo?.season_number || episodeInfo?.season || resolvedItem.season_number || 1;
         const episode = episodeInfo?.episode_number || episodeInfo?.episode || resolvedItem.episode_number || 1;
-        const budget = new Promise((res) => setTimeout(() => res('timeout'), 4000));
+        const budget = new Promise((res) => setTimeout(() => res('timeout'), 1500));
         let hevcOk = true;
         try { hevcOk = !!(window.MediaSource && MediaSource.isTypeSupported('video/mp4; codecs="hvc1.1.6.L120.90"')); } catch {}
         const [vidy, vidsrc, vidrift] = await Promise.all([
@@ -483,9 +501,10 @@ export default function App() {
             name: s.label,
             url: s.url,
             // web path (hls.js/<video>) can't send Referer — VPS proxy can
-            proxyUrl: s.headers?.Referer
-              ? `https://new.ajo.co.in/movibox/stream?url=${encodeURIComponent(s.url)}&ref=${encodeURIComponent(s.headers.Referer)}`
-              : undefined,
+            // v3.17.30: VPS proxy removed — native player sends headers directly.
+            // Direct streams with Referer headers play in native player (KExoPlayer).
+            // Web player cannot send Referer, so native handoff is automatic.
+            proxyUrl: undefined,
             source: s.source || 'hls',
             quality: s.quality,
             headers: s.headers,
@@ -649,7 +668,7 @@ export default function App() {
       return;
     }
     if (otaPrompt) {
-      setOtaPrompt(null);
+      dismissOtaPrompt();
       return;
     }
     if (selectedItem) {
@@ -670,7 +689,29 @@ export default function App() {
       setActiveTab('home');
       return;
     }
+    // v3.17.53: on Home, the first Back press from content opens the left rail.
+    // This gives every remote a second fast path to navigation without changing
+    // the existing two-step exit guard when the rail already owns focus.
+    const focused = document.activeElement;
+    const nav = document.querySelector('.tv-header');
+    if (nav && (!focused || !nav.contains(focused))) {
+      const target = nav.querySelector('.tv-nav-pill.active') || nav.querySelector('.tv-nav-pill');
+      if (target) {
+        try { target.focus({ preventScroll: true }); } catch { try { target.focus(); } catch (_) {} }
+        return;
+      }
+    }
     // On Home tab with nothing open: exit app cleanly via native interface
+    // v3.17.24: show a confirm dialog first — accidental exits are the #1
+    // complaint on TV apps. Two-step: first Back shows the dialog, second
+    // Back (or OK on "Exit") actually exits.
+    if (!confirmExitRef.current) {
+      confirmExitRef.current = true;
+      setShowExitConfirm(true);
+      setTimeout(() => { confirmExitRef.current = false; setShowExitConfirm(false); }, 4000);
+      return;
+    }
+    setShowExitConfirm(false);
     if (window.AndroidNativePlayer && typeof window.AndroidNativePlayer.exitApp === 'function') {
       window.AndroidNativePlayer.exitApp();
     }
@@ -682,8 +723,13 @@ export default function App() {
   // (play/pause/seek/back), NAV_TAB and UNPAIR.
   // v3.9.0 PERF: lazy-load castSync only when needed
   useEffect(() => {
+    // v3.17.52: cancelled flag — without it, a handleBack identity change while
+    // the dynamic import was still resolving leaked the subscription forever
+    // (cleanup ran with unsubscribe=null; the stale-closure sub landed after).
+    let cancelled = false;
     let unsubscribe = null;
     import('./api/castSync').then(({ castEngine, ensureTvRole, injectRemoteCommandKey }) => {
+      if (cancelled) return;
       // v3.11.1: ALWAYS run as the TV-side cast peer with a persisted room
       // code (regardless of UA/display-mode detection) or phones can never
       // pair — the engine drops every inbound message if the room/role is
@@ -774,7 +820,7 @@ export default function App() {
         }
       });
     }).catch(() => {});
-    return () => { if (unsubscribe) unsubscribe(); };
+    return () => { cancelled = true; if (unsubscribe) unsubscribe(); };
   }, [handleBack]);
 
   // Spatial Navigation Hook
@@ -822,7 +868,6 @@ export default function App() {
     }).slice(0, 7);
   }, [tmdbTrending, nowPlaying, bollywoodItems, hollywoodItems]);
 
-  const featuredItem = featuredItems[0] || null;
 
   // v3.12.83 (StreamFlix structure): the Home feed needs SEPARATE trending
   // movie + series rails (the reference mixes them). Split the blended
@@ -892,7 +937,7 @@ export default function App() {
       {showSplash && (
         <SplashScreen onDone={() => { window.__ajoSplashShown = true; setShowSplash(false); }} />
       )}
-      {/* Top MovieBox-Style Navigation Bar with Sub-tabs */}
+      {/* v3.17.53: fixed remote-first left navigation rail */}
       <GoogleTVHeader
         activeTab={activeTab}
         onSelectTab={(tab) => {
@@ -910,58 +955,9 @@ export default function App() {
         onSelectSubTab={(sub) => { setActiveSubTab(sub); setActiveProvider(null); }}
       />
 
-      {/* OTA Update Toast Banner */}
-      {otaPrompt && (
-        <div className="tv-ota-rail tv-rail" style={{
-          background: otaPrompt.needsReinstall
-            ? 'linear-gradient(90deg, #b45309, #f59e0b)'
-            : 'linear-gradient(90deg, #2563eb, #38bdf8)',
-          color: '#ffffff',
-          padding: '10px 48px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          fontWeight: 700,
-          fontSize: '0.95rem'
-        }}>
-          <span>
-            {downloadProgress
-              ? (downloadProgress.ready ? '⚡ Update downloaded! Launching installer...' : `📥 Downloading: ${downloadProgress.percent || 0}%`)
-              : (otaPrompt.isPhoneSwitch
-                ? `📱 Phone detected! Tap to install the touch-friendly AJO Phone app (v${otaPrompt.latestVersion})`
-                : (otaPrompt.needsReinstall
-                  ? '⚠ AJO is switching to its permanent release key — this update needs a quick one-time reinstall.'
-                  : `🚀 New Update Available: v${otaPrompt.latestVersion} (Android TV Edition)`))}
-          </span>
-          <div style={{ display: 'flex', gap: 10 }}>
-            {!downloadProgress && (
-              <button
-                tabIndex={0}
-                className="tv-btn-primary"
-                style={{ padding: '6px 16px', fontSize: '0.85rem' }}
-                onClick={() => {
-                  setDownloadProgress({ percent: 0 });
-                  if (window.AndroidUpdater?.downloadAndInstall) {
-                    window.AndroidUpdater.downloadAndInstall(otaPrompt.apkUrl);
-                  } else {
-                    window.open(otaPrompt.apkUrl, '_blank');
-                  }
-                }}
-              >
-                {otaPrompt.isPhoneSwitch ? 'Install Phone App' : (otaPrompt.needsReinstall ? 'One-Time Reinstall' : 'Update Now')}
-              </button>
-            )}
-            <button
-              tabIndex={0}
-              className="tv-btn-secondary"
-              style={{ padding: '6px 16px', fontSize: '0.85rem' }}
-              onClick={() => setOtaPrompt(null)}
-            >
-              Dismiss
-            </button>
-          </div>
-        </div>
-      )}
+      {/* OTA Update Toast Banner — v3.17.52: extracted; percent ticks no longer
+          re-render the whole app tree. */}
+      <OtaBanner otaPrompt={otaPrompt} onDismiss={dismissOtaPrompt} />
 
       {/* Main Content Area */}
       <main className="tv-main-content">
@@ -1142,6 +1138,15 @@ export default function App() {
               />
             )}
 
+            {/* 🧲 TORRENTS TAB (v3.17.45: 1tamilmv + webtor.io embed streaming) */}
+            {activeTab === 'torrents' && (
+              <MediaGridView
+                title="🧲 Latest Torrents (1tamilmv)"
+                items={tamilmvItems}
+                onSelectItem={handleItemClick}
+              />
+            )}
+
             {/* 🔴 LIVE TV TAB */}
             {activeTab === 'live' && (
               <>
@@ -1233,6 +1238,27 @@ export default function App() {
             )}
 
             {/* ⚙️ SETTINGS TAB */}
+            {activeTab === 'movibox' && (
+              <div style={{ 
+                width: '100%', 
+                height: 'calc(100vh - 120px)', 
+                overflow: 'auto'
+              }}>
+                <iframe
+                  src="https://movibox.xyz"
+                  tabIndex={-1}
+                  style={{ 
+                    width: '100%', 
+                    height: '100%', 
+                    border: 'none',
+                    display: 'block'
+                  }}
+                  allow="fullscreen; autoplay"
+                  title="MovieBox"
+                />
+              </div>
+            )}
+
             {activeTab === 'settings' && (
               <SettingsView />
             )}
@@ -1278,6 +1304,44 @@ export default function App() {
           onSelectChannel={(ch) => handleItemClick(ch)}
           onClose={handleClosePlayer}
         />
+      )}
+
+      {/* Exit Confirmation Dialog (v3.17.24) */}
+      {showExitConfirm && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(4, 8, 16, 0.85)', display: 'flex',
+          alignItems: 'center', justifyContent: 'center', zIndex: 1000
+        }}>
+          <div style={{
+            background: '#16181f', border: '1px solid rgba(255,255,255,0.12)',
+            borderRadius: '16px', padding: '32px 40px', textAlign: 'center',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.8)', maxWidth: '400px'
+          }}>
+            <div style={{ fontSize: 22, fontWeight: 800, color: '#fff', marginBottom: 8 }}>
+              Exit AJO TV?
+            </div>
+            <div style={{ fontSize: 15, color: '#94a3b8', marginBottom: 24 }}>
+              Press OK to exit, or Back to stay.
+            </div>
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+              <button
+                tabIndex={0}
+                onClick={() => { setShowExitConfirm(false); confirmExitRef.current = false; }}
+                style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.25)', borderRadius: 10, padding: '12px 28px', color: '#e2e8f0', fontSize: 16, fontWeight: 700, cursor: 'pointer' }}
+              >
+                Stay
+              </button>
+              <button
+                tabIndex={0}
+                onClick={() => { setShowExitConfirm(false); if (window.AndroidNativePlayer?.exitApp) window.AndroidNativePlayer.exitApp(); }}
+                style={{ background: '#ef4444', border: 'none', borderRadius: 10, padding: '12px 28px', color: '#fff', fontSize: 16, fontWeight: 800, cursor: 'pointer' }}
+              >
+                Exit
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

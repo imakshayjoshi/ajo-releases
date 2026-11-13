@@ -1,64 +1,70 @@
-import React from 'react';
-import { Search, Settings } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Home, Film, Tv, Radio, Search, Settings } from 'lucide-react';
 
-export function GoogleTVHeader({ activeTab, onTabChange }) {
+export function GoogleTVHeader({ activeTab, onSelectTab }) {
+  const [timeStr, setTimeStr] = useState('');
+
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date();
+      setTimeStr(now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+    };
+    updateTime();
+    const interval = setInterval(updateTime, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // v3.17.53: six permanent destinations only. MovieBox remains a source for
+  // Movies/Series, while Anime and Torrents can still surface inside content.
+  // They no longer consume top-level remote navigation slots.
   const tabs = [
+    { id: 'home', label: 'Home', icon: Home },
+    { id: 'live', label: 'Live TV', icon: Radio },
+    { id: 'movies', label: 'Movies', icon: Film },
+    { id: 'series', label: 'Series', icon: Tv },
     { id: 'search', label: 'Search', icon: Search },
-    { id: 'home', label: 'For You' },
-    { id: 'epg', label: 'Live TV & Guide' },
-    { id: 'movies', label: 'Movies' },
-    { id: 'shows', label: 'Shows' },
-    { id: 'apps', label: 'Live Channels' },
+    { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
   return (
-    <header className="gtv-top-header">
-      {/* Brand Logo on Top-Left */}
-      <div 
-        className="gtv-brand-container" 
-        onClick={() => onTabChange('home')}
-        style={{ cursor: 'pointer' }}
-      >
-        <div className="gtv-brand-icon">
-          <span style={{ fontSize: '18px', fontWeight: 900, color: '#fff' }}>A</span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
-          <span className="gtv-brand-title">AJO</span>
-          <span className="gtv-brand-sub">TV</span>
+    <header className="tv-header" aria-label="AJO TV main navigation">
+      <div className="tv-logo-section">
+        <button
+          className="tv-logo-badge"
+          tabIndex={0}
+          aria-label="Open AJO TV Home"
+          onClick={() => onSelectTab('home')}
+        >
+          AJO
+        </button>
+        <div className="tv-logo-title" aria-hidden="true">
+          <strong>AJO TV</strong>
+          <span>Cinema & Live</span>
         </div>
       </div>
 
-      {/* Navigation Pills (Google TV Standard) */}
-      <nav className="gtv-nav-bar">
+      <nav className="tv-nav-pills" aria-label="Browse">
         {tabs.map((tab) => {
-          const isActive = activeTab === tab.id;
           const Icon = tab.icon;
+          const isActive = activeTab === tab.id;
           return (
             <button
               key={tab.id}
-              className={`gtv-nav-pill ${isActive ? 'gtv-pill-active is-focused' : ''}`}
-              data-focusable="true"
               tabIndex={0}
-              onClick={() => onTabChange(tab.id)}
+              className={`tv-nav-pill ${isActive ? 'active' : ''}`}
+              aria-current={isActive ? 'page' : undefined}
+              onClick={() => onSelectTab(tab.id)}
             >
-              {Icon && <Icon size={16} />}
+              <Icon size={20} strokeWidth={2.2} />
               <span>{tab.label}</span>
             </button>
           );
         })}
       </nav>
 
-      {/* Settings / Profile on Top-Right */}
-      <div className="gtv-header-right">
-        <button
-          className={`gtv-profile-btn ${activeTab === 'settings' ? 'gtv-pill-active is-focused' : ''}`}
-          data-focusable="true"
-          tabIndex={0}
-          onClick={() => onTabChange('settings')}
-          title="Settings & Reset"
-        >
-          <Settings size={18} />
-        </button>
+      <div className="tv-header-info" aria-hidden="true">
+        <span className="tv-nav-clock">{timeStr}</span>
+        <span className="tv-nav-hint">Left opens menu · Right returns</span>
       </div>
     </header>
   );

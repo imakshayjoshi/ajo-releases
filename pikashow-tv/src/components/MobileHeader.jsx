@@ -11,8 +11,8 @@ export function MobileHeader({ activeTab, onTabChange }) {
       top: 0,
       zIndex: 100,
       background: 'linear-gradient(180deg, rgba(6, 9, 14, 0.98) 0%, rgba(6, 9, 14, 0.92) 85%, transparent 100%)',
-      backdropFilter: 'blur(20px)',
-      WebkitBackdropFilter: 'blur(20px)',
+      background: 'rgba(15, 17, 23, 0.97)',
+      
       paddingTop: 'env(safe-area-inset-top, 8px)',
       borderBottom: '1px solid rgba(255, 255, 255, 0.08)'
     }}>

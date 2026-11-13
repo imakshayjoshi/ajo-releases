@@ -1,5 +1,5 @@
-export const CURRENT_APP_VERSION = '3.17.20';
-export const CURRENT_VERSION_CODE = 271;
+export const CURRENT_APP_VERSION = '3.17.53';
+export const CURRENT_VERSION_CODE = 310;
 const MANIFEST_SOURCES = [
   'https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/version.json',
   'https://cdn.jsdelivr.net/gh/imakshayjoshi/ajo-releases@main/version.json',
@@ -9,6 +9,19 @@ const MANIFEST_SOURCES = [
   // networks where raw.github fails never saw update banners.
 ];
 const RELEASE_PREFIX = 'https://github.com/imakshayjoshi/ajo-releases/releases/download/';
+
+// v3.17.53: per-appType target table. The release repo ships one APK per
+// package, and each key maps to a DIFFERENT package (fire_tv is com.ajo.tv,
+// not com.ajo.androidtv). The old ternaries collapsed fire_tv into the phone
+// branch, so a Fire TV device would download the phone APK and fail to install
+// (INSTALL_FAILED_UPDATE_INCOMPATIBLE). This table is the single source of
+// truth for both the manifest keys and the GitHub-API asset fallback.
+export const APP_TARGETS = {
+  tv:         { packageId: 'com.ajo.androidtv', assetName: 'AJO_TV.apk' },
+  android_tv: { packageId: 'com.ajo.androidtv', assetName: 'AJO_ANDROID_TV.apk' },
+  fire_tv:    { packageId: 'com.ajo.tv',        assetName: 'AJO_TV_FIRE.apk' },
+  phone:      { packageId: 'com.ajo.phone',     assetName: 'AJO_PHONE.apk' },
+};
 
 export function extractVersion(tagOrVersion) {
   const match = String(tagOrVersion || '').match(/\d+(?:\.\d+)+/);
@@ -27,15 +40,31 @@ export function compareVersions(a, b) {
   return 0;
 }
 
+// v3.17.51: strict host validation. The old `url.includes('github.com')` check
+// passed for `github.com.evil.com/AJO_TV.apk` — a poisoned manifest could have
+// pointed the installer anywhere. Parse the URL and whitelist exact hosts.
+const OTA_TRUSTED_HOSTS = new Set([
+  'github.com',
+  'raw.githubusercontent.com',
+  'objects.githubusercontent.com', // release-asset redirect target
+  'cdn.jsdelivr.net',
+  'api.github.com',
+]);
+
 export function isAllowedApkUrl(url) {
   if (typeof url !== 'string') return false;
-  const isAjoApk = /\/AJO_(PHONE|TV|ANDROID_TV)\.apk(\?.*)?$/i.test(url) || url.endsWith('.apk');
-  const isTrustedHost = url.includes('github.com') || 
-                        url.includes('raw.githubusercontent.com') || 
-                        url.includes('githack.com') ||
-                        url.includes('jsdelivr.net') || 
-                        url.includes('tinyurl.com');
-  return isAjoApk && isTrustedHost;
+  let u;
+  try { u = new URL(url); } catch { return false; }
+  if (u.protocol !== 'https:') return false;
+  const host = u.hostname.toLowerCase();
+  if (!OTA_TRUSTED_HOSTS.has(host)) return false;
+  // Must be OUR repo path AND our APK name — no bare endsWith('.apk').
+  const path = u.pathname;
+  const isAjoApk = /\/AJO_[A-Z_]+\.apk$/i.test(path);
+  if (!isAjoApk) return false;
+  if (host === 'objects.githubusercontent.com') return true; // signed redirect, path is opaque
+  if (host === 'cdn.jsdelivr.net') return path.startsWith('/gh/imakshayjoshi/ajo-releases');
+  return path.startsWith('/imakshayjoshi/ajo-releases/');
 }
 
 export async function checkForAppUpdates(appType = 'tv') {
@@ -67,6 +96,15 @@ export async function checkForAppUpdates(appType = 'tv') {
         const data = await response.json();
         if (data && data.assets && data.tag_name) {
           const v = extractVersion(data.tag_name);
+          // v3.17.53: the GitHub release tag is the TV version series
+          // (e.g. v3.17.53). A phone app (3.9.x) must NEVER adopt a TV tag —
+          // the old code let the phone fall into the GH-API branch and then
+          // picked the first asset containing "TV", i.e. a TV APK. Guard on
+          // the major.minor series so only the matching family accepts it.
+          const seriesPrefix = String(CURRENT_APP_VERSION).split('.').slice(0, 2).join('.');
+          if (!extractVersion(data.tag_name).startsWith(seriesPrefix)) {
+            continue;
+          }
           // v3.12.43: strict > — an older release from a later-queried source
           // must never override a newer version.json result.
           if (compareVersions(v, highestVersion) > 0) {
@@ -92,24 +130,24 @@ export async function checkForAppUpdates(appType = 'tv') {
   }
 
   try {
-    let target = {};
+    const target = APP_TARGETS[appType] || APP_TARGETS.tv;
+    let targetEntry = {};
     let latestVersion = highestVersion !== '0.0.0' ? highestVersion : CURRENT_APP_VERSION;
     let apkUrl = '';
     let changelog = [];
     let size = '6.9 MB';
     let releaseDate = new Date().toISOString().split('T')[0];
-    const packageId = appType === 'tv' ? 'com.ajo.tv' : (appType === 'android_tv' ? 'com.ajo.androidtv' : 'com.ajo.phone');
+    const packageId = target.packageId;
 
-    const directApkUrl = appType === 'tv'
-      ? 'https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk'
-      : appType === 'android_tv'
-        ? 'https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_ANDROID_TV.apk'
-        : 'https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_PHONE.apk';
+    const directApkUrl = `https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/${target.assetName}`;
 
     if (fromGithubApi && manifestData) {
       latestVersion = extractVersion(manifestData.tag_name || CURRENT_APP_VERSION);
       if (Array.isArray(manifestData.assets)) {
-        const apkAsset = manifestData.assets.find(a => (a.name || '').includes('TV') && (a.name || '').endsWith('.apk'));
+        // v3.17.53: exact asset-name match per appType. The old
+        // `includes('TV')` grabbed AJO_TV.apk (an Android-TV package) for the
+        // phone and for fire_tv — never the right binary.
+        const apkAsset = manifestData.assets.find(a => (a.name || '') === target.assetName);
         if (apkAsset?.browser_download_url) {
           apkUrl = apkAsset.browser_download_url;
         }
@@ -118,11 +156,11 @@ export async function checkForAppUpdates(appType = 'tv') {
       changelog = manifestData.body ? manifestData.body.split('\n').filter(l => l.trim().startsWith('-') || l.trim().startsWith('*')).map(l => l.replace(/^[-*]\s*/, '').trim()) : [];
       releaseDate = manifestData.published_at ? manifestData.published_at.split('T')[0] : releaseDate;
     } else if (manifestData && manifestData[appType]) {
-      target = manifestData[appType] || {};
-      latestVersion = extractVersion(target.version || manifestData.version || CURRENT_APP_VERSION);
-      apkUrl = target.apkUrl || target.apk_url || directApkUrl;
-      changelog = Array.isArray(target.changelog) ? target.changelog : [];
-      size = target.size_mb || target.size || size;
+      targetEntry = manifestData[appType] || {};
+      latestVersion = extractVersion(targetEntry.version || manifestData.version || CURRENT_APP_VERSION);
+      apkUrl = targetEntry.apkUrl || targetEntry.apk_url || directApkUrl;
+      changelog = Array.isArray(targetEntry.changelog) ? targetEntry.changelog : [];
+      size = targetEntry.size_mb || targetEntry.size || size;
       releaseDate = manifestData.releaseDate || releaseDate;
     }
 
@@ -130,43 +168,63 @@ export async function checkForAppUpdates(appType = 'tv') {
       apkUrl = directApkUrl;
     }
 
+    // v3.17.47: robust installed-version detection. The native bridge is the
+    // source of truth; if it is missing (web preview / stale bridge) we fall
+    // back to the compiled constant. A null/empty bridge value must NEVER be
+    // treated as an old version (that caused a permanent false update banner).
     let installedVersion = CURRENT_APP_VERSION;
     let installedCode = CURRENT_VERSION_CODE;
+    let bridgeAvailable = false;
     try {
-      if (window.AndroidUpdater?.getAppVersionName) {
-        installedVersion = window.AndroidUpdater.getAppVersionName();
+      if (window.AndroidUpdater && typeof window.AndroidUpdater.getAppVersionName === 'function') {
+        const v = window.AndroidUpdater.getAppVersionName();
+        if (v !== null && v !== undefined && String(v).trim() !== '') {
+          installedVersion = String(v);
+          bridgeAvailable = true;
+        }
       }
-      if (window.AndroidUpdater?.getAppVersionCode) {
-        installedCode = Number(window.AndroidUpdater.getAppVersionCode()) || CURRENT_VERSION_CODE;
+      if (window.AndroidUpdater && typeof window.AndroidUpdater.getAppVersionCode === 'function') {
+        const c = Number(window.AndroidUpdater.getAppVersionCode());
+        if (Number.isFinite(c) && c > 0) {
+          installedCode = c;
+          bridgeAvailable = true;
+        }
       }
     } catch {}
 
     const cleanLatest = String(latestVersion || '').trim().replace(/^v/, '');
     const cleanInstalled = String(installedVersion || '').trim().replace(/^v/, '');
-    const targetCode = Number(target.versionCode || manifestData.versionCode || 0);
+    const targetCode = Number(targetEntry.versionCode || (manifestData && manifestData.versionCode) || 0);
 
+    // v3.17.47: strict comparison. Only show the banner when the target is
+    // STRICTLY newer than what is installed. Equal versions never prompt.
     let hasUpdate = false;
     if (targetCode > 0 && installedCode > 0) {
       hasUpdate = targetCode > installedCode;
-    } else {
+    } else if (cleanInstalled && cleanInstalled !== '0') {
       hasUpdate = compareVersions(cleanLatest, cleanInstalled) > 0;
+    } else {
+      hasUpdate = false; // unknown install -> do not nag
     }
 
     return {
       hasUpdate,
       latestVersion: cleanLatest,
       currentVersion: cleanInstalled,
+      installedCode,
+      targetCode,
+      bridgeAvailable,
       changelog,
       apkUrl,
       size,
       releaseDate,
       packageId,
-      sha256: target.sha256 || null,
+      sha256: targetEntry.sha256 || null,
       // v3.2.0 keystore cutover: manifest declares which key signs new builds.
       // Debug-signed installs must NOT update in place to release-signed APKs
       // (INSTALL_FAILED_UPDATE_INCOMPATIBLE) — UI routes them to a guided
       // one-time reinstall instead.
-      targetSigning: String(target.signing || manifestData.signing || 'debug'),
+      targetSigning: String(targetEntry.signing || manifestData.signing || 'debug'),
       isReleaseSigned: (() => {
         try { return window.AndroidUpdater?.isReleaseSigned?.() === true; } catch { return false; }
       })()
@@ -182,15 +240,4 @@ export async function checkForAppUpdates(appType = 'tv') {
       releaseDate: ''
     };
   }
-}
-
-export function startAppUpdate(apkUrl, onProgress, onStatus, onError) {
-  if (!isAllowedApkUrl(apkUrl)) { onError?.('Update URL was rejected.'); return false; }
-  window.onAJOUpdateProgress = onProgress || (() => {});
-  window.onAJOUpdateStatus = onStatus || (() => {});
-  window.onAJOUpdateError = onError || (() => {});
-  try { if (window.AndroidUpdater?.downloadAndInstall) { window.AndroidUpdater.downloadAndInstall(apkUrl); return true; } } catch (error) { onError?.(error.message); }
-  window.open(apkUrl, '_blank', 'noopener,noreferrer');
-  onStatus?.('BROWSER_DOWNLOAD_OPENED', 100);
-  return false;
 }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { groupByCategory, liveLogoProxyUrl, guessLiveLogo } from '../api/live';
 
 /**
@@ -32,6 +32,7 @@ const CATEGORY_ORDER = ['Sports', 'News', 'Entertainment', 'Movies', 'Kids', 'Mu
 const deadLogoUrls = new Set();
 
 export function LiveView({ channels, onSelectItem, loading }) {
+  const [, bumpLogoVersion] = useReducer((x) => x + 1, 0); // v3.17.52: re-render on logo failure
   const [activeCat, setActiveCat] = useState(ALL);
   const gridRef = useRef(null);
   const railRef = useRef(null);
@@ -213,17 +214,13 @@ export function LiveView({ channels, onSelectItem, loading }) {
                         const proxyUrl = liveLogoProxyUrl(cur);
                         if (proxyUrl && cur !== proxyUrl) { img.src = proxyUrl; return; }
                       }
+                      // v3.17.52: mark BOTH the original and the last-tried src
+                      // dead, then re-render — the declarative logoDead check
+                      // renders the fallback. The old replaceChildren mutated
+                      // DOM React owns (reconciliation hazard).
+                      deadLogoUrls.add(ch.logo);
                       deadLogoUrls.add(cur);
-                      const box = img.parentElement;
-                      if (!box) return;
-                      const fallback = document.createElement('div');
-                      fallback.className = 'live-logo live-logo-fallback';
-                      fallback.setAttribute('aria-hidden', 'true');
-                      fallback.textContent = String(ch.title || ch.name || '📺').replace(/[^A-Za-z0-9 ]/g, '').trim().slice(0, 2).toUpperCase() || '📺';
-                      const badge = document.createElement('span');
-                      badge.className = 'tv-badge-live';
-                      badge.textContent = 'LIVE';
-                      box.replaceChildren(fallback, badge);
+                      bumpLogoVersion();
                     }}
                   />
                 ) : (

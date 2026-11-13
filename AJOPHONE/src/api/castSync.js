@@ -9,23 +9,6 @@ export const CONNECTION_STATES = {
   FAILED: 'FAILED'
 };
 
-export const REMOTE_COMMANDS = {
-  DPAD_UP: 'DPAD_UP',
-  DPAD_DOWN: 'DPAD_DOWN',
-  DPAD_LEFT: 'DPAD_LEFT',
-  DPAD_RIGHT: 'DPAD_RIGHT',
-  DPAD_CENTER: 'DPAD_CENTER',
-  BACK: 'BACK',
-  HOME: 'HOME',
-  PLAY: 'PLAY',
-  PAUSE: 'PAUSE',
-  PLAY_PAUSE: 'PLAY_PAUSE',
-  SEEK_FORWARD: 'SEEK_FORWARD',
-  SEEK_BACK: 'SEEK_BACK',
-  CHANNEL_UP: 'CHANNEL_UP',
-  CHANNEL_DOWN: 'CHANNEL_DOWN',
-  STOP: 'STOP'
-};
 
 const STORAGE_KEYS = {
   DEVICE_ID: 'ajo_device_id_v3',
@@ -330,10 +313,12 @@ export class CastSyncEngine {
 
     // v3.11.3 FIX: public.mqtthq.com is NXDOMAIN (DNS-dead since 2026-08) —
     // it rotated in every ~3rd reconnect and stalled pairing. Two live brokers.
+    // v3.17.51: public brokers first. The VPS broker was first in rotation and
+    // every dead-VPS episode cost an 8s connect timeout per pairing attempt.
     const MQTT_BROKERS = [
-      'wss://new.ajo.co.in/mqtt',
       'wss://broker.emqx.io:8084/mqtt',
-      'wss://broker.hivemq.com:8884/mqtt'
+      'wss://broker.hivemq.com:8884/mqtt',
+      'wss://new.ajo.co.in/mqtt'
     ];
 
     const currentBroker = MQTT_BROKERS[this.reconnectAttempts % MQTT_BROKERS.length];
@@ -749,7 +734,10 @@ export class CastSyncEngine {
     // and doubled outbound traffic for zero delivery. MQTT + BroadcastChannel are
     // the real transports; stale messages are retried via the heartbeat/pair loops.
 
-    return true;
+    // v3.17.51: honest result. BroadcastChannel/localStorage only reach THIS
+    // device — when MQTT is down, a phone->TV command goes nowhere and callers
+    // must know (they surface NETWORK_OFFLINE and retry).
+    return Boolean(this.ws && this.mqttConnected);
   }
 
   handleIncoming(msg) {

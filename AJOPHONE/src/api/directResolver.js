@@ -92,10 +92,19 @@ const VIDY_CITIES = ['miami', 'boise', 'vegas', 'reno', 'oakland', 'seattle', 'p
 
 const seedCache = new Map();
 
+// v3.17.51: every resolver fetch gets a hard timeout — a hung seed/sources
+// call used to stall the play path indefinitely.
+function fetchWithTimeout(url, options = {}, ms = 5000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  return fetch(url, { ...options, signal: controller.signal })
+    .finally(() => clearTimeout(timer));
+}
+
 async function getSeed(tmdbId) {
   const cached = seedCache.get(tmdbId);
   if (cached && cached.expiresAt - 5000 > Date.now()) return cached.seed;
-  const res = await fetch(`${VIDY_API}/seed?mediaId=${tmdbId}`);
+  const res = await fetchWithTimeout(`${VIDY_API}/seed?mediaId=${tmdbId}`);
   if (!res.ok) throw new Error('vidy seed failed');
   const data = await res.json();
   if (!data || !data.seed) throw new Error('vidy seed empty');
@@ -126,7 +135,7 @@ export async function resolveVidyDirect({ title, year, tmdbId, imdbId, mediaType
     // miami first (their default), boise as second opinion
     for (const city of VIDY_CITIES.slice(0, 2)) {
       try {
-        const res = await fetch(`${VIDY_API}/${city}/sources?${params}`, { headers: { Referer: 'https://www.vidy.st/' } });
+        const res = await fetchWithTimeout(`${VIDY_API}/${city}/sources?${params}`, { headers: { Referer: 'https://www.vidy.st/' } });
         if (!res.ok) continue;
         const blob = await res.text();
         const json = JSON.parse(vidyDecrypt(blob, seed, tmdbId));
@@ -166,7 +175,7 @@ export async function resolveVidsrcDirect({ tmdbId, mediaType, season, episode }
     const path = mediaType === 'tv'
       ? `/api/vidora/v1/tv/${tmdbId}/${season || 1}/${episode || 1}?source=oreon`
       : `/api/vidora/v1/movie/${tmdbId}?source=oreon`;
-    const res = await fetch(`https://vidsrc.pm${path}`, { headers: VIDSRC_HEADERS });
+    const res = await fetchWithTimeout(`https://vidsrc.pm${path}`, { headers: VIDSRC_HEADERS });
     if (!res.ok) return [];
     const data = await res.json().catch(() => null);
     if (!data?.result || !Array.isArray(data.sources)) return [];
@@ -204,13 +213,13 @@ export async function resolveVidriftDirect({ tmdbId, mediaType, season, episode,
     const embedUrl = isTv
       ? `https://embed.vidrift.in/embed/tv/${tmdbId}/${season || 1}/${episode || 1}`
       : `https://embed.vidrift.in/embed/movie/${tmdbId}`;
-    const pageRes = await fetch(embedUrl, { headers: { 'User-Agent': VIDRIFT_UA } });
+    const pageRes = await fetchWithTimeout(embedUrl, { headers: { 'User-Agent': VIDRIFT_UA } });
     if (!pageRes.ok) return [];
     const html = await pageRes.text();
     const tokMatch = html.match(/"playbackToken":"([^"]+)"/);
     if (!tokMatch) return [];
     const path = isTv ? `tv/${tmdbId}/${season || 1}/${episode || 1}` : `movie/${tmdbId}`;
-    const apiRes = await fetch(
+    const apiRes = await fetchWithTimeout(
       `https://embed.vidrift.in/api/source/${path}?token=${encodeURIComponent(tokMatch[1])}&provider=orion${hevcOk ? '' : '&hevc=0'}`,
       { headers: { Referer: embedUrl, 'User-Agent': VIDRIFT_UA } }
     );

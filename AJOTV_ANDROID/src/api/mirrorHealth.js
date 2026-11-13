@@ -58,7 +58,7 @@ export function rankServersByHealth(servers, health) {
   }
   const statusByName = {};
   for (const m of health.mirrors) {
-    statusByName[m.name.toLowerCase()] = { ok: m.ok, ms: m.ms };
+    statusByName[String(m.name || '').toLowerCase()] = { ok: m.ok, ms: m.ms };
   }
 
   const hostOf = (url) => {

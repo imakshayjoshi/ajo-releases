@@ -1,214 +1,152 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Play, Info, Star, Plus, Check, Sparkles } from 'lucide-react';
-import { isFavorite, toggleFavorite } from '../api/history';
 
-// v3.9.0: TV-parity hero — the same auto-rotating spotlight carousel as the
-// Android TV app (tv-hero design tokens: accent badge, 900-weight title,
-// green-glow Play button, dot indicators), adapted to portrait + touch.
-// Accepts a LIST of items (featuredItems) or a single featuredItem; rotates
-// every 6s, pauses while touching, swipe to change slide.
-export function HeroBanner({ featuredItem, featuredItems, onPlay, onSelectInfo, onFavoritesChanged }) {
-  const items = (Array.isArray(featuredItems) && featuredItems.length > 0
-    ? featuredItems
-    : featuredItem ? [featuredItem] : []
-  ).filter(Boolean).slice(0, 7);
-
+/**
+ * MovieBox-style auto-rotating spotlight carousel for Android TV.
+ * Shows 5-7 featured items with smooth cross-fade transitions and dot indicators.
+ */
+export function HeroBanner({ items = [], onPlay, onSelectInfo }) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
-  const [inWatchlist, setInWatchlist] = useState(false);
   const timerRef = useRef(null);
-  const touchRef = useRef(null);
 
-  const active = items[activeIndex] || items[0] || null;
-
-  useEffect(() => {
-    if (active) setInWatchlist(isFavorite(active));
-  }, [active]);
-
-  useEffect(() => {
-    if (isPaused || items.length <= 1) return;
-    timerRef.current = setInterval(() => {
-      setActiveIndex((prev) => (prev + 1) % items.length);
-    }, 6000);
-    return () => clearInterval(timerRef.current);
-  }, [isPaused, items.length]);
+  // Limit to 7 items max for the carousel
+  const carouselItems = items.slice(0, 7).filter(Boolean);
 
   const goToSlide = useCallback((idx) => {
-    if (items.length === 0) return;
-    setActiveIndex(((idx % items.length) + items.length) % items.length);
-  }, [items.length]);
+    setActiveIndex(idx % carouselItems.length);
+  }, [carouselItems.length]);
 
-  const onTouchStart = (e) => { touchRef.current = e.touches[0].clientX; setIsPaused(true); };
-  const onTouchEnd = (e) => {
+  // Auto-rotate every 6 seconds
+  useEffect(() => {
+    if (isPaused || carouselItems.length <= 1) return;
+    timerRef.current = setInterval(() => {
+      setActiveIndex(prev => (prev + 1) % carouselItems.length);
+    }, 6000);
+    return () => clearInterval(timerRef.current);
+  }, [isPaused, carouselItems.length]);
+
+  // Pause on focus/interaction, resume on blur
+  const handleFocus = () => setIsPaused(true);
+  const handleBlur = () => setIsPaused(false);
+  // v3.17.7: D-pad focus pause. The old pause only listened to the MOUSE —
+  // on a TV the carousel kept rotating while a slide held focus; rotation
+  // flips the focused slide to tabIndex -1, focus falls to <body>, and the
+  // next keypress fired the nearest-neighbor recovery = "focus jumps
+  // anywhere". Blur only resumes when focus LEFT the carousel entirely.
+  const rootRef = useRef(null);
+  const handleFocusIn = () => setIsPaused(true);
+  const handleFocusOut = (e) => {
+    const rt = e.relatedTarget;
+    if (rootRef.current && rt && rootRef.current.contains(rt)) return;
     setIsPaused(false);
-    if (touchRef.current == null || items.length <= 1) return;
-    const dx = e.changedTouches[0].clientX - touchRef.current;
-    touchRef.current = null;
-    if (Math.abs(dx) > 42) goToSlide(activeIndex + (dx < 0 ? 1 : -1));
   };
 
-  if (!active) return null;
-
-  const isLive = active.is_live || active.type === 'live' || active.year === 'LIVE';
-  const title = active.title_en || active.title || active.title_ru || active.name || 'Featured';
-  const genres = (active.genres || []).map(g => (typeof g === 'string' ? g : g.name)).filter(Boolean);
-  const rating = active.rating ? Number(active.rating).toFixed(1) : null;
-  const year = active.year || (active.release_date ? String(active.release_date).split('-')[0] : '');
-  const desc = typeof active.description === 'string' ? active.description : (active.overview || '');
-
-  const handleToggleWatchlist = (e) => {
-    e.stopPropagation();
-    const newState = toggleFavorite(active);
-    setInWatchlist(newState);
-    if (onFavoritesChanged) onFavoritesChanged();
-  };
+  if (carouselItems.length === 0) return null;
 
   return (
-    <section
-      className="ajo-hero"
-      onTouchStart={onTouchStart}
-      onTouchEnd={onTouchEnd}
-      onClick={() => onSelectInfo && onSelectInfo(active)}
-      style={{
-        position: 'relative',
-        width: '100%',
-        height: '480px',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'flex-end',
-        overflow: 'hidden',
-        cursor: 'pointer'
-      }}
+    <div
+      ref={rootRef}
+      className="tv-hero-carousel"
+      onMouseEnter={handleFocus}
+      onMouseLeave={handleBlur}
+      onFocus={handleFocusIn}
+      onBlur={handleFocusOut}
     >
-      {/* slides cross-fade */}
-      {items.map((item, idx) => {
-        const p = item.backdrop_url || item.backdrop || item.poster_url || item.poster || item.logo || '';
+      {carouselItems.map((item, idx) => {
+        const isActive = idx === activeIndex;
+        const title = item.title_en || item.title || item.name || 'Featured';
+        const poster = item.backdrop_url || item.poster_url || item.poster || '';
+        const desc = typeof item.description === 'string' ? item.description : (item.overview || '');
+        const year = item.year || (item.release_date ? item.release_date.split('-')[0] : '');
+        const rating = typeof item.rating === 'number' ? item.rating.toFixed(1)
+          : typeof item.rating === 'string' && item.rating !== '[object Object]' ? item.rating : '';
+        const genres = item.genres?.map(g => g.name).filter(Boolean).slice(0, 3) || [];
+
         return (
           <div
             key={item.id || idx}
-            style={{
-              position: 'absolute',
-              inset: 0,
-              backgroundImage: p ? `url(${p})` : undefined,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center 20%',
-              opacity: idx === activeIndex ? 1 : 0,
-              transition: 'opacity 0.7s ease',
-              transform: 'scale(1.02)'
-            }}
-          />
+            className={`tv-hero-carousel-slide ${isActive ? 'active' : ''}`}
+          >
+            <div
+              tabIndex={isActive ? 0 : -1}
+              className="tv-hero"
+              style={{
+                backgroundImage: poster ? `url(${poster})` : undefined,
+              }}
+              onClick={() => onSelectInfo && onSelectInfo(item)}
+              onFocus={handleFocus}
+              onBlur={handleBlur}
+            >
+              <div className="tv-hero-overlay" />
+              <div className="tv-hero-content">
+                <div className="tv-hero-badge">
+                  <Sparkles size={11} />
+                  <span>Featured</span>
+                </div>
+
+                <h1 className="tv-hero-title">{title}</h1>
+
+                {/* Meta row with year, rating, genres */}
+                <div className="tv-hero-meta">
+                  {year && <span className="tv-hero-meta-tag">{year}</span>}
+                  {rating && (
+                    <>
+                      <span className="tv-hero-meta-separator" />
+                      <span style={{ color: '#2DD4BF', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 3 }}>
+                        <Star size={12} fill="#2DD4BF" color="#2DD4BF" />
+                        {rating}
+                      </span>
+                    </>
+                  )}
+                  {genres.length > 0 && (
+                    <>
+                      <span className="tv-hero-meta-separator" />
+                      <span>{genres.join(' • ')}</span>
+                    </>
+                  )}
+                </div>
+
+                <p className="tv-hero-desc">{desc}</p>
+
+                <div className="tv-hero-actions">
+                  <button
+                    className="tv-hero-btn"
+                    tabIndex={isActive ? 0 : -1}
+                    onClick={(e) => { e.stopPropagation(); onPlay && onPlay(item); }}
+                  >
+                    <Play size={16} fill="#08080f" />
+                    <span>Watch Now</span>
+                  </button>
+                  <button
+                    className="tv-hero-btn-secondary"
+                    tabIndex={isActive ? 0 : -1}
+                    onClick={(e) => { e.stopPropagation(); onSelectInfo && onSelectInfo(item); }}
+                  >
+                    <Info size={15} />
+                    <span>Details</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         );
       })}
 
-      {/* gradient into page bg — a slate gradient under everything so the
-          hero is never a pure black void while poster art loads (v3.9.10) */}
-      <div style={{
-        position: 'absolute', inset: 0,
-        background: 'linear-gradient(180deg, #171a22 0%, #131519 55%, #0f1014 100%)',
-        pointerEvents: 'none', zIndex: 1
-      }} />
-      <div style={{
-        position: 'absolute',
-        inset: 0,
-        background: 'linear-gradient(180deg, rgba(15,16,20,0.08) 0%, rgba(15,16,20,0.18) 40%, rgba(15,16,20,0.78) 74%, #0f1014 100%)',
-        pointerEvents: 'none', zIndex: 2
-      }} />
-
-      <div style={{ position: 'relative', zIndex: 3, padding: '0 18px 22px', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left' }}>
-        {/* badge (tv-hero-badge) */}
-        <span style={{
-          display: 'inline-flex', alignItems: 'center', gap: 6,
-          background: '#E50914', color: '#fff',
-          fontSize: 11, fontWeight: 900, textTransform: 'uppercase',
-          padding: '3px 10px', borderRadius: 4, marginBottom: 10, letterSpacing: 0.8
-        }}>
-          <Sparkles size={11} />
-          Featured
-        </span>
-
-        {/* title (tv-hero-title) */}
-        <h1 style={{
-          fontSize: 30, fontWeight: 900, lineHeight: 1.15, letterSpacing: -0.5,
-          margin: '0 0 8px', color: '#fff', textShadow: '0 2px 20px rgba(0,0,0,0.9)',
-          display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
-        }}>{title}</h1>
-
-        {/* meta row */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8, fontSize: 13, color: '#d7dae0', fontWeight: 600, flexWrap: 'wrap' }}>
-          {rating && (
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: '#FFD236' }}>
-              <Star size={13} fill="#FFD236" /> {rating}
-            </span>
-          )}
-          {year && <span>{year}</span>}
-          {genres.slice(0, 2).map(g => <span key={g} style={{ opacity: 0.85 }}>{g}</span>)}
-          {isLive && <span style={{ color: '#ff4d4d', fontWeight: 800 }}>● LIVE</span>}
-        </div>
-
-        {desc && (
-          <p style={{
-            margin: '0 0 14px', fontSize: 13, lineHeight: 1.45, color: '#b9bdc7',
-            display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
-            maxWidth: 520
-          }}>{desc}</p>
-        )}
-
-        {/* actions (tv-hero-btn) */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }} onClick={(e) => e.stopPropagation()}>
-          <button
-            onClick={() => onPlay && onPlay(active)}
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: 8,
-              padding: '12px 26px', background: '#00BB7F', color: '#0f1014',
-              fontWeight: 800, fontSize: 15, borderRadius: 8, border: 'none',
-              cursor: 'pointer'
-            }}
-          >
-            <Play size={17} fill="#0f1014" /> Play
-          </button>
-          <button
-            onClick={handleToggleWatchlist}
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: 7,
-              padding: '12px 18px', background: 'rgba(255,255,255,0.1)', color: '#fff',
-              fontWeight: 700, fontSize: 14, borderRadius: 8,
-              border: '1px solid rgba(255,255,255,0.22)', cursor: 'pointer'
-            }}
-          >
-            {inWatchlist ? <Check size={16} color="#00BB7F" /> : <Plus size={16} />} My List
-          </button>
-          <button
-            onClick={() => onSelectInfo && onSelectInfo(active)}
-            aria-label="More info"
-            style={{
-              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              width: 44, height: 44, background: 'rgba(255,255,255,0.1)', color: '#fff',
-              borderRadius: 8, border: '1px solid rgba(255,255,255,0.22)', cursor: 'pointer'
-            }}
-          >
-            <Info size={17} />
-          </button>
-        </div>
-      </div>
-
-      {/* dots */}
-      {items.length > 1 && (
-        <div style={{ position: 'absolute', bottom: 8, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 7, zIndex: 10 }}>
-          {items.map((_, idx) => (
+      {/* Dot indicators */}
+      {carouselItems.length > 1 && (
+        <div className="tv-hero-dots">
+          {carouselItems.map((_, idx) => (
             <button
               key={idx}
+              className={`tv-hero-dot ${idx === activeIndex ? 'active' : ''}`}
+              onClick={() => goToSlide(idx)}
+              tabIndex={0}
               aria-label={`Slide ${idx + 1}`}
-              onClick={(e) => { e.stopPropagation(); goToSlide(idx); }}
-              style={{
-                width: idx === activeIndex ? 18 : 7, height: 7,
-                borderRadius: 4, border: 'none', padding: 0, cursor: 'pointer',
-                background: idx === activeIndex ? '#00BB7F' : 'rgba(255,255,255,0.35)',
-                transition: 'all 0.25s ease'
-              }}
             />
           ))}
         </div>
       )}
-    </section>
+    </div>
   );
 }

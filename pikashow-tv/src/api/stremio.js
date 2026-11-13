@@ -124,7 +124,9 @@ async function addonFetchJson(url) {
     clearTimeout(timer);
     if (!res.ok) return null;
     const data = await res.json();
-    try { storageSet(cacheKey, JSON.stringify({ at: Date.now(), data })); } catch {}
+    // v3.17.51: storageSet already JSON.stringifies — passing a string here
+    // double-encoded the cache so it never hit and grew localStorage forever.
+    try { storageSet(cacheKey, { at: Date.now(), data }); } catch {}
     return data;
   } catch {
     clearTimeout(timer);
@@ -226,13 +228,3 @@ export async function getAddonStreams(item) {
   return streams.filter(s => s.url); // only direct-playable for now (torrent needs debrid)
 }
 
-/** Fetch rich meta detail (description, cast, runtime) for a title. */
-export async function getAddonMeta(imdbId, mediaType) {
-  if (!imdbId) return null;
-  for (const addon of getInstalledAddons()) {
-    if (!(addon.types || []).includes(mediaType)) continue;
-    const data = await addonFetchJson(`${addon.url}/meta/${mediaType}/${imdbId}.json`);
-    if (data?.meta) return data.meta;
-  }
-  return null;
-}

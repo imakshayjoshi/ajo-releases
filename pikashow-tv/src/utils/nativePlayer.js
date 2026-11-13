@@ -37,6 +37,9 @@ const EMBED_HOST_PATTERNS = [
   /smashystream/i,
   /multiembed\.mov/i,
   /\/embed(\/|\?|$)/i,
+  /webtor\.io/i,
+  /vidfast\.vc/i,
+  /vidbinge\.dev/i,
 ];
 
 // v3.12.22: expanded dead host list based on live testing Sep 2026
@@ -51,14 +54,10 @@ const DEAD_HOST_PATTERNS = [
   /rivestream\.live/i,
   /vidsrc\.cc/i,
   /vidsrc\.xyz/i,
-  /vidsrc\.to/i,
-  /vidsrc\.io/i,
   /vidsrc\.in/i,
-  /v2\.vidsrc\.me/i,
-  /smashystream\.com/i,
+  /vidsrc\.pro/i,
   /apiplayer\.ru/i,
   /multiembed\.mov/i,
-  /vidbinge\.dev/i,
   /sus\.stream/i,
   /filmxy\.wafflehacker/i,
 ];
@@ -191,6 +190,18 @@ export function isDirectMediaUrl(url) {
 export function isNativePlayableUrl(url) {
   if (!url || typeof url !== 'string') return false;
   if (!/^https?:\/\//i.test(url)) return false;
+  // v3.17.42: embed pages (HTML iframes) are NOT native-playable — ExoPlayer
+  // can't play an HTML page as video. These must go through the WebView player.
+  if (/\/embed\//i.test(url)) return false;
+  if (/vidsrc\.(fyi|pm|io|xyz|cc|to|in)/i.test(url)) return false;
+  if (/vidy\.st/i.test(url)) return false;
+  if (/vidrift\.in/i.test(url)) return false;
+  if (/vidlink\.pro/i.test(url)) return false;
+  if (/superembed\.stream/i.test(url)) return false;
+  if (/2embed\.cc/i.test(url)) return false;
+  if (/autoembed/i.test(url)) return false;
+  // v3.17.47: webtor.io is an HTML app (torrent player UI), not a media file.
+  if (/webtor\.io/i.test(url)) return false;
   for (const pattern of DEAD_HOST_PATTERNS) {
     if (pattern.test(url)) return false;
   }
@@ -236,14 +247,14 @@ export function nativePlayerControl(cmd, arg = 0) {
  * from the VPS live aggregator (jio/zee/hotstar feeds). Falls back to the
  * plain native path when the bridge is old or the channel is not DRM'd.
  */
-export function playInNativePlayerWithDrm(url, title, isLive, fallbackUrls, drm, headers) {
+export function playInNativePlayerWithDrm(url, title, isLive, fallbackUrls, drm, headers, startPositionMs = 0) {
   const api = bridge();
   if (!api || !url) return false;
   if (!isNativePlayableUrl(url)) return false;
   const hasDrm = drm && Array.isArray(drm.keys) && drm.keys.length > 0;
   const hasHeaders = headers && Object.keys(headers).length > 0;
   if (!hasDrm && !hasHeaders) {
-    return playInNativePlayer(url, title, isLive, fallbackUrls);
+    return playInNativePlayer(url, title, isLive, fallbackUrls, startPositionMs);
   }
   try {
     const nativeFallbacks = Array.isArray(fallbackUrls)
@@ -255,6 +266,22 @@ export function playInNativePlayerWithDrm(url, title, isLive, fallbackUrls, drm,
     if (hasDrm) payload.keys = drm.keys;
     if (hasHeaders) payload.headers = headers;
     const drmJson = JSON.stringify(payload);
+    // v3.17.51: when we carry a resume position AND headers/DRM, route through
+    // the full bridge method — playStreamWithDrm has no position param.
+    if (startPositionMs > 0 && typeof api.playLiveStreamWithChannelsAndDrm === 'function') {
+      api.playLiveStreamWithChannelsAndDrm(
+        String(url),
+        String(title || 'Live Channel'),
+        Boolean(isLive),
+        nativeFallbacks.length ? JSON.stringify(nativeFallbacks) : '',
+        Number(startPositionMs),
+        '',
+        0,
+        drmJson
+      );
+      nativePlaybackActive = true;
+      return true;
+    }
     if (typeof api.playStreamWithDrm === 'function') {
       api.playStreamWithDrm(
         String(url),
@@ -267,10 +294,10 @@ export function playInNativePlayerWithDrm(url, title, isLive, fallbackUrls, drm,
       return true;
     }
     // Old bridge: drop the DRM info and play what we can
-    return playInNativePlayer(url, title, isLive, fallbackUrls);
+    return playInNativePlayer(url, title, isLive, fallbackUrls, startPositionMs);
   } catch (error) {
     console.warn('Native DRM player launch failed:', error);
-    return playInNativePlayer(url, title, isLive, fallbackUrls);
+    return playInNativePlayer(url, title, isLive, fallbackUrls, startPositionMs);
   }
 }
 

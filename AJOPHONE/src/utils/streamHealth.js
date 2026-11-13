@@ -1,4 +1,4 @@
-// v3.4.1: background stream-health sweep — after the first catalog paint,
+// v3.12.93: background stream-health sweep — after the first catalog paint,
 // probe the FIRST direct source of the items currently on screen and mark
 // confirmed-dead titles so they disappear from the catalog. Only a hard
 // 404/410 marks an item dead (403/401/network can be UA gates or blips and

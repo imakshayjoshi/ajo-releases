@@ -87,7 +87,6 @@ export function LazyImage({
           src={src}
           alt={alt}
           referrerPolicy="no-referrer"
-          draggable={false}
           onLoad={handleLoad}
           onError={handleError}
           style={{
@@ -114,8 +113,8 @@ export function LazyImage({
             transform: 'translate(-50%, -50%)',
             width: '24px',
             height: '24px',
-            border: '2px solid rgba(0, 187, 127, 0.3)',
-            borderTopColor: '#00BB7F',
+            border: '2px solid rgba(56, 189, 248, 0.3)',
+            borderTopColor: '#38bdf8',
             borderRadius: '50%',
             animation: 'spin 0.8s linear infinite'
           }}

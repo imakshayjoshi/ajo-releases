@@ -38,7 +38,7 @@ export const LandscapeMediaCard = React.memo(function LandscapeMediaCard({ item,
             alt={title}
             className="mobile-landscape-img"
             style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#0a0f18', padding: '6px' }}
-            loading="lazy"
+            loading="lazy" decoding="async"
             referrerPolicy="no-referrer"
             onError={() => setImgError(true)}
           />

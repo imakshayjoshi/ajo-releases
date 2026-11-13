@@ -38,14 +38,16 @@ export function AppProvidersRow({ onSelectApp }) {
         zIndex: 20,
         display: 'flex',
         gap: '8px',
-        overflowX: 'auto', WebkitOverflowScrolling: 'touch', touchAction: 'pan-x pan-y',
+        overflowX: 'auto',
         padding: '0 16px 8px 16px',
         scrollbarWidth: 'none'
       }}>
         {apps.map((app) => (
           <button
             key={app.id}
-            className="mobile-app-chip"
+            tabIndex={0}
+            data-focusable="true"
+            className="mobile-app-chip tv-cat-btn tv-app-provider-chip"
             onClick={() => onSelectApp(app.id)}
             style={{ 
               '--app-accent': app.color,
@@ -63,7 +65,7 @@ export function AppProvidersRow({ onSelectApp }) {
               flexShrink: 0,
               cursor: 'pointer',
               boxShadow: '0 2px 8px rgba(0, 0, 0, 0.5)',
-              backdropFilter: 'blur(8px)',
+              background: 'rgba(15, 17, 23, 0.95)',
               WebkitBackdropFilter: 'blur(8px)'
             }}
           >

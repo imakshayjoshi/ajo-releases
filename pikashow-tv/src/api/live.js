@@ -16,7 +16,7 @@
  */
 
 const LIVE_URL = 'https://new.ajo.co.in/live/channels.json';
-const CACHE_KEY = 'ajo_live_channels_v5';
+const CACHE_KEY = 'ajo_live_channels_v6';
 const TTL = 10 * 60 * 1000; // 10 min client cache (server refreshes 15 min)
 
 /**
@@ -141,7 +141,7 @@ function repairLiveLogo(name, logo) {
 // proxy. Some devices resolve/route specific CDNs badly (the stick already
 // needed the TMDB image proxy for the same reason), and the proxy also
 // normalizes spec-invalid CORS from jio/xstreamcp/amagi logo servers.
-const LOGO_PROXY = 'https://new.ajo.co.in/channels/logo?u=';
+const LOGO_PROXY = ''; // v3.17.30: VPS logo proxy removed — direct URLs
 const LOGO_PROXY_HOSTS = [
   'd229kpbsb5jevy.cloudfront.net',
   'xstreamcp-assets-msp.streamready.in',
@@ -155,7 +155,8 @@ function proxyLiveLogo(logo) {
   try {
     const h = new URL(logo).hostname;
     if (LOGO_PROXY_HOSTS.some((host) => h === host || h.endsWith('.' + host))) {
-      return LOGO_PROXY + encodeURIComponent(logo);
+      // v3.17.30: no proxy — return direct URL
+      return logo;
     }
   } catch { /* invalid url — keep as-is */ }
   return logo;
@@ -169,11 +170,13 @@ function proxyLiveLogo(logo) {
 // stay direct-or-initials). Returns null when the host is not rescuable.
 export function liveLogoProxyUrl(logo) {
   if (!logo || typeof logo !== 'string') return null;
-  if (logo.startsWith(LOGO_PROXY)) return null;
+  // v3.17.30: no proxy to check — skip this validation
+  if (false) return null;
   try {
     const h = new URL(logo).hostname;
     if (LOGO_PROXY_HOSTS.some((host) => h === host || h.endsWith('.' + host))) {
-      return LOGO_PROXY + encodeURIComponent(logo);
+      // v3.17.30: no proxy — return direct URL
+      return logo;
     }
   } catch { /* invalid */ }
   return null;
@@ -411,8 +414,8 @@ export function applyLiveSourceOverride(ch) {
 }
 
 export function isPopularLiveChannel(raw) {
-  // v3.17.16: bhoom-sourced channels are pre-curated Indian free-to-air —
-  // bypass the whitelist (it exists to filter junk legacy feeds only).
+  // bhoom-sourced channels are pre-curated Indian free-to-air — bypass the
+  // whitelist (it exists to filter junk legacy feeds only).
   if (raw && (raw.source === 'bhoom' || String(raw.id || '').startsWith('bhoom-'))) return true;
   if (!raw) return false;
   const name = String(raw.name || raw.title || raw.title_en || '').toLowerCase();
@@ -512,14 +515,100 @@ export async function getLiveChannels() {
     } catch { /* corrupt cache — refetch */ }
   }
 
-  const res = await fetch(LIVE_URL + (LIVE_URL.includes('?') ? '&' : '?') + '_=' + Date.now(), { signal: AbortSignal.timeout ? AbortSignal.timeout(15000) : undefined, cache: 'no-store' });
-  if (!res.ok) throw new Error('live catalog http ' + res.status);
-  const data = await res.json();
-  const channels = (Array.isArray(data.channels) ? data.channels : []).filter(isPopularLiveChannel);
   try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify({ t: Date.now(), channels }));
-  } catch { /* storage full — fine */ }
-  return channels.map(normalizeLiveChannel).filter(Boolean);
+    // v3.17.44: Cloudflare Worker APIs (reverse-engineered from JioStar+/+PlusTV)
+    // — no VPS dependency, direct Jio TV HLS streams with DRM cookies.
+    // v3.17.51: hard timeouts — a hung worker used to stall the whole Live tab.
+    const fetchTimeout = (u) => {
+      const c = new AbortController();
+      const t = setTimeout(() => c.abort(), 8000);
+      return fetch(u, { cache: 'no-store', signal: c.signal }).finally(() => clearTimeout(t));
+    };
+    const [jiostarRes, geoRes] = await Promise.allSettled([
+      fetchTimeout('https://lemajekaat.streamxlive.workers.dev/'),
+      fetchTimeout('https://geolive.streamxlive.workers.dev/?id=test')
+    ]);
+    let feedChannels = [];
+    if (jiostarRes.status === 'fulfilled' && jiostarRes.value.ok) {
+      try {
+        const data = await jiostarRes.value.json();
+        if (Array.isArray(data)) feedChannels.push(...data.map(c => ({
+          id: c.id || 'js-' + c.name,
+          name: c.name,
+          title: c.name,
+          url: c.url,
+          logo: c.logo || '',
+          lang: c.category || '',
+          kind: 'hls',
+          source: 'jiostar',
+          headers: c.cookie ? { Cookie: c.cookie } : null,
+          drm: c.keyId && c.key ? { keys: [[c.keyId, c.key]] } : null
+        })));
+      } catch {}
+    }
+    if (geoRes.status === 'fulfilled' && geoRes.value.ok) {
+      try {
+        const data = await geoRes.value.json();
+        if (Array.isArray(data)) feedChannels.push(...data.map(c => ({
+          id: c.id || 'geo-' + c.name,
+          name: c.name,
+          title: c.name,
+          url: c.url,
+          logo: c.logo || '',
+          lang: c.category || '',
+          kind: 'hls',
+          source: 'geolive',
+          headers: c.cookie ? { Cookie: c.cookie } : null
+        })));
+      } catch {}
+    }
+    let channels = feedChannels.filter(isPopularLiveChannel);
+    // v3.17.38: ALWAYS merge Sony Liv builtin channels (Cloudflare Workers HLS)
+    // so Live TV tab shows all 23 Sony channels regardless of feed state.
+    try {
+      const { BUILTIN_SPORTS_CHANNELS } = await import('./sports.js');
+      for (const b of BUILTIN_SPORTS_CHANNELS) {
+        const exists = channels.some(c => String(c.title || c.name || '').toLowerCase() === String(b.title).toLowerCase());
+        if (!exists) {
+          channels.push({
+            id: 'sonyliv-' + b.id,
+            name: b.title,
+            title: b.title,
+            url: b.players?.[0]?.url || b.url,
+            logo: b.poster,
+            lang: '',
+            kind: 'hls',
+            source: 'sonyliv'
+          });
+        }
+      }
+    } catch {}
+    try {
+      localStorage.setItem(CACHE_KEY, JSON.stringify({ t: Date.now(), channels }));
+    } catch { /* storage full — fine */ }
+    return channels.map(normalizeLiveChannel).filter(Boolean);
+  } catch {
+    // v3.17.51: a failed cold fetch must NOT be permanent — reset the flag so
+    // the next tab visit retries fresh instead of serving stale/empty forever.
+    coldStartFetchDone = false;
+    // v3.17.40: VPS down — return normalized Sony Liv channels ONLY
+    // (no VPS dependency for these channels).
+    try {
+      const { BUILTIN_SPORTS_CHANNELS } = await import('./sports.js');
+      const builtin = (BUILTIN_SPORTS_CHANNELS || []).map(b => ({
+        id: 'sonyliv-' + b.id,
+        name: b.title,
+        title: b.title,
+        url: b.players?.[0]?.url || b.url,
+        logo: b.poster,
+        lang: '',
+        kind: 'hls',
+        source: 'sonyliv'
+      }));
+      if (builtin.length > 0) return builtin.map(normalizeLiveChannel).filter(Boolean);
+    } catch {}
+    return [];
+  }
 }
 
 /**
@@ -588,6 +677,9 @@ export async function probeLiveChannels(channels) {
     localStorage.setItem(LIVE_PROBE_CACHE_KEY, JSON.stringify({ savedAt: Date.now(), verdicts }));
   } catch {}
   return out.filter((ch) => {
+    // v3.17.41: Sony Liv channels skip probe (Cloudflare Workers blocks CORS probe)
+    // v3.17.44: JioStar/GeoLive channels also skip probe (DRM + cookie auth)
+    if (ch.source === 'sonyliv' || ch.source === 'jiostar' || ch.source === 'geolive') return true;
     const players = (ch.players && ch.players.length ? ch.players : [{ url: ch.url }]);
     const alive = players.some((p) => {
       const u = p?.url || p;

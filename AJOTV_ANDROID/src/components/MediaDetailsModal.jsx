@@ -18,9 +18,15 @@ function formatTime(seconds) {
   return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 }
 
-export function MediaDetailsModal({ item, onClose, onStartPlayback }) {
-  if (!item) return null;
+// v3.17.52: the null gate lives in this wrapper so the inner component's hook
+// order is unconditional (an item->null flip mid-mount used to be a latent
+// Rules-of-Hooks crash).
+export function MediaDetailsModal(props) {
+  if (!props.item) return null;
+  return <MediaDetailsModalInner {...props} />;
+}
 
+function MediaDetailsModalInner({ item, onClose, onStartPlayback }) {
   const [episodes, setEpisodes] = useState([]);
   const [loadingEpisodes, setLoadingEpisodes] = useState(false);
   const [selectedServer, setSelectedServer] = useState(0);
@@ -68,6 +74,14 @@ export function MediaDetailsModal({ item, onClose, onStartPlayback }) {
     setInWatchlist(isFavorite(item));
   }, [item]);
 
+  // v3.17.52: a new item in the same mounted instance must not inherit the old
+  // selection — an index beyond the new filteredServers passed srv=null.
+  useEffect(() => {
+    setSelectedServer(0);
+    setSelectedSeason(1);
+    setAudioLang('all');
+  }, [item]);
+
   const handleToggleWatchlist = (e) => {
     if (e && e.stopPropagation) e.stopPropagation();
     const next = toggleFavorite(item);
@@ -94,41 +108,34 @@ export function MediaDetailsModal({ item, onClose, onStartPlayback }) {
 
   // Load episodes if TV series
   useEffect(() => {
-    if (isSeries && item) {
-      setLoadingEpisodes(true);
-      let tmdbId = item.tmdb_id;
-      if (!tmdbId && typeof item.id === 'string' && item.id.startsWith('tmdb-')) {
-        const parts = item.id.split('-');
-        const candidate = parts[parts.length - 1];
-        if (/^\d+$/.test(candidate)) tmdbId = Number(candidate);
-      }
-
-      if (tmdbId) {
-        getTmdbEpisodes(tmdbId, selectedSeason).then((eps) => {
-          if (eps && eps.length > 0) {
-            setEpisodes(eps);
-            setLoadingEpisodes(false);
-          } else {
-            getSeriesEpisodes(item.id).then((fallbackEps) => {
-              setEpisodes(fallbackEps || []);
-              setLoadingEpisodes(false);
-            }).catch(() => setLoadingEpisodes(false));
-          }
-        }).catch(() => {
-          getSeriesEpisodes(item.id).then((fallbackEps) => {
-            setEpisodes(fallbackEps || []);
-            setLoadingEpisodes(false);
-          }).catch(() => setLoadingEpisodes(false));
-        });
-      } else {
-        getSeriesEpisodes(item.id).then((eps) => {
-          setEpisodes(eps || []);
-          setLoadingEpisodes(false);
-        }).catch(() => {
-          setLoadingEpisodes(false);
-        });
-      }
+    if (!(isSeries && item)) return;
+    // v3.17.52: clear the previous title's episodes immediately (they used to
+    // render under the new item until the fetch landed) and cancel late writes
+    // from a superseded season/item fetch.
+    let cancelled = false;
+    setEpisodes([]);
+    setLoadingEpisodes(true);
+    const done = (eps) => {
+      if (cancelled) return;
+      setEpisodes(eps || []);
+      setLoadingEpisodes(false);
+    };
+    const fail = () => { if (!cancelled) setLoadingEpisodes(false); };
+    let tmdbId = item.tmdb_id;
+    if (!tmdbId && typeof item.id === 'string' && item.id.startsWith('tmdb-')) {
+      const parts = item.id.split('-');
+      const candidate = parts[parts.length - 1];
+      if (/^\d+$/.test(candidate)) tmdbId = Number(candidate);
     }
+    const fallback = () => getSeriesEpisodes(item.id).then((eps) => done(eps || [])).catch(fail);
+    if (tmdbId) {
+      getTmdbEpisodes(tmdbId, selectedSeason)
+        .then((eps) => { if (eps && eps.length > 0) done(eps); else fallback(); })
+        .catch(fallback);
+    } else {
+      fallback();
+    }
+    return () => { cancelled = true; };
   }, [isSeries, item, selectedSeason]);
 
   const [showServerMenu, setShowServerMenu] = useState(false);
@@ -380,7 +387,7 @@ export function MediaDetailsModal({ item, onClose, onStartPlayback }) {
                 Seasons:
               </span>
               <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 6 }} data-horizontal-scroll="true">
-                {[1, 2, 3, 4, 5, 6, 7, 8].slice(0, Math.max(1, item.number_of_seasons || item.seasons_count || 6)).map(sNum => (
+                {Array.from({ length: Math.max(1, item.number_of_seasons || item.seasons_count || 6) }, (_, i) => i + 1).map(sNum => (
                   <button
                     key={sNum}
                     tabIndex={0}
@@ -405,7 +412,12 @@ export function MediaDetailsModal({ item, onClose, onStartPlayback }) {
           )}
 
           {/* Episode List for TV Series */}
-          {isSeries && episodes.length > 0 && (
+          {isSeries && loadingEpisodes && (
+            <div style={{ marginBottom: 20, color: '#94a3b8', fontSize: '0.85rem' }}>
+              Loading Season {selectedSeason} episodes...
+            </div>
+          )}
+          {isSeries && !loadingEpisodes && episodes.length > 0 && (
             <div style={{ marginBottom: 20 }}>
               <span style={{ fontSize: '0.8rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', display: 'block', marginBottom: 8 }}>
                 Season {selectedSeason} Episodes ({episodes.length}):

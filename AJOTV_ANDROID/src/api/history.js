@@ -111,7 +111,10 @@ export function saveProgress(item, currentTime, duration) {
 export function getWatchHistory() {
   try {
     const data = localStorage.getItem(HISTORY_KEY);
-    return data ? JSON.parse(data) : [];
+    const parsed = data ? JSON.parse(data) : [];
+    // v3.17.51: a corrupted entry (object instead of array) used to make every
+    // downstream findIndex/map throw — progress silently stopped saving.
+    return Array.isArray(parsed) ? parsed : [];
   } catch (err) {
     return [];
   }
@@ -144,15 +147,6 @@ export function deleteHistoryItem(item) {
   } catch (err) {}
 }
 
-export function clearWatchHistory() {
-  try {
-    localStorage.removeItem(HISTORY_KEY);
-    syncContinueToNative();
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('ajo-watch-history-updated'));
-    }
-  } catch (err) {}
-}
 
 // ==========================================
 // MY WATCHLIST & MOVIE/SHOW FAVORITES
@@ -250,51 +244,7 @@ export function toggleFavoriteChannel(channel) {
 // ==========================================
 let sleepTimerTimeout = null;
 
-export function setSleepTimer(minutes, onTrigger) {
-  if (sleepTimerTimeout) {
-    clearTimeout(sleepTimerTimeout);
-    sleepTimerTimeout = null;
-  }
 
-  if (!minutes || minutes <= 0) {
-    localStorage.removeItem(SLEEP_TIMER_KEY);
-    return;
-  }
-
-  const expireTime = Date.now() + (minutes * 60 * 1000);
-  localStorage.setItem(SLEEP_TIMER_KEY, JSON.stringify({ minutes, expireTime }));
-
-  sleepTimerTimeout = setTimeout(() => {
-    localStorage.removeItem(SLEEP_TIMER_KEY);
-    if (onTrigger) onTrigger();
-  }, minutes * 60 * 1000);
-}
-
-export function clearAppCache() {
-  try {
-    // v3.12.59 FIX (ported): was localStorage.clear() — one Settings tap
-    // destroyed watch history, favorites, watchlist and cast pairing. Only
-    // cache keys (re-fetchable data) are removed now.
-    const CACHE_KEY_PATTERNS = [
-      /^ajo_iptv_cache_v\d+$/,
-      /^ajo_channels_manifest_v\d+$/,
-      /^ajo_sports_cache_v\d+$/,
-      /^ajo_catalog_v\d+$/,
-      /^ajo_prov_/,                 // v3.12.80: provider catalog + logo cache
-      /^ajo_live_channels_v\d+$/,   // v3.12.80: live channel walls
-      /^ajo_live_probe_v\d+$/,      // v3.12.80: stream health probes
-      /^ajo_mirror_failures_v\d+$/, // v3.12.80: dead-mirror learning
-      /^ajo_dead_items_v\d+$/,      // v3.12.93: dead-title blocklist
-    ];
-    const keys = [];
-    for (let i = 0; i < localStorage.length; i++) keys.push(localStorage.key(i));
-    for (const key of keys) {
-      if (CACHE_KEY_PATTERNS.some((p) => p.test(key))) {
-        localStorage.removeItem(key);
-      }
-    }
-  } catch {}
-}
 // v3.12.93 / phone v3.4.1: dead-item blocklist — when every stream source for
 // a title fails, the title stops appearing in catalogs and search until its
 // TTL expires (sources recover all the time). Delivers "only show thumbnails
@@ -336,10 +286,6 @@ export function getDeadItemIds() {
   return new Set(Object.keys(readDeadItemMap()));
 }
 
-export function isItemDead(itemId) {
-  if (!itemId) return false;
-  return Boolean(readDeadItemMap()[String(itemId)]);
-}
 
 /** Filter helper for catalog/search arrays. */
 export function filterAliveItems(items) {

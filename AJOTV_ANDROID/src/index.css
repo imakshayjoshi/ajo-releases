@@ -4,8 +4,6 @@
    Optimized for Fire TV OS & Low-RAM Smart TVs (60 FPS)
    ======================================================== */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
-
 :root {
   /* MovieBox Dark Cinema Palette */
   --bg-main: #0f1014;
@@ -101,151 +99,232 @@ html, body, #root {
 }
 
 /* ============================================
-   FLOATING CAPSULE NAV (ColorOS 17 Fluid Design)
-   v3.12.79: top header replaced by a floating,
-   translucent pill anchored bottom-center.
-   `.tv-header` class + DOM order (nav before
-   <main>) are preserved so the spatial-nav
-   engine's rail-walk is untouched.
+   REMOTE-FIRST LEFT NAVIGATION RAIL
+   v3.17.53: fixed at the left edge so the menu
+   is one LEFT press away from any content row.
+   It expands on focus and overlays instead of
+   shifting the page while the user navigates.
    ============================================ */
 
 .tv-header {
   position: fixed;
+  top: 18px;
   bottom: 18px;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 18px;
+  width: 72px;
   display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 7px 10px;
-  border-radius: var(--radius-full);
-  /* v3.12.88: hug the full content width — shrink-to-fit was squeezing the
-     capsule narrower than the pill row (Settings pill overflowed the edge). */
-  width: max-content;
-  /* frosted glass at ~0.85 alpha */
-  background: var(--fluid-glass);
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 24px;
+  overflow: hidden;
+  background: linear-gradient(180deg, rgba(20, 23, 31, 0.98), rgba(8, 10, 15, 0.96));
   border: 1px solid var(--fluid-glass-border);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
+  box-shadow: 10px 0 36px rgba(0, 0, 0, 0.42);
   z-index: 100;
-  transition: box-shadow 0.25s ease;
+  transition: width 0.24s var(--fluid-ease),
+              box-shadow 0.24s ease,
+              border-color 0.24s ease;
+  will-change: width;
 }
 
-/* soft radial glow pools behind the capsule whenever it holds focus */
 .tv-header:focus-within {
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55),
-              0 0 48px rgba(0, 187, 127, 0.22),
-              0 0 96px rgba(56, 189, 248, 0.12);
+  width: 236px;
+  border-color: rgba(0, 187, 127, 0.34);
+  box-shadow: 18px 0 54px rgba(0, 0, 0, 0.66),
+              0 0 46px rgba(0, 187, 127, 0.16);
 }
 
 .tv-logo-section {
+  height: 56px;
   display: flex;
   align-items: center;
+  gap: 12px;
   flex-shrink: 0;
+  overflow: hidden;
 }
 
 .tv-logo-badge {
-  background: linear-gradient(135deg, #00BB7F 0%, #00A572 50%, #00875F 100%);
-  color: #0f1014;
-  font-weight: 900;
-  font-size: 0.78rem;
-  padding: 4px 10px;
-  border-radius: var(--radius-full);
-  letter-spacing: 1.2px;
+  width: 50px;
+  height: 50px;
+  flex: 0 0 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #00BB7F 0%, #00A572 55%, #00875F 100%);
+  color: #07110d;
+  font-weight: 950;
+  font-size: 0.72rem;
+  border-radius: 16px;
+  letter-spacing: 1.1px;
   text-transform: uppercase;
-  box-shadow: 0 2px 10px rgba(0, 187, 127, 0.35);
+  box-shadow: 0 4px 16px rgba(0, 187, 127, 0.3);
   border: 2px solid transparent;
-  cursor: default;
+  cursor: pointer;
   font-family: inherit;
 }
 
-/* v3.12.81: subtle focus ring when D-pad lands on the logo (it's now a
-   focusable button so the header zone walk can stop here deliberately). */
 .tv-logo-badge:focus {
   outline: none;
-  border-color: rgba(255, 255, 255, 0.9);
-  box-shadow: 0 0 0 3px rgba(0, 187, 127, 0.45), 0 2px 10px rgba(0, 187, 127, 0.35);
+  border-color: #ffffff;
+  box-shadow: 0 0 0 3px rgba(0, 187, 127, 0.48), 0 4px 16px rgba(0, 187, 127, 0.35);
 }
 
-.tv-logo-title { display: none; }
+.tv-logo-title {
+  min-width: 140px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  opacity: 0;
+  transform: translateX(-8px);
+  transition: opacity 0.16s ease 0.05s, transform 0.2s var(--fluid-ease) 0.04s;
+  pointer-events: none;
+}
+
+.tv-logo-title strong {
+  color: #ffffff;
+  font-size: 1rem;
+  letter-spacing: 0.04em;
+}
+
+.tv-logo-title span {
+  color: var(--text-tertiary);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.tv-header:focus-within .tv-logo-title {
+  opacity: 1;
+  transform: translateX(0);
+}
 
 .tv-nav-pills {
-  position: relative; /* indicator positions against this */
   display: flex;
-  align-items: center;
-  gap: 4px;
-  min-width: 0;
-  flex-wrap: nowrap;
-  /* v3.12.88: the nav shrank under its content (scrollWidth 576 > box 552),
-     so the last pill (Settings) stuck out past the frosted capsule. Never
-     let it shrink — the pills can't compress (flex-shrink: 0 on them). */
-  flex-shrink: 0;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  gap: 6px;
+  overflow: hidden;
 }
-
-/* Sliding indicator — glides between pills on D-pad, no hard cuts.
-   transform/opacity only: GPU-composited, no layout. */
-.tv-nav-indicator {
-  position: absolute;
-  top: 0;
-  left: 0;
-  height: 100%;
-  border-radius: var(--radius-full);
-  background: var(--accent-gold-dim);
-  border: 1.5px solid rgba(0, 187, 127, 0.3);
-  opacity: 0;
-  pointer-events: none;
-  transition: transform 0.32s cubic-bezier(0.3, 1.3, 0.4, 1),
-              width 0.32s cubic-bezier(0.3, 1.3, 0.4, 1),
-              opacity 0.18s ease;
-  will-change: transform;
-}
-
-.tv-nav-indicator.visible { opacity: 1; }
 
 .tv-nav-pill {
   position: relative;
-  z-index: 1; /* above the sliding indicator */
-  padding: 8px 16px;
-  border-radius: var(--radius-full);
+  width: 100%;
+  min-height: 48px;
+  padding: 0 14px;
+  border-radius: 15px;
   background: transparent;
   color: var(--text-secondary);
-  font-size: 0.85rem;
-  font-weight: 600;
-  border: 1.5px solid transparent;
+  font-size: 0.9rem;
+  font-weight: 650;
+  border: 2px solid transparent;
   cursor: pointer;
-  transition: transform 0.28s var(--fluid-ease),
-              color 0.18s ease,
-              box-shadow 0.25s ease;
+  transition: background 0.16s ease,
+              color 0.16s ease,
+              border-color 0.16s ease,
+              box-shadow 0.2s ease;
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 14px;
   white-space: nowrap;
+  overflow: hidden;
+  text-align: left;
   flex-shrink: 0;
+}
+
+.tv-nav-pill svg {
+  flex: 0 0 20px;
+}
+
+.tv-nav-pill > span {
+  max-width: 0;
+  opacity: 0;
+  overflow: hidden;
+  transform: translateX(-8px);
+  transition: max-width 0.2s var(--fluid-ease),
+              opacity 0.14s ease,
+              transform 0.2s var(--fluid-ease);
+}
+
+.tv-header:focus-within .tv-nav-pill > span {
+  max-width: 150px;
+  opacity: 1;
+  transform: translateX(0);
 }
 
 .tv-nav-pill.active {
   color: var(--accent-gold);
-  font-weight: 700;
+  background: rgba(0, 187, 127, 0.11);
+  font-weight: 800;
 }
 
-/* focused item grows 5% with an expanded luminous aura */
+.tv-nav-pill.active::before {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 12px;
+  bottom: 12px;
+  width: 3px;
+  border-radius: 3px;
+  background: var(--accent-gold);
+  box-shadow: 0 0 12px rgba(0, 187, 127, 0.7);
+}
+
 .tv-nav-pill:focus {
+  outline: none;
   color: #ffffff;
-  transform: scale(1.05);
-  animation: luminous-focus 3s linear infinite;
+  border-color: rgba(255, 255, 255, 0.92);
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 0 0 3px rgba(0, 187, 127, 0.4), 0 8px 22px rgba(0, 0, 0, 0.32);
 }
 
-.tv-header-info { display: none; }
-
-@media (max-width: 1360px) {
-  .tv-logo-title { display: none; }
-  .tv-nav-pill { padding: 7px 13px; font-size: 0.8rem; }
+.tv-header-info {
+  min-width: 188px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 4px 8px 2px;
+  opacity: 0;
+  transform: translateX(-8px);
+  transition: opacity 0.14s ease, transform 0.2s var(--fluid-ease);
+  pointer-events: none;
 }
-/* v3.12.79: keep pills readable on the 960px Lumio viewport — the capsule
-   shrinks gaps, never the label size below 0.75rem (elders). */
+
+.tv-header:focus-within .tv-header-info {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.tv-nav-clock {
+  color: #ffffff;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.tv-nav-hint {
+  color: var(--text-tertiary);
+  font-size: 0.64rem;
+  letter-spacing: 0.01em;
+}
+
 @media (max-width: 1000px) {
-  .tv-header { gap: 4px; padding: 6px 8px; bottom: 14px; }
-  .tv-nav-pill { padding: 7px 11px; font-size: 0.75rem; gap: 5px; }
-  .tv-logo-badge { font-size: 0.7rem; padding: 4px 8px; }
+  .tv-header {
+    top: 10px;
+    bottom: 10px;
+    left: 10px;
+    width: 64px;
+    padding: 8px;
+    border-radius: 20px;
+  }
+  .tv-header:focus-within { width: 210px; }
+  .tv-logo-section { height: 50px; gap: 10px; }
+  .tv-logo-badge { width: 46px; height: 46px; flex-basis: 46px; font-size: 0.67rem; border-radius: 14px; }
+  .tv-nav-pill { min-height: 44px; padding: 0 11px; gap: 12px; font-size: 0.82rem; }
+  .tv-header-info { min-width: 174px; }
 }
 
 /* ============================================
@@ -301,13 +380,17 @@ html, body, #root {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  /* v3.12.79: extra top air (no more top bar) and bottom clearance so the
-     floating capsule never covers the last row of content. */
-  padding: 24px 40px 120px;
+  /* v3.17.53: permanent clearance for the collapsed left rail. The expanded
+     rail overlays temporarily, then collapses when focus returns to content. */
+  padding: 24px 40px 56px 108px;
   scroll-behavior: auto;
   overscroll-behavior-x: none;
   -webkit-overflow-scrolling: touch;
   touch-action: pan-y;
+}
+
+@media (max-width: 1000px) {
+  .tv-main-content { padding: 20px 24px 48px 88px; }
 }
 
 .tv-main-content,
@@ -819,6 +902,7 @@ html, body, #root {
   border: 2px solid transparent;
   cursor: pointer;
   position: relative;
+  contain: layout paint;
   /* v3.12.77 ColorOS: soft resting shadow so cards read as touchable
      surfaces, not flat rectangles */
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
@@ -844,9 +928,16 @@ html, body, #root {
   width: 100%;
   height: 244px;
   object-fit: cover;
-  background-color: #12121a;
+  background: linear-gradient(110deg, #12121a 8%, #1a1c22 18%, #12121a 33%);
+  background-size: 200% 100%;
+  animation: posterShimmer 1.5s linear infinite;
   display: block;
   transition: transform 0.3s ease;
+}
+
+@keyframes posterShimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
 }
 
 /* v3.12.79: poster stays still on focus — the luminous aura carries the
@@ -2085,4 +2176,42 @@ html, body, #root {
 }
 @keyframes ajoSplashFade {
   to { opacity: 1; }
+}
+
+/* v3.17.28: keyboard focus visibility for D-pad navigation.
+   tv-spatial-nav uses a JS-driven focus ring, but CSS :focus-visible ensures
+   the ring is visible even if the JS spatial nav loses track. */
+:focus-visible {
+  outline: 3px solid #00BB7F;
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* v3.17.28: content relevance tooltip — shows "Why am I seeing this?" */
+.ajo-relevance-tip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(11, 15, 20, 0.97);
+  border: 1px solid rgba(0, 187, 127, 0.4);
+  color: #e8edf2;
+  font-size: 11px;
+  line-height: 1.4;
+  padding: 8px 10px;
+  border-radius: 6px;
+  max-width: 200px;
+  z-index: 100;
+  pointer-events: none;
+  white-space: normal;
+  text-align: center;
+}
+.ajo-relevance-tip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: rgba(0, 187, 127, 0.4);
 }

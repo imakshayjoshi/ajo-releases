@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { RefreshCw, Trash2, ShieldCheck, Download, Tv, Info, CheckCircle2, AlertCircle, Puzzle, Plus, Cast } from 'lucide-react';
-import { checkForAppUpdates, CURRENT_APP_VERSION, CURRENT_VERSION_CODE } from '../api/otaUpdate';
+import { checkForAppUpdates, CURRENT_APP_VERSION, CURRENT_VERSION_CODE, isAllowedApkUrl } from '../api/otaUpdate';
 import { getInstalledAddons, installAddon, removeAddon, FEATURED_ADDONS } from '../api/stremio';
 
 export function SettingsView() {
@@ -134,6 +134,11 @@ export function SettingsView() {
 
   const handleInstallUpdate = (apkUrl) => {
     if (!apkUrl) return;
+    // v3.17.51: whitelist at the point of use.
+    if (!isAllowedApkUrl(apkUrl)) {
+      setDownloadError('Update URL rejected (untrusted source)');
+      return;
+    }
     setDownloadError(null);
     setDownloadProgress({ percent: 0, total: 0, totalLength: 0 });
     if (window.AndroidUpdater && window.AndroidUpdater.downloadAndInstall) {

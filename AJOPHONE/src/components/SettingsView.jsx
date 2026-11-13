@@ -1,41 +1,77 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Settings, 
-  Trash2, 
-  Moon, 
-  Tv, 
-  ShieldCheck, 
-  HardDrive, 
-  Check, 
-  RefreshCw,
-  Server,
-  Info,
-  Sparkles,
-  Download,
-  ArrowUpCircle,
-  Loader2,
-  AlertCircle,
-  Puzzle,
-  CheckCircle2,
-  Plus
-} from 'lucide-react';
-import { clearWatchHistory, clearAppCache, setSleepTimer as applySleepTimer } from '../api/history';
-import { getIPTVConfig, saveIPTVConfig } from '../api/iptv';
+import { RefreshCw, Trash2, ShieldCheck, Download, Tv, Info, CheckCircle2, AlertCircle, Puzzle, Plus, Cast } from 'lucide-react';
+import { checkForAppUpdates, CURRENT_APP_VERSION, CURRENT_VERSION_CODE, isAllowedApkUrl } from '../api/otaUpdate';
 import { getInstalledAddons, installAddon, removeAddon, FEATURED_ADDONS } from '../api/stremio';
-import { checkForAppUpdates, startAppUpdate, CURRENT_APP_VERSION, CURRENT_VERSION_CODE } from '../api/otaUpdate';
 
-export function SettingsView({ onClearHistory, onReloadApp }) {
-  const currentConfig = getIPTVConfig();
-  let __addonsInit = [];
-try { __addonsInit = getInstalledAddons() || []; } catch {}
-const [addons, setAddons] = useState(__addonsInit);
+export function SettingsView() {
+  const [updateStatus, setUpdateStatus] = useState(null);
+  const [isChecking, setIsChecking] = useState(false);
+  const [cacheCleared, setCacheCleared] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState(null);
+  const [downloadError, setDownloadError] = useState(null);
+  const [addons, setAddons] = useState([]);
   const [addonUrl, setAddonUrl] = useState('');
   const [addonStatus, setAddonStatus] = useState(null);
 
-  const installedVersion = (typeof window !== 'undefined' && window.AndroidUpdater?.getAppVersionName?.()) || CURRENT_APP_VERSION;
-  const installedCode = (typeof window !== 'undefined' && window.AndroidUpdater?.getAppVersionCode?.()) || CURRENT_VERSION_CODE;
+  const installedVersion = (() => {
+    try {
+      if (window.AndroidUpdater && window.AndroidUpdater.getAppVersionName) {
+        return window.AndroidUpdater.getAppVersionName();
+      }
+    } catch (_) {}
+    return CURRENT_APP_VERSION;
+  })();
+
+  const installedCode = (() => {
+    try {
+      if (window.AndroidUpdater && window.AndroidUpdater.getAppVersionCode) {
+        return Number(window.AndroidUpdater.getAppVersionCode()) || CURRENT_VERSION_CODE;
+      }
+    } catch (_) {}
+    return CURRENT_VERSION_CODE;
+  })();
 
   const refreshAddons = () => setAddons(getInstalledAddons());
+  useEffect(() => { 
+    refreshAddons();
+    handleCheckUpdate();
+  }, []);
+
+  // ---- v3.11.1 Cast & Remote pairing surface ----
+  const [castState, setCastState] = useState(null);
+  useEffect(() => {
+    let unsub = null;
+    let cancelled = false;
+    import('../api/castSync').then(({ castEngine, ensureTvRole, setPairingRoom, generateShortCode, getStoredRoomCode }) => {
+      if (cancelled) return;
+      const engine = ensureTvRole();
+      const refresh = () => setCastState({
+        roomCode: engine.roomCode || getStoredRoomCode() || null,
+        isPaired: Boolean(engine.session?.sessionId),
+        phoneName: engine.session?.phoneName || null
+      });
+      refresh();
+      unsub = engine.subscribeState(() => refresh());
+    }).catch(() => { setCastState({ roomCode: null, isPaired: false, phoneName: null }); });
+    return () => { cancelled = true; if (unsub) unsub(); };
+  }, []);
+
+  const handleNewRoomCode = () => {
+    import('../api/castSync').then(({ castEngine, setPairingRoom, setStoredSession, generateShortCode }) => {
+      const code = setPairingRoom(generateShortCode(4));
+      castEngine.updateRoom(code);
+      setStoredSession(null); // old paired phone no longer valid
+      setCastState({ roomCode: code, isPaired: false, phoneName: null });
+    });
+  };
+
+  const handleForgetPairing = () => {
+    import('../api/castSync').then(({ castEngine, setStoredSession }) => {
+      castEngine.session = null;
+      setStoredSession(null);
+      setCastState((prev) => ({ ...prev, isPaired: false, phoneName: null }));
+    });
+  };
 
   const handleInstallAddon = async (url) => {
     setAddonStatus({ type: 'loading', msg: 'Installing...' });
@@ -55,535 +91,217 @@ const [addons, setAddons] = useState(__addonsInit);
     removeAddon(id);
     refreshAddons();
   };
-  const [jioTvHost, setJioTvHost] = useState(currentConfig.jioTvHost);
-  const [customM3uUrl, setCustomM3uUrl] = useState(currentConfig.customM3uUrl);
-  const [sleepTimer, setSleepTimer] = useState('off');
-  const [actionNotice, setActionNotice] = useState(null);
 
-  // OTA Update State
-  const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
-  const [updateInfo, setUpdateInfo] = useState(null);
-  const [isUpdating, setIsUpdating] = useState(false);
-  const [downloadProgress, setDownloadProgress] = useState(0);
-  const [downloadStats, setDownloadStats] = useState({ downloaded: 0, total: 0 });
-  const [updateStatusText, setUpdateStatusText] = useState('');
-  const [updateError, setUpdateError] = useState(null);
-
-  const playlistPresets = [
-    { name: 'India National & Regional (700+ Channels)', url: 'https://iptv-org.github.io/iptv/countries/in.m3u' },
-    { name: 'Worldwide Live Sports & Cricket', url: 'https://iptv-org.github.io/iptv/categories/sports.m3u' },
-    { name: '24/7 International News Channels', url: 'https://iptv-org.github.io/iptv/categories/news.m3u' },
-    { name: 'Global Cinema & Entertainment', url: 'https://iptv-org.github.io/iptv/categories/movies.m3u' }
-  ];
-
-  const showNotice = (msg) => {
-    setActionNotice(msg);
-    setTimeout(() => setActionNotice(null), 3000);
-  };
-
-  // Auto-check for updates silently on mount so update info is instant
   useEffect(() => {
-    checkForAppUpdates('phone', false).then(info => {
-      if (info) setUpdateInfo(info);
-    }).catch(() => {});
+    window.onAJOUpdateProgress = (percent, total, totalLength) => {
+      setDownloadProgress({ percent, total, totalLength });
+    };
+    window.onAJOUpdateStatus = (status) => {
+      if (status === 'READY_TO_INSTALL') {
+        setDownloadProgress({ percent: 100, ready: true });
+      }
+    };
+    window.onAJOUpdateError = (err) => {
+      setDownloadError(err);
+      setDownloadProgress(null);
+    };
+    return () => {
+      window.onAJOUpdateProgress = null;
+      window.onAJOUpdateStatus = null;
+      window.onAJOUpdateError = null;
+    };
   }, []);
 
   const handleCheckUpdate = async () => {
-    setIsCheckingUpdate(true);
-    setUpdateError(null);
+    setIsChecking(true);
+    setUpdateStatus(null);
+    setDownloadProgress(null);
+    setDownloadError(null);
     try {
-      const info = await checkForAppUpdates('phone', true);
-      // v3.2.0 keystore cutover: debug-signed installs can't update in place
+      const result = await checkForAppUpdates('phone');
+      // v3.8.0 keystore cutover: debug-signed installs can't update in place
       // to a release-signed APK — show the one-time reinstall path instead.
-      if (info.targetSigning === 'release' && !info.isReleaseSigned) {
-        info.needsReinstall = true;
+      if (result.targetSigning === 'release' && !result.isReleaseSigned) {
+        result.needsReinstall = true;
       }
-      setUpdateInfo(info);
-      if (!info.hasUpdate) {
-        showNotice(`✓ App is up to date (v${info.currentVersion})`);
-      } else if (info.needsReinstall) {
-        showNotice('⚠ One-time reinstall needed for the new release key');
-      } else {
-        showNotice(`🚀 New update ready: v${info.latestVersion}!`);
-      }
-    } catch (e) {
-      setUpdateError("Failed to check for updates: " + e.message);
+      setUpdateStatus(result);
+    } catch (err) {
+      setUpdateStatus({ hasUpdate: false, error: 'Could not connect to update servers.' });
     } finally {
-      setIsCheckingUpdate(false);
+      setIsChecking(false);
     }
   };
 
-  const handleInstallUpdate = () => {
-    if (!updateInfo || !updateInfo.apkUrl) {
-      showNotice("Update URL not found");
+  const handleInstallUpdate = (apkUrl) => {
+    if (!apkUrl) return;
+    // v3.17.51: whitelist at the point of use.
+    if (!isAllowedApkUrl(apkUrl)) {
+      setDownloadError('Update URL rejected (untrusted source)');
       return;
     }
-
-    setIsUpdating(true);
-    setUpdateError(null);
-    setDownloadProgress(0);
-    setUpdateStatusText('Connecting to update server...');
-
-    startAppUpdate(
-      updateInfo.apkUrl,
-      (progress, downloaded, total) => {
-        setDownloadProgress(progress);
-        setDownloadStats({ downloaded, total });
-        setUpdateStatusText(`Downloading APK: ${progress}%`);
-      },
-      (status, progress) => {
-        if (status === 'READY_TO_INSTALL') {
-          setUpdateStatusText('Launching Android Package Installer...');
-          showNotice("✓ Download complete! Please tap 'Install' on the prompt.");
-        } else if (status === 'BROWSER_DOWNLOAD_OPENED') {
-          setUpdateStatusText('Download started in browser');
-          setIsUpdating(false);
-        }
-      },
-      (errMsg) => {
-        setUpdateError(errMsg || "Download failed");
-        setIsUpdating(false);
-      }
-    );
-  };
-
-  const handleSaveIPTV = () => {
-    saveIPTVConfig({ jioTvHost, customM3uUrl });
-    showNotice("Settings Saved! Reloading channels...");
-    if (onReloadApp) onReloadApp();
-  };
-
-  const handleSelectPreset = (url, name) => {
-    setCustomM3uUrl(url);
-    saveIPTVConfig({ customM3uUrl: url });
-    showNotice(`Loaded: ${name}`);
-    if (onReloadApp) onReloadApp();
-  };
-
-  const handleSetSleepTimer = (timeStr) => {
-    setSleepTimer(timeStr);
-    let minutes = 0;
-    if (timeStr === '15m') minutes = 15;
-    else if (timeStr === '30m') minutes = 30;
-    else if (timeStr === '45m') minutes = 45;
-    else if (timeStr === '60m') minutes = 60;
-    else if (timeStr === '120m') minutes = 120;
-
-    applySleepTimer(minutes, () => {
-      showNotice("🌙 Sleep Timer Expired: Playback Paused");
-      const video = document.querySelector('video');
-      if (video) video.pause();
-    });
-
-    showNotice(minutes > 0 ? `Sleep timer set for ${timeStr.toUpperCase()}` : "Sleep timer turned OFF");
-  };
-
-  const handleClearHistory = () => {
-    clearWatchHistory();
-    onClearHistory && onClearHistory();
-    showNotice("Watch History Cleared!");
-  };
-
-  const handleFullReset = () => {
-    if (window.confirm("Are you sure you want to reset all app settings, playlists, and cache?")) {
-      clearAppCache();
-      showNotice("Cache cleared. Reloading...");
-      setTimeout(() => {
-        window.location.reload();
-      }, 800);
+    setDownloadError(null);
+    setDownloadProgress({ percent: 0, total: 0, totalLength: 0 });
+    if (window.AndroidUpdater && window.AndroidUpdater.downloadAndInstall) {
+      window.AndroidUpdater.downloadAndInstall(apkUrl);
+    } else {
+      window.open(apkUrl, '_blank');
     }
+  };
+
+  const handleClearCache = () => {
+    try {
+      // v3.12.59 FIX (ported): cache keys only — user data survives.
+      const CACHE_KEY_PATTERNS = [
+        /^ajo_iptv_cache_v\d+$/,
+        /^ajo_channels_manifest_v\d+$/,
+        /^ajo_sports_cache_v\d+$/,
+        /^ajo_catalog_v\d+$/,
+      ];
+      const keys = [];
+      for (let i = 0; i < localStorage.length; i++) keys.push(localStorage.key(i));
+      for (const key of keys) {
+        if (CACHE_KEY_PATTERNS.some((p) => p.test(key))) {
+          localStorage.removeItem(key);
+        }
+      }
+      setCacheCleared(true);
+      setTimeout(() => setCacheCleared(false), 3000);
+    } catch (_) {}
   };
 
   return (
-    <div className="mobile-settings-container" style={{ padding: '16px', maxWidth: '600px', margin: '0 auto' }}>
-      {actionNotice && (
-        <div className="mobile-toast-notice" style={{
-          position: 'fixed',
-          top: '64px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          zIndex: 1000,
-          background: 'rgba(15, 23, 42, 0.95)',
-          border: '1.5px solid #00BB7F',
-          color: '#ffffff',
-          padding: '10px 20px',
-          borderRadius: '24px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          fontSize: '13px',
-          fontWeight: 700,
-          boxShadow: '0 8px 24px rgba(0, 0, 0, 0.6)'
-        }}>
-          <Check size={16} color="#00BB7F" />
-          <span>{actionNotice}</span>
-        </div>
-      )}
+    <div className="tv-settings-grid">
+      {/* v3.11.1 Cast & Remote — THE pairing surface. Before this, the TV
+          never displayed its room code, so a phone could never pair. */}
+      <div className="tv-settings-card">
+        <h2 className="tv-settings-title">
+          <Cast size={20} style={{ display: 'inline', marginRight: 8 }} />
+          Connect Your Phone (Remote)
+        </h2>
+        <p className="tv-settings-desc">
+          On your phone: open AJO Phone → press Connect to TV → type this code.
+          Your phone becomes your remote and can play any movie, show or channel on this TV.
+        </p>
 
-      {/* 🚀 ON-DEVICE OTA SOFTWARE UPDATE CARD */}
-      <div className="mobile-settings-card" style={{
-        background: 'linear-gradient(145deg, rgba(14, 20, 31, 0.95), rgba(22, 32, 50, 0.95))',
-        border: '1px solid rgba(0, 187, 127, 0.3)',
-        borderRadius: '16px',
-        padding: '18px',
-        marginBottom: '16px',
-        boxShadow: '0 8px 30px rgba(0, 0, 0, 0.4)'
-      }}>
-        <div className="mobile-settings-card-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        {castState === null ? (
+          <p style={{ color: '#94a3b8', fontSize: '0.9rem' }}>Starting cast engine…</p>
+        ) : (
+        <>
             <div style={{
-              width: '36px',
-              height: '36px',
-              borderRadius: '10px',
-              background: 'linear-gradient(135deg, #00BB7F 0%, #00BB7F 100%)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#fff'
+              display: 'flex', alignItems: 'center', gap: 14, margin: '12px 0',
+              background: 'rgba(229,9,20,0.12)', border: '1px solid #e50914',
+              borderRadius: 10, padding: '14px 18px'
             }}>
-              <ArrowUpCircle size={20} />
-            </div>
-            <div>
-              <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#ffffff', margin: 0 }}>
-                App Software Updates
-              </h3>
-              <span style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 600 }}>
-                Current Installed: <strong style={{ color: '#00BB7F' }}>v{installedVersion} (Build {installedCode})</strong>
-              </span>
-            </div>
-          </div>
-
-          <button
-            onClick={handleCheckUpdate}
-            disabled={isCheckingUpdate || isUpdating}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              background: 'rgba(0, 187, 127, 0.15)',
-              border: '1px solid rgba(0, 187, 127, 0.4)',
-              color: '#00BB7F',
-              padding: '8px 14px',
-              borderRadius: '20px',
-              fontSize: '12px',
-              fontWeight: 800,
-              cursor: 'pointer',
-              opacity: (isCheckingUpdate || isUpdating) ? 0.6 : 1
-            }}
-          >
-            {isCheckingUpdate ? (
-              <>
-                <Loader2 size={14} className="spin-animation" />
-                <span>Checking...</span>
-              </>
-            ) : (
-              <>
-                <RefreshCw size={14} />
-                <span>Check Update</span>
-              </>
-            )}
-          </button>
-        </div>
-
-        {/* Update Error Banner */}
-        {updateError && (
-          <div style={{
-            background: 'rgba(239, 68, 68, 0.15)',
-            border: '1px solid rgba(239, 68, 68, 0.3)',
-            borderRadius: '10px',
-            padding: '10px 14px',
-            marginTop: '10px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            color: '#f87171',
-            fontSize: '12px'
-          }}>
-            <AlertCircle size={16} />
-            <span>{updateError}</span>
-          </div>
-        )}
-
-        {/* Downloading Progress View */}
-        {isUpdating && (
-          <div style={{ marginTop: '14px', background: 'rgba(0, 0, 0, 0.3)', padding: '14px', borderRadius: '12px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-              <span style={{ fontSize: '13px', fontWeight: 700, color: '#ffffff' }}>
-                {updateStatusText}
-              </span>
-              <span style={{ fontSize: '13px', fontWeight: 800, color: '#00BB7F' }}>
-                {downloadProgress}%
-              </span>
-            </div>
-
-            {/* Progress Track */}
-            <div style={{
-              width: '100%',
-              height: '8px',
-              background: 'rgba(255, 255, 255, 0.1)',
-              borderRadius: '4px',
-              overflow: 'hidden'
-            }}>
-              <div style={{
-                width: `${downloadProgress}%`,
-                height: '100%',
-                background: 'linear-gradient(90deg, #00BB7F, #00BB7F)',
-                borderRadius: '4px',
-                transition: 'width 0.2s ease'
-              }} />
-            </div>
-          </div>
-        )}
-
-        {/* Update Available Card Details */}
-        {updateInfo && updateInfo.hasUpdate && !isUpdating && (
-          <div style={{
-            marginTop: '14px',
-            background: updateInfo.needsReinstall ? 'rgba(245, 158, 11, 0.08)' : 'rgba(0, 187, 127, 0.08)',
-            border: updateInfo.needsReinstall ? '1px solid rgba(245, 158, 11, 0.35)' : '1px solid rgba(0, 187, 127, 0.25)',
-            borderRadius: '12px',
-            padding: '14px'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-              <div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1 }}>
+                <span style={{ fontSize: 15, color: '#e2e8f0', fontWeight: 600 }}>Room Code</span>
                 <span style={{
-                  background: updateInfo.needsReinstall ? '#f59e0b' : '#22c55e',
-                  color: '#fff',
-                  fontSize: '10px',
-                  fontWeight: 900,
-                  padding: '2px 8px',
-                  borderRadius: '10px',
-                  marginRight: '6px'
+                  fontSize: 26, fontWeight: 800, letterSpacing: 3, color: '#fff',
+                  fontVariantNumeric: 'tabular-nums'
                 }}>
-                  {updateInfo.needsReinstall ? 'ONE-TIME REINSTALL' : 'NEW UPDATE'}
+                  {castState.roomCode || '—'}
                 </span>
-                <strong style={{ color: '#fff', fontSize: '14px' }}>Version {updateInfo.latestVersion}</strong>
+                <span style={{
+                  fontSize: 12, padding: '4px 10px', borderRadius: 999, width: 'fit-content',
+                  background: castState.isPaired ? '#16a34a' : '#475569', color: '#fff', fontWeight: 700
+                }}>
+                  {castState.isPaired ? `CONNECTED · ${castState.phoneName || 'Phone'}` : 'Waiting for your phone'}
+                </span>
               </div>
-              <span style={{ fontSize: '12px', color: '#94a3b8' }}>Size: {updateInfo.size}</span>
+              {castState.roomCode && !castState.isPaired && (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                  {/* v3.12.90: QR carries the room code as an ajoapp:// deep
+                      link — AJO Phone scans it (in-app scanner or phone camera
+                      via the ajoapp:// intent filter) and pairs instantly.
+                      The old https://new.ajo.co.in/pair URL 404'd. */}
+                  <img
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent('ajoapp://pair?code=' + castState.roomCode)}`}
+                    alt={`QR: ${castState.roomCode}`}
+                    style={{ width: 110, height: 110, borderRadius: 8, background: '#fff', padding: 4 }}
+                    onError={(e) => { e.target.style.display = 'none'; }}
+                  />
+                  <span style={{ fontSize: 11, color: '#94a3b8', textAlign: 'center', maxWidth: 110 }}>Scan with AJO Phone app</span>
+                </div>
+              )}
             </div>
 
-            {updateInfo.needsReinstall && (
-              <div style={{ margin: '10px 0', fontSize: '12px', color: '#fbbf24', lineHeight: '1.6', fontWeight: 700 }}>
-                ⚠ AJO is switching to its permanent release key. Android requires a one-time uninstall → reinstall for this switch. Your watch history is preserved if you keep app data; the app reopens normally afterwards.
-              </div>
-            )}
-
-            {updateInfo.changelog && updateInfo.changelog.length > 0 && (
-              <div style={{ margin: '10px 0', fontSize: '12px', color: '#cbd5e1', lineHeight: '1.6' }}>
-                {updateInfo.changelog.map((log, i) => (
-                  <div key={i} style={{ display: 'flex', gap: '6px', alignItems: 'flex-start', marginBottom: '4px' }}>
-                    <span style={{ color: '#00BB7F' }}>•</span>
-                    <span>{log}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <button
-              onClick={handleInstallUpdate}
-              style={{
-                width: '100%',
-                marginTop: '8px',
-                background: 'linear-gradient(135deg, #00875f 0%, #0f766e 100%)',
-                border: 'none',
-                color: '#ffffff',
-                padding: '12px',
-                borderRadius: '10px',
-                fontSize: '13px',
-                fontWeight: 800,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                cursor: 'pointer',
-                boxShadow: '0 4px 15px rgba(2, 132, 199, 0.4)'
-              }}
-            >
-              <Download size={16} />
-              <span>{updateInfo.needsReinstall ? 'Download & Reinstall (One Time)' : '1-Tap Download & Install Update'}</span>
-            </button>
-          </div>
-        )}
-
-        {/* Up-to-date Status Message */}
-        {updateInfo && !updateInfo.hasUpdate && !isUpdating && (
-          <div style={{
-            marginTop: '12px',
-            background: 'rgba(34, 197, 94, 0.1)',
-            border: '1px solid rgba(34, 197, 94, 0.25)',
-            borderRadius: '10px',
-            padding: '10px 14px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            color: '#4ade80',
-            fontSize: '12px',
-            fontWeight: 700
-          }}>
-            <Check size={16} />
-            <span>AJO is up to date with the latest features, streaming engines & ad blockers.</span>
-          </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button tabIndex={0} className="tv-btn-primary" onClick={handleNewRoomCode} style={{ width: 'fit-content' }}>
+                <RefreshCw size={16} style={{ display: 'inline', marginRight: 6 }} />
+                New Code
+              </button>
+              {castState.isPaired && (
+                <button tabIndex={0} className="tv-btn-secondary" onClick={handleForgetPairing} style={{ width: 'fit-content' }}>
+                  <Trash2 size={16} style={{ display: 'inline', marginRight: 6 }} />
+                  Disconnect Phone
+                </button>
+              )}
+            </div>
+            <p style={{ color: '#64748b', fontSize: '0.8rem', marginTop: 10, lineHeight: 1.5 }}>
+              Works on any internet — your phone and TV don't need to be on the same Wi-Fi. Just enter the same code or scan the QR.
+            </p>
+          </>
         )}
       </div>
 
-      {/* Sleep Timer Section */}
-      <div className="mobile-settings-card" style={{
-        background: 'rgba(14, 20, 31, 0.9)',
-        border: '1px solid rgba(255, 255, 255, 0.08)',
-        borderRadius: '16px',
-        padding: '18px',
-        marginBottom: '16px'
-      }}>
-        <div className="mobile-settings-card-header" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-          <Moon size={18} color="#00BB7F" />
-          <h3 style={{ fontSize: '15px', fontWeight: 800, color: '#fff', margin: 0 }}>Playback Sleep Timer</h3>
-        </div>
-        <p style={{ fontSize: '12px', color: '#94a3b8', margin: '0 0 12px 0' }}>
-          Automatically pause playback after a set time.
+      <div className="tv-settings-card">
+        <h2 className="tv-settings-title">
+          <Puzzle size={20} style={{ display: 'inline', marginRight: 8 }} />
+          Addons (Stremio Compatible)
+        </h2>
+        <p className="tv-settings-desc">
+          Install community addons for unlimited catalogs and streams. Paste any Stremio addon URL.
         </p>
 
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-          {['off', '15m', '30m', '45m', '60m', '120m'].map(time => (
-            <button
-              key={time}
-              style={{
-                background: sleepTimer === time ? 'linear-gradient(135deg, #00875f, #0f766e)' : 'rgba(255, 255, 255, 0.08)',
-                border: sleepTimer === time ? '1px solid #00BB7F' : '1px solid rgba(255, 255, 255, 0.1)',
-                color: '#fff',
-                padding: '6px 14px',
-                borderRadius: '16px',
-                fontSize: '12px',
-                fontWeight: 700,
-                cursor: 'pointer'
-              }}
-              onClick={() => handleSetSleepTimer(time)}
-            >
-              {time === 'off' ? 'Off' : time.toUpperCase()}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Watch History & Data Management */}
-      <div className="mobile-settings-card" style={{
-        background: 'rgba(14, 20, 31, 0.9)',
-        border: '1px solid rgba(255, 255, 255, 0.08)',
-        borderRadius: '16px',
-        padding: '18px',
-        marginBottom: '16px'
-      }}>
-        <div className="mobile-settings-card-header" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-          <HardDrive size={18} color="#00BB7F" />
-          <h3 style={{ fontSize: '15px', fontWeight: 800, color: '#fff', margin: 0 }}>Storage & History</h3>
-        </div>
-        <p style={{ fontSize: '12px', color: '#94a3b8', margin: '0 0 12px 0' }}>
-          Manage local watch resume points and cached catalog data.
-        </p>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          <button 
-            onClick={handleClearHistory}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '10px',
-              background: 'rgba(239, 68, 68, 0.12)',
-              border: '1px solid rgba(239, 68, 68, 0.3)',
-              color: '#f87171',
-              padding: '12px 16px',
-              borderRadius: '12px',
-              fontSize: '13px',
-              fontWeight: 700,
-              cursor: 'pointer'
-            }}
-          >
-            <Trash2 size={16} />
-            <span>Clear Watch History & Continue Watching</span>
-          </button>
-
-          <button 
-            onClick={handleFullReset}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '10px',
-              background: 'rgba(0, 187, 127, 0.12)',
-              border: '1px solid rgba(0, 187, 127, 0.3)',
-              color: '#00BB7F',
-              padding: '12px 16px',
-              borderRadius: '12px',
-              fontSize: '13px',
-              fontWeight: 700,
-              cursor: 'pointer'
-            }}
-          >
-            <RefreshCw size={16} />
-            <span>Reset App Cache & Reload</span>
-          </button>
-        </div>
-      </div>
-
-      {/* STREMIO ADDONS */}
-      <div className="mobile-settings-card" style={{
-        background: 'rgba(14, 20, 31, 0.9)',
-        border: '1px solid rgba(255, 255, 255, 0.08)',
-        borderRadius: '16px',
-        padding: '18px'
-      }}>
-        <h3 style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '0 0 8px', fontSize: '1rem' }}>
-          <Puzzle size={18} color="#00BB7F" /> Addons (Stremio Compatible)
-        </h3>
-        <p style={{ color: '#94a3b8', fontSize: '0.85rem', margin: '0 0 12px' }}>
-          Install community addons for unlimited catalogs & streams.
-        </p>
-
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '10px 0' }}>
           {FEATURED_ADDONS.map(fa => {
             const installed = addons.some(a => a.id === fa.id);
             return (
               <button
                 key={fa.id}
+                tabIndex={0}
+                className="tv-btn-secondary"
                 onClick={() => handleInstallAddon(fa.url)}
                 disabled={installed}
-                style={{
-                  padding: '8px 14px', borderRadius: 20, fontSize: '0.8rem', fontWeight: 700,
-                  background: installed ? 'rgba(34,197,94,0.15)' : 'rgba(0,187,127,0.12)',
-                  border: `1px solid ${installed ? 'rgba(34,197,94,0.4)' : 'rgba(0,187,127,0.4)'}`,
-                  color: installed ? '#22c55e' : '#00BB7F',
-                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6
-                }}
+                style={{ padding: '8px 14px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: 6 }}
               >
-                {installed ? <CheckCircle2 size={13} /> : <Plus size={13} />}
+                {installed ? <CheckCircle2 size={14} color="#22c55e" /> : <Plus size={14} />}
                 {installed ? fa.name : `Add ${fa.name}`}
               </button>
             );
           })}
         </div>
 
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
           <input
+            tabIndex={0}
             value={addonUrl}
             onChange={(e) => setAddonUrl(e.target.value)}
-            placeholder="Paste addon manifest URL..."
-            style={{ flex: 1, padding: '10px 12px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(148,163,184,0.3)', borderRadius: 8, color: '#fff', fontSize: '0.85rem' }}
+            placeholder="https://addon.example.com/manifest.json"
+            style={{
+              flex: 1, minWidth: 260, padding: '10px 12px',
+              background: 'rgba(15,20,31,0.9)', border: '1px solid rgba(148,163,184,0.3)',
+              borderRadius: 8, color: '#fff', fontSize: '0.9rem'
+            }}
           />
-          <button onClick={() => handleInstallAddon()} disabled={!addonUrl} style={{
-            padding: '10px 16px', borderRadius: 8, fontWeight: 800, fontSize: '0.85rem',
-            background: addonUrl ? '#00BB7F' : 'rgba(148,163,184,0.2)', color: addonUrl ? '#06121f' : '#64748b', border: 'none', cursor: 'pointer'
-          }}>Add</button>
+          <button tabIndex={0} className="tv-btn-primary" onClick={() => handleInstallAddon()} disabled={!addonUrl}>
+            <Plus size={16} /> Install
+          </button>
         </div>
+
         {addonStatus && (
-          <p style={{ marginTop: 8, fontSize: '0.8rem', fontWeight: 700, color: addonStatus.type === 'ok' ? '#22c55e' : addonStatus.type === 'err' ? '#ef4444' : '#00BB7F' }}>
+          <p style={{ marginTop: 10, fontWeight: 700, color: addonStatus.type === 'ok' ? '#22c55e' : addonStatus.type === 'err' ? '#ef4444' : '#38bdf8' }}>
             {addonStatus.msg}
           </p>
         )}
+
         {addons.length > 0 && (
-          <div style={{ marginTop: 12 }}>
+          <div style={{ marginTop: 14 }}>
+            <strong style={{ color: '#94a3b8', fontSize: '0.85rem' }}>INSTALLED ({addons.length}):</strong>
             {addons.map(a => (
-              <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 0', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                <span style={{ fontSize: '0.85rem' }}>{a.name}</span>
-                <button onClick={() => handleRemoveAddon(a.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <Trash2 size={11} /> Remove
+              <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                <span>{a.name} <span style={{ color: '#64748b', fontSize: '0.8rem' }}>v{a.version}</span></span>
+                <button tabIndex={0} className="tv-btn-secondary" onClick={() => handleRemoveAddon(a.id)} style={{ padding: '4px 10px', fontSize: '0.75rem' }}>
+                  <Trash2 size={12} /> Remove
                 </button>
               </div>
             ))}
@@ -591,113 +309,119 @@ const [addons, setAddons] = useState(__addonsInit);
         )}
       </div>
 
-      {/* IPTV & M3U Playlist Source */}
-      <div className="mobile-settings-card" style={{
-        background: 'rgba(14, 20, 31, 0.9)',
-        border: '1px solid rgba(255, 255, 255, 0.08)',
-        borderRadius: '16px',
-        padding: '18px',
-        marginBottom: '16px'
-      }}>
-        <div className="mobile-settings-card-header" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-          <Tv size={18} color="#00BB7F" />
-          <h3 style={{ fontSize: '15px', fontWeight: 800, color: '#fff', margin: 0 }}>Live TV & Playlist Source</h3>
-        </div>
-        <p style={{ fontSize: '12px', color: '#94a3b8', margin: '0 0 12px 0' }}>
-          Custom M3U playlist URL or 1-tap presets for 700+ live broadcast channels.
+      <div className="tv-settings-card">
+        <h2 className="tv-settings-title">
+          <RefreshCw size={20} style={{ display: 'inline', marginRight: 8 }} />
+          Software Updates
+        </h2>
+        <p className="tv-settings-desc">
+          Current Installed Version: <strong>v{installedVersion} (Build {installedCode})</strong>
         </p>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {playlistPresets.map((preset, idx) => (
-            <button
-              key={idx}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                background: customM3uUrl === preset.url ? 'rgba(0, 187, 127, 0.15)' : 'rgba(255, 255, 255, 0.05)',
-                border: customM3uUrl === preset.url ? '1px solid #00BB7F' : '1px solid rgba(255, 255, 255, 0.08)',
-                padding: '10px 14px',
-                borderRadius: '10px',
-                cursor: 'pointer',
-                color: '#fff',
-                textAlign: 'left'
-              }}
-              onClick={() => handleSelectPreset(preset.url, preset.name)}
-            >
+        <button
+          tabIndex={0}
+          className="tv-btn-primary"
+          onClick={handleCheckUpdate}
+          disabled={isChecking || Boolean(downloadProgress)}
+          style={{ width: 'fit-content', marginTop: 8 }}
+        >
+          {isChecking ? <RefreshCw className="tv-spinner" size={16} /> : <Download size={16} />}
+          <span>{isChecking ? 'Checking for updates...' : 'Check for Updates'}</span>
+        </button>
+
+        {downloadProgress && (
+          <div style={{ marginTop: 14, padding: 14, background: 'rgba(15, 20, 31, 0.9)', borderRadius: 8, border: '1px solid #38bdf8' }}>
+            <p style={{ color: '#38bdf8', fontWeight: 700, marginBottom: 8 }}>
+              {downloadProgress.ready
+                ? '⚡ Update downloaded! Launching installer...'
+                : `📥 Downloading Update: ${downloadProgress.percent || 0}%`}
+            </p>
+            <div style={{ width: '100%', height: 8, background: 'rgba(255,255,255,0.1)', borderRadius: 4, overflow: 'hidden' }}>
+              <div style={{
+                width: `${downloadProgress.percent || 0}%`,
+                height: '100%',
+                background: 'linear-gradient(90deg, #38bdf8, #22c55e)',
+                transition: 'width 0.2s linear'
+              }} />
+            </div>
+          </div>
+        )}
+
+        {downloadError && (
+          <div style={{ marginTop: 12, padding: 12, background: 'rgba(239, 68, 68, 0.2)', borderRadius: 8, border: '1px solid #ef4444' }}>
+            <p style={{ color: '#f87171', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <AlertCircle size={16} />
+              Update Failed: {String(downloadError)}
+            </p>
+          </div>
+        )}
+
+        {updateStatus && !downloadProgress && (
+          <div style={{ marginTop: 12, padding: 12, background: 'rgba(15, 20, 31, 0.8)', borderRadius: 8 }}>
+            {updateStatus.hasUpdate ? (
               <div>
-                <div style={{ fontSize: '13px', fontWeight: 700 }}>{preset.name}</div>
-                <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '2px' }}>{preset.url}</div>
+                <p style={{ color: updateStatus.needsReinstall ? '#f59e0b' : '#38bdf8', fontWeight: 700, marginBottom: 6 }}>
+                  {updateStatus.needsReinstall
+                    ? '⚠ AJO is switching to its permanent release key. This one-time reinstall keeps your app updatable forever — your data and watch history are preserved.'
+                    : `🚀 New Update Available: v${updateStatus.latestVersion}`}
+                </p>
+                <button
+                  tabIndex={0}
+                  className="tv-btn-primary"
+                  onClick={() => handleInstallUpdate(updateStatus.apkUrl)}
+                  style={{ background: updateStatus.needsReinstall ? '#f59e0b' : '#22c55e', marginTop: 6 }}
+                >
+                  <Download size={16} />
+                  <span>{updateStatus.needsReinstall ? 'One-Time Reinstall' : 'Download & Install Now'}</span>
+                </button>
               </div>
-              {customM3uUrl === preset.url && <Check size={16} color="#00BB7F" />}
-            </button>
-          ))}
-        </div>
-
-        <div style={{ marginTop: '14px' }}>
-          <label style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 700, display: 'block', marginBottom: '6px' }}>
-            Custom M3U Playlist URL:
-          </label>
-          <input
-            type="text"
-            style={{
-              width: '100%',
-              background: 'rgba(0, 0, 0, 0.4)',
-              border: '1px solid rgba(255, 255, 255, 0.15)',
-              borderRadius: '8px',
-              padding: '10px 12px',
-              color: '#ffffff',
-              fontSize: '13px',
-              outline: 'none',
-              boxSizing: 'border-box'
-            }}
-            value={customM3uUrl}
-            onChange={(e) => setCustomM3uUrl(e.target.value)}
-            placeholder="https://example.com/playlist.m3u"
-          />
-
-          <button 
-            onClick={handleSaveIPTV}
-            style={{
-              width: '100%',
-              marginTop: '10px',
-              background: 'linear-gradient(135deg, #00875f, #0f766e)',
-              border: 'none',
-              color: '#ffffff',
-              padding: '10px',
-              borderRadius: '8px',
-              fontSize: '13px',
-              fontWeight: 800,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '6px',
-              cursor: 'pointer'
-            }}
-          >
-            <Check size={16} />
-            <span>Save & Apply Playlist</span>
-          </button>
-        </div>
+            ) : (
+              <p style={{ color: '#22c55e', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <CheckCircle2 size={16} />
+                You are on the latest version (v{installedVersion}).
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* App Info Card */}
-      <div className="mobile-settings-card" style={{
-        background: 'rgba(14, 20, 31, 0.9)',
-        border: '1px solid rgba(255, 255, 255, 0.08)',
-        borderRadius: '16px',
-        padding: '18px',
-        marginBottom: '40px'
-      }}>
-        <div className="mobile-settings-card-header" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-          <Info size={18} color="#00BB7F" />
-          <h3 style={{ fontSize: '15px', fontWeight: 800, color: '#fff', margin: 0 }}>About AJO Phone</h3>
-        </div>
-        <div style={{ fontSize: '12px', color: '#94a3b8', lineHeight: '1.8' }}>
-          <p style={{ margin: 0 }}><strong style={{ color: '#fff' }}>Version:</strong> v{installedVersion} (Build {installedCode}) (Mobile Touch & OTA Edition)</p>
-          <p style={{ margin: 0 }}><strong style={{ color: '#fff' }}>Streaming Engine:</strong> Direct Native HLS 4K + 60fps Hardware Acceleration</p>
-          <p style={{ margin: 0 }}><strong style={{ color: '#fff' }}>OTA Updater:</strong> Built-in Native APK Installer</p>
-          <p style={{ margin: 0 }}><strong style={{ color: '#fff' }}>Failover Protection:</strong> 6-Engine Mirror Redundancy</p>
+      <div className="tv-settings-card">
+        <h2 className="tv-settings-title">
+          <Trash2 size={20} style={{ display: 'inline', marginRight: 8 }} />
+          Storage & RAM Optimization
+        </h2>
+        <p className="tv-settings-desc">
+          Clear temporary metadata cache, playlists, and history to free up memory on 1GB RAM Fire TV devices.
+        </p>
+
+        <button
+          tabIndex={0}
+          className="tv-btn-secondary"
+          onClick={handleClearCache}
+          style={{ width: 'fit-content', marginTop: 8 }}
+        >
+          <span>Clear Cache & Reset Memory</span>
+        </button>
+
+        {cacheCleared && (
+          <p style={{ color: '#22c55e', fontWeight: 600, marginTop: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <CheckCircle2 size={16} />
+            Memory cache cleared successfully!
+          </p>
+        )}
+      </div>
+
+      {/* Device & Playback Engine Diagnostics */}
+      <div className="tv-settings-card">
+        <h2 className="tv-settings-title">
+          <Tv size={20} style={{ display: 'inline', marginRight: 8 }} />
+          Playback Engine Status
+        </h2>
+        <div style={{ color: '#94a3b8', fontSize: '0.9rem', lineHeight: 1.6 }}>
+          <p>• <strong>Video Pipeline:</strong> Hardware Direct SurfaceView (Z-MediaOverlay)</p>
+          <p>• <strong>Decoder Fallback:</strong> Automatic H.264/H.265 Hardware to Software</p>
+          <p>• <strong>Buffer Optimization:</strong> Ultra-Low Latency Live Buffer (30+ Mbps Optimized)</p>
+          <p>• <strong>Target Architecture:</strong> Fire OS 5/6/7 / Android TV 5.1+</p>
         </div>
       </div>
     </div>

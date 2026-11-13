@@ -70,6 +70,12 @@ export function SearchView({ onSelectItem, initialQuery }) {
   const inputRef = useRef(null);
   const reqSeqRef = useRef(0);
 
+  // v3.17.52: ajo://search?q= deep links can arrive while the view is mounted —
+  // useState only reads initialQuery once, so the new query never appeared.
+  useEffect(() => {
+    if (initialQuery) setQuery(initialQuery);
+  }, [initialQuery]);
+
   useEffect(() => {
     const t = setTimeout(() => {
       const active = document.activeElement;

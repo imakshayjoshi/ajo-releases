@@ -26,15 +26,9 @@ const TMDB_API = (() => {
   } catch {}
   return 'https://new.ajo.co.in/tmdb';
 })();
-const TMDB_IMG = (() => {
-  try {
-    if (typeof window !== 'undefined' && window.__AJO_USE_DIRECT_TMDB) {
-      return 'https://image.tmdb.org/t/p';
-    }
-  } catch {}
-  // posters through the same proxy (traefik /tmdbimg -> :3005 -> image.tmdb.org)
-  return 'https://new.ajo.co.in/tmdbimg/t/p';
-})();
+// v3.17.27: direct image.tmdb.org — posters load everywhere without the VPS proxy.
+// The proxy route (new.ajo.co.in/tmdbimg) stalls along with /tmdb/, blanking all posters.
+const TMDB_IMG = 'https://image.tmdb.org/t/p';
 // Primary key extracted from FilmPlus; fallback = phone's existing public key
 const TMDB_KEYS = ['5b458cad0b474d21129c717626038657', '4e44d9029b1270a757cddc766a1bcb63'];
 const TMDB_KEY = TMDB_KEYS[0];
@@ -72,24 +66,33 @@ function cacheSet(key, data) {
   }
 }
 
+// v3.17.50: DIRECT API IS NOW PRIMARY. The VPS proxy (Traefik -> :3005) hangs
+// indefinitely (verified Nov 7 2026: every /tmdb/ route times out while
+// api.themoviedb.org answers in <1s with full CORS). The proxy was originally
+// added because the Fire TV stick's DNS could not resolve api.themoviedb.org;
+// that failure is FAST (DNS error) so the proxy fallback still covers it.
+// Proxy-first cost every catalog request a 3s stall before failing over.
+const TMDB_DIRECT = 'https://api.themoviedb.org/3';
+
 async function tmdb(path, params = {}) {
-  const qs = new URLSearchParams({ api_key: TMDB_KEY, ...params });
-  let res = null;
-  // Try primary key, fall back to secondary on auth failure
-  for (const key of TMDB_KEYS) {
-    try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 8000);
-      const url = `${TMDB_API}${path}?${new URLSearchParams({ api_key: key, ...params })}`;
-      res = await fetch(url, { signal: controller.signal, cache: 'no-store' });
-      clearTimeout(timer);
-      if (res.status !== 401) break;
-    } catch {
-      // network error — try next key
+  const bases = TMDB_API === TMDB_DIRECT ? [TMDB_DIRECT] : [TMDB_DIRECT, TMDB_API];
+  for (const base of bases) {
+    for (const key of TMDB_KEYS) {
+      try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 2000);
+        const url = `${base}${path}?${new URLSearchParams({ api_key: key, ...params })}`;
+        const res = await fetch(url, { signal: controller.signal, cache: 'no-store' });
+        clearTimeout(timer);
+        if (res.ok) return await res.json();
+        if (res.status === 401) continue; // try next key
+        break; // non-401 error — try next base
+      } catch {
+        // network error — try next key/base
+      }
     }
   }
-  if (!res || !res.ok) return null;
-  try { return await res.json(); } catch { return null; }
+  return null;
 }
 
 /** Normalize a TMDB movie/show object into AJO's MediaItem shape. */
@@ -254,37 +257,6 @@ export async function getBecauseYouWatched(historyEntries) {
   return merged.filter(m => !watchedTitles.has(m.title));
 }
 
-/**
- * Fetch the official YouTube trailer key for a title (TMDB /videos).
- * Returns a YouTube key or null.
- */
-export async function getTrailerKey(tmdbId, mediaType = 'movie', fallbackTitle = '') {
-  // No id? Resolve via title search first.
-  if (!tmdbId && fallbackTitle) {
-    try {
-      const results = await searchTmdb(fallbackTitle);
-      const match = results.find(r => r.tmdb_id);
-      if (match) tmdbId = match.tmdb_id;
-    } catch {}
-  }
-  if (!tmdbId) return null;
-  const key = `trailer_${mediaType}_${tmdbId}`;
-  let cached = cacheGet(key);
-  if (cached !== null && cached !== undefined) return cached;
-  try {
-    const data = await tmdb(`/${mediaType}/${tmdbId}/videos`, { language: 'en_US' });
-    const vids = data?.results || [];
-    const official =
-      vids.find(v => v.site === 'YouTube' && v.official && v.type === 'Trailer') ||
-      vids.find(v => v.site === 'YouTube' && v.type === 'Trailer') ||
-      vids.find(v => v.site === 'YouTube' && v.type === 'Teaser');
-    const result = official ? official.key : null;
-    cacheSet(key, result || '');
-    return result;
-  } catch {
-    return null;
-  }
-}
 
 export async function searchTmdb(query, page = 1) {
   if (!query || query.length < 2) return [];

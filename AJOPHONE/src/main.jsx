@@ -1,18 +1,23 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
-import { initAnalytics } from './api/analytics';
+import './utils/nativePlayer'; // Force execution of side-effects to bind window.__ajoEmbedPreflightResult
+import { initAnalytics, setAnalyticsVersion } from './api/analytics';
 import { CURRENT_APP_VERSION } from './api/otaUpdate';
 
-// v3.4.2: analytics was defined but never initialized on phone — app_boot
-// events never fired and every event carried the hardcoded fallback version.
-window.__ajoAnalyticsVersion = CURRENT_APP_VERSION;
+// v3.12.74: analytics was defined but never initialized — app_boot events only
+// fired after a search/playback imported the module. Boot it here so crash
+// diagnostics exist on the first frame.
+// v3.13.0 FIX: version tag was hardcoded ('3.12.74'), so every device kept
+// reporting a stale build. Tag from the single source of truth instead.
+setAnalyticsVersion(CURRENT_APP_VERSION);
 initAnalytics();
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
     this.state = { hasError: false, error: null };
+    this.reloadBtnRef = React.createRef();
   }
 
   static getDerivedStateFromError(error) {
@@ -21,7 +26,79 @@ class ErrorBoundary extends React.Component {
 
   componentDidCatch(error, errorInfo) {
     console.error("React ErrorBoundary caught error:", error, errorInfo);
+    try {
+      import('./api/analytics').then((m) => m.track('crash', {
+        message: String(error?.message || error).slice(0, 200),
+        stack: String(error?.stack || '').slice(0, 500),
+        component: String(errorInfo?.componentStack || '').slice(0, 500),
+      })).catch(() => {});
+    } catch {}
   }
+
+  componentDidUpdate(prevProps, prevState) {
+    if (this.state.hasError && !prevState.hasError) {
+      setTimeout(() => {
+        if (this.reloadBtnRef.current) {
+          this.reloadBtnRef.current.focus();
+        }
+      }, 100);
+    }
+  }
+
+  componentDidMount() {
+    window.addEventListener('keydown', this.handleKeyDown);
+  }
+
+  componentWillUnmount() {
+    window.removeEventListener('keydown', this.handleKeyDown);
+  }
+
+  handleKeyDown = (e) => {
+    if (!this.state.hasError) return;
+    if (e.key === 'Enter' || e.keyCode === 13) {
+      if (document.activeElement && document.activeElement.tagName === 'BUTTON') {
+        document.activeElement.click();
+      } else {
+        window.location.reload();
+      }
+    } else if (e.key === 'Escape' || e.keyCode === 27) {
+      if (window.AndroidNativePlayer?.exitApp) {
+        window.AndroidNativePlayer.exitApp();
+      } else {
+        window.location.reload();
+      }
+    }
+  };
+
+  handleClearCacheAndReload = () => {
+    try {
+      {
+                // v3.12.59 FIX (ported): cache keys only — user data survives
+                const CACHE_KEY_PATTERNS = [
+                  /^ajo_iptv_cache_v\d+$/,
+                  /^ajo_channels_manifest_v\d+$/,
+                  /^ajo_sports_cache_v\d+$/,
+                  /^ajo_catalog_v\d+$/,
+                ];
+                const keys = [];
+                for (let i = 0; i < localStorage.length; i++) keys.push(localStorage.key(i));
+                for (const key of keys) {
+                  if (CACHE_KEY_PATTERNS.some((p) => p.test(key))) {
+                    localStorage.removeItem(key);
+                  }
+                }
+              }
+      sessionStorage.clear();
+      if ('caches' in window) {
+        caches.keys().then((names) => {
+          names.forEach((name) => caches.delete(name));
+        });
+      }
+    } catch (e) {
+      console.warn("Error clearing cache:", e);
+    }
+    window.location.reload();
+  };
 
   render() {
     if (this.state.hasError) {
@@ -39,62 +116,69 @@ class ErrorBoundary extends React.Component {
           padding: '40px',
           textAlign: 'center'
         }}>
-          <h1 style={{ fontSize: '32px', marginBottom: '16px', color: '#f87171' }}>AJO Error</h1>
-          <p style={{ color: '#94a3b8', maxWidth: '600px', marginBottom: '24px', lineHeight: '1.6' }}>
-            {this.state.error?.message || "An unexpected rendering error occurred."}
+          <h1 style={{ fontSize: '32px', marginBottom: '16px', color: '#f87171' }}>AJO TV Recovery</h1>
+          <p style={{ color: '#94a3b8', maxWidth: '600px', marginBottom: '28px', lineHeight: '1.6' }}>
+            {this.state.error?.message || "An unexpected error occurred while loading this view."}
           </p>
-          <pre style={{ color: '#64748b', fontSize: 12, maxWidth: 600, overflow: 'auto', marginBottom: 24, textAlign: 'left' }}>
-            {this.state.error?.stack?.split('\n').slice(0, 6).join('\n') || ''}
-          </pre>
-          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', justifyContent: 'center' }}>
+          <div style={{ display: 'flex', gap: '16px' }}>
             <button
+              ref={this.reloadBtnRef}
+              autoFocus
+              tabIndex={0}
               onClick={() => window.location.reload()}
               style={{
-                padding: '12px 28px',
-                backgroundColor: '#00BB7F',
-                color: '#06090e',
-                border: 'none',
+                padding: '14px 32px',
+                backgroundColor: '#0284c7',
+                color: '#ffffff',
+                border: '3px solid transparent',
                 borderRadius: '12px',
-                fontWeight: 800,
-                cursor: 'pointer'
+                fontSize: '16px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                outline: 'none',
+              }}
+              onFocus={(e) => {
+                e.target.style.borderColor = '#ffffff';
+                e.target.style.backgroundColor = '#38bdf8';
+                e.target.style.color = '#000000';
+              }}
+              onBlur={(e) => {
+                e.target.style.borderColor = 'transparent';
+                e.target.style.backgroundColor = '#0284c7';
+                e.target.style.color = '#ffffff';
               }}
             >
-              Reload App
+              🔄 Reload App
             </button>
             <button
-              onClick={() => {
-                try { {
-                // v3.12.59 FIX (ported): cache keys only — user data survives
-                const CACHE_KEY_PATTERNS = [
-                  /^ajo_iptv_cache_v\d+$/,
-                  /^ajo_channels_manifest_v\d+$/,
-                  /^ajo_sports_cache_v\d+$/,
-                  /^ajo_catalog_v\d+$/,
-                ];
-                const keys = [];
-                for (let i = 0; i < localStorage.length; i++) keys.push(localStorage.key(i));
-                for (const key of keys) {
-                  if (CACHE_KEY_PATTERNS.some((p) => p.test(key))) {
-                    localStorage.removeItem(key);
-                  }
-                }
-              } } catch {}
-                try { sessionStorage.clear(); } catch {}
-                window.location.reload();
-              }}
+              tabIndex={0}
+              onClick={this.handleClearCacheAndReload}
               style={{
-                padding: '12px 28px',
-                backgroundColor: 'rgba(239, 68, 68, 0.2)',
-                border: '1px solid #ef4444',
-                color: '#ef4444',
+                padding: '14px 32px',
+                backgroundColor: '#334155',
+                color: '#ffffff',
+                border: '3px solid transparent',
                 borderRadius: '12px',
-                fontWeight: 800,
-                cursor: 'pointer'
+                fontSize: '16px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                outline: 'none',
+              }}
+              onFocus={(e) => {
+                e.target.style.borderColor = '#ffffff';
+                e.target.style.backgroundColor = '#64748b';
+              }}
+              onBlur={(e) => {
+                e.target.style.borderColor = 'transparent';
+                e.target.style.backgroundColor = '#334155';
               }}
             >
-              Clear Cache & Reset
+              🧹 Reset Cache & Restart
             </button>
           </div>
+          <p style={{ marginTop: '24px', fontSize: '13px', color: '#64748b' }}>
+            Remote: Press [OK] to execute • [Back] to exit
+          </p>
         </div>
       );
     }

@@ -12,6 +12,20 @@ import { getCurrentAndNextProgram } from '../api/epg';
 import { getIPTVChannels } from '../api/iptv';
 import { toggleFavoriteChannel, isFavoriteChannel } from '../api/history';
 
+function relativeTimeLabel(isoStr) {
+  if (!isoStr) return '';
+  try {
+    const diffMs = new Date(isoStr).getTime() - Date.now();
+    const mins = Math.round(diffMs / 60000);
+    if (mins < 0) {
+      const ago = Math.abs(mins);
+      return ago < 60 ? `started ${ago}m ago` : `started ${Math.round(ago/60)}h ago`;
+    }
+    if (mins < 60) return mins <= 1 ? 'starting now' : `in ${mins}m`;
+    return `in ${Math.round(mins/60)}h`;
+  } catch { return ''; }
+}
+
 export function EPGGuideView({ channels = [], onSelectChannel, onFocusItem }) {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchFilter, setSearchFilter] = useState('');
@@ -117,7 +131,7 @@ export function EPGGuideView({ channels = [], onSelectChannel, onFocusItem }) {
               Live TV Guide
             </div>
             <div style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 600 }}>
-              {filteredChannels.length} channels · {formatClock(currentTime)}
+              {filteredChannels.length} channels · {formatClock(currentTime)} · Sample guide (no live EPG feed)
             </div>
           </div>
         </div>
@@ -275,7 +289,7 @@ export function EPGGuideView({ channels = [], onSelectChannel, onFocusItem }) {
                           fontSize: '11px', color: '#94a3b8', fontWeight: 600,
                           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1
                         }}>
-                          {nextProg.startTimeFormatted} · {nextProg.title}
+                          {nextProg.startTimeFormatted} · {relativeTimeLabel(nextProg.startTime || nextProg.start_time)} · {nextProg.title}
                         </span>
                       </div>
                     )}
@@ -314,7 +328,7 @@ export function EPGGuideView({ channels = [], onSelectChannel, onFocusItem }) {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
                       <span style={{ fontSize: '10px', color: '#64748b', fontWeight: 600 }}>
                         <Clock size={9} style={{ marginRight: '3px', verticalAlign: 'middle' }} />
-                        {currentProg.startTimeFormatted} – {currentProg.endTimeFormatted}
+                        {currentProg.startTimeFormatted} – {currentProg.endTimeFormatted} · {Math.round(progress)}% aired
                       </span>
                       <span style={{ fontSize: '10px', color: '#38bdf8', fontWeight: 700 }}>
                         {progress}% aired

@@ -1,10 +1,10 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
-import { Play, Star, Calendar, Clock, X, Server, Tv, RotateCcw } from 'lucide-react';
+import { Play, Star, Calendar, Clock, X, Server, Tv, RotateCcw, Bookmark, Check } from 'lucide-react';
 import { getSeriesEpisodes } from '../api/pikashow';
 import { getTmdbEpisodes } from '../api/tmdb';
 import { generateUniversalServers } from '../utils/streamingEngines';
 import { hasNativePlayer, playInNativePlayer } from '../utils/nativePlayer';
-import { getWatchHistory, deleteHistoryItem, getWatchProgress } from '../api/history';
+import { getWatchHistory, deleteHistoryItem, getWatchProgress, isFavorite, toggleFavorite } from '../api/history';
 
 function formatTime(seconds) {
   if (!seconds || isNaN(seconds) || !isFinite(seconds)) return '00:00';
@@ -18,9 +18,15 @@ function formatTime(seconds) {
   return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 }
 
-export function MediaDetailsModal({ item, onClose, onStartPlayback }) {
-  if (!item) return null;
+// v3.17.52: the null gate lives in this wrapper so the inner component's hook
+// order is unconditional (an item->null flip mid-mount used to be a latent
+// Rules-of-Hooks crash).
+export function MediaDetailsModal(props) {
+  if (!props.item) return null;
+  return <MediaDetailsModalInner {...props} />;
+}
 
+function MediaDetailsModalInner({ item, onClose, onStartPlayback }) {
   const [episodes, setEpisodes] = useState([]);
   const [loadingEpisodes, setLoadingEpisodes] = useState(false);
   const [selectedServer, setSelectedServer] = useState(0);
@@ -62,6 +68,26 @@ export function MediaDetailsModal({ item, onClose, onStartPlayback }) {
   }, [item]);
 
   const [audioLang, setAudioLang] = useState('all');
+  const [inWatchlist, setInWatchlist] = useState(() => isFavorite(item));
+
+  useEffect(() => {
+    setInWatchlist(isFavorite(item));
+  }, [item]);
+
+  // v3.17.52: a new item in the same mounted instance must not inherit the old
+  // selection — an index beyond the new filteredServers passed srv=null.
+  useEffect(() => {
+    setSelectedServer(0);
+    setSelectedSeason(1);
+    setAudioLang('all');
+  }, [item]);
+
+  const handleToggleWatchlist = (e) => {
+    if (e && e.stopPropagation) e.stopPropagation();
+    const next = toggleFavorite(item);
+    setInWatchlist(next);
+    window.dispatchEvent(new Event('storage'));
+  };
 
   // Compute available servers
   const servers = useMemo(() => {
@@ -82,41 +108,34 @@ export function MediaDetailsModal({ item, onClose, onStartPlayback }) {
 
   // Load episodes if TV series
   useEffect(() => {
-    if (isSeries && item) {
-      setLoadingEpisodes(true);
-      let tmdbId = item.tmdb_id;
-      if (!tmdbId && typeof item.id === 'string' && item.id.startsWith('tmdb-')) {
-        const parts = item.id.split('-');
-        const candidate = parts[parts.length - 1];
-        if (/^\d+$/.test(candidate)) tmdbId = Number(candidate);
-      }
-
-      if (tmdbId) {
-        getTmdbEpisodes(tmdbId, selectedSeason).then((eps) => {
-          if (eps && eps.length > 0) {
-            setEpisodes(eps);
-            setLoadingEpisodes(false);
-          } else {
-            getSeriesEpisodes(item.id).then((fallbackEps) => {
-              setEpisodes(fallbackEps || []);
-              setLoadingEpisodes(false);
-            }).catch(() => setLoadingEpisodes(false));
-          }
-        }).catch(() => {
-          getSeriesEpisodes(item.id).then((fallbackEps) => {
-            setEpisodes(fallbackEps || []);
-            setLoadingEpisodes(false);
-          }).catch(() => setLoadingEpisodes(false));
-        });
-      } else {
-        getSeriesEpisodes(item.id).then((eps) => {
-          setEpisodes(eps || []);
-          setLoadingEpisodes(false);
-        }).catch(() => {
-          setLoadingEpisodes(false);
-        });
-      }
+    if (!(isSeries && item)) return;
+    // v3.17.52: clear the previous title's episodes immediately (they used to
+    // render under the new item until the fetch landed) and cancel late writes
+    // from a superseded season/item fetch.
+    let cancelled = false;
+    setEpisodes([]);
+    setLoadingEpisodes(true);
+    const done = (eps) => {
+      if (cancelled) return;
+      setEpisodes(eps || []);
+      setLoadingEpisodes(false);
+    };
+    const fail = () => { if (!cancelled) setLoadingEpisodes(false); };
+    let tmdbId = item.tmdb_id;
+    if (!tmdbId && typeof item.id === 'string' && item.id.startsWith('tmdb-')) {
+      const parts = item.id.split('-');
+      const candidate = parts[parts.length - 1];
+      if (/^\d+$/.test(candidate)) tmdbId = Number(candidate);
     }
+    const fallback = () => getSeriesEpisodes(item.id).then((eps) => done(eps || [])).catch(fail);
+    if (tmdbId) {
+      getTmdbEpisodes(tmdbId, selectedSeason)
+        .then((eps) => { if (eps && eps.length > 0) done(eps); else fallback(); })
+        .catch(fallback);
+    } else {
+      fallback();
+    }
+    return () => { cancelled = true; };
   }, [isSeries, item, selectedSeason]);
 
   const [showServerMenu, setShowServerMenu] = useState(false);
@@ -138,15 +157,39 @@ export function MediaDetailsModal({ item, onClose, onStartPlayback }) {
   }, []);
 
   const handlePlay = (episodeItem = null, episodeIndex = 0, specificServer = null) => {
-    const targetItem = episodeItem || item;
-    // v3.12.50: filteredServers belong to the SERIES item (S1E1 by design) — never
-    // hand them to episode playback or every episode opens the S1E1 embed. TVPlayer
-    // regenerates the server list for the concrete episode instead.
-    const srv = episodeItem
-      ? specificServer
-      : (specificServer || (selectedServer < filteredServers.length ? (filteredServers[selectedServer] || null) : null));
+    const effectiveEpisode = episodeItem || (isSeries && episodes.length > 0 ? episodes[0] : null);
+    const effectiveIndex = episodeItem ? episodeIndex : 0;
+
+    let targetItem = item;
+    if (effectiveEpisode) {
+      const sNum = effectiveEpisode.season_number || effectiveEpisode.season_num || effectiveEpisode.season || selectedSeason || 1;
+      const eNum = effectiveEpisode.episode_number || effectiveEpisode.episode_num || effectiveEpisode.episode || (effectiveIndex + 1);
+      targetItem = {
+        ...item,
+        ...effectiveEpisode,
+        title: `${title} - S${sNum}E${eNum}${effectiveEpisode.name && !effectiveEpisode.name.startsWith('Episode') ? `: ${effectiveEpisode.name}` : ''}`,
+        series_title: title,
+        season: sNum,
+        season_number: sNum,
+        episode: eNum,
+        episode_number: eNum,
+        type: 'series',
+        category: item.category || 'serials',
+        tmdb_id: item.tmdb_id || effectiveEpisode.tmdb_id,
+        imdb_id: item.imdb_id || effectiveEpisode.imdb_id
+      };
+    }
+
+    let srv = specificServer;
+    if (!srv && effectiveEpisode) {
+      const epServers = generateUniversalServers(targetItem, effectiveEpisode);
+      srv = epServers[selectedServer] || epServers[0] || null;
+    } else if (!srv) {
+      srv = selectedServer < filteredServers.length ? (filteredServers[selectedServer] || null) : null;
+    }
+
     if (onStartPlayback) {
-      onStartPlayback(targetItem, srv, episodes, episodeIndex);
+      onStartPlayback(targetItem, srv, episodes, effectiveIndex);
     }
   };
 
@@ -187,8 +230,8 @@ export function MediaDetailsModal({ item, onClose, onStartPlayback }) {
           </div>
 
           <div className="tv-modal-meta-row" style={{ margin: '8px 0 12px 0' }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#f59e0b', fontWeight: 700 }}>
-              <Star size={14} fill="#f59e0b" /> {rating}
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#2DD4BF', fontWeight: 700 }}>
+              <Star size={14} fill="#2DD4BF" /> {rating}
             </span>
             <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
               <Calendar size={14} /> {year}
@@ -196,7 +239,7 @@ export function MediaDetailsModal({ item, onClose, onStartPlayback }) {
             <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
               <Clock size={14} /> {duration}
             </span>
-            <span style={{ background: 'rgba(0, 187, 127, 0.15)', color: '#00BB7F', padding: '2px 8px', borderRadius: 4, fontWeight: 700 }}>
+            <span style={{ background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', padding: '2px 8px', borderRadius: 4, fontWeight: 700 }}>
               {isSeries ? 'TV SERIES' : isLive ? 'LIVE TV' : 'MOVIE'}
             </span>
           </div>
@@ -232,34 +275,37 @@ export function MediaDetailsModal({ item, onClose, onStartPlayback }) {
             <button
               className="tv-btn-secondary"
               tabIndex={0}
-              onClick={() => {
-                const srv = filteredServers[selectedServer] || servers[0];
-                const streamUrl = srv?.url || srv?.src || '';
-                if (!streamUrl) return;
-                const fallbacks = filteredServers
-                  .filter((_, i) => i !== selectedServer)
-                  .map((s) => s?.url)
-                  .filter(Boolean);
-                if (!playInNativePlayer(streamUrl, title, false, fallbacks)) {
-                  handlePlay();
-                }
-              }}
-              style={{ borderColor: 'rgba(0, 187, 127, 0.4)', color: '#00BB7F' }}
+              onClick={() => handlePlay()}
+              style={{ borderColor: 'rgba(56, 189, 248, 0.4)', color: '#38bdf8' }}
             >
               <Tv size={18} />
               <span>{hasNativePlayer() ? 'Hardware Player' : 'Web Player'}</span>
+            </button>
+
+            <button
+              className="tv-btn-secondary"
+              tabIndex={0}
+              onClick={handleToggleWatchlist}
+              style={{
+                borderColor: inWatchlist ? 'rgba(56, 189, 248, 0.6)' : 'rgba(255, 255, 255, 0.2)',
+                color: inWatchlist ? '#38bdf8' : '#e2e8f0',
+                background: inWatchlist ? 'rgba(56, 189, 248, 0.12)' : 'transparent'
+              }}
+            >
+              {inWatchlist ? <Check size={18} color="#38bdf8" /> : <Bookmark size={18} />}
+              <span>{inWatchlist ? 'In Watchlist' : '+ Watchlist'}</span>
             </button>
           </div>
 
           {/* Resume Progress Bar */}
           {watchProgress && (
-            <div style={{ marginBottom: 12, background: 'rgba(0, 187, 127, 0.08)', border: '1px solid rgba(0, 187, 127, 0.25)', borderRadius: 8, padding: '10px 14px' }}>
+            <div style={{ marginBottom: 12, background: 'rgba(56, 189, 248, 0.08)', border: '1px solid rgba(56, 189, 248, 0.25)', borderRadius: 8, padding: '10px 14px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#94a3b8', marginBottom: 6 }}>
-                <span style={{ color: '#00BB7F', fontWeight: 700 }}>Watching in Progress</span>
+                <span style={{ color: '#38bdf8', fontWeight: 700 }}>Watching in Progress</span>
                 <span>{formatTime(watchProgress.currentTime)} / {formatTime(watchProgress.duration)} ({watchProgress.percentage}%)</span>
               </div>
               <div style={{ height: 4, background: 'rgba(255, 255, 255, 0.1)', borderRadius: 2, overflow: 'hidden' }}>
-                <div style={{ width: `${watchProgress.percentage}%`, height: '100%', background: '#00BB7F', borderRadius: 2 }} />
+                <div style={{ width: `${watchProgress.percentage}%`, height: '100%', background: '#38bdf8', borderRadius: 2 }} />
               </div>
             </div>
           )}
@@ -306,7 +352,7 @@ export function MediaDetailsModal({ item, onClose, onStartPlayback }) {
                   justifyContent: 'space-between'
                 }}
               >
-                <span>⚡ Server: <strong style={{ color: '#00BB7F' }}>{filteredServers[selectedServer]?.name || `Server ${selectedServer + 1}`}</strong></span>
+                <span>⚡ Server: <strong style={{ color: '#38bdf8' }}>{filteredServers[selectedServer]?.name || `Server ${selectedServer + 1}`}</strong></span>
                 <span>{showServerMenu ? '▲ Hide Mirrors' : '▼ Change Mirror'}</span>
               </button>
 
@@ -341,7 +387,7 @@ export function MediaDetailsModal({ item, onClose, onStartPlayback }) {
                 Seasons:
               </span>
               <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 6 }} data-horizontal-scroll="true">
-                {[1, 2, 3, 4, 5, 6, 7, 8].slice(0, Math.max(1, item.number_of_seasons || item.seasons_count || 6)).map(sNum => (
+                {Array.from({ length: Math.max(1, item.number_of_seasons || item.seasons_count || 6) }, (_, i) => i + 1).map(sNum => (
                   <button
                     key={sNum}
                     tabIndex={0}
@@ -352,10 +398,10 @@ export function MediaDetailsModal({ item, onClose, onStartPlayback }) {
                       fontSize: '0.82rem',
                       whiteSpace: 'nowrap',
                       borderRadius: '8px',
-                      background: selectedSeason === sNum ? 'linear-gradient(135deg, #00BB7F, #00875f)' : 'rgba(255, 255, 255, 0.08)',
+                      background: selectedSeason === sNum ? 'linear-gradient(135deg, #38bdf8, #0284c7)' : 'rgba(255, 255, 255, 0.08)',
                       color: selectedSeason === sNum ? '#06090e' : '#ffffff',
                       fontWeight: 800,
-                      border: selectedSeason === sNum ? '2px solid #00BB7F' : '1px solid rgba(255, 255, 255, 0.15)'
+                      border: selectedSeason === sNum ? '2px solid #38bdf8' : '1px solid rgba(255, 255, 255, 0.15)'
                     }}
                   >
                     Season {sNum}
@@ -366,7 +412,12 @@ export function MediaDetailsModal({ item, onClose, onStartPlayback }) {
           )}
 
           {/* Episode List for TV Series */}
-          {isSeries && episodes.length > 0 && (
+          {isSeries && loadingEpisodes && (
+            <div style={{ marginBottom: 20, color: '#94a3b8', fontSize: '0.85rem' }}>
+              Loading Season {selectedSeason} episodes...
+            </div>
+          )}
+          {isSeries && !loadingEpisodes && episodes.length > 0 && (
             <div style={{ marginBottom: 20 }}>
               <span style={{ fontSize: '0.8rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', display: 'block', marginBottom: 8 }}>
                 Season {selectedSeason} Episodes ({episodes.length}):
@@ -380,7 +431,7 @@ export function MediaDetailsModal({ item, onClose, onStartPlayback }) {
                     onClick={() => handlePlay(ep, idx)}
                     style={{ padding: '8px 16px', fontSize: '0.85rem', whiteSpace: 'nowrap' }}
                   >
-                    Episode {String(ep.episode || idx + 1)}
+                    Episode {String(ep.episode_number || ep.episode || idx + 1)}
                   </button>
                 ))}
               </div>

@@ -76,7 +76,7 @@ export function isAllowedLanguageChannel(ch) {
   return false;
 }
 
-const MANIFEST_URL = 'https://new.ajo.co.in/channels/channels.json';
+const MANIFEST_URL = ''; // v3.17.30: VPS manifest removed
 const MANIFEST_CACHE_KEY = 'ajo_channels_manifest_v8';
 
 // 100% Verified HTTP 200 Logos without CORS/ORB conflicts
@@ -397,16 +397,6 @@ const BUILTIN_INDIAN_CHANNELS = [
     ]
   },
   {
-    id: 'builtin-historytv18',
-    title: 'History TV18 HD',
-    category: 'Infotainment',
-    poster: 'https://dtil.tmsimg.com/assets/s143132_ld_h15_aa.png?lock=720x540',
-    url: 'https://raw.githubusercontent.com/amazeyourself/adaptive-streams/main/streams/in/HistoryTV18HD.m3u8',
-    players: [
-      { name: 'Server 1 (HD)', url: 'https://raw.githubusercontent.com/amazeyourself/adaptive-streams/main/streams/in/HistoryTV18HD.m3u8', source: 'hls', quality: '1080p' }
-    ]
-  },
-  {
     id: 'builtin-discoveryhd',
     title: 'Discovery HD',
     category: 'Infotainment',
@@ -468,7 +458,8 @@ const BUILTIN_INDIAN_CHANNELS = [
     url: 'http://59.103.38.46:8000/play/a065/index.m3u8',
     players: [
       { name: 'Server 1 (Live HD)', url: 'http://59.103.38.46:8000/play/a065/index.m3u8', source: 'hls', quality: '1080p' },
-      { name: 'Server 2 (Backup)', url: 'http://59.103.38.40:8000/play/a065/index.m3u8', source: 'hls', quality: '1080p' }
+      { name: 'Server 2 (Backup)', url: 'http://59.103.38.40:8000/play/a065/index.m3u8', source: 'hls', quality: '1080p' },
+      { name: 'Server 3 (GitHub mirror)', url: 'https://raw.githubusercontent.com/amazeyourself/adaptive-streams/main/streams/in/HistoryTV18HD.m3u8', source: 'hls', quality: '1080p' }
     ]
   },
   {
@@ -539,36 +530,6 @@ const BUILTIN_INDIAN_CHANNELS = [
     ]
   },
   {
-    id: 'builtin-sonysports2',
-    title: 'Sony Sports Ten 2 HD',
-    category: 'Sports',
-    poster: 'https://dtil.tmsimg.com/assets/s176764_ld_h15_aa.png?lock=720x540',
-    url: 'http://38.96.178.205/TEN_1/index.m3u8',
-    players: [
-      { name: 'Server 1 (Live HD)', url: 'http://38.96.178.205/TEN_1/index.m3u8', source: 'hls', quality: '1080p' }
-    ]
-  },
-  {
-    id: 'builtin-sonysports3',
-    title: 'Sony Sports Ten 3 Hindi HD',
-    category: 'Sports',
-    poster: 'https://dtil.tmsimg.com/assets/s176764_ld_h15_aa.png?lock=720x540',
-    url: 'http://38.96.178.205/TEN_1/index.m3u8',
-    players: [
-      { name: 'Server 1 (Live HD)', url: 'http://38.96.178.205/TEN_1/index.m3u8', source: 'hls', quality: '1080p' }
-    ]
-  },
-  {
-    id: 'builtin-sonysports5',
-    title: 'Sony Sports Ten 5 HD',
-    category: 'Sports',
-    poster: 'https://dtil.tmsimg.com/assets/s176764_ld_h15_aa.png?lock=720x540',
-    url: 'http://38.96.178.205/TEN_1/index.m3u8',
-    players: [
-      { name: 'Server 1 (Live HD)', url: 'http://38.96.178.205/TEN_1/index.m3u8', source: 'hls', quality: '1080p' }
-    ]
-  },
-  {
     id: 'builtin-sonymax',
     title: 'Sony MAX HD',
     category: 'Movies',
@@ -578,17 +539,6 @@ const BUILTIN_INDIAN_CHANNELS = [
       { name: 'Server 1 (Live HD)', url: 'http://59.103.38.46:8000/play/a068/index.m3u8', source: 'hls', quality: '1080p' },
       { name: 'Server 2 (&pictures HD)', url: 'http://59.103.38.46:8000/play/a06b/index.m3u8', source: 'hls', quality: '1080p' },
       { name: 'Server 3 (Colors Cineplex)', url: 'http://59.103.38.46:8000/play/a058/index.m3u8', source: 'hls', quality: '576p' }
-    ]
-  },
-  {
-    id: 'builtin-sonymax2',
-    title: 'Sony MAX 2',
-    category: 'Movies',
-    poster: 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/sony-max-2-in.png',
-    url: 'http://59.103.38.46:8000/play/a058/index.m3u8',
-    players: [
-      { name: 'Server 1 (Colors Cineplex Live)', url: 'http://59.103.38.46:8000/play/a058/index.m3u8', source: 'hls', quality: '576p' },
-      { name: 'Server 2 (&pictures HD)', url: 'http://59.103.38.46:8000/play/a06b/index.m3u8', source: 'hls', quality: '1080p' }
     ]
   },
   {
@@ -603,16 +553,6 @@ const BUILTIN_INDIAN_CHANNELS = [
     ]
   },
   {
-    id: 'builtin-sonywah',
-    title: 'Sony Wah',
-    category: 'Movies',
-    poster: 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/sony-wah-in.png',
-    url: 'http://59.103.38.46:8000/play/a058/index.m3u8',
-    players: [
-      { name: 'Server 1 (Colors Cineplex Live)', url: 'http://59.103.38.46:8000/play/a058/index.m3u8', source: 'hls', quality: '576p' }
-    ]
-  },
-  {
     id: 'builtin-sonyyay',
     title: 'Sony Yay!',
     category: 'Kids',
@@ -622,16 +562,6 @@ const BUILTIN_INDIAN_CHANNELS = [
       { name: 'Server 1 (Cartoon Network HD)', url: 'http://59.103.38.46:8000/play/a0a3/index.m3u8', source: 'hls', quality: '1080p' },
       { name: 'Server 2 (Pogo)', url: 'http://59.103.38.46:8000/play/a0a7/index.m3u8', source: 'hls', quality: '576p' },
       { name: 'Server 3 (Nickelodeon)', url: 'http://59.103.38.46:8000/play/a0b0/index.m3u8', source: 'hls', quality: '576p' }
-    ]
-  },
-  {
-    id: 'builtin-sonymarathi',
-    title: 'Sony Marathi HD',
-    category: 'Entertainment',
-    poster: 'https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/sony-marathi-in.png',
-    url: 'https://raw.githubusercontent.com/amazeyourself/adaptive-streams/refs/heads/main/streams/in/YuppTV/ZeeMarathiHD.m3u8',
-    players: [
-      { name: 'Server 1 (Zee Marathi HD Live)', url: 'https://raw.githubusercontent.com/amazeyourself/adaptive-streams/refs/heads/main/streams/in/YuppTV/ZeeMarathiHD.m3u8', source: 'hls', quality: '720p' }
     ]
   },
   {
@@ -831,19 +761,6 @@ export function channelPriority(title) {
   return priorityRank(title);
 }
 
-export function markChannelFailed(channelId) {
-  if (!channelId) return;
-  try {
-    const raw = sessionStorage.getItem(FAILED_CHANNELS_KEY);
-    const failed = raw ? JSON.parse(raw) : [];
-    if (!failed.includes(channelId)) {
-      failed.push(channelId);
-      sessionStorage.setItem(FAILED_CHANNELS_KEY, JSON.stringify(failed.slice(-50)));
-    }
-  } catch (err) {
-    console.warn("Failed to mark channel failure:", err);
-  }
-}
 
 function cleanChannelTitle(title) {
   return String(title || '')
@@ -933,12 +850,6 @@ export function markChannelDead(url) {
   } catch (err) { /* storage full - ignore */ }
 }
 
-export function clearDeadChannels() {
-  try {
-    localStorage.removeItem(DEAD_KEY);
-    localStorage.removeItem('ajo_dead_channels_v1');
-  } catch {}
-}
 
 function readDeadChannels() {
   try {
@@ -1029,6 +940,7 @@ function readManifestCache() {
 }
 
 async function fetchManifestChannels() {
+  if (!MANIFEST_URL) return []; // v3.17.51: no manifest configured — skip the self-origin fetch
   const cached = readManifestCache();
   if (cached && cached.length > 0) return cached;
   const controller = new AbortController();

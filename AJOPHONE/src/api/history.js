@@ -11,6 +11,45 @@ function normalizeTitle(t) {
   return String(t || '').toLowerCase().trim().replace(/[^a-z0-9]/g, '');
 }
 
+// ==========================================
+// CONTINUE WATCHING -> HOME LAUNCHER BRIDGE
+// ==========================================
+// The Home launcher's Continue Watching rail reads content://com.ajo.androidtv/continue,
+// which serves exactly what we push here on every history change.
+function continuePosterOf(it) {
+  return it.poster || it.posterUrl || it.poster_url || it.backdrop || it.image || it.logo || '';
+}
+
+function continueIdOf(it) {
+  return it.id || it.tmdb_id || it.imdb_id || '';
+}
+
+export function syncContinueToNative() {
+  try {
+    if (typeof window === 'undefined' || !window.AjoLink || !window.AjoLink.setContinueJson) return;
+    const items = getWatchHistory().slice(0, 12).map((h) => {
+      const title = h.title_en || h.title || h.name || '';
+      const id = continueIdOf(h);
+      const tmdb = h.tmdb_id || (String(id).match(/tmdb-(?:ep-)?(\d+)/) || [])[1] || '';
+      const subTitle = h.season_number
+        ? `S${h.season_number} E${h.episode_number || 1}`
+        : (h.year ? String(h.year) : '');
+      return {
+        title,
+        subTitle,
+        poster: continuePosterOf(h),
+        deepLink: `ajo://watch/${encodeURIComponent(id)}?type=${encodeURIComponent(h.type || '')}&title=${encodeURIComponent(title)}&tmdb=${encodeURIComponent(tmdb)}`,
+        package: 'com.ajo.androidtv',
+        updatedAt: h.lastWatched || Date.now(),
+        progress: h.duration > 0 ? Math.min(1, h.currentTime / h.duration) : -1,
+        source: 'AJO TV'
+      };
+    }).filter((i) => i.title && !i.deepLink.includes('watch/?') && !i.deepLink.endsWith('watch/'));
+    window.AjoLink.setContinueJson(JSON.stringify({ items }));
+  } catch { /* bridge absent on web builds */ }
+}
+
+
 export function matchMediaItem(a, b) {
   if (!a || !b) return false;
   const idA = a.id || a.tmdb_id || a.imdb_id || a.kinopoisk_id || a.movie_id;
@@ -60,6 +99,7 @@ export function saveProgress(item, currentTime, duration) {
     history.unshift(historyEntry);
 
     localStorage.setItem(HISTORY_KEY, JSON.stringify(history.slice(0, 30)));
+    syncContinueToNative();
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('ajo-watch-history-updated', { detail: historyEntry }));
     }
@@ -71,7 +111,10 @@ export function saveProgress(item, currentTime, duration) {
 export function getWatchHistory() {
   try {
     const data = localStorage.getItem(HISTORY_KEY);
-    return data ? JSON.parse(data) : [];
+    const parsed = data ? JSON.parse(data) : [];
+    // v3.17.51: a corrupted entry (object instead of array) used to make every
+    // downstream findIndex/map throw — progress silently stopped saving.
+    return Array.isArray(parsed) ? parsed : [];
   } catch (err) {
     return [];
   }
@@ -97,20 +140,13 @@ export function deleteHistoryItem(item) {
     const history = getWatchHistory();
     const filtered = history.filter(h => !matchMediaItem(h, item));
     localStorage.setItem(HISTORY_KEY, JSON.stringify(filtered));
+    syncContinueToNative();
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('ajo-watch-history-updated'));
     }
   } catch (err) {}
 }
 
-export function clearWatchHistory() {
-  try {
-    localStorage.removeItem(HISTORY_KEY);
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('ajo-watch-history-updated'));
-    }
-  } catch (err) {}
-}
 
 // ==========================================
 // MY WATCHLIST & MOVIE/SHOW FAVORITES
@@ -208,48 +244,8 @@ export function toggleFavoriteChannel(channel) {
 // ==========================================
 let sleepTimerTimeout = null;
 
-export function setSleepTimer(minutes, onTrigger) {
-  if (sleepTimerTimeout) {
-    clearTimeout(sleepTimerTimeout);
-    sleepTimerTimeout = null;
-  }
 
-  if (!minutes || minutes <= 0) {
-    localStorage.removeItem(SLEEP_TIMER_KEY);
-    return;
-  }
-
-  const expireTime = Date.now() + (minutes * 60 * 1000);
-  localStorage.setItem(SLEEP_TIMER_KEY, JSON.stringify({ minutes, expireTime }));
-
-  sleepTimerTimeout = setTimeout(() => {
-    localStorage.removeItem(SLEEP_TIMER_KEY);
-    if (onTrigger) onTrigger();
-  }, minutes * 60 * 1000);
-}
-
-export function clearAppCache() {
-  try {
-    // v3.12.59 FIX (ported): was localStorage.clear() — one Settings tap
-    // destroyed watch history, favorites, watchlist and cast pairing. Only
-    // cache keys (re-fetchable data) are removed now.
-    const CACHE_KEY_PATTERNS = [
-      /^ajo_iptv_cache_v\d+$/,
-      /^ajo_channels_manifest_v\d+$/,
-      /^ajo_sports_cache_v\d+$/,
-      /^ajo_catalog_v\d+$/,
-      /^ajo_dead_items_v\d+$/,      // v3.4.1: dead-title blocklist
-    ];
-    const keys = [];
-    for (let i = 0; i < localStorage.length; i++) keys.push(localStorage.key(i));
-    for (const key of keys) {
-      if (CACHE_KEY_PATTERNS.some((p) => p.test(key))) {
-        localStorage.removeItem(key);
-      }
-    }
-  } catch {}
-}
-// v3.4.1 / phone v3.4.1: dead-item blocklist — when every stream source for
+// v3.12.93 / phone v3.4.1: dead-item blocklist — when every stream source for
 // a title fails, the title stops appearing in catalogs and search until its
 // TTL expires (sources recover all the time). Delivers "only show thumbnails
 // that actually stream" reactively, without probing thousands of items.
@@ -290,10 +286,6 @@ export function getDeadItemIds() {
   return new Set(Object.keys(readDeadItemMap()));
 }
 
-export function isItemDead(itemId) {
-  if (!itemId) return false;
-  return Boolean(readDeadItemMap()[String(itemId)]);
-}
 
 /** Filter helper for catalog/search arrays. */
 export function filterAliveItems(items) {

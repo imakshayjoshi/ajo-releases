@@ -65,7 +65,7 @@ export function AppProvidersRow({ onSelectApp }) {
               flexShrink: 0,
               cursor: 'pointer',
               boxShadow: '0 2px 8px rgba(0, 0, 0, 0.5)',
-              backdropFilter: 'blur(8px)',
+              background: 'rgba(15, 17, 23, 0.95)',
               WebkitBackdropFilter: 'blur(8px)'
             }}
           >

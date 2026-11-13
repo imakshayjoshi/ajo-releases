@@ -1,94 +1,37 @@
-import React, { useRef } from 'react';
+import React from 'react';
 import { MediaCard } from './MediaCard';
-import { LandscapeMediaCard } from './LandscapeMediaCard';
-import { ChevronRight, Sparkles, Flame, Film, Tv, Radio, Newspaper } from 'lucide-react';
-import { useTouchDragScroll } from '../hooks/useTouchDragScroll';
+import { ChevronRight } from 'lucide-react';
 
-export function MediaRail({ title, items, landscape = false, onSelectItem, onFocusItem, onSeeAll }) {
-  const scrollRef = useRef(null);
-  useTouchDragScroll(scrollRef); // v3.9.12: manual drag — WebView-proof horizontal scroll
-  const safeItems = Array.isArray(items) ? items : (items && Array.isArray(items.results) ? items.results : []);
-  if (safeItems.length === 0) return null;
-
-  // Determine section icon
-  const titleLower = (title || '').toLowerCase();
-  let SectionIcon = Sparkles;
-  if (titleLower.includes('sport') || titleLower.includes('cricket')) SectionIcon = Flame;
-  else if (titleLower.includes('bollywood') || titleLower.includes('hollywood') || titleLower.includes('cinema') || titleLower.includes('movie')) SectionIcon = Film;
-  else if (titleLower.includes('series') || titleLower.includes('show')) SectionIcon = Tv;
-  else if (titleLower.includes('live') || titleLower.includes('star') || titleLower.includes('sony')) SectionIcon = Radio;
-  else if (titleLower.includes('news')) SectionIcon = Newspaper;
+export function MediaRail({ title, items = [], isLive = false, onSelectItem, onSeeAll }) {
+  if (!items || items.length === 0) return null;
 
   return (
-    <section className="mobile-rail-section" style={{ position: 'relative', zIndex: 20, width: '100%', marginTop: '22px' }}>
-      <div className="mobile-rail-header" style={{ position: 'relative', zIndex: 20, padding: '0 16px 10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div className="mobile-rail-title-box" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <div style={{
-            width: '24px',
-            height: '24px',
-            borderRadius: '6px',
-            background: 'rgba(0, 187, 127, 0.15)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}>
-            <SectionIcon size={14} color="#00BB7F" />
-          </div>
-          <h2 className="mobile-rail-title" style={{
-            fontSize: '18px',
-            fontWeight: 900,
-            color: '#ffffff',
-            letterSpacing: '-0.3px',
-            textShadow: '0 2px 8px rgba(0, 0, 0, 0.8)',
-            margin: 0
-          }}>
-            {title}
-          </h2>
+    <section className="tv-rail">
+      <div className="tv-rail-header">
+        <h2 className="tv-rail-title">{title}</h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span className="tv-rail-count">{items.length} {items.length === 1 ? 'title' : 'titles'}</span>
+          {onSeeAll && (
+            <button
+              tabIndex={0}
+              className="tv-rail-see-all"
+              onClick={onSeeAll}
+            >
+              See All <ChevronRight size={14} style={{ verticalAlign: 'middle' }} />
+            </button>
+          )}
         </div>
-
-        {onSeeAll && (
-          <button 
-            className="mobile-rail-see-all" 
-            onClick={onSeeAll}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '3px',
-              background: 'rgba(0, 187, 127, 0.12)',
-              border: '1px solid rgba(0, 187, 127, 0.3)',
-              borderRadius: '12px',
-              padding: '4px 10px',
-              color: '#00BB7F',
-              fontSize: '12px',
-              fontWeight: 800,
-              cursor: 'pointer'
-            }}
-          >
-            <span>See All</span>
-            <ChevronRight size={14} />
-          </button>
-        )}
       </div>
 
-      <div ref={scrollRef} className={`mobile-rail-scroll ${landscape ? 'is-landscape' : 'is-portrait'}`} style={{ position: 'relative', zIndex: 20 }}>
-        {safeItems.map((item, index) => {
-          const key = item.kinopoisk_id || item.id || item.movie_id || `${item.title}-${index}`;
-          return landscape ? (
-            <LandscapeMediaCard
-              key={key}
-              item={item}
-              onClick={onSelectItem}
-              onFocus={onFocusItem}
-            />
-          ) : (
-            <MediaCard
-              key={key}
-              item={item}
-              onClick={onSelectItem}
-              onFocus={onFocusItem}
-            />
-          );
-        })}
+      <div className="tv-rail-track">
+        {items.map((item, idx) => (
+          <MediaCard
+            key={item.id || idx}
+            item={item}
+            isLive={isLive}
+            onClick={onSelectItem}
+          />
+        ))}
       </div>
     </section>
   );
