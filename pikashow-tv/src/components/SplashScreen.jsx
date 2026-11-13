@@ -120,15 +120,11 @@ export function SplashScreen({ onDone }) {
       onClick={() => finish(220)}
       aria-label="AJO"
     >
-      <div className="ajo-splash-glow" />
-      <div className="ajo-splash-mark">
-        <span className="ajo-splash-letter" style={{ animationDelay: '0ms' }}>A</span>
-        <span className="ajo-splash-letter" style={{ animationDelay: '100ms' }}>J</span>
-        <span className="ajo-splash-letter" style={{ animationDelay: '200ms' }}>O</span>
-        <div className="ajo-splash-sweep" />
-      </div>
-      <div className="ajo-splash-rule" />
-      <div className="ajo-splash-tag">STREAM ANYTHING</div>
+      <img
+        src="/ajo-logo.png"
+        alt="AJO TV"
+        style={{ width: 'min(62vmin, 560px)', height: 'min(62vmin, 560px)', objectFit: 'contain' }}
+      />
     </div>
   );
 }

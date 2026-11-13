@@ -64,7 +64,7 @@ export default function App() {
   const [selectedItem, setSelectedItem] = useState(null);
   const [activePlayback, setActivePlayback] = useState(null); // { item, server, episodes, episodeIndex }
   // v3.17.1: Netflix-style cold-start splash — once per process, any key skips
-  const [showSplash, setShowSplash] = useState(() => !window.__ajoSplashShown);
+  const [showSplash, setShowSplash] = useState(() => !window.__ajoSplashShown && !window.__ajoIntroPlayed && !window.AjoStartup?.hasPlayedStartupIntro?.());
   // v3.17.24: exit confirmation dialog state
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   const confirmExitRef = useRef(false);

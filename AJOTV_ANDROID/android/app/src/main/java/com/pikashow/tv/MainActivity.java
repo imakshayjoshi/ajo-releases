@@ -22,6 +22,7 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.widget.Toast;
 import androidx.core.content.FileProvider;
+import androidx.core.splashscreen.SplashScreen;
 import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.BridgeWebChromeClient;
 import com.getcapacitor.BridgeWebViewClient;
@@ -35,8 +36,12 @@ import android.util.Log;
 public class MainActivity extends BridgeActivity {
     private static final String TAG = "MainActivity";
 
-    // v3.12.49: unacknowledged Back press counter (dead-WebView escape hatch).
+    // v3.17.55: unacknowledged Back press counter (dead-WebView escape hatch).
     private int backPressCount = 0;
+
+    // v3.17.55: startup-animation cold-start gate. Process-level, never persisted,
+    // so warm launches (task resume, activity recreation) never replay the intro.
+    private static boolean sIntroShownThisProcess = false;
 
     /**
      * Stops WebView media and frees the hardware decoder. Runs before the native
@@ -101,6 +106,27 @@ public class MainActivity extends BridgeActivity {
         }
     }
 
+    // v3.17.51: OTA URL whitelist, enforced natively (the JS check was dead code).
+    private static boolean isAllowedOtaUrl(String url) {
+        try {
+            java.net.URL u = new java.net.URL(url);
+            if (!"https".equalsIgnoreCase(u.getProtocol())) return false;
+            String host = u.getHost() == null ? "" : u.getHost().toLowerCase(java.util.Locale.ROOT);
+            java.util.Set<String> trusted = new java.util.HashSet<>(java.util.Arrays.asList(
+                    "github.com", "raw.githubusercontent.com", "objects.githubusercontent.com",
+                    "cdn.jsdelivr.net", "api.github.com"));
+            if (!trusted.contains(host)) return false;
+            String path = u.getPath() == null ? "" : u.getPath();
+            if (!path.matches("(?i).*/AJO_[A-Z_]+\\.apk$")) return false;
+            if ("objects.githubusercontent.com".equals(host)) return true;
+            if ("cdn.jsdelivr.net".equals(host)) return path.startsWith("/gh/imakshayjoshi/ajo-releases");
+            if ("api.github.com".equals(host)) return false; // API never serves APK bytes directly
+            return path.startsWith("/imakshayjoshi/ajo-releases/");
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     private static volatile long lastNativePositionSeconds = 0;
     private static volatile long lastNativeDurationSeconds = 0;
 
@@ -131,7 +157,18 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        // v3.17.55: native launch splash (black bg + AJO logo) via core-splashscreen.
+        SplashScreen splashScreen = SplashScreen.installSplashScreen(this);
         super.onCreate(savedInstanceState);
+
+        // v3.17.55: premium startup animation on COLD launch only. MainActivity is
+        // the launcher; StartupActivity plays the packaged intro full-screen then
+        // returns here. Warm launches skip it (process-level flag, not persisted).
+        if (savedInstanceState == null && !sIntroShownThisProcess) {
+            sIntroShownThisProcess = true;
+            startActivity(new android.content.Intent(this, StartupActivity.class));
+            overridePendingTransition(0, 0);
+        }
 
         Thread.setDefaultUncaughtExceptionHandler((thread, throwable) -> {
             Log.e("AJOTV_CRASH", "Uncaught exception on thread " + thread.getName() + ": " + throwable.getMessage(), throwable);
@@ -150,6 +187,11 @@ public class MainActivity extends BridgeActivity {
         if (getBridge() != null && getBridge().getWebView() != null) {
             WebView webView = getBridge().getWebView();
             webView.setBackgroundColor(android.graphics.Color.BLACK);
+            // Synchronous native ownership check, installed before the React bundle runs.
+            webView.addJavascriptInterface(new Object() {
+                @JavascriptInterface
+                public boolean hasPlayedStartupIntro() { return sIntroShownThisProcess; }
+            }, "AjoStartup");
             // v3.17.4: hardware layer on the TV WebView — compositor-thread
             // animations (splash, card focus, hero cross-fades) stay at 60fps
             // even while the JS bundle is executing on the main thread.
@@ -159,10 +201,18 @@ public class MainActivity extends BridgeActivity {
             webView.setHorizontalScrollBarEnabled(false);
 
             getBridge().setWebViewClient(new BridgeWebViewClient(getBridge()) {
+
                 @Override
                 public void onReceivedSslError(WebView view, SslErrorHandler handler, SslError error) {
                     // 2014-2016 Smart TV panels ship root CA stores that expired years
                     // ago; without this, HTTPS stream CDNs abort the handshake.
+                    // v3.17.51: scoped — hostname mismatch (IDMISMATCH) is never an
+                    // old-CA-store symptom; it's a MITM signature. Cancel it.
+                    int primary = error != null ? error.getPrimaryError() : SslError.SSL_INVALID;
+                    if (primary == SslError.SSL_IDMISMATCH) {
+                        handler.cancel();
+                        return;
+                    }
                     handler.proceed();
                 }
 
@@ -536,6 +586,15 @@ public class MainActivity extends BridgeActivity {
                         return;
                     }
 
+                    // v3.17.51: enforce the OTA host whitelist at the enforcement
+                    // point. The JS-side check lived in a dead export — anything
+                    // reaching this bridge installs. github.com.evil.com must not.
+                    if (!isAllowedOtaUrl(apkUrl)) {
+                        runOnUiThread(
+                                () -> Toast.makeText(MainActivity.this, "Update URL rejected (untrusted source)", Toast.LENGTH_LONG).show());
+                        return;
+                    }
+
                     // Check install permission on Android 8.0+
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                         if (!getPackageManager().canRequestPackageInstalls()) {
@@ -764,6 +823,88 @@ public class MainActivity extends BridgeActivity {
                 }
             }, "AndroidUpdater");
 
+            // v3.17.31: Movibox native API bridge — calls api.inmoviebox.com directly
+            // from Android (no CORS, no VPS proxy needed). The WebView cannot call
+            // this API because it sends no CORS headers; native HttpURLConnection
+            // bypasses CORS entirely.
+            webView.addJavascriptInterface(new Object() {
+                private static final String MOVIBOX_BASE = "https://api.inmoviebox.com/wefeed-tv-bff";
+                private static final String[] API_HOSTS = {
+                    "api.inmoviebox.com",
+                    "api.twibida.com",
+                    "api3.aoneroom.com",
+                    "api4.aoneroom.com"
+                };
+
+                @JavascriptInterface
+                public String moviboxGet(final String path, final String params) {
+                    return moviboxRequest("GET", path, params, null);
+                }
+
+                @JavascriptInterface
+                public String moviboxSearch(final String keyword) {
+                    String p = "keyword=" + android.net.Uri.encode(keyword) + "&page=1&perPage=20";
+                    return moviboxRequest("GET", "/search/everyone", p, null);
+                }
+
+                @JavascriptInterface
+                public String moviboxPlayInfo(final String subjectId, final int season, final int episode) {
+                    // subject/play-info/v2 returns signed MP4 URLs
+                    String p = "subjectId=" + subjectId + "&season=" + season + "&episode=" + episode;
+                    return moviboxRequest("GET", "/subject/play-info/v2", p, null);
+                }
+
+                @JavascriptInterface
+                public String moviboxSubjectDetail(final String subjectId) {
+                    return moviboxRequest("GET", "/subject/get", "subjectId=" + subjectId, null);
+                }
+
+                private String moviboxRequest(String method, String path, String params, String body) {
+                    String fullUrl = MOVIBOX_BASE + path;
+                    if (params != null && !params.isEmpty()) {
+                        fullUrl += "?" + params;
+                    }
+                    Exception lastError = null;
+                    // Try each API host until one responds (failover)
+                    for (String host : API_HOSTS) {
+                        try {
+                            String url = "https://" + host + "/wefeed-tv-bff" + path;
+                            if (params != null && !params.isEmpty()) {
+                                url += "?" + params;
+                            }
+                            HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
+                            conn.setRequestMethod(method);
+                            conn.setConnectTimeout(8000);
+                            conn.setReadTimeout(12000);
+                            conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14; Lumio VISION) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36");
+                            conn.setRequestProperty("Accept", "application/json");
+                            conn.setRequestProperty("Content-Type", "application/json");
+                            conn.setRequestProperty("Origin", "https://movibox.xyz");
+                            conn.setRequestProperty("Referer", "https://movibox.xyz/");
+                            if (body != null && !body.isEmpty()) {
+                                conn.setDoOutput(true);
+                                try (java.io.OutputStream os = conn.getOutputStream()) {
+                                    os.write(body.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                                }
+                            }
+                            int code = conn.getResponseCode();
+                            String response;
+                            try (java.io.InputStream is = code >= 200 && code < 300 ? conn.getInputStream() : conn.getErrorStream();
+                                 java.util.Scanner scanner = new java.util.Scanner(is, "UTF-8").useDelimiter("\\z")) {
+                                response = scanner.hasNext() ? scanner.next() : "";
+                            }
+                            if (code >= 200 && code < 300 && response != null && !response.isEmpty()) {
+                                return response;
+                            }
+                            lastError = new Exception("HTTP " + code);
+                        } catch (Exception e) {
+                            lastError = e;
+                        }
+                    }
+                    return "{\"error\":\"" + (lastError != null ? lastError.getMessage().replace("\"", "\\\"") : "unknown") + "\",\"code\":-1}";
+                }
+            }, "MoviboxApi");
+
             webView.setFocusable(true);
             webView.setFocusableInTouchMode(true);
             webView.requestFocus();
@@ -848,16 +989,15 @@ public class MainActivity extends BridgeActivity {
     public boolean dispatchKeyEvent(KeyEvent event) {
         int keyCode = event.getKeyCode();
         // v3.17.19: remote gear/menu buttons (KEYCODE_SETTINGS=176 on most
-        // Android TV remotes, KEYCODE_MENU=82 on others) never reached the
-        // WebView — the settings panel was unreachable from the remote.
-        // Forward as a DOM event; the app toggles the settings overlay.
+        // Android TV remotes, KEYCODE_MENU=82 on others) must open the Android
+        // SYSTEM settings dialog (the one that appeared before the app was
+        // installed), NOT an in-app settings overlay. Launch the system
+        // settings intent directly from the Activity.
         if (keyCode == KeyEvent.KEYCODE_SETTINGS || keyCode == KeyEvent.KEYCODE_MENU) {
             if (event.getAction() == KeyEvent.ACTION_DOWN) {
-                if (getBridge() != null && getBridge().getWebView() != null) {
-                    getBridge().getWebView().evaluateJavascript(
-                            "(function(){ window.dispatchEvent(new KeyboardEvent('keydown', {key: 'ContextMenu', code: 'ContextMenu', keyCode: 93, which: 93, bubbles: true, cancelable: true})); window.dispatchEvent(new CustomEvent('ajo-settings-key')); })();",
-                            null);
-                }
+                try {
+                    startActivity(new Intent(android.provider.Settings.ACTION_SETTINGS));
+                } catch (Exception ignored) {}
             }
             return true;
         }

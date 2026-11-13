@@ -22,6 +22,7 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.widget.Toast;
 import androidx.core.content.FileProvider;
+import androidx.core.splashscreen.SplashScreen;
 import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.BridgeWebChromeClient;
 import java.io.File;
@@ -32,8 +33,12 @@ import java.net.URL;
 
 public class MainActivity extends BridgeActivity {
 
-    // v3.3.43: unacknowledged Back press counter (dead-WebView escape hatch).
+    // v3.17.55: unacknowledged Back press counter (dead-WebView escape hatch).
     private int backPressCount = 0;
+
+    // v3.17.55: startup-animation cold-start gate. Process-level, never persisted,
+    // so warm launches (task resume, activity recreation) never replay the intro.
+    private static boolean sIntroShownThisProcess = false;
 
     // ---- v3.3.1 (ported from TV app 3.10.1): embed preflight ----
     // Server-side error pages (Vercel "Application error", Cloudflare 52x,
@@ -65,7 +70,18 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        // v3.17.55: native launch splash (black bg + AJO logo) via core-splashscreen.
+        SplashScreen splashScreen = SplashScreen.installSplashScreen(this);
         super.onCreate(savedInstanceState);
+
+        // v3.17.55: premium startup animation on COLD launch only. MainActivity is
+        // the launcher; StartupActivity plays the packaged intro full-screen then
+        // returns here. Warm launches skip it (process-level flag, not persisted).
+        if (savedInstanceState == null && !sIntroShownThisProcess) {
+            sIntroShownThisProcess = true;
+            startActivity(new android.content.Intent(this, StartupActivity.class));
+            overridePendingTransition(0, 0);
+        }
 
         // --- FULLSCREEN IMMERSIVE MODE & PURE BLACK BACKGROUND ---
         enableImmersiveMode();
@@ -75,6 +91,11 @@ public class MainActivity extends BridgeActivity {
         if (getBridge() != null && getBridge().getWebView() != null) {
             WebView webView = getBridge().getWebView();
             webView.setBackgroundColor(android.graphics.Color.BLACK);
+            // Synchronous native ownership check, installed before the React bundle runs.
+            webView.addJavascriptInterface(new Object() {
+                @JavascriptInterface
+                public boolean hasPlayedStartupIntro() { return sIntroShownThisProcess; }
+            }, "AjoStartup");
             webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
             webView.setOverScrollMode(View.OVER_SCROLL_NEVER);
             webView.setVerticalScrollBarEnabled(false);
@@ -231,6 +252,12 @@ public class MainActivity extends BridgeActivity {
                 public void downloadAndInstall(final String apkUrl) {
                     if (apkUrl == null || apkUrl.isEmpty()) {
                         runOnUiThread(() -> Toast.makeText(MainActivity.this, "Invalid APK URL", Toast.LENGTH_SHORT).show());
+                        return;
+                    }
+
+                    // v3.17.51: enforce the OTA host whitelist at the enforcement point.
+                    if (!isAllowedOtaUrl(apkUrl)) {
+                        runOnUiThread(() -> Toast.makeText(MainActivity.this, "Update URL rejected (untrusted source)", Toast.LENGTH_LONG).show());
                         return;
                     }
 
@@ -582,6 +609,81 @@ public class MainActivity extends BridgeActivity {
                 }
             }, "AndroidDownloader");
 
+            // v3.9.28: Movibox native API bridge
+            webView.addJavascriptInterface(new Object() {
+                private static final String[] API_HOSTS = {
+                    "api.inmoviebox.com",
+                    "api.twibida.com",
+                    "api3.aoneroom.com",
+                    "api4.aoneroom.com"
+                };
+
+                @JavascriptInterface
+                public String moviboxGet(final String path, final String params) {
+                    return moviboxRequest("GET", path, params, null);
+                }
+
+                @JavascriptInterface
+                public String moviboxSearch(final String keyword) {
+                    String p = "keyword=" + android.net.Uri.encode(keyword) + "&page=1&perPage=20";
+                    return moviboxRequest("GET", "/search/everyone", p, null);
+                }
+
+                @JavascriptInterface
+                public String moviboxPlayInfo(final String subjectId, final int season, final int episode) {
+                    String p = "subjectId=" + subjectId + "&season=" + season + "&episode=" + episode;
+                    return moviboxRequest("GET", "/subject/play-info/v2", p, null);
+                }
+
+                @JavascriptInterface
+                public String moviboxSubjectDetail(final String subjectId) {
+                    return moviboxRequest("GET", "/subject/get", "subjectId=" + subjectId, null);
+                }
+
+                private String moviboxRequest(String method, String path, String params, String body) {
+                    Exception lastError = null;
+                    for (String host : API_HOSTS) {
+                        try {
+                            String url = "https://" + host + "/wefeed-tv-bff" + path;
+                            if (params != null && !params.isEmpty()) {
+                                url += "?" + params;
+                            }
+                            HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
+                            conn.setRequestMethod(method);
+                            conn.setConnectTimeout(8000);
+                            conn.setReadTimeout(12000);
+                            conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36");
+                            conn.setRequestProperty("Accept", "application/json");
+                            conn.setRequestProperty("Content-Type", "application/json");
+                            conn.setRequestProperty("Origin", "https://movibox.xyz");
+                            conn.setRequestProperty("Referer", "https://movibox.xyz/");
+                            if (body != null && !body.isEmpty()) {
+                                conn.setDoOutput(true);
+                                try (java.io.OutputStream os = conn.getOutputStream()) {
+                                    os.write(body.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                                }
+                            }
+                            int code = conn.getResponseCode();
+                            String response;
+                            java.io.InputStream is = code >= 200 && code < 300 ? conn.getInputStream() : conn.getErrorStream();
+                            java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
+                            byte[] buf = new byte[4096];
+                            int len;
+                            while ((len = is.read(buf)) != -1) baos.write(buf, 0, len);
+                            is.close();
+                            response = baos.toString("UTF-8");
+                            if (code >= 200 && code < 300 && response != null && !response.isEmpty()) {
+                                return response;
+                            }
+                            lastError = new Exception("HTTP " + code);
+                        } catch (Exception e) {
+                            lastError = e;
+                        }
+                    }
+                    return "{\"error\":\"" + (lastError != null ? lastError.getMessage().replace("\"", "\\\"") : "unknown") + "\",\"code\":-1}";
+                }
+            }, "MoviboxApi");
+
             // 3. Suppress All Popups, New Tabs & Ad Redirects natively
             // (v3.3.43: the renderer-crash guard lives in the WebViewClient
             // below — onRenderProcessGone is a WebViewClient callback.)
@@ -593,74 +695,16 @@ public class MainActivity extends BridgeActivity {
             });
 
             webView.setWebViewClient(new com.getcapacitor.BridgeWebViewClient(getBridge()) {
-                // v3.9.3: network-layer ad block. The phone plays embeds in
-                // iframes inside THIS WebView, and until now it had no
-                // ad blocking at all — embed pages were loading popad/adsterra
-                // scripts and YouTube ad iframes ("youtube opens while opening
-                // a movie"). Same list as the TV player, plus YouTube domains
-                // (youtube-nocookie stays allowed — the in-app YouTube tab
-                // uses it legitimately).
-                private final String[] AD_DOMAINS = {
-                    "doubleclick.net", "googlesyndication.com", "googleadservices.com",
-                    "popads.net", "popcash.net", "popunder.net", "juicyads.com",
-                    "exoclick.com", "exosrv.com", "adsterra.com", "monetag.com",
-                    "propellerads.com", "adskeeper.co.uk",
-                    "adcash.com", "hilltopads.net", "trafficjunky.com",
-                    "pushno.com", "clksite.com", "betterads.org",
-                    "a-ads.com", "revenuecpmnetwork.com", "adf.ly",
-                    "richpush.co", "ero-advertising.com", "clickadu.com",
-                    "cpm.bz", "bongacash.com", "tsyndicate.com",
-                    "bidvertiser.com", "ad-maven.com", "admaven.com",
-                    "realsrv.com", "onclicka.com", "onclicksuper.com",
-                    "sssmaster.com", "sureads.com", "adserverplus.com"
-                };
-                private final String[] YOUTUBE_AD_HOSTS = {
-                    // NOT googlevideo.com (YouTube tab's video bytes) and NOT
-                    // ytimg.com (its thumbnails) — blocking the embed pages is
-                    // enough to kill the ad players.
-                    "youtube.com", "youtu.be", "youtubei.googleapis.com"
-                };
-
-                private boolean isAdUrl(String url) {
-                    if (url == null) return false;
-                    String lower = url.toLowerCase(java.util.Locale.US);
-                    for (String domain : AD_DOMAINS) {
-                        if (lower.contains(domain)) return true;
-                    }
-                    // YouTube iframes inside movie embeds = the ad layer.
-                    // youtube-nocookie.com is NOT blocked (in-app YouTube tab).
-                    if (!lower.contains("youtube-nocookie.com")) {
-                        for (String host : YOUTUBE_AD_HOSTS) {
-                            if (lower.contains(host)) return true;
-                        }
-                    }
-                    if (lower.contains("/popunder") || lower.contains("/pop_under")
-                            || lower.contains("/clickunder") || lower.contains("/adserve")
-                            || lower.contains("ads.php") || lower.contains("/ad/click")
-                            || lower.contains("track.php?")) {
-                        return true;
-                    }
-                    return false;
-                }
-
-                @Override
-                public android.webkit.WebResourceResponse shouldInterceptRequest(
-                        WebView view, android.webkit.WebResourceRequest request) {
-                    try {
-                        String url = request.getUrl() != null ? request.getUrl().toString() : "";
-                        if (isAdUrl(url)) {
-                            android.util.Log.d("AJO.MainActivity", "AD_BLOCK: " + url);
-                            return new android.webkit.WebResourceResponse(
-                                    "text/plain", "utf-8",
-                                    new java.io.ByteArrayInputStream(new byte[0]));
-                        }
-                    } catch (Throwable ignored) {}
-                    return super.shouldInterceptRequest(view, request);
-                }
 
                 @Override
                 public void onReceivedSslError(WebView view, SslErrorHandler handler, SslError error) {
-                    // Ignore expired/untrusted intermediate certificates on free streaming CDNs & IPTV
+                    // Expired/clock errors proceed (old device CA stores).
+                    // v3.17.51: hostname mismatch is a MITM signature — cancel it.
+                    int primary = error != null ? error.getPrimaryError() : SslError.SSL_INVALID;
+                    if (primary == SslError.SSL_IDMISMATCH) {
+                        handler.cancel();
+                        return;
+                    }
                     handler.proceed();
                 }
 
@@ -812,4 +856,26 @@ public class MainActivity extends BridgeActivity {
             } catch (Exception ignored) {}
         }
     }
+    // v3.17.51: OTA URL whitelist, enforced natively (the JS check was dead code).
+    private static boolean isAllowedOtaUrl(String url) {
+        try {
+            java.net.URL u = new java.net.URL(url);
+            if (!"https".equalsIgnoreCase(u.getProtocol())) return false;
+            String host = u.getHost() == null ? "" : u.getHost().toLowerCase(java.util.Locale.ROOT);
+            java.util.Set<String> trusted = new java.util.HashSet<>(java.util.Arrays.asList(
+                    "github.com", "raw.githubusercontent.com", "objects.githubusercontent.com",
+                    "cdn.jsdelivr.net", "api.github.com"));
+            if (!trusted.contains(host)) return false;
+            String path = u.getPath() == null ? "" : u.getPath();
+            if (!path.matches("(?i).*/AJO_[A-Z_]+\\.apk$")) return false;
+            if ("objects.githubusercontent.com".equals(host)) return true;
+            if ("cdn.jsdelivr.net".equals(host)) return path.startsWith("/gh/imakshayjoshi/ajo-releases");
+            if ("api.github.com".equals(host)) return false;
+            return path.startsWith("/imakshayjoshi/ajo-releases/");
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+
 }

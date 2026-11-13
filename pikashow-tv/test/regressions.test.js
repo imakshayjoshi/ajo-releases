@@ -136,8 +136,8 @@ test('Bug C2: getPairingRoom / setPairingRoom persist correctly', () => {
 // --- v3.12.52 STABILITY REGRESSION TESTS -----------------------------------
 test('v3.12.52: OTA version and code are bumped', async () => {
   const ota = await import('../src/api/otaUpdate.js');
-  assert.equal(ota.CURRENT_APP_VERSION, '3.17.19');
-  assert.equal(ota.CURRENT_VERSION_CODE, 271);
+  assert.equal(ota.CURRENT_APP_VERSION, '3.17.56');
+  assert.equal(ota.CURRENT_VERSION_CODE, 313);
   // v3.12.82: the -androidtv release-tag suffix must never confuse the
   // version compare (the OTA banner silently no-shows if a source wins with a
   // malformed version string).
@@ -231,7 +231,9 @@ test('v3.14.2: chain keeps only render-tested-live hosts; dead ones are gone', (
   const servers = generateUniversalServers({ id: 'tmdb-1236045', type: 'movie', title: 'Animals' });
   const urls = servers.map(s => s.url);
   // dead-that-day (Oct 18 2026 render test) and the apiplayer '12th server'
-  for (const dead of [/videasy/, /2embed\.skin/, /vidbolt/, /filmu/, /cinezo/, /apiplayer\.ru/, /vidjoy/]) {
+  // v3.17.49: 2embed.skin re-probed alive Nov 7 2026 (200, 8.7KB, identical
+  // payload to 2embed.cc) — removed from the dead list.
+  for (const dead of [/videasy/, /vidbolt/, /filmu/, /cinezo/, /apiplayer\.ru/, /vidjoy/]) {
     assert.ok(!urls.some(u => dead.test(u)), `dead host must be absent: ${dead}`);
   }
   for (const good of [/vidsrc\.pm/, /vidlink\.pro/, /vidrift\.in/, /vidy\.st/]) {
@@ -341,4 +343,104 @@ test('v3.17.0: vidrift resolver extracts token and parses orion streams', async 
   } finally {
     globalThis.fetch = realFetch;
   }
+});
+
+
+// ---------------------------------------------------------------------------
+// v3.17.51 fixes
+// ---------------------------------------------------------------------------
+
+test('v3.17.51: OTA URL check rejects host-spoofed APK urls', async () => {
+  const { isAllowedApkUrl } = await import('../src/api/otaUpdate.js');
+  // real release URLs pass
+  assert.ok(isAllowedApkUrl('https://github.com/imakshayjoshi/ajo-releases/releases/download/v3.17.51/AJO_TV.apk'));
+  assert.ok(isAllowedApkUrl('https://raw.githubusercontent.com/imakshayjoshi/ajo-releases/main/AJO_TV.apk'));
+  assert.ok(isAllowedApkUrl('https://cdn.jsdelivr.net/gh/imakshayjoshi/ajo-releases@main/AJO_PHONE.apk'));
+  // spoof attempts fail
+  assert.ok(!isAllowedApkUrl('https://github.com.evil.com/AJO_TV.apk'));
+  assert.ok(!isAllowedApkUrl('https://evil.com/AJO_TV.apk'));
+  assert.ok(!isAllowedApkUrl('http://github.com/imakshayjoshi/ajo-releases/releases/download/v1/AJO_TV.apk'));
+  assert.ok(!isAllowedApkUrl('https://github.com/other/repo/releases/download/v1/AJO_TV.apk'));
+  assert.ok(!isAllowedApkUrl('https://tinyurl.com/abc123'));
+  assert.ok(!isAllowedApkUrl('not a url'));
+  assert.ok(!isAllowedApkUrl(null));
+});
+
+test('v3.17.51: server health read/write share one cache key', async () => {
+  // Regression: prober wrote origin+path, chain read bare origin — dead
+  // servers were never skipped.
+  const fs = await import('fs');
+  const src = fs.readFileSync(new URL('../src/utils/streamingEngines.js', import.meta.url), 'utf8');
+  assert.ok(src.includes('function healthKey('), 'shared healthKey exists');
+  const probeBody = src.split('export async function probeServerHealth')[1] || '';
+  assert.ok(probeBody.includes('healthKey(url)'), 'prober uses healthKey');
+  const genBody = src.split('export function generateUniversalServers')[1] || '';
+  assert.ok(genBody.includes('healthCache.get(healthKey(url))'), 'chain reads with healthKey');
+});
+
+test('v3.17.51: cast broadcast does not claim success when MQTT is down', async () => {
+  const fs = await import('fs');
+  const src = fs.readFileSync(new URL('../src/api/castSync.js', import.meta.url), 'utf8');
+  assert.ok(src.includes('return Boolean(this.ws && this.mqttConnected);'), 'honest broadcast return');
+  // public brokers must come before the fragile VPS broker
+  const iEmqx = src.indexOf('wss://broker.emqx.io');
+  const iVps = src.indexOf('wss://new.ajo.co.in/mqtt');
+  assert.ok(iEmqx > -1 && iVps > -1 && iEmqx < iVps, 'emqx before VPS in rotation');
+});
+
+test('v3.17.51: direct resolvers carry timeouts', async () => {
+  const fs = await import('fs');
+  const src = fs.readFileSync(new URL('../src/api/directResolver.js', import.meta.url), 'utf8');
+  assert.ok(src.includes('function fetchWithTimeout('), 'timeout helper exists');
+  const fetchCalls = (src.match(/await fetch\(/g) || []).length;
+  const wrapped = (src.match(/await fetchWithTimeout\(/g) || []).length;
+  assert.ok(fetchCalls === 0, 'no bare fetch left on the resolve path (found ' + fetchCalls + ', wrapped ' + wrapped + ')');
+});
+
+test('v3.17.51: watch history survives corrupted localStorage', async () => {
+  const store = new Map();
+  globalThis.localStorage = {
+    getItem: (k) => (store.has(k) ? store.get(k) : null),
+    setItem: (k, v) => store.set(k, v),
+    removeItem: (k) => store.delete(k),
+  };
+  const { getWatchHistory } = await import('../src/api/history.js');
+  store.set('ajo_watch_history_v1', JSON.stringify({ not: 'an array' }));
+  assert.deepStrictEqual(getWatchHistory(), []);
+  store.set('ajo_watch_history_v1', '[{"id":1}]');
+  assert.strictEqual(getWatchHistory().length, 1);
+});
+
+test('v3.17.53: remote-first left rail exposes only core destinations', async () => {
+  const fs = await import('fs');
+  const header = fs.readFileSync(new URL('../src/components/GoogleTVHeader.jsx', import.meta.url), 'utf8');
+  const nav = fs.readFileSync(new URL('../src/hooks/useSpatialNavigation.js', import.meta.url), 'utf8');
+  const css = fs.readFileSync(new URL('../src/index.css', import.meta.url), 'utf8');
+  const app = fs.readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8');
+
+  for (const id of ['home', 'live', 'movies', 'series', 'search', 'settings']) {
+    assert.match(header, new RegExp(`id: '${id}'`), `${id} stays in the main nav`);
+  }
+  for (const id of ['movibox', 'anime', 'torrents']) {
+    assert.doesNotMatch(header, new RegExp(`id: '${id}'`), `${id} is removed from the main nav`);
+  }
+  assert.ok(css.includes('REMOTE-FIRST LEFT NAVIGATION RAIL'), 'left rail CSS ships');
+  assert.ok(nav.includes('const navTarget = navItemNear(current)'), 'LEFT edge routes into the rail');
+  assert.ok(nav.includes("if (direction === 'ArrowRight')"), 'RIGHT returns from the rail to content');
+  assert.ok(app.includes("nav.querySelector('.tv-nav-pill.active')"), 'Back can focus the active rail item');
+});
+
+// --- v3.17.53 OTA APP-TYPE / PACKAGE CONSISTENCY ---------------------------
+test('v3.17.53: OTA appType matches this build package and APK', async () => {
+  const fs = await import('fs');
+  const app = fs.readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8');
+  const settings = fs.readFileSync(new URL('../src/components/SettingsView.jsx', import.meta.url), 'utf8');
+  const gradle = fs.readFileSync(new URL('../android/app/build.gradle', import.meta.url), 'utf8');
+  const { APP_TARGETS } = await import('../src/api/otaUpdate.js');
+
+  assert.ok(app.includes("const targetType = 'fire_tv'"), 'App checks the fire_tv manifest');
+  assert.ok(settings.includes("checkForAppUpdates('fire_tv')"), 'Settings checks the fire_tv manifest');
+  assert.ok(gradle.includes('applicationId "com.ajo.tv"'), 'build package is com.ajo.tv');
+  assert.equal(APP_TARGETS.fire_tv.packageId, 'com.ajo.tv', 'fire_tv maps to com.ajo.tv');
+  assert.equal(APP_TARGETS.fire_tv.assetName, 'AJO_TV_FIRE.apk', 'fire_tv downloads AJO_TV_FIRE.apk');
 });
